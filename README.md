@@ -4,6 +4,8 @@
 
 ![](images/glview_duck.png)
 
+[![Build status](https://ci.appveyor.com/api/projects/status/i5ku97hf0r0quti3?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltfloader)
+
 ## Features
 
 * Portable C++. C++-98 with STL dependency only.
