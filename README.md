@@ -51,7 +51,7 @@ TinyGLTFLoader uses the following third party libraries.
 
 ## Build and example
 
-Copy `stb_image.h`, picojson.h` and `tiny_gltf_loader.h` to your project.
+Copy `stb_image.h`, `picojson.h` and `tiny_gltf_loader.h` to your project.
 
 ```
 // Define these only in *one* .cc file.
