@@ -9,4 +9,4 @@ configuration: Release
 
 build:
   parallel: true
-  project: TinyGLTFSolution.sln
+  project: TinyGLTFLoaderSolution.sln
