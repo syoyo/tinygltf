@@ -9,12 +9,7 @@
 
 #include <GL/glew.h>
 
-#ifdef __APPLE__
-#include <OpenGL/glu.h>
-#else
-#include <GL/glu.h>
-#endif
-
+#define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
 
 #include "trackball.h"
