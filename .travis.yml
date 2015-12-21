@@ -1,0 +1,10 @@
+language: cpp
+
+compiler: gcc
+
+before_install:
+  - sudo apt-get update -qq -y
+
+script:
+  - make
+  - ./loader_test box.gltf
