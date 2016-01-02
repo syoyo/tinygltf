@@ -78,3 +78,15 @@ if (!ret) {
 }
 ```
 
+## Running tests.
+
+### Setup
+
+Python 2.6 or 2.7 required.
+Git clone https://github.com/KhronosGroup/glTF to your local dir.
+
+### Run test
+
+After building `loader_test`, edit `test_runner.py`, then,
+
+    $ python test_runner.py

@@ -511,26 +511,57 @@ bool IsDataURI(const std::string &in) {
   if (in.find(header) == 0) {
     return true;
   }
+
+  header = "data:image/png;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+
+  header = "data:image/jpeg;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+
   return false;
 }
 
 bool DecodeDataURI(std::vector<unsigned char> &out, const std::string &in,
                    size_t reqBytes, bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
+  std::string data;
   if (in.find(header) == 0) {
-    std::string data =
-        base64_decode(in.substr(header.size())); // cut mime string.
-    if (checkSize) {
-      if (data.size() != reqBytes) {
-        return false;
-      }
-      out.resize(reqBytes);
-    } else {
-      out.resize(data.size());
-    }
-    std::copy(data.begin(), data.end(), out.begin());
-    return true;
+    data = base64_decode(in.substr(header.size())); // cut mime string.
   }
+
+  if (data.empty()) {
+    header = "data:image/jpeg;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size())); // cut mime string.
+    }
+  }
+
+  if (data.empty()) {
+    header = "data:image/png;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size())); // cut mime string.
+    }
+  }
+
+  if (data.empty()) {
+    return false;
+  } 
+
+  if (checkSize) {
+    if (data.size() != reqBytes) {
+      return false;
+    }
+    out.resize(reqBytes);
+  } else {
+    out.resize(data.size());
+  }
+  std::copy(data.begin(), data.end(), out.begin());
+  return true;
+
   return false;
 }
 
