@@ -4,6 +4,8 @@
 
 ![](images/glview_duck.png)
 
+[![Build Status](https://travis-ci.org/syoyo/tinygltfloader.svg?branch=master)](https://travis-ci.org/syoyo/tinygltfloader)
+
 [![Build status](https://ci.appveyor.com/api/projects/status/i5ku97hf0r0quti3?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltfloader)
 
 ## Features
