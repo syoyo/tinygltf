@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+
+# Assume python 2.6 or 2.7
+
+import glob
+import os
+import subprocess
+
+## Simple test runner.
+
+# -- config -----------------------
+
+# Absolute path pointing to your cloned git repo of https://github.com/KhronosGroup/glTF/sampleModels
+base_model_dir = "/Users/syoyo/work/glTF/sampleModels"
+
+kinds = [ "glTF", "glTF-Binary", "glTF-Embedded", "glTF-MaterialsCommon"]
+# ---------------------------------
+
+failed = []
+success = []
+
+def run(filename):
+
+    print("Testing: " + filename)
+    cmd = ["./loader_test", filename]
+    try:
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        (stdout, stderr) = p.communicate()
+    except:
+        print "Failed to execute: ", cmd
+        raise
+
+    if p.returncode != 0:
+        failed.append(filename)
+        print(stdout)
+        print(stderr)
+    else:
+        success.append(filename)
+
+
+def test():
+
+    for d in os.listdir(base_model_dir):
+        p = os.path.join(base_model_dir, d)
+        if os.path.isdir(p):
+            for k in kinds:
+                targetDir = os.path.join(p, k)
+                g = glob.glob(targetDir + "/*.gltf")
+                for gltf in g:
+                    run(gltf)
+
+
+def main():
+
+    test()
+
+    print("Success : {0}".format(len(success)))
+    print("Failed  : {0}".format(len(failed)))
+
+    for fail in failed:
+        print("FAIL: " + fail)
+
+if __name__ == '__main__':
+    main()
