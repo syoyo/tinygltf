@@ -31,6 +31,7 @@
 //
 //
 // Version:
+//  - v0.9.1 Support loading glTF asset from memory 
 //  - v0.9.0 Initial
 //
 // Tiny glTF loader is using following libraries:
@@ -203,10 +204,17 @@ public:
   TinyGLTFLoader(){};
   ~TinyGLTFLoader(){};
 
-  /// Loads GLTF asset from a file.
-  /// Returns false and set error string to `err` if there's and parsing error.
+  /// Loads glTF asset from a file.
+  /// Returns false and set error string to `err` if there's an error.
   bool LoadFromFile(Scene &scene, std::string &err,
                     const std::string &filename);
+
+  /// Loads glTF asset from string(memory).
+  /// `length` = strlen(str);
+  /// Returns false and set error string to `err` if there's an error.
+  bool LoadFromString(Scene &scene, std::string &err,
+                    const char* str, const unsigned int length, const std::string& baseDir);
+
 };
 
 } // namespace tinygltf
@@ -1051,19 +1059,10 @@ bool ParseMaterial(Material &material, std::string &err,
 }
 }
 
-bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
-                                  const std::string &filename) {
-  std::stringstream ss;
-
-  std::ifstream ifs(filename.c_str());
-  if (!ifs) {
-    ss << "Failed to open file: " << filename << std::endl;
-    err = ss.str();
-    return false;
-  }
-
+bool TinyGLTFLoader::LoadFromString(Scene &scene, std::string &err,
+                                  const char *str, unsigned int length, const std::string& baseDir) {
   picojson::value v;
-  std::string perr = picojson::parse(v, ifs);
+  std::string perr = picojson::parse(v, str, str + length);
 
   if (!perr.empty()) {
     err = perr;
@@ -1120,8 +1119,6 @@ bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
   scene.nodes.clear();
   scene.defaultScene = "";
 
-  std::string basedir = GetBaseDir(filename);
-
   // 0. Parse Asset
   if (v.contains("asset") && v.get("asset").is<picojson::object>()) {
     const picojson::object &root = v.get("asset").get<picojson::object>();
@@ -1139,7 +1136,7 @@ bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
 
       Buffer buffer;
       if (!ParseBuffer(buffer, err, (it->second).get<picojson::object>(),
-                       basedir)) {
+                       baseDir)) {
         return false;
       }
 
@@ -1277,7 +1274,7 @@ bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
 
       Image image;
       if (!ParseImage(image, err, (it->second).get<picojson::object>(),
-                      basedir)) {
+                      baseDir)) {
         return false;
       }
 
@@ -1286,6 +1283,32 @@ bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
   }
 
   return true;
+}
+
+bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
+                                  const std::string &filename) {
+  std::stringstream ss;
+
+  std::ifstream f(filename.c_str());
+  if (!f) {
+    ss << "Failed to open file: " << filename << std::endl;
+    err = ss.str();
+    return false;
+  }
+
+  f.seekg(0, f.end);
+  size_t sz = f.tellg();
+  std::vector<char> buf(sz);
+
+  f.seekg(0, f.beg);
+  f.read(&buf.at(0), sz);
+  f.close();
+
+  std::string basedir = GetBaseDir(filename);
+
+  bool ret = LoadFromString(scene, err, &buf.at(0), buf.size(), basedir);
+
+  return ret;
 }
 
 #endif // TINYGLTF_LOADER_IMPLEMENTATION
