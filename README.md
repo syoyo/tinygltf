@@ -38,7 +38,6 @@ Currently, TinyGLTFLoader only loads nodes and geometry(mesh/buffer) data.
 * [ ] Parse `animation`, `program`, `sampler`, `shader`, `technique`, `texture`
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
-* [ ] Load `.gltf` from memory.
 * [ ] HDR image
 * [ ] Binary glTF.
 
