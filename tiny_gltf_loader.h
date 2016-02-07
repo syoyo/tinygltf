@@ -31,7 +31,8 @@
 //
 //
 // Version:
-//  - v0.9.1 Support loading glTF asset from memory 
+//  - v0.9.2 Support parsing `texture`
+//  - v0.9.1 Support loading glTF asset from memory
 //  - v0.9.0 Initial
 //
 // Tiny glTF loader is using following libraries:
@@ -80,12 +81,20 @@ namespace tinygltf {
 #define TINYGLTF_IMAGE_FORMAT_BMP (2)
 #define TINYGLTF_IMAGE_FORMAT_GIF (3)
 
+#define TINYGLTF_TEXTURE_FORMAT_RGBA (6408)
+#define TINYGLTF_TEXTURE_TARGET_TEXTURE2D (3553)
+#define TINYGLTF_TEXTURE_TYPE_UNSIGNED_BYTE (5121)
+
 #define TINYGLTF_TARGET_ARRAY_BUFFER (34962)
 #define TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER (34963)
 
-typedef std::map<std::string, std::vector<double> > FloatParameterMap;
+typedef struct {
+  std::string stringValue;
+  std::vector<double> numberArray;
+} Parameter;
 
-// LDR 8bit image
+typedef std::map<std::string, Parameter> ParameterMap;
+
 typedef struct {
   std::string name;
   int width;
@@ -95,9 +104,19 @@ typedef struct {
 } Image;
 
 typedef struct {
+  int format;
+  int internalFormat;
+  std::string sampler; // Required
+  std::string source;  // Required
+  int target;
+  int type;
+  std::string name;
+} Texture;
+
+typedef struct {
   std::string name;
   std::string technique;
-  FloatParameterMap values;
+  ParameterMap values;
 } Material;
 
 typedef struct {
@@ -191,6 +210,7 @@ public:
   std::map<std::string, Material> materials;
   std::map<std::string, Mesh> meshes;
   std::map<std::string, Node> nodes;
+  std::map<std::string, Texture> textures;
   std::map<std::string, Image> images;
   std::map<std::string, std::vector<std::string> > scenes; // list of nodes
 
@@ -212,9 +232,8 @@ public:
   /// Loads glTF asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadFromString(Scene &scene, std::string &err,
-                    const char* str, const unsigned int length, const std::string& baseDir);
-
+  bool LoadFromString(Scene &scene, std::string &err, const char *str,
+                      const unsigned int length, const std::string &baseDir);
 };
 
 } // namespace tinygltf
@@ -557,7 +576,7 @@ bool DecodeDataURI(std::vector<unsigned char> &out, const std::string &in,
 
   if (data.empty()) {
     return false;
-  } 
+  }
 
   if (checkSize) {
     if (data.size() != reqBytes) {
@@ -776,6 +795,39 @@ bool ParseImage(Image &image, std::string &err, const picojson::object &o,
   image.component = comp;
   image.image.resize(w * h * comp);
   std::copy(data, data + w * h * comp, image.image.begin());
+
+  return true;
+}
+
+bool ParseTexture(Texture &texture, std::string &err, const picojson::object &o,
+                  const std::string &basedir) {
+
+  if (!ParseStringProperty(texture.sampler, err, o, "sampler", true)) {
+    return false;
+  }
+
+  if (!ParseStringProperty(texture.source, err, o, "source", true)) {
+    return false;
+  }
+
+  ParseStringProperty(texture.name, err, o, "name", false);
+
+  double format = TINYGLTF_TEXTURE_FORMAT_RGBA;
+  ParseNumberProperty(format, err, o, "format", false);
+
+  double internalFormat = TINYGLTF_TEXTURE_FORMAT_RGBA;
+  ParseNumberProperty(internalFormat, err, o, "internalFormat", false);
+
+  double target = TINYGLTF_TEXTURE_TARGET_TEXTURE2D;
+  ParseNumberProperty(target, err, o, "target", false);
+
+  double type = TINYGLTF_TEXTURE_TYPE_UNSIGNED_BYTE;
+  ParseNumberProperty(type, err, o, "type", false);
+
+  texture.format = static_cast<int>(format);
+  texture.internalFormat = static_cast<int>(internalFormat);
+  texture.target = static_cast<int>(target);
+  texture.type = static_cast<int>(type);
 
   return true;
 }
@@ -1041,17 +1093,20 @@ bool ParseMaterial(Material &material, std::string &err,
 
     for (; it != itEnd; it++) {
       // Assume number values.
-      std::vector<double> values;
-      if (!ParseNumberArrayProperty(values, err, valuesObject, it->first,
-                                    false)) {
+      Parameter param;
+      if (ParseStringProperty(param.stringValue, err, valuesObject, it->first,
+                              false)) {
+        // Found string property.
+      } else if (!ParseNumberArrayProperty(param.numberArray, err, valuesObject,
+                                           it->first, false)) {
         // Fallback to numer property.
         double value;
         if (ParseNumberProperty(value, err, valuesObject, it->first, false)) {
-          values.push_back(value);
+          param.numberArray.push_back(value);
         }
       }
 
-      material.values[it->first] = values;
+      material.values[it->first] = param;
     }
   }
 
@@ -1060,7 +1115,8 @@ bool ParseMaterial(Material &material, std::string &err,
 }
 
 bool TinyGLTFLoader::LoadFromString(Scene &scene, std::string &err,
-                                  const char *str, unsigned int length, const std::string& baseDir) {
+                                    const char *str, unsigned int length,
+                                    const std::string &baseDir) {
   picojson::value v;
   std::string perr = picojson::parse(v, str, str + length);
 
@@ -1279,6 +1335,25 @@ bool TinyGLTFLoader::LoadFromString(Scene &scene, std::string &err,
       }
 
       scene.images[it->first] = image;
+    }
+  }
+
+  // 9. Parse Texture
+  if (v.contains("textures") && v.get("textures").is<picojson::object>()) {
+
+    const picojson::object &root = v.get("textures").get<picojson::object>();
+
+    picojson::object::const_iterator it(root.begin());
+    picojson::object::const_iterator itEnd(root.end());
+    for (; it != itEnd; it++) {
+
+      Texture texture;
+      if (!ParseTexture(texture, err, (it->second).get<picojson::object>(),
+                        baseDir)) {
+        return false;
+      }
+
+      scene.textures[it->first] = texture;
     }
   }
 

@@ -18,6 +18,7 @@ Simple OpenGL viewer for glTF geometry.
 
 ## TODO
 
-* [ ] Texture
+* [x] Texture
+  * [ ] Various texture format.
 * [ ] Shader
 * [ ] Animation

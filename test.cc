@@ -6,8 +6,7 @@
 #include <cstdio>
 #include <iostream>
 
-std::string PrintMode(int mode)
-{
+std::string PrintMode(int mode) {
   if (mode == TINYGLTF_MODE_POINTS) {
     return "POINTS";
   } else if (mode == TINYGLTF_MODE_LINE) {
@@ -24,9 +23,7 @@ std::string PrintMode(int mode)
   return "**UNKNOWN**";
 }
 
-
-std::string PrintType(int ty)
-{
+std::string PrintType(int ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return "SCALAR";
   } else if (ty == TINYGLTF_TYPE_VECTOR) {
@@ -49,8 +46,7 @@ std::string PrintType(int ty)
   return "**UNKNOWN**";
 }
 
-std::string PrintComponentType(int ty)
-{
+std::string PrintComponentType(int ty) {
   if (ty == TINYGLTF_COMPONENT_TYPE_BYTE) {
     return "BYTE";
   } else if (ty == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
@@ -72,8 +68,7 @@ std::string PrintComponentType(int ty)
   return "**UNKNOWN**";
 }
 
-std::string PrintFloatArray(const std::vector<double>& arr)
-{
+std::string PrintFloatArray(const std::vector<double> &arr) {
   if (arr.size() == 0) {
     return "";
   }
@@ -88,8 +83,7 @@ std::string PrintFloatArray(const std::vector<double>& arr)
   return ss.str();
 }
 
-std::string PrintStringArray(const std::vector<std::string>& arr)
-{
+std::string PrintStringArray(const std::vector<std::string> &arr) {
   if (arr.size() == 0) {
     return "";
   }
@@ -104,9 +98,7 @@ std::string PrintStringArray(const std::vector<std::string>& arr)
   return ss.str();
 }
 
-
-std::string Indent(int indent)
-{
+std::string Indent(int indent) {
   std::string s;
   for (int i = 0; i < indent; i++) {
     s += "  ";
@@ -115,64 +107,82 @@ std::string Indent(int indent)
   return s;
 }
 
-void DumpNode(const Node& node, int indent)
-{
-  std::cout << Indent(indent) <<   "name        : " << node.name << std::endl;
-  std::cout << Indent(indent) <<   "camera      : " << node.camera << std::endl;
+void DumpNode(const Node &node, int indent) {
+  std::cout << Indent(indent) << "name        : " << node.name << std::endl;
+  std::cout << Indent(indent) << "camera      : " << node.camera << std::endl;
   if (!node.rotation.empty()) {
-    std::cout << Indent(indent) << "rotation    : " << PrintFloatArray(node.rotation) << std::endl;
+    std::cout << Indent(indent)
+              << "rotation    : " << PrintFloatArray(node.rotation)
+              << std::endl;
   }
   if (!node.scale.empty()) {
-    std::cout << Indent(indent) << "scale       : " << PrintFloatArray(node.scale) << std::endl;
+    std::cout << Indent(indent)
+              << "scale       : " << PrintFloatArray(node.scale) << std::endl;
   }
   if (!node.translation.empty()) {
-    std::cout << Indent(indent) << "translation : " << PrintFloatArray(node.translation) << std::endl;
+    std::cout << Indent(indent)
+              << "translation : " << PrintFloatArray(node.translation)
+              << std::endl;
   }
 
   if (!node.matrix.empty()) {
-    std::cout << Indent(indent) << "matrix      : " << PrintFloatArray(node.matrix) << std::endl;
+    std::cout << Indent(indent)
+              << "matrix      : " << PrintFloatArray(node.matrix) << std::endl;
   }
 
-  std::cout << Indent(indent) <<   "meshes      : " << PrintStringArray(node.meshes) << std::endl;
+  std::cout << Indent(indent)
+            << "meshes      : " << PrintStringArray(node.meshes) << std::endl;
 
-  std::cout << Indent(indent) <<   "children    : " << PrintStringArray(node.children) << std::endl;
-
+  std::cout << Indent(indent)
+            << "children    : " << PrintStringArray(node.children) << std::endl;
 }
 
-void DumpPrimitive(const Primitive& primitive, int indent)
-{
-  std::cout << Indent(indent) << "material : " << primitive.material << std::endl;
-  std::cout << Indent(indent) << "mode     : " << PrintMode(primitive.mode) << "(" << primitive.mode << ")" << std::endl;
-  std::cout << Indent(indent) << "attributes(items=" << primitive.attributes.size() << ")" << std::endl;
-  std::map<std::string, std::string>::const_iterator it(primitive.attributes.begin());
-  std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
+void DumpPrimitive(const Primitive &primitive, int indent) {
+  std::cout << Indent(indent) << "material : " << primitive.material
+            << std::endl;
+  std::cout << Indent(indent) << "mode     : " << PrintMode(primitive.mode)
+            << "(" << primitive.mode << ")" << std::endl;
+  std::cout << Indent(indent)
+            << "attributes(items=" << primitive.attributes.size() << ")"
+            << std::endl;
+  std::map<std::string, std::string>::const_iterator it(
+      primitive.attributes.begin());
+  std::map<std::string, std::string>::const_iterator itEnd(
+      primitive.attributes.end());
   for (; it != itEnd; it++) {
-    std::cout << Indent(indent + 1) << it->first << ": " << it->second << std::endl;
+    std::cout << Indent(indent + 1) << it->first << ": " << it->second
+              << std::endl;
   }
-
 }
 
-void Dump(const Scene& scene)
-{
+void Dump(const Scene &scene) {
   std::cout << "=== Dump glTF ===" << std::endl;
-  std::cout << "asset.generator          : " << scene.asset.generator << std::endl;
-  std::cout << "asset.premultipliedAlpha : " << scene.asset.premultipliedAlpha << std::endl;
-  std::cout << "asset.version            : " << scene.asset.version << std::endl;
-  std::cout << "asset.profile.api        : " << scene.asset.profile_api << std::endl;
-  std::cout << "asset.profile.version    : " << scene.asset.profile_version << std::endl;
+  std::cout << "asset.generator          : " << scene.asset.generator
+            << std::endl;
+  std::cout << "asset.premultipliedAlpha : " << scene.asset.premultipliedAlpha
+            << std::endl;
+  std::cout << "asset.version            : " << scene.asset.version
+            << std::endl;
+  std::cout << "asset.profile.api        : " << scene.asset.profile_api
+            << std::endl;
+  std::cout << "asset.profile.version    : " << scene.asset.profile_version
+            << std::endl;
   std::cout << std::endl;
   std::cout << "=== Dump scene ===" << std::endl;
   std::cout << "defaultScene: " << scene.defaultScene << std::endl;
 
   {
-    std::map<std::string, std::vector<std::string> >::const_iterator it(scene.scenes.begin());
-    std::map<std::string, std::vector<std::string> >::const_iterator itEnd(scene.scenes.end());
+    std::map<std::string, std::vector<std::string> >::const_iterator it(
+        scene.scenes.begin());
+    std::map<std::string, std::vector<std::string> >::const_iterator itEnd(
+        scene.scenes.end());
     std::cout << "scenes(items=" << scene.scenes.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name  : " << it->first << std::endl;
       std::cout << Indent(2) << "nodes : [ ";
       for (size_t i = 0; i < it->second.size(); i++) {
-        std::cout << it->second[i] << ((i != it->second.size()) ? ", " : "");
+        std::cout << it->second[i]
+                  << ((i != (it->second.size() - 1)) ? ", " : "");
       }
       std::cout << " ] " << std::endl;
     }
@@ -184,8 +194,10 @@ void Dump(const Scene& scene)
     std::cout << "meshes(item=" << scene.meshes.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name     : " << it->second.name << std::endl;
-      std::cout << Indent(1) << "primitives(items=" << it->second.primitives.size() << "): " << std::endl;
-    
+      std::cout << Indent(1)
+                << "primitives(items=" << it->second.primitives.size()
+                << "): " << std::endl;
+
       for (size_t i = 0; i < it->second.primitives.size(); i++) {
         DumpPrimitive(it->second.primitives[i], 2);
       }
@@ -194,27 +206,38 @@ void Dump(const Scene& scene)
 
   {
     std::map<std::string, Accessor>::const_iterator it(scene.accessors.begin());
-    std::map<std::string, Accessor>::const_iterator itEnd(scene.accessors.end());
-    std::cout << "accessos(items=" << scene.accessors.size() << ")" << std::endl;
+    std::map<std::string, Accessor>::const_iterator itEnd(
+        scene.accessors.end());
+    std::cout << "accessos(items=" << scene.accessors.size() << ")"
+              << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
-      std::cout << Indent(2) << "bufferView   : " << it->second.bufferView << std::endl;
-      std::cout << Indent(2) << "byteOffset   : " << it->second.byteOffset << std::endl;
-      std::cout << Indent(2) << "byteStride   : " << it->second.byteStride << std::endl;
-      std::cout << Indent(2) << "componentType: " << PrintComponentType(it->second.componentType) << "(" << it->second.componentType << ")" << std::endl;
-      std::cout << Indent(2) << "count        : " << it->second.count << std::endl;
-      std::cout << Indent(2) << "type         : " << PrintType(it->second.type) << std::endl;
+      std::cout << Indent(2) << "bufferView   : " << it->second.bufferView
+                << std::endl;
+      std::cout << Indent(2) << "byteOffset   : " << it->second.byteOffset
+                << std::endl;
+      std::cout << Indent(2) << "byteStride   : " << it->second.byteStride
+                << std::endl;
+      std::cout << Indent(2) << "componentType: "
+                << PrintComponentType(it->second.componentType) << "("
+                << it->second.componentType << ")" << std::endl;
+      std::cout << Indent(2) << "count        : " << it->second.count
+                << std::endl;
+      std::cout << Indent(2) << "type         : " << PrintType(it->second.type)
+                << std::endl;
       if (!it->second.minValues.empty()) {
         std::cout << Indent(2) << "min          : [";
         for (size_t i = 0; i < it->second.minValues.size(); i++) {
-          std::cout << it->second.minValues[i] << ((i != it->second.minValues.size()-1) ? ", " : "");
+          std::cout << it->second.minValues[i]
+                    << ((i != it->second.minValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
       }
       if (!it->second.maxValues.empty()) {
         std::cout << Indent(2) << "max          : [";
         for (size_t i = 0; i < it->second.maxValues.size(); i++) {
-          std::cout << it->second.maxValues[i] << ((i != it->second.maxValues.size()-1) ? ", " : "");
+          std::cout << it->second.maxValues[i]
+                    << ((i != it->second.maxValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
       }
@@ -222,14 +245,20 @@ void Dump(const Scene& scene)
   }
 
   {
-    std::map<std::string, BufferView>::const_iterator it(scene.bufferViews.begin());
-    std::map<std::string, BufferView>::const_iterator itEnd(scene.bufferViews.end());
-    std::cout << "bufferViews(items=" << scene.bufferViews.size() << ")" << std::endl;
+    std::map<std::string, BufferView>::const_iterator it(
+        scene.bufferViews.begin());
+    std::map<std::string, BufferView>::const_iterator itEnd(
+        scene.bufferViews.end());
+    std::cout << "bufferViews(items=" << scene.bufferViews.size() << ")"
+              << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
-      std::cout << Indent(2) << "buffer       : " << it->second.buffer << std::endl;
-      std::cout << Indent(2) << "byteLength   : " << it->second.byteLength << std::endl;
-      std::cout << Indent(2) << "byteOffset   : " << it->second.byteOffset << std::endl;
+      std::cout << Indent(2) << "buffer       : " << it->second.buffer
+                << std::endl;
+      std::cout << Indent(2) << "byteLength   : " << it->second.byteLength
+                << std::endl;
+      std::cout << Indent(2) << "byteOffset   : " << it->second.byteOffset
+                << std::endl;
     }
   }
 
@@ -239,23 +268,35 @@ void Dump(const Scene& scene)
     std::cout << "buffers(items=" << scene.buffers.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
-      std::cout << Indent(2) << "byteLength   : " << it->second.data.size() << std::endl;
+      std::cout << Indent(2) << "byteLength   : " << it->second.data.size()
+                << std::endl;
     }
   }
 
   {
     std::map<std::string, Material>::const_iterator it(scene.materials.begin());
-    std::map<std::string, Material>::const_iterator itEnd(scene.materials.end());
-    std::cout << "materials(items=" << scene.materials.size() << ")" << std::endl;
+    std::map<std::string, Material>::const_iterator itEnd(
+        scene.materials.end());
+    std::cout << "materials(items=" << scene.materials.size() << ")"
+              << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
-      std::cout << Indent(1) << "technique    : " << it->second.technique << std::endl;
-      std::cout << Indent(1) << "values(items=" << it->second.values.size() << std::endl;
+      std::cout << Indent(1) << "technique    : " << it->second.technique
+                << std::endl;
+      std::cout << Indent(1) << "values(items=" << it->second.values.size()
+                << std::endl;
 
-      FloatParameterMap::const_iterator p(it->second.values.begin());
-      FloatParameterMap::const_iterator pEnd(it->second.values.end());
+      ParameterMap::const_iterator p(it->second.values.begin());
+      ParameterMap::const_iterator pEnd(it->second.values.end());
       for (; p != pEnd; p++) {
-        std::cout << Indent(3) << p->first << PrintFloatArray(p->second) << std::endl;
+        if (!p->second.numberArray.empty()) {
+          std::cout << Indent(3) << p->first
+                    << PrintFloatArray(p->second.numberArray) << std::endl;
+        }
+        if (!p->second.stringValue.empty()) {
+          std::cout << Indent(3) << p->first << " : " << p->second.stringValue
+                    << std::endl;
+        }
       }
     }
   }
@@ -270,7 +311,7 @@ void Dump(const Scene& scene)
       DumpNode(it->second, 2);
     }
   }
-  
+
   {
     std::map<std::string, Image>::const_iterator it(scene.images.begin());
     std::map<std::string, Image>::const_iterator itEnd(scene.images.end());
@@ -279,24 +320,46 @@ void Dump(const Scene& scene)
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
 
       std::cout << Indent(2) << "width     : " << it->second.width << std::endl;
-      std::cout << Indent(2) << "height    : " << it->second.height << std::endl;
-      std::cout << Indent(2) << "component : " << it->second.component << std::endl;
+      std::cout << Indent(2) << "height    : " << it->second.height
+                << std::endl;
+      std::cout << Indent(2) << "component : " << it->second.component
+                << std::endl;
       std::cout << Indent(2) << "name      : " << it->second.name << std::endl;
+    }
+  }
+
+  {
+    std::map<std::string, Texture>::const_iterator it(scene.textures.begin());
+    std::map<std::string, Texture>::const_iterator itEnd(scene.textures.end());
+    std::cout << "textures(items=" << scene.textures.size() << ")" << std::endl;
+    for (; it != itEnd; it++) {
+      std::cout << Indent(1) << "name           : " << it->first << std::endl;
+      std::cout << Indent(1) << "format         : " << it->second.format
+                << std::endl;
+      std::cout << Indent(1) << "internalFormat : " << it->second.internalFormat
+                << std::endl;
+      std::cout << Indent(1) << "sampler        : " << it->second.sampler
+                << std::endl;
+      std::cout << Indent(1) << "source         : " << it->second.source
+                << std::endl;
+      std::cout << Indent(1) << "target         : " << it->second.target
+                << std::endl;
+      std::cout << Indent(1) << "type           : " << it->second.type
+                << std::endl;
     }
   }
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
   if (argc < 2) {
     printf("Needs input.gltf\n");
     exit(1);
   }
 
-  Scene scene; 
+  Scene scene;
   TinyGLTFLoader loader;
   std::string err;
-  
+
   bool ret = loader.LoadFromFile(scene, err, argv[1]);
 
   if (!err.empty()) {
