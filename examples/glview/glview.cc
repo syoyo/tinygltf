@@ -20,6 +20,16 @@
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
+#define CheckGLErrors(desc)                                                    \
+  {                                                                            \
+    GLenum e = glGetError();                                                   \
+    if (e != GL_NO_ERROR) {                                                    \
+      printf("OpenGL error in \"%s\": %d (%d) %s:%d\n", desc, e, e, __FILE__,  \
+             __LINE__);                                                        \
+      exit(20);                                                                \
+    }                                                                          \
+  }
+
 #define CAM_Z (3.0f)
 int width = 768;
 int height = 768;
@@ -32,19 +42,21 @@ float curr_quat[4];
 float prev_quat[4];
 float eye[3], lookat[3], up[3];
 
-GLFWwindow* window;
+GLFWwindow *window;
 
-typedef struct
-{
-  GLuint vb;
-} GLBufferState;
+typedef struct { GLuint vb; } GLBufferState;
 
-typedef struct
-{
+typedef struct {
+  std::vector<GLuint> diffuseTex; // for each primitive in mesh
+} GLMeshState;
+
+typedef struct {
   std::map<std::string, GLint> attribs;
+  std::map<std::string, GLint> uniforms;
 } GLProgramState;
 
 std::map<std::string, GLBufferState> gBufferState;
+std::map<std::string, GLMeshState> gMeshState;
 GLProgramState gGLProgramState;
 
 void CheckErrors(std::string desc) {
@@ -79,7 +91,7 @@ bool LoadShader(GLenum shaderType, // GL_VERTEX_SHADER or GL_FRAGMENT_SHADER(or
   srcbuf[len] = 0;
   fclose(fp);
 
-  const GLchar* srcs[1];
+  const GLchar *srcs[1];
   srcs[0] = &srcbuf.at(0);
 
   shader = glCreateShader(shaderType);
@@ -93,7 +105,7 @@ bool LoadShader(GLenum shaderType, // GL_VERTEX_SHADER or GL_FRAGMENT_SHADER(or
     printf("%s\n", log);
     // assert(val == GL_TRUE && "failed to compile shader");
     printf("ERR: Failed to load or compile shader [ %s ]\n",
-        shaderSourceFilename);
+           shaderSourceFilename);
     return false;
   }
 
@@ -122,8 +134,7 @@ bool LinkShader(GLuint &prog, GLuint &vertShader, GLuint &fragShader) {
   return true;
 }
 
-void reshapeFunc(GLFWwindow* window, int w, int h)
-{
+void reshapeFunc(GLFWwindow *window, int w, int h) {
   glViewport(0, 0, w, h);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
@@ -135,113 +146,187 @@ void reshapeFunc(GLFWwindow* window, int w, int h)
   height = h;
 }
 
-void keyboardFunc(GLFWwindow *window, int key, int scancode, int action, int mods) {
-  if(action == GLFW_PRESS || action == GLFW_REPEAT){
+void keyboardFunc(GLFWwindow *window, int key, int scancode, int action,
+                  int mods) {
+  if (action == GLFW_PRESS || action == GLFW_REPEAT) {
     // Close window
-    if(key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window, GL_TRUE);
+    if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE)
+      glfwSetWindowShouldClose(window, GL_TRUE);
   }
 }
 
-void clickFunc(GLFWwindow* window, int button, int action, int mods){
-    double x, y;
-    glfwGetCursorPos(window,&x, &y);
+void clickFunc(GLFWwindow *window, int button, int action, int mods) {
+  double x, y;
+  glfwGetCursorPos(window, &x, &y);
 
-    if(button == GLFW_MOUSE_BUTTON_LEFT){
-        mouseLeftPressed = true;
-        if(action == GLFW_PRESS){
-          int id = -1;
-          //int id = ui.Proc(x, y);
-          if (id < 0) { // outside of UI 
-            trackball(prev_quat, 0.0, 0.0, 0.0, 0.0);
-          }
-        } else if(action == GLFW_RELEASE){
-            mouseLeftPressed = false;
-        }
+  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+    mouseLeftPressed = true;
+    if (action == GLFW_PRESS) {
+      int id = -1;
+      // int id = ui.Proc(x, y);
+      if (id < 0) { // outside of UI
+        trackball(prev_quat, 0.0, 0.0, 0.0, 0.0);
+      }
+    } else if (action == GLFW_RELEASE) {
+      mouseLeftPressed = false;
+    }
   }
-  if(button == GLFW_MOUSE_BUTTON_RIGHT){
-    if(action == GLFW_PRESS){
+  if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+    if (action == GLFW_PRESS) {
       mouseRightPressed = true;
-    } else if(action == GLFW_RELEASE){
+    } else if (action == GLFW_RELEASE) {
       mouseRightPressed = false;
     }
   }
-  if(button == GLFW_MOUSE_BUTTON_MIDDLE){
-    if(action == GLFW_PRESS){
+  if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+    if (action == GLFW_PRESS) {
       mouseMiddlePressed = true;
-    } else if(action == GLFW_RELEASE){
+    } else if (action == GLFW_RELEASE) {
       mouseMiddlePressed = false;
     }
   }
 }
 
-void motionFunc(GLFWwindow* window, double mouse_x, double mouse_y){
+void motionFunc(GLFWwindow *window, double mouse_x, double mouse_y) {
   float rotScale = 1.0f;
   float transScale = 2.0f;
 
-    if(mouseLeftPressed){
-      trackball(prev_quat,
-          rotScale * (2.0f * prevMouseX - width) / (float)width,
-          rotScale * (height - 2.0f * prevMouseY) / (float)height,
-          rotScale * (2.0f * mouse_x - width) / (float)width,
-          rotScale * (height - 2.0f * mouse_y) / (float)height);
+  if (mouseLeftPressed) {
+    trackball(prev_quat, rotScale * (2.0f * prevMouseX - width) / (float)width,
+              rotScale * (height - 2.0f * prevMouseY) / (float)height,
+              rotScale * (2.0f * mouse_x - width) / (float)width,
+              rotScale * (height - 2.0f * mouse_y) / (float)height);
 
-      add_quats(prev_quat, curr_quat, curr_quat);
-    } else if (mouseMiddlePressed) {
-      eye[0] += -transScale * (mouse_x - prevMouseX) / (float)width;
-      lookat[0] += -transScale * (mouse_x - prevMouseX) / (float)width;
-      eye[1] += transScale * (mouse_y - prevMouseY) / (float)height;
-      lookat[1] += transScale * (mouse_y - prevMouseY) / (float)height;
-    } else if (mouseRightPressed) {
-      eye[2] += transScale * (mouse_y - prevMouseY) / (float)height;
-      lookat[2] += transScale * (mouse_y - prevMouseY) / (float)height;
-    }
+    add_quats(prev_quat, curr_quat, curr_quat);
+  } else if (mouseMiddlePressed) {
+    eye[0] += -transScale * (mouse_x - prevMouseX) / (float)width;
+    lookat[0] += -transScale * (mouse_x - prevMouseX) / (float)width;
+    eye[1] += transScale * (mouse_y - prevMouseY) / (float)height;
+    lookat[1] += transScale * (mouse_y - prevMouseY) / (float)height;
+  } else if (mouseRightPressed) {
+    eye[2] += transScale * (mouse_y - prevMouseY) / (float)height;
+    lookat[2] += transScale * (mouse_y - prevMouseY) / (float)height;
+  }
 
   // Update mouse point
   prevMouseX = mouse_x;
   prevMouseY = mouse_y;
 }
 
-static void SetupGLState(Scene& scene, GLuint progId)
-{
-  std::map<std::string, BufferView>::const_iterator it(scene.bufferViews.begin());
-  std::map<std::string, BufferView>::const_iterator itEnd(scene.bufferViews.end());
+static void SetupGLState(Scene &scene, GLuint progId) {
+  // Buffer
+  {
+    std::map<std::string, BufferView>::const_iterator it(
+        scene.bufferViews.begin());
+    std::map<std::string, BufferView>::const_iterator itEnd(
+        scene.bufferViews.end());
 
-  for (; it != itEnd; it++) {
-    const BufferView& bufferView = it->second;
-    if (bufferView.target == 0) {
-      continue; // Unsupported bufferView.
+    for (; it != itEnd; it++) {
+      const BufferView &bufferView = it->second;
+      if (bufferView.target == 0) {
+        continue; // Unsupported bufferView.
+      }
+
+      const Buffer &buffer = scene.buffers[bufferView.buffer];
+      GLBufferState state;
+      glGenBuffers(1, &state.vb);
+      glBindBuffer(bufferView.target, state.vb);
+      glBufferData(bufferView.target, bufferView.byteLength,
+                   &buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
+      glBindBuffer(bufferView.target, 0);
+
+      gBufferState[it->first] = state;
     }
+  }
 
-    const Buffer& buffer = scene.buffers[bufferView.buffer];
-    GLBufferState state;
-    glGenBuffers(1, &state.vb);
-    glBindBuffer(bufferView.target, state.vb);
-    glBufferData(bufferView.target, bufferView.byteLength, &buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
-    glBindBuffer(bufferView.target, 0);
-    
-    gBufferState[it->first] = state;
+  // Texture
+  {
+    std::map<std::string, Mesh>::const_iterator it(scene.meshes.begin());
+    std::map<std::string, Mesh>::const_iterator itEnd(scene.meshes.end());
+
+    for (; it != itEnd; it++) {
+      const Mesh &mesh = it->second;
+
+      gMeshState[mesh.name].diffuseTex.resize(mesh.primitives.size());
+      for (size_t primId = 0; primId < mesh.primitives.size(); primId++) {
+        const Primitive &primitive = mesh.primitives[primId];
+
+        gMeshState[mesh.name].diffuseTex[primId] = 0;
+
+        if (primitive.material.empty()) {
+          continue;
+        }
+        Material &mat = scene.materials[primitive.material];
+        printf("material.name = %s\n", mat.name.c_str());
+        if (mat.values.find("diffuse") != mat.values.end()) {
+          std::string diffuseTexName = mat.values["diffuse"].stringValue;
+          if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
+            Texture &tex = scene.textures[diffuseTexName];
+            if (scene.images.find(tex.source) != scene.images.end()) {
+              Image &image = scene.images[tex.source];
+              GLuint texId;
+              glGenTextures(1, &texId);
+              glBindTexture(tex.target, texId);
+              glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+              glTexParameterf(tex.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+              glTexParameterf(tex.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+              // Ignore Texture.fomat.
+              GLenum format = GL_RGBA;
+              if (image.component == 3) {
+                format = GL_RGB;
+              }
+              glTexImage2D(tex.target, 0, tex.internalFormat, image.width,
+                           image.height, 0, format, tex.type,
+                           &image.image.at(0));
+
+              CheckErrors("texImage2D");
+              glBindTexture(tex.target, 0);
+
+              printf("TexId = %d\n", texId);
+              gMeshState[mesh.name].diffuseTex[primId] = texId;
+            }
+          }
+        }
+      }
+    }
   }
 
   glUseProgram(progId);
   GLint vtloc = glGetAttribLocation(progId, "in_vertex");
   GLint nrmloc = glGetAttribLocation(progId, "in_normal");
+  GLint uvloc = glGetAttribLocation(progId, "in_texcoord");
+
+  GLint diffuseTexLoc = glGetUniformLocation(progId, "diffuseTex");
+
   gGLProgramState.attribs["POSITION"] = vtloc;
   gGLProgramState.attribs["NORMAL"] = nrmloc;
-  
+  gGLProgramState.attribs["TEXCOORD_0"] = uvloc;
+  gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
 };
 
-void DrawMesh(Scene& scene, const Mesh& mesh)
-{
-  for (size_t i = 0; i < mesh.primitives.size(); i++) { 
-    const Primitive& primitive = mesh.primitives[i];
+void DrawMesh(Scene &scene, const Mesh &mesh) {
 
-    if (primitive.indices.empty()) return;
+  if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
+    glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0); // TEXTURE0
+  }
 
-    std::map<std::string, std::string>::const_iterator it(primitive.attributes.begin());
-    std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
+  for (size_t i = 0; i < mesh.primitives.size(); i++) {
+    const Primitive &primitive = mesh.primitives[i];
+
+    if (primitive.indices.empty())
+      return;
+
+    std::map<std::string, std::string>::const_iterator it(
+        primitive.attributes.begin());
+    std::map<std::string, std::string>::const_iterator itEnd(
+        primitive.attributes.end());
+
+    // Assume TEXTURE_2D target for the texture object.
+    glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
 
     for (; it != itEnd; it++) {
-      const Accessor& accessor = scene.accessors[it->second];
+      const Accessor &accessor = scene.accessors[it->second];
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
       int count = 1;
@@ -254,18 +339,22 @@ void DrawMesh(Scene& scene, const Mesh& mesh)
       } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
         count = 4;
       }
-      // it->first would be "POSITION", "NORMAL", ...
-      if ( (it->first.compare("POSITION") == 0) ||
-           (it->first.compare("NORMAL") == 0)) {
-        glVertexAttribPointer(gGLProgramState.attribs[it->first], count, accessor.componentType, GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
+      // it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
+      if ((it->first.compare("POSITION") == 0) ||
+          (it->first.compare("NORMAL") == 0) ||
+          (it->first.compare("TEXCOORD_0") == 0)) {
+        glVertexAttribPointer(
+            gGLProgramState.attribs[it->first], count, accessor.componentType,
+            GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
         CheckErrors("vertex attrib pointer");
         glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
         CheckErrors("enable vertex attrib array");
       }
     }
 
-    const Accessor& indexAccessor = scene.accessors[primitive.indices];
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gBufferState[indexAccessor.bufferView].vb);
+    const Accessor &indexAccessor = scene.accessors[primitive.indices];
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                 gBufferState[indexAccessor.bufferView].vb);
     CheckErrors("bind buffer");
     int mode = -1;
     if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
@@ -281,26 +370,28 @@ void DrawMesh(Scene& scene, const Mesh& mesh)
     } else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) {
       mode = GL_LINE_LOOP;
     };
-    glDrawElements(mode, indexAccessor.count, indexAccessor.componentType, BUFFER_OFFSET(indexAccessor.byteOffset));
+    glDrawElements(mode, indexAccessor.count, indexAccessor.componentType,
+                   BUFFER_OFFSET(indexAccessor.byteOffset));
     CheckErrors("draw elements");
 
     {
-      std::map<std::string, std::string>::const_iterator it(primitive.attributes.begin());
-      std::map<std::string, std::string>::const_iterator itEnd(primitive.attributes.end());
+      std::map<std::string, std::string>::const_iterator it(
+          primitive.attributes.begin());
+      std::map<std::string, std::string>::const_iterator itEnd(
+          primitive.attributes.end());
 
       for (; it != itEnd; it++) {
-        if ( (it->first.compare("POSITION") == 0) ||
-             (it->first.compare("NORMAL") == 0)) {
+        if ((it->first.compare("POSITION") == 0) ||
+            (it->first.compare("NORMAL") == 0) ||
+            (it->first.compare("TEXCOORD_0") == 0)) {
           glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
         }
       }
     }
   }
-
 }
 
-void DrawScene(Scene& scene)
-{
+void DrawScene(Scene &scene) {
   std::map<std::string, Mesh>::const_iterator it(scene.meshes.begin());
   std::map<std::string, Mesh>::const_iterator itEnd(scene.meshes.end());
 
@@ -308,7 +399,6 @@ void DrawScene(Scene& scene)
     DrawMesh(scene, it->second);
   }
 }
-
 
 static void Init() {
   trackball(curr_quat, 0, 0, 0, 0);
@@ -326,8 +416,7 @@ static void Init() {
   up[2] = 0.0f;
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   if (argc < 2) {
     std::cout << "glview input.gltf <scale>\n" << std::endl;
     return 0;
@@ -338,10 +427,10 @@ int main(int argc, char **argv)
     scale = atof(argv[2]);
   }
 
-  Scene scene; 
+  Scene scene;
   TinyGLTFLoader loader;
   std::string err;
-  
+
   bool ret = loader.LoadFromFile(scene, err, argv[1]);
   if (!err.empty()) {
     printf("ERR: %s\n", err.c_str());
@@ -353,13 +442,14 @@ int main(int argc, char **argv)
 
   Init();
 
-  if(!glfwInit()){
+  if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;
     return -1;
   }
 
-  window = glfwCreateWindow(width, height, "Simple glTF geometry viewer", NULL, NULL);
-  if(window == NULL){
+  window = glfwCreateWindow(width, height, "Simple glTF geometry viewer", NULL,
+                            NULL);
+  if (window == NULL) {
     std::cerr << "Failed to open GLFW window. " << std::endl;
     glfwTerminate();
     return 1;
@@ -420,7 +510,7 @@ int main(int argc, char **argv)
   SetupGLState(scene, progId);
   CheckErrors("SetupGLState");
 
-  while(glfwWindowShouldClose(window) == GL_FALSE) {
+  while (glfwWindowShouldClose(window) == GL_FALSE) {
     glfwPollEvents();
     glClearColor(0.1f, 0.2f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -433,7 +523,8 @@ int main(int argc, char **argv)
     // camera(define it in projection matrix)
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
-    gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], up[0], up[1], up[2]);
+    gluLookAt(eye[0], eye[1], eye[2], lookat[0], lookat[1], lookat[2], up[0],
+              up[1], up[2]);
 
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
