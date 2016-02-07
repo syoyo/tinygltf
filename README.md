@@ -24,10 +24,6 @@
   * [x] BMP
   * [x] GIF
 
-## Limitation
-
-Currently, TinyGLTFLoader only loads nodes and geometry(mesh/buffer) data.
-
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
@@ -35,7 +31,7 @@ Currently, TinyGLTFLoader only loads nodes and geometry(mesh/buffer) data.
 ## TODOs
 
 * [ ] Support multiple scenes in `.gltf`
-* [ ] Parse `animation`, `program`, `sampler`, `shader`, `technique`, `texture`
+* [ ] Parse `animation`, `program`, `sampler`, `shader`, `technique`
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image
