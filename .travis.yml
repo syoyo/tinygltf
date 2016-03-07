@@ -1,10 +1,46 @@
 language: cpp
-
-compiler: gcc
+sudo: false
+matrix:
+  include:
+  - addons: &1
+      apt:
+        sources:
+        - george-edison55-precise-backports
+        - ubuntu-toolchain-r-test
+        - llvm-toolchain-precise-3.7
+        packages:
+        - g++-4.9
+        - clang-3.7
+    compiler: clang
+    env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug
+  - addons: *1
+    compiler: clang
+    env: COMPILER_VERSION=3.7 BUILD_TYPE=Release
+  - addons: &2
+      apt:
+        sources:
+        - george-edison55-precise-backports
+        - ubuntu-toolchain-r-test
+        packages:
+        - g++-4.9
+    compiler: gcc
+    env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug
+  - addons: *2
+    compiler: gcc
+    env: COMPILER_VERSION=4.9 BUILD_TYPE=Release
+  - addons: *1
+    compiler: clang
+    env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug CFLAGS="-O0 --coverage" CXXFLAGS="-O0
+      --coverage" REPORT_COVERAGE=1
 
 before_install:
-  - sudo apt-get update -qq -y
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew upgrade; fi
+- if [ -n "$REPORT_COVERAGE" ]; then pip install --user cpp-coveralls; fi
+
 
 script:
-  - make
+  - export CC="${CC}-${COMPILER_VERSION}"
+  - export CXX="${CXX}-${COMPILER_VERSION}"
+  - ${CC} -v
+  - ${CXX} -fsanitize=address -Wall -Werror -g -o loader_test test.cc
   - ./loader_test box.gltf
