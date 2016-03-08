@@ -1013,7 +1013,6 @@ bool ParseNode(Node &node, std::string &err, const picojson::object &o) {
     const picojson::array &childrenArray =
         (childrenObject->second).get<picojson::array>();
     for (size_t i = 0; i < childrenArray.size(); i++) {
-      Node node;
       if (!childrenArray[i].is<std::string>()) {
         err += "Invalid `children` array.\n";
         return false;
