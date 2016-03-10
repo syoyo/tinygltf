@@ -24,10 +24,10 @@ matrix:
         packages:
         - g++-4.9
     compiler: gcc
-    env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug
+    env: COMPILER_VERSION=4.9 BUILD_TYPE=Debug EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *2
     compiler: gcc
-    env: COMPILER_VERSION=4.9 BUILD_TYPE=Release
+    env: COMPILER_VERSION=4.9 BUILD_TYPE=Release EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *1
     compiler: clang
     env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug CFLAGS="-O0 --coverage" CXXFLAGS="-O0
@@ -42,5 +42,5 @@ script:
   - export CC="${CC}-${COMPILER_VERSION}"
   - export CXX="${CXX}-${COMPILER_VERSION}"
   - ${CC} -v
-  - ${CXX} -fsanitize=address -Wall -Werror -g -o loader_test test.cc
+  - ${CXX} ${EXTRA_CXXFLAGS} -Wall -Werror -g -o loader_test test.cc
   - ./loader_test box.gltf
