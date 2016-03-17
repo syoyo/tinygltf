@@ -244,8 +244,8 @@ class TinyGLTFLoader {
 #include <cassert>
 #include <algorithm>
 
-#include "picojson.h"
-#include "stb_image.h"
+#include "./picojson.h"
+#include "./stb_image.h"
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -253,9 +253,7 @@ class TinyGLTFLoader {
 #include <wordexp.h>
 #endif
 
-using namespace tinygltf;
-
-namespace {
+namespace tinygltf {
 
 bool FileExists(const std::string &abs_filename) {
   bool ret;
@@ -1060,8 +1058,6 @@ bool ParseMaterial(Material &material, std::string &err,
   return true;
 }
 
-}  // namespace
-
 bool TinyGLTFLoader::LoadFromString(Scene &scene, std::string &err,
                                     const char *str, unsigned int length,
                                     const std::string &baseDir) {
@@ -1315,6 +1311,8 @@ bool TinyGLTFLoader::LoadFromFile(Scene &scene, std::string &err,
 
   return ret;
 }
+
+}  // namespace tinygltf
 
 #endif  // TINYGLTF_LOADER_IMPLEMENTATION
 
