@@ -135,6 +135,7 @@ bool LinkShader(GLuint &prog, GLuint &vertShader, GLuint &fragShader) {
 }
 
 void reshapeFunc(GLFWwindow *window, int w, int h) {
+  (void)window;
   glViewport(0, 0, w, h);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
@@ -148,6 +149,8 @@ void reshapeFunc(GLFWwindow *window, int w, int h) {
 
 void keyboardFunc(GLFWwindow *window, int key, int scancode, int action,
                   int mods) {
+  (void)scancode;
+  (void)mods;
   if (action == GLFW_PRESS || action == GLFW_REPEAT) {
     // Close window
     if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE)
@@ -156,6 +159,7 @@ void keyboardFunc(GLFWwindow *window, int key, int scancode, int action,
 }
 
 void clickFunc(GLFWwindow *window, int button, int action, int mods) {
+  (void)mods;
   double x, y;
   glfwGetCursorPos(window, &x, &y);
 
@@ -188,6 +192,7 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
 }
 
 void motionFunc(GLFWwindow *window, double mouse_x, double mouse_y) {
+  (void)window;
   float rotScale = 1.0f;
   float transScale = 2.0f;
 
@@ -213,21 +218,21 @@ void motionFunc(GLFWwindow *window, double mouse_x, double mouse_y) {
   prevMouseY = mouse_y;
 }
 
-static void SetupGLState(Scene &scene, GLuint progId) {
+static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
   // Buffer
   {
-    std::map<std::string, BufferView>::const_iterator it(
+    std::map<std::string, tinygltf::BufferView>::const_iterator it(
         scene.bufferViews.begin());
-    std::map<std::string, BufferView>::const_iterator itEnd(
+    std::map<std::string, tinygltf::BufferView>::const_iterator itEnd(
         scene.bufferViews.end());
 
     for (; it != itEnd; it++) {
-      const BufferView &bufferView = it->second;
+      const tinygltf::BufferView &bufferView = it->second;
       if (bufferView.target == 0) {
         continue; // Unsupported bufferView.
       }
 
-      const Buffer &buffer = scene.buffers[bufferView.buffer];
+      const tinygltf::Buffer &buffer = scene.buffers[bufferView.buffer];
       GLBufferState state;
       glGenBuffers(1, &state.vb);
       glBindBuffer(bufferView.target, state.vb);
@@ -241,29 +246,29 @@ static void SetupGLState(Scene &scene, GLuint progId) {
 
   // Texture
   {
-    std::map<std::string, Mesh>::const_iterator it(scene.meshes.begin());
-    std::map<std::string, Mesh>::const_iterator itEnd(scene.meshes.end());
+    std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
+    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
 
     for (; it != itEnd; it++) {
-      const Mesh &mesh = it->second;
+      const tinygltf::Mesh &mesh = it->second;
 
       gMeshState[mesh.name].diffuseTex.resize(mesh.primitives.size());
       for (size_t primId = 0; primId < mesh.primitives.size(); primId++) {
-        const Primitive &primitive = mesh.primitives[primId];
+        const tinygltf::Primitive &primitive = mesh.primitives[primId];
 
         gMeshState[mesh.name].diffuseTex[primId] = 0;
 
         if (primitive.material.empty()) {
           continue;
         }
-        Material &mat = scene.materials[primitive.material];
+        tinygltf::Material &mat = scene.materials[primitive.material];
         printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
           std::string diffuseTexName = mat.values["diffuse"].stringValue;
           if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
-            Texture &tex = scene.textures[diffuseTexName];
+            tinygltf::Texture &tex = scene.textures[diffuseTexName];
             if (scene.images.find(tex.source) != scene.images.end()) {
-              Image &image = scene.images[tex.source];
+              tinygltf::Image &image = scene.images[tex.source];
               GLuint texId;
               glGenTextures(1, &texId);
               glBindTexture(tex.target, texId);
@@ -305,14 +310,14 @@ static void SetupGLState(Scene &scene, GLuint progId) {
   gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
 };
 
-void DrawMesh(Scene &scene, const Mesh &mesh) {
+void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
 
   if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
     glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0); // TEXTURE0
   }
 
   for (size_t i = 0; i < mesh.primitives.size(); i++) {
-    const Primitive &primitive = mesh.primitives[i];
+    const tinygltf::Primitive &primitive = mesh.primitives[i];
 
     if (primitive.indices.empty())
       return;
@@ -326,7 +331,7 @@ void DrawMesh(Scene &scene, const Mesh &mesh) {
     glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
 
     for (; it != itEnd; it++) {
-      const Accessor &accessor = scene.accessors[it->second];
+      const tinygltf::Accessor &accessor = scene.accessors[it->second];
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
       int count = 1;
@@ -352,7 +357,7 @@ void DrawMesh(Scene &scene, const Mesh &mesh) {
       }
     }
 
-    const Accessor &indexAccessor = scene.accessors[primitive.indices];
+    const tinygltf::Accessor &indexAccessor = scene.accessors[primitive.indices];
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                  gBufferState[indexAccessor.bufferView].vb);
     CheckErrors("bind buffer");
@@ -391,9 +396,9 @@ void DrawMesh(Scene &scene, const Mesh &mesh) {
   }
 }
 
-void DrawScene(Scene &scene) {
-  std::map<std::string, Mesh>::const_iterator it(scene.meshes.begin());
-  std::map<std::string, Mesh>::const_iterator itEnd(scene.meshes.end());
+void DrawScene(tinygltf::Scene &scene) {
+  std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
+  std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
 
   for (; it != itEnd; it++) {
     DrawMesh(scene, it->second);
@@ -427,11 +432,11 @@ int main(int argc, char **argv) {
     scale = atof(argv[2]);
   }
 
-  Scene scene;
-  TinyGLTFLoader loader;
+  tinygltf::Scene scene;
+  tinygltf::TinyGLTFLoader loader;
   std::string err;
 
-  bool ret = loader.LoadFromFile(scene, err, argv[1]);
+  bool ret = loader.LoadFromFile(&scene, &err, argv[1]);
   if (!err.empty()) {
     printf("ERR: %s\n", err.c_str());
   }
