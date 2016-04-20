@@ -257,7 +257,15 @@ namespace tinygltf {
 
 bool FileExists(const std::string &abs_filename) {
   bool ret;
+#ifdef _WIN32
+  FILE *fp;
+  errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
+  if (err != 0) {
+	  return false;
+  }
+#else
   FILE *fp = fopen(abs_filename.c_str(), "rb");
+#endif
   if (fp) {
     ret = true;
     fclose(fp);
@@ -406,7 +414,7 @@ std::string base64_decode(std::string const &encoded_string) {
     in_++;
     if (i == 4) {
       for (i = 0; i < 4; i++)
-        char_array_4[i] = base64_chars.find(char_array_4[i]);
+        char_array_4[i] = static_cast<unsigned char>(base64_chars.find(char_array_4[i]));
 
       char_array_3[0] =
           (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
@@ -423,7 +431,7 @@ std::string base64_decode(std::string const &encoded_string) {
     for (j = i; j < 4; j++) char_array_4[j] = 0;
 
     for (j = 0; j < 4; j++)
-      char_array_4[j] = base64_chars.find(char_array_4[j]);
+      char_array_4[j] = static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
 
     char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
     char_array_3[1] =
@@ -462,7 +470,7 @@ bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   }
 
   f.seekg(0, f.end);
-  size_t sz = f.tellg();
+  size_t sz = static_cast<size_t>(f.tellg());
   std::vector<unsigned char> buf(sz);
 
   f.seekg(0, f.beg);
@@ -1374,7 +1382,7 @@ bool TinyGLTFLoader::LoadFromFile(Scene *scene, std::string *err,
   }
 
   f.seekg(0, f.end);
-  size_t sz = f.tellg();
+  size_t sz = static_cast<size_t>(f.tellg());
   std::vector<char> buf(sz);
 
   f.seekg(0, f.beg);
