@@ -67,6 +67,12 @@ void CheckErrors(std::string desc) {
   }
 }
 
+static std::string GetFilePathExtension(const std::string &FileName) {
+  if (FileName.find_last_of(".") != std::string::npos)
+    return FileName.substr(FileName.find_last_of(".") + 1);
+  return "";
+}
+
 bool LoadShader(GLenum shaderType, // GL_VERTEX_SHADER or GL_FRAGMENT_SHADER(or
                                    // maybe GL_COMPUTE_SHADER)
                 GLuint &shader, const char *shaderSourceFilename) {
@@ -264,7 +270,7 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
         tinygltf::Material &mat = scene.materials[primitive.material];
         printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
-          std::string diffuseTexName = mat.values["diffuse"].stringValue;
+          std::string diffuseTexName = mat.values["diffuse"].string_value;
           if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
             tinygltf::Texture &tex = scene.textures[diffuseTexName];
             if (scene.images.find(tex.source) != scene.images.end()) {
@@ -435,8 +441,18 @@ int main(int argc, char **argv) {
   tinygltf::Scene scene;
   tinygltf::TinyGLTFLoader loader;
   std::string err;
+  std::string input_filename(argv[1]);
+  std::string ext = GetFilePathExtension(input_filename);
 
-  bool ret = loader.LoadFromFile(&scene, &err, argv[1]);
+  bool ret = false;
+  if (ext.compare("glb") == 0) {
+    // assume binary glTF.
+    ret = loader.LoadBinaryFromFile(&scene, &err, input_filename.c_str());
+  } else {
+    // assume ascii glTF.
+    ret = loader.LoadASCIIFromFile(&scene, &err, input_filename.c_str());
+  }
+
   if (!err.empty()) {
     printf("ERR: %s\n", err.c_str());
   }
@@ -452,7 +468,10 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  window = glfwCreateWindow(width, height, "Simple glTF geometry viewer", NULL,
+  char title[1024];
+  sprintf(title, "Simple glTF viewer: %s", input_filename.c_str());
+
+  window = glfwCreateWindow(width, height, title, NULL,
                             NULL);
   if (window == NULL) {
     std::cerr << "Failed to open GLFW window. " << std::endl;

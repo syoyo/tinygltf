@@ -6,7 +6,13 @@
 #include <cstdio>
 #include <iostream>
 
-std::string PrintMode(int mode) {
+static std::string GetFilePathExtension(const std::string &FileName) {
+  if (FileName.find_last_of(".") != std::string::npos)
+    return FileName.substr(FileName.find_last_of(".") + 1);
+  return "";
+}
+
+static std::string PrintMode(int mode) {
   if (mode == TINYGLTF_MODE_POINTS) {
     return "POINTS";
   } else if (mode == TINYGLTF_MODE_LINE) {
@@ -23,7 +29,7 @@ std::string PrintMode(int mode) {
   return "**UNKNOWN**";
 }
 
-std::string PrintType(int ty) {
+static std::string PrintType(int ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return "SCALAR";
   } else if (ty == TINYGLTF_TYPE_VECTOR) {
@@ -46,7 +52,7 @@ std::string PrintType(int ty) {
   return "**UNKNOWN**";
 }
 
-std::string PrintComponentType(int ty) {
+static std::string PrintComponentType(int ty) {
   if (ty == TINYGLTF_COMPONENT_TYPE_BYTE) {
     return "BYTE";
   } else if (ty == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
@@ -68,7 +74,7 @@ std::string PrintComponentType(int ty) {
   return "**UNKNOWN**";
 }
 
-std::string PrintFloatArray(const std::vector<double> &arr) {
+static std::string PrintFloatArray(const std::vector<double> &arr) {
   if (arr.size() == 0) {
     return "";
   }
@@ -83,7 +89,7 @@ std::string PrintFloatArray(const std::vector<double> &arr) {
   return ss.str();
 }
 
-std::string PrintStringArray(const std::vector<std::string> &arr) {
+static std::string PrintStringArray(const std::vector<std::string> &arr) {
   if (arr.size() == 0) {
     return "";
   }
@@ -98,7 +104,7 @@ std::string PrintStringArray(const std::vector<std::string> &arr) {
   return ss.str();
 }
 
-std::string Indent(int indent) {
+static std::string Indent(int indent) {
   std::string s;
   for (int i = 0; i < indent; i++) {
     s += "  ";
@@ -107,7 +113,7 @@ std::string Indent(int indent) {
   return s;
 }
 
-void DumpNode(const tinygltf::Node &node, int indent) {
+static void DumpNode(const tinygltf::Node &node, int indent) {
   std::cout << Indent(indent) << "name        : " << node.name << std::endl;
   std::cout << Indent(indent) << "camera      : " << node.camera << std::endl;
   if (!node.rotation.empty()) {
@@ -137,7 +143,7 @@ void DumpNode(const tinygltf::Node &node, int indent) {
             << "children    : " << PrintStringArray(node.children) << std::endl;
 }
 
-void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
+static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
   std::cout << Indent(indent) << "material : " << primitive.material
             << std::endl;
   std::cout << Indent(indent) << "mode     : " << PrintMode(primitive.mode)
@@ -155,7 +161,7 @@ void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
   }
 }
 
-void Dump(const tinygltf::Scene &scene) {
+static void Dump(const tinygltf::Scene &scene) {
   std::cout << "=== Dump glTF ===" << std::endl;
   std::cout << "asset.generator          : " << scene.asset.generator
             << std::endl;
@@ -289,12 +295,12 @@ void Dump(const tinygltf::Scene &scene) {
       tinygltf::ParameterMap::const_iterator p(it->second.values.begin());
       tinygltf::ParameterMap::const_iterator pEnd(it->second.values.end());
       for (; p != pEnd; p++) {
-        if (!p->second.numberArray.empty()) {
+        if (!p->second.number_array.empty()) {
           std::cout << Indent(3) << p->first
-                    << PrintFloatArray(p->second.numberArray) << std::endl;
+                    << PrintFloatArray(p->second.number_array) << std::endl;
         }
-        if (!p->second.stringValue.empty()) {
-          std::cout << Indent(3) << p->first << " : " << p->second.stringValue
+        if (!p->second.string_value.empty()) {
+          std::cout << Indent(3) << p->first << " : " << p->second.string_value
                     << std::endl;
         }
       }
@@ -359,8 +365,17 @@ int main(int argc, char **argv) {
   tinygltf::Scene scene;
   tinygltf::TinyGLTFLoader loader;
   std::string err;
+  std::string input_filename(argv[1]);
+  std::string ext = GetFilePathExtension(input_filename);
 
-  bool ret = loader.LoadFromFile(&scene, &err, argv[1]);
+  bool ret = false;
+  if (ext.compare("glb") == 0) {
+    // assume binary glTF.
+    ret = loader.LoadBinaryFromFile(&scene, &err, input_filename.c_str());
+  } else {
+    // assume ascii glTF.
+    ret = loader.LoadASCIIFromFile(&scene, &err, input_filename.c_str());
+  }
 
   if (!err.empty()) {
     printf("Err: %s\n", err.c_str());

@@ -1,5 +1,5 @@
 sources = {
-   "test.cc",
+   "loader_example.cc",
    }
 
 -- premake4.lua
@@ -21,9 +21,9 @@ solution "TinyGLTFLoaderSolution"
       configuration "Debug"
          defines { "DEBUG" } -- -DDEBUG
          flags { "Symbols" }
-         targetname "test_tinygltfloader_debug"
+         targetname "loader_example_tinygltfloader_debug"
 
       configuration "Release"
          -- defines { "NDEBUG" } -- -NDEBUG
          flags { "Symbols", "Optimize" }
-         targetname "test_tinygltfloader"
+         targetname "loader_example_tinygltfloader"

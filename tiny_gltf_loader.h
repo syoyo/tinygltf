@@ -102,6 +102,9 @@ typedef struct {
   int component;
   int pad0;
   std::vector<unsigned char> image;
+
+  std::string bufferView;  // KHR_binary_glTF extenstion.
+  std::string mimeType;    // KHR_binary_glTF extenstion.
 } Image;
 
 typedef struct {
@@ -137,7 +140,7 @@ typedef struct {
   int componentType;  // One of TINYGLTF_COMPONENT_TYPE_***
   int pad0;
   size_t count;
-  int type;                       // One of TINYGLTF_TYPE_***
+  int type;  // One of TINYGLTF_TYPE_***
   int pad1;
   std::vector<double> minValues;  // Optional
   std::vector<double> maxValues;  // Optional
@@ -235,34 +238,36 @@ class TinyGLTFLoader {
   /// Loads glTF ASCII asset from a file.
   /// Returns false and set error string to `err` if there's an error.
   bool LoadASCIIFromFile(Scene *scene, std::string *err,
-                    const std::string &filename);
+                         const std::string &filename);
 
   /// Loads glTF ASCII asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
   bool LoadASCIIFromString(Scene *scene, std::string *err, const char *str,
-                      const unsigned int length, const std::string &baseDir);
+                           const unsigned int length,
+                           const std::string &base_dir);
 
   /// Loads glTF binary asset from a file.
   /// Returns false and set error string to `err` if there's an error.
   bool LoadBinaryFromFile(Scene *scene, std::string *err,
-                    const std::string &filename);
+                          const std::string &filename);
 
   /// Loads glTF binary asset from memory.
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadBinaryFromMemory(Scene *scene, std::string *err, const unsigned char *bytes,
-                      const unsigned int length);
+  bool LoadBinaryFromMemory(Scene *scene, std::string *err,
+                            const unsigned char *bytes,
+                            const unsigned int length,
+                            const std::string &base_dir = "");
 
-private:
-
+ private:
   /// Loads glTF asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
   bool LoadFromString(Scene *scene, std::string *err, const char *str,
-                      const unsigned int length, const std::string &baseDir);
+                      const unsigned int length, const std::string &base_dir);
 
-  const unsigned char* bin_data_;
+  const unsigned char *bin_data_;
   size_t bin_size_;
   bool is_binary_;
   char pad[7];
@@ -275,7 +280,7 @@ private:
 #include <cassert>
 #include <fstream>
 #include <sstream>
- 
+
 // Disable some warnings for external files.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -308,21 +313,6 @@ private:
 
 namespace tinygltf {
 
-#if 0
-static void swap2(unsigned short *val) {
-#ifdef TINYGLTF_LITTLE_ENDIAN
-  (void)val;
-#else
-  unsigned short tmp = *val;
-  unsigned char *dst = reinterpret_cast<unsigned char *>(val);
-  unsigned char *src = reinterpret_cast<unsigned char *>(&tmp);
-
-  dst[0] = src[1];
-  dst[1] = src[0];
-#endif
-}
-#endif
-
 static void swap4(unsigned int *val) {
 #ifdef TINYGLTF_LITTLE_ENDIAN
   (void)val;
@@ -338,34 +328,13 @@ static void swap4(unsigned int *val) {
 #endif
 }
 
-#if 0
-static void swap8(unsigned long long *val) {
-#ifdef TINYGLTF_LITTLE_ENDIAN
-  (void)val;
-#else
-  unsigned long long tmp = (*val);
-  unsigned char *dst = reinterpret_cast<unsigned char *>(val);
-  unsigned char *src = reinterpret_cast<unsigned char *>(&tmp);
-
-  dst[0] = src[7];
-  dst[1] = src[6];
-  dst[2] = src[5];
-  dst[3] = src[4];
-  dst[4] = src[3];
-  dst[5] = src[2];
-  dst[6] = src[1];
-  dst[7] = src[0];
-#endif
-}
-#endif
-
 static bool FileExists(const std::string &abs_filename) {
   bool ret;
 #ifdef _WIN32
   FILE *fp;
   errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
   if (err != 0) {
-	  return false;
+    return false;
   }
 #else
   FILE *fp = fopen(abs_filename.c_str(), "rb");
@@ -426,7 +395,8 @@ static std::string ExpandFilePath(const std::string &filepath) {
 #endif
 }
 
-static std::string JoinPath(const std::string &path0, const std::string &path1) {
+static std::string JoinPath(const std::string &path0,
+                            const std::string &path1) {
   if (path0.empty()) {
     return path1;
   } else {
@@ -441,7 +411,7 @@ static std::string JoinPath(const std::string &path0, const std::string &path1) 
 }
 
 static std::string FindFile(const std::vector<std::string> &paths,
-                     const std::string &filepath) {
+                            const std::string &filepath) {
   for (size_t i = 0; i < paths.size(); i++) {
     std::string absPath = ExpandFilePath(JoinPath(paths[i], filepath));
     if (FileExists(absPath)) {
@@ -523,7 +493,8 @@ std::string base64_decode(std::string const &encoded_string) {
     in_++;
     if (i == 4) {
       for (i = 0; i < 4; i++)
-        char_array_4[i] = static_cast<unsigned char>(base64_chars.find(char_array_4[i]));
+        char_array_4[i] =
+            static_cast<unsigned char>(base64_chars.find(char_array_4[i]));
 
       char_array_3[0] =
           (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
@@ -540,7 +511,8 @@ std::string base64_decode(std::string const &encoded_string) {
     for (j = i; j < 4; j++) char_array_4[j] = 0;
 
     for (j = 0; j < 4; j++)
-      char_array_4[j] = static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
+      char_array_4[j] =
+          static_cast<unsigned char>(base64_chars.find(char_array_4[j]));
 
     char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
     char_array_3[1] =
@@ -555,8 +527,9 @@ std::string base64_decode(std::string const &encoded_string) {
 #pragma clang diagnostic pop
 
 static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
-                      const std::string &filename, const std::string &basedir,
-                      size_t reqBytes, bool checkSize) {
+                             const std::string &filename,
+                             const std::string &basedir, size_t reqBytes,
+                             bool checkSize) {
   out->clear();
 
   std::vector<std::string> paths;
@@ -584,7 +557,8 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   std::vector<unsigned char> buf(sz);
 
   f.seekg(0, f.beg);
-  f.read(reinterpret_cast<char *>(&buf.at(0)), static_cast<std::streamsize>(sz));
+  f.read(reinterpret_cast<char *>(&buf.at(0)),
+         static_cast<std::streamsize>(sz));
   f.close();
 
   if (checkSize) {
@@ -603,6 +577,52 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   }
 
   out->swap(buf);
+  return true;
+}
+
+static bool LoadImageData(Image *image, std::string *err, int req_width,
+                          int req_height, const unsigned char *bytes,
+                          int size) {
+  int w, h, comp;
+  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, 0);
+  if (!data) {
+    if (err) {
+      (*err) += "Unknown image format.\n";
+    }
+    return false;
+  }
+
+  if (w < 1 || h < 1) {
+    if (err) {
+      (*err) += "Unknown image format.\n";
+    }
+    return false;
+  }
+
+  if (req_width > 0) {
+    if (req_width != w) {
+      if (err) {
+        (*err) += "Image width mismatch.\n";
+      }
+      return false;
+    }
+  }
+
+  if (req_height > 0) {
+    if (req_height != h) {
+      if (err) {
+        (*err) += "Image height mismatch.\n";
+      }
+      return false;
+    }
+  }
+
+  image->width = w;
+  image->height = h;
+  image->component = comp;
+  image->image.resize(static_cast<size_t>(w * h * comp));
+  std::copy(data, data + w * h * comp, image->image.begin());
+
   return true;
 }
 
@@ -625,8 +645,9 @@ static bool IsDataURI(const std::string &in) {
   return false;
 }
 
-static bool DecodeDataURI(std::vector<unsigned char> *out, const std::string &in,
-                   size_t reqBytes, bool checkSize) {
+static bool DecodeDataURI(std::vector<unsigned char> *out,
+                          const std::string &in, size_t reqBytes,
+                          bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
   std::string data;
   if (in.find(header) == 0) {
@@ -664,8 +685,8 @@ static bool DecodeDataURI(std::vector<unsigned char> *out, const std::string &in
 }
 
 static bool ParseBooleanProperty(bool *ret, std::string *err,
-                          const picojson::object &o,
-                          const std::string &property, bool required) {
+                                 const picojson::object &o,
+                                 const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -693,8 +714,8 @@ static bool ParseBooleanProperty(bool *ret, std::string *err,
 }
 
 static bool ParseNumberProperty(double *ret, std::string *err,
-                         const picojson::object &o, const std::string &property,
-                         bool required) {
+                                const picojson::object &o,
+                                const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -722,8 +743,9 @@ static bool ParseNumberProperty(double *ret, std::string *err,
 }
 
 static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
-                              const picojson::object &o,
-                              const std::string &property, bool required) {
+                                     const picojson::object &o,
+                                     const std::string &property,
+                                     bool required) {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -761,8 +783,8 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
 }
 
 static bool ParseStringProperty(std::string *ret, std::string *err,
-                         const picojson::object &o, const std::string &property,
-                         bool required) {
+                                const picojson::object &o,
+                                const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -789,9 +811,11 @@ static bool ParseStringProperty(std::string *ret, std::string *err,
   return true;
 }
 
-static bool ParseStringArrayProperty(std::vector<std::string> *ret, std::string *err,
-                              const picojson::object &o,
-                              const std::string &property, bool required) {
+static bool ParseStringArrayProperty(std::vector<std::string> *ret,
+                                     std::string *err,
+                                     const picojson::object &o,
+                                     const std::string &property,
+                                     bool required) {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -828,7 +852,72 @@ static bool ParseStringArrayProperty(std::vector<std::string> *ret, std::string 
   return true;
 }
 
-static bool ParseAsset(Asset *asset, std::string *err, const picojson::object &o) {
+static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
+                                    std::string *buffer_view,
+                                    std::string *mime_type, int *image_width,
+                                    int *image_height) {
+  picojson::object j = o;
+
+  if (j.find("extensions") == j.end()) {
+    if (err) {
+      (*err) += "`extensions' property is missing.\n";
+    }
+    return false;
+  }
+
+  if (!(j["extensions"].is<picojson::object>())) {
+    if (err) {
+      (*err) += "Invalid `extensions' property.\n";
+    }
+    return false;
+  }
+
+  picojson::object ext = j["extensions"].get<picojson::object>();
+
+  if (ext.find("KHR_binary_glTF") == ext.end()) {
+    if (err) {
+      (*err) +=
+          "`KHR_binary_glTF' property is missing in extension property.\n";
+    }
+    return false;
+  }
+
+  if (!(ext["KHR_binary_glTF"].is<picojson::object>())) {
+    if (err) {
+      (*err) += "Invalid `KHR_binary_glTF' property.\n";
+    }
+    return false;
+  }
+
+  picojson::object k = ext["KHR_binary_glTF"].get<picojson::object>();
+
+  if (!ParseStringProperty(buffer_view, err, k, "bufferView", true)) {
+    return false;
+  }
+
+  if (mime_type) {
+    ParseStringProperty(mime_type, err, k, "mimeType", false);
+  }
+
+  if (image_width) {
+    double width = 0.0;
+    if (ParseNumberProperty(&width, err, k, "width", false)) {
+      (*image_width) = static_cast<int>(width);
+    }
+  }
+
+  if (image_height) {
+    double height = 0.0;
+    if (ParseNumberProperty(&height, err, k, "height", false)) {
+      (*image_height) = static_cast<int>(height);
+    }
+  }
+
+  return true;
+}
+
+static bool ParseAsset(Asset *asset, std::string *err,
+                       const picojson::object &o) {
   ParseStringProperty(&asset->generator, err, o, "generator", false);
   ParseBooleanProperty(&asset->premultipliedAlpha, err, o, "premultipliedAlpha",
                        false);
@@ -849,8 +938,10 @@ static bool ParseAsset(Asset *asset, std::string *err, const picojson::object &o
   return true;
 }
 
-static bool ParseImage(Image *image, std::string *err, const picojson::object &o,
-                const std::string &basedir) {
+static bool ParseImage(Image *image, std::string *err,
+                       const picojson::object &o, const std::string &basedir,
+                       bool is_binary, const unsigned char *bin_data,
+                       size_t bin_size) {
   std::string uri;
   if (!ParseStringProperty(&uri, err, o, "uri", true)) {
     return false;
@@ -859,57 +950,90 @@ static bool ParseImage(Image *image, std::string *err, const picojson::object &o
   ParseStringProperty(&image->name, err, o, "name", false);
 
   std::vector<unsigned char> img;
-  if (IsDataURI(uri)) {
-    if (!DecodeDataURI(&img, uri, 0, false)) {
-      if (err) {
-        (*err) += "Failed to decode 'uri'.\n";
+
+  if (is_binary) {
+    // Still binary glTF accepts external dataURI. First try external resources.
+    bool loaded = false;
+    if (IsDataURI(uri)) {
+      loaded = DecodeDataURI(&img, uri, 0, false);
+    } else {
+      // Assume external .bin file.
+      loaded = LoadExternalFile(&img, err, uri, basedir, 0, false);
+    }
+
+    if (!loaded) {
+      // load data from (embedded) binary data
+
+      if ((bin_size == 0) || (bin_data == NULL)) {
+        if (err) {
+          (*err) += "Invalid binary data.\n";
+        }
+        return false;
       }
-      return false;
+
+      // There should be "extensions" property.
+      // "extensions":{"KHR_binary_glTF":{"bufferView": "id", ...
+
+      std::string buffer_view;
+      std::string mime_type;
+      int image_width;
+      int image_height;
+      bool ret = ParseKHRBinaryExtension(o, err, &buffer_view, &mime_type,
+                                         &image_width, &image_height);
+      if (!ret) {
+        return false;
+      }
+
+      if (uri.compare("data:,") == 0) {
+        // ok
+      } else {
+        if (err) {
+          (*err) += "Invalid URI for binary data.\n";
+        }
+        return false;
+      }
+
+      // Just only save some information here. Loading actual image data from
+      // bufferView is done in other place.
+      image->bufferView = buffer_view;
+      image->mimeType = mime_type;
+      image->width = image_width;
+      image->height = image_height;
+
+      return true;
     }
   } else {
-    // Assume external file
-    if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
-      if (err) {
-        (*err) += "Failed to load external 'uri'.\n";
+    if (IsDataURI(uri)) {
+      if (!DecodeDataURI(&img, uri, 0, false)) {
+        if (err) {
+          (*err) += "Failed to decode 'uri'.\n";
+        }
+        return false;
       }
-      return false;
-    }
-    if (img.empty()) {
-      if (err) {
-        (*err) += "File is empty.\n";
+    } else {
+      // Assume external file
+      if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
+        if (err) {
+          (*err) += "Failed to load external 'uri'.\n";
+        }
+        return false;
       }
-      return false;
+      if (img.empty()) {
+        if (err) {
+          (*err) += "File is empty.\n";
+        }
+        return false;
+      }
     }
   }
 
-  int w, h, comp;
-  unsigned char *data =
-      stbi_load_from_memory(&img.at(0), static_cast<int>(img.size()), &w, &h, &comp, 0);
-  if (!data) {
-    if (err) {
-      (*err) += "Unknown image format.\n";
-    }
-    return false;
-  }
-
-  if (w < 1 || h < 1) {
-    if (err) {
-      (*err) += "Unknown image format.\n";
-    }
-    return false;
-  }
-
-  image->width = w;
-  image->height = h;
-  image->component = comp;
-  image->image.resize(static_cast<size_t>(w * h * comp));
-  std::copy(data, data + w * h * comp, image->image.begin());
-
-  return true;
+  return LoadImageData(image, err, 0, 0, &img.at(0),
+                       static_cast<int>(img.size()));
 }
 
-static bool ParseTexture(Texture *texture, std::string *err, const picojson::object &o,
-                  const std::string &basedir) {
+static bool ParseTexture(Texture *texture, std::string *err,
+                         const picojson::object &o,
+                         const std::string &basedir) {
   (void)basedir;
 
   if (!ParseStringProperty(&texture->sampler, err, o, "sampler", true)) {
@@ -942,8 +1066,11 @@ static bool ParseTexture(Texture *texture, std::string *err, const picojson::obj
   return true;
 }
 
-static bool ParseBuffer(Buffer *buffer, std::string *err, const picojson::object &o,
-                 const std::string &basedir, bool is_binary = false, const unsigned char* bin_data = NULL, size_t bin_size = 0) {
+static bool ParseBuffer(Buffer *buffer, std::string *err,
+                        const picojson::object &o, const std::string &basedir,
+                        bool is_binary = false,
+                        const unsigned char *bin_data = NULL,
+                        size_t bin_size = 0) {
   double byteLength;
   if (!ParseNumberProperty(&byteLength, err, o, "byteLength", true)) {
     return false;
@@ -966,35 +1093,49 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const picojson::object
 
   size_t bytes = static_cast<size_t>(byteLength);
   if (is_binary) {
-    if ((bin_size == 0) || (bin_data == NULL)) {
-      if (err) {
-        (*err) += "Invalid binary data.\n";
-      }
-      return false;
-    }
-
-    if (byteLength > bin_size) {
-      if (err) {
-        std::stringstream ss;
-        ss << "Invalid `byteLength'. Must be equal or less than binary size: `byteLength' = " << byteLength << ", binary size = " << bin_size << std::endl;
-        (*err) += ss.str();
-      }
-      return false;
-    }
-
-    if (uri.compare("data:,") == 0) {
-
-      // @todo { check uri }
-      buffer->data.resize(static_cast<size_t>(byteLength));
-      memcpy(&(buffer->data.at(0)), bin_data, static_cast<size_t>(byteLength));
-
+    // Still binary glTF accepts external dataURI. First try external resources.
+    bool loaded = false;
+    if (IsDataURI(uri)) {
+      loaded = DecodeDataURI(&buffer->data, uri, bytes, true);
     } else {
-      if (err) {
-        (*err) += "Invalid URI for binary data.\n";
-      }
-      return false;
+      // Assume external .bin file.
+      loaded = LoadExternalFile(&buffer->data, err, uri, basedir, bytes, true);
     }
 
+    if (!loaded) {
+      // load data from (embedded) binary data
+
+      if ((bin_size == 0) || (bin_data == NULL)) {
+        if (err) {
+          (*err) += "Invalid binary data.\n";
+        }
+        return false;
+      }
+
+      if (byteLength > bin_size) {
+        if (err) {
+          std::stringstream ss;
+          ss << "Invalid `byteLength'. Must be equal or less than binary size: "
+                "`byteLength' = " << byteLength
+             << ", binary size = " << bin_size << std::endl;
+          (*err) += ss.str();
+        }
+        return false;
+      }
+
+      if (uri.compare("data:,") == 0) {
+        // @todo { check uri }
+        buffer->data.resize(static_cast<size_t>(byteLength));
+        memcpy(&(buffer->data.at(0)), bin_data,
+               static_cast<size_t>(byteLength));
+
+      } else {
+        if (err) {
+          (*err) += "Invalid URI for binary data.\n";
+        }
+        return false;
+      }
+    }
 
   } else {
     if (IsDataURI(uri)) {
@@ -1018,7 +1159,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const picojson::object
 }
 
 static bool ParseBufferView(BufferView *bufferView, std::string *err,
-                     const picojson::object &o) {
+                            const picojson::object &o) {
   std::string buffer;
   if (!ParseStringProperty(&buffer, err, o, "buffer", true)) {
     return false;
@@ -1053,7 +1194,7 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
 }
 
 static bool ParseAccessor(Accessor *accessor, std::string *err,
-                   const picojson::object &o) {
+                          const picojson::object &o) {
   std::string bufferView;
   if (!ParseStringProperty(&bufferView, err, o, "bufferView", true)) {
     return false;
@@ -1137,7 +1278,7 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 }
 
 static bool ParsePrimitive(Primitive *primitive, std::string *err,
-                    const picojson::object &o) {
+                           const picojson::object &o) {
   if (!ParseStringProperty(&primitive->material, err, o, "material", true)) {
     return false;
   }
@@ -1233,7 +1374,7 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
 }
 
 static bool ParseMaterial(Material *material, std::string *err,
-                   const picojson::object &o) {
+                          const picojson::object &o) {
   ParseStringProperty(&material->name, err, o, "name", false);
   ParseStringProperty(&material->technique, err, o, "technique", false);
 
@@ -1248,8 +1389,8 @@ static bool ParseMaterial(Material *material, std::string *err,
     for (; it != itEnd; it++) {
       // Assume number values.
       Parameter param;
-      if (ParseStringProperty(&param.string_value, err, values_object, it->first,
-                              false)) {
+      if (ParseStringProperty(&param.string_value, err, values_object,
+                              it->first, false)) {
         // Found string property.
       } else if (!ParseNumberArrayProperty(&param.number_array, err,
                                            values_object, it->first, false)) {
@@ -1269,7 +1410,7 @@ static bool ParseMaterial(Material *material, std::string *err,
 
 bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
                                     const char *str, unsigned int length,
-                                    const std::string &baseDir) {
+                                    const std::string &base_dir) {
   picojson::value v;
   std::string perr = picojson::parse(v, str, str + length);
 
@@ -1358,7 +1499,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     for (; it != itEnd; it++) {
       Buffer buffer;
       if (!ParseBuffer(&buffer, err, (it->second).get<picojson::object>(),
-                       baseDir, is_binary_, bin_data_, bin_size_)) {
+                       base_dir, is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
@@ -1483,8 +1624,32 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     for (; it != itEnd; it++) {
       Image image;
       if (!ParseImage(&image, err, (it->second).get<picojson::object>(),
-                      baseDir)) {
+                      base_dir, is_binary_, bin_data_, bin_size_)) {
         return false;
+      }
+
+      if (!image.bufferView.empty()) {
+        // Load image from the buffer view.
+        if (scene->bufferViews.find(image.bufferView) ==
+            scene->bufferViews.end()) {
+          if (err) {
+            std::stringstream ss;
+            ss << "bufferView \"" << image.bufferView
+               << "\" not found in the scene." << std::endl;
+            (*err) += ss.str();
+          }
+          return false;
+        }
+
+        const BufferView &bufferView = scene->bufferViews[image.bufferView];
+        const Buffer &buffer = scene->buffers[bufferView.buffer];
+
+        bool ret = LoadImageData(&image, err, image.width, image.height,
+                                 &buffer.data[bufferView.byteOffset],
+                                 static_cast<int>(bufferView.byteLength));
+        if (!ret) {
+          return false;
+        }
       }
 
       scene->images[it->first] = image;
@@ -1500,7 +1665,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     for (; it != itEnd; it++) {
       Texture texture;
       if (!ParseTexture(&texture, err, (it->second).get<picojson::object>(),
-                        baseDir)) {
+                        base_dir)) {
         return false;
       }
 
@@ -1512,17 +1677,17 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 }
 
 bool TinyGLTFLoader::LoadASCIIFromString(Scene *scene, std::string *err,
-                                    const char *str, unsigned int length,
-                                    const std::string &baseDir) {
+                                         const char *str, unsigned int length,
+                                         const std::string &base_dir) {
   is_binary_ = false;
   bin_data_ = NULL;
   bin_size_ = 0;
 
-  return LoadFromString(scene, err, str, length, baseDir);
+  return LoadFromString(scene, err, str, length, base_dir);
 }
 
 bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
-                                  const std::string &filename) {
+                                       const std::string &filename) {
   std::stringstream ss;
 
   std::ifstream f(filename.c_str());
@@ -1544,14 +1709,16 @@ bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
 
   std::string basedir = GetBaseDir(filename);
 
-  bool ret = LoadASCIIFromString(scene, err, &buf.at(0), static_cast<unsigned int>(buf.size()), basedir);
+  bool ret = LoadASCIIFromString(
+      scene, err, &buf.at(0), static_cast<unsigned int>(buf.size()), basedir);
 
   return ret;
 }
 
 bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
-                                    const unsigned char* bytes, unsigned int size) {
-
+                                          const unsigned char *bytes,
+                                          unsigned int size,
+                                          const std::string &base_dir) {
   if (size < 20) {
     if (err) {
       (*err) = "Too short data size for glTF Binary.";
@@ -1559,7 +1726,8 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
     return false;
   }
 
-  if (bytes[0] == 'g' && bytes[1] == 'l' && bytes[2] == 'T' && bytes[3] == 'F') {
+  if (bytes[0] == 'g' && bytes[1] == 'l' && bytes[2] == 'T' &&
+      bytes[3] == 'F') {
     // ok
   } else {
     if (err) {
@@ -1568,20 +1736,23 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
     return false;
   }
 
-  unsigned int version; // 4 bytes
-  unsigned int length;  // 4 bytes
-  unsigned int scene_length; // 4 bytes
-  unsigned int scene_format; // 4 bytes;
+  unsigned int version;       // 4 bytes
+  unsigned int length;        // 4 bytes
+  unsigned int scene_length;  // 4 bytes
+  unsigned int scene_format;  // 4 bytes;
 
   // @todo { Endian swap for big endian machine. }
-  memcpy(&version, bytes + 4, 4); swap4(&version);
-  memcpy(&length, bytes + 8, 4); swap4(&length);
-  memcpy(&scene_length, bytes + 12, 4); swap4(&scene_length);
-  memcpy(&scene_format, bytes + 16, 4); swap4(&scene_format);
+  memcpy(&version, bytes + 4, 4);
+  swap4(&version);
+  memcpy(&length, bytes + 8, 4);
+  swap4(&length);
+  memcpy(&scene_length, bytes + 12, 4);
+  swap4(&scene_length);
+  memcpy(&scene_format, bytes + 16, 4);
+  swap4(&scene_format);
 
-  if ((20 + scene_length >= size) ||
-      (scene_length < 1) ||
-      (scene_format != 0)) { // 0 = JSON format.
+  if ((20 + scene_length >= size) || (scene_length < 1) ||
+      (scene_format != 0)) {  // 0 = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
     }
@@ -1589,13 +1760,17 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
   }
 
   // Extract JSON string.
-  std::string jsonString(reinterpret_cast<const char*>(&bytes[20]), scene_length);
+  std::string jsonString(reinterpret_cast<const char *>(&bytes[20]),
+                         scene_length);
 
   is_binary_ = true;
   bin_data_ = bytes + 20 + scene_length;
-  bin_size_ = length - (20 + scene_length); // extract header + JSON scene data.
+  bin_size_ =
+      length - (20 + scene_length);  // extract header + JSON scene data.
 
-  bool ret = LoadFromString(scene, err, reinterpret_cast<const char*>(&bytes[20]), scene_length, "");
+  bool ret =
+      LoadFromString(scene, err, reinterpret_cast<const char *>(&bytes[20]),
+                     scene_length, base_dir);
   if (!ret) {
     return ret;
   }
@@ -1604,7 +1779,7 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
 }
 
 bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
-                                  const std::string &filename) {
+                                        const std::string &filename) {
   std::stringstream ss;
 
   std::ifstream f(filename.c_str());
@@ -1624,7 +1799,11 @@ bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
   f.read(&buf.at(0), static_cast<std::streamsize>(sz));
   f.close();
 
-  bool ret = LoadBinaryFromMemory(scene, err, reinterpret_cast<unsigned char*>(&buf.at(0)), static_cast<unsigned int>(buf.size()));
+  std::string basedir = GetBaseDir(filename);
+
+  bool ret = LoadBinaryFromMemory(
+      scene, err, reinterpret_cast<unsigned char *>(&buf.at(0)),
+      static_cast<unsigned int>(buf.size()), basedir);
 
   return ret;
 }
