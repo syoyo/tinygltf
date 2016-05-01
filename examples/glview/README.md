@@ -8,6 +8,10 @@ Simple OpenGL viewer for glTF geometry.
 
 ### MacOSX and Linux
 
+
+    # optional. set pkg-config path to find glfw3
+    $ export PKG_CONFIG_PATH=/path/to/pkgconfig
+
     > premake4 gmake
     $ make
 

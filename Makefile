@@ -1,2 +1,5 @@
 all:
-	g++ -Wall -Werror -g -O2 -o loader_test test.cc
+	clang++ -fsanitize=address -Wall -Werror -Weverything -Wno-c++11-long-long -g -O0 -o example example.cc
+
+lint:
+	./cpplint.py tiny_gltf_loader.h

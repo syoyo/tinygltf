@@ -13,7 +13,7 @@ solution "glview"
 
 		configuration { "linux" }
 			 linkoptions { "`pkg-config --libs glfw3`" }
-			 links { "GL", "GLU", "m", "GLEW" }
+			 links { "GL", "GLU", "m", "GLEW", "X11", "Xrandr", "Xinerama", "Xi", "Xxf86vm", "Xcursor", "dl" }
 
 		configuration { "windows" }
 			 links { "glfw3", "gdi32", "winmm", "user32", "GLEW", "glu32","opengl32", "kernel32" }

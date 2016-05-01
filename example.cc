@@ -360,7 +360,7 @@ int main(int argc, char **argv) {
   tinygltf::TinyGLTFLoader loader;
   std::string err;
 
-  bool ret = loader.LoadFromFile(scene, err, argv[1]);
+  bool ret = loader.LoadFromFile(&scene, &err, argv[1]);
 
   if (!err.empty()) {
     printf("Err: %s\n", err.c_str());
