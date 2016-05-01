@@ -281,6 +281,7 @@ class TinyGLTFLoader {
 #include <fstream>
 #include <sstream>
 
+#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
 // Disable some warnings for external files.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -292,10 +293,13 @@ class TinyGLTFLoader {
 #pragma clang diagnostic ignored "-Wreserved-id-macro"
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
 #pragma clang diagnostic ignored "-Wpadded"
+#endif
 
 #include "./picojson.h"
 #include "./stb_image.h"
+#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
 #pragma clang diagnostic pop
+#endif
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -465,11 +469,13 @@ std::string base64_decode(std::string const &s);
 
 */
 
+#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wconversion"
+#endif
 static const std::string base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
@@ -524,7 +530,9 @@ std::string base64_decode(std::string const &encoded_string) {
 
   return ret;
 }
+#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
 #pragma clang diagnostic pop
+#endif
 
 static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
                              const std::string &filename,

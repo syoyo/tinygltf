@@ -42,5 +42,5 @@ script:
   - export CC="${CC}-${COMPILER_VERSION}"
   - export CXX="${CXX}-${COMPILER_VERSION}"
   - ${CC} -v
-  - ${CXX} ${EXTRA_CXXFLAGS} -Wall -Werror -g -o loader_example loader_example.cc
+  - ${CXX} ${EXTRA_CXXFLAGS} -Wall -g -o loader_example loader_example.cc
   - ./loader_example box.gltf
