@@ -10,9 +10,11 @@
 
 ## Features
 
-* Portable C++. C++-98 with STL dependency only.
+* Portable C++. C++-03 with STL dependency only.
 * Moderate parsing time and memory consumption.
 * glTF specification v1.0.0
+  * [x] ASCII glTF
+  * [x] Binary glTF(https://github.com/KhronosGroup/glTF/tree/master/extensions/Khronos/KHR_binary_glTF)
 * Buffers
   * [x] Parse BASE64 encoded embedded buffer fata(DataURI).
   * [x] Load `.bin` file.
@@ -34,8 +36,7 @@
 * [ ] Parse `animation`, `program`, `sampler`, `shader`, `technique`
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
-* [ ] HDR image
-* [ ] Binary glTF.
+* [ ] HDR image?
 
 ## License
 
@@ -64,7 +65,8 @@ Scene scene;
 TinyGLTFLoader loader;
 std::string err;
   
-bool ret = loader.LoadFromFile(scene, err, argv[1]);
+bool ret = loader.LoadASCIIFromFile(scene, err, argv[1]);
+//bool ret = loader.LoadBinaryFromFile(scene, err, argv[1]); // for binary glTF(.glb) 
 if (!err.empty()) {
   printf("Err: %s\n", err.c_str());
 }

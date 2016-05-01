@@ -22,7 +22,7 @@ success = []
 def run(filename):
 
     print("Testing: " + filename)
-    cmd = ["./loader_test", filename]
+    cmd = ["./example", filename]
     try:
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
@@ -45,7 +45,7 @@ def test():
         if os.path.isdir(p):
             for k in kinds:
                 targetDir = os.path.join(p, k)
-                g = glob.glob(targetDir + "/*.gltf")
+                g = glob.glob(targetDir + "/*.gltf") + glob.glob(targetDir + "/*.glb")
                 for gltf in g:
                     run(gltf)
 
