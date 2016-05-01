@@ -243,9 +243,21 @@ class TinyGLTFLoader {
 #include <fstream>
 #include <cassert>
 #include <algorithm>
-
+ 
+// Disable some warnings for external files.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wdouble-promotion"
+#pragma clang diagnostic ignored "-Wglobal-constructors"
+#pragma clang diagnostic ignored "-Wreserved-id-macro"
+#pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
+#pragma clang diagnostic ignored "-Wpadded"
 #include "./picojson.h"
 #include "./stb_image.h"
+#pragma clang diagnostic pop
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -255,7 +267,7 @@ class TinyGLTFLoader {
 
 namespace tinygltf {
 
-bool FileExists(const std::string &abs_filename) {
+static bool FileExists(const std::string &abs_filename) {
   bool ret;
   FILE *fp = fopen(abs_filename.c_str(), "rb");
   if (fp) {
@@ -268,7 +280,7 @@ bool FileExists(const std::string &abs_filename) {
   return ret;
 }
 
-std::string ExpandFilePath(const std::string &filepath) {
+static std::string ExpandFilePath(const std::string &filepath) {
 #ifdef _WIN32
   DWORD len = ExpandEnvironmentStringsA(filepath.c_str(), NULL, 0);
   char *str = new char[len];
@@ -281,7 +293,7 @@ std::string ExpandFilePath(const std::string &filepath) {
   return s;
 #else
 
-#if TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR
+#if defined(TARGET_OS_IPHONE) || defined(TARGET_IPHONE_SIMULATOR)
   // no expansion
   std::string s = filepath;
 #else
@@ -314,7 +326,7 @@ std::string ExpandFilePath(const std::string &filepath) {
 #endif
 }
 
-std::string JoinPath(const std::string &path0, const std::string &path1) {
+static std::string JoinPath(const std::string &path0, const std::string &path1) {
   if (path0.empty()) {
     return path1;
   } else {
@@ -328,7 +340,7 @@ std::string JoinPath(const std::string &path0, const std::string &path1) {
   }
 }
 
-std::string FindFile(const std::vector<std::string> &paths,
+static std::string FindFile(const std::vector<std::string> &paths,
                      const std::string &filepath) {
   for (size_t i = 0; i < paths.size(); i++) {
     std::string absPath = ExpandFilePath(JoinPath(paths[i], filepath));
@@ -347,7 +359,7 @@ std::string FindFile(const std::vector<std::string> &paths,
 //    return "";
 //}
 
-std::string GetBaseDir(const std::string &filepath) {
+static std::string GetBaseDir(const std::string &filepath) {
   if (filepath.find_last_of("/\\") != std::string::npos)
     return filepath.substr(0, filepath.find_last_of("/\\"));
   return "";
@@ -383,6 +395,11 @@ std::string base64_decode(std::string const &s);
 
 */
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#pragma clang diagnostic ignored "-Wglobal-constructors"
+#pragma clang diagnostic ignored "-Wsign-conversion"
+#pragma clang diagnostic ignored "-Wconversion"
 static const std::string base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
@@ -435,8 +452,9 @@ std::string base64_decode(std::string const &encoded_string) {
 
   return ret;
 }
+#pragma clang diagnostic pop
 
-bool LoadExternalFile(std::vector<unsigned char> &out, std::string &err,
+static bool LoadExternalFile(std::vector<unsigned char> &out, std::string &err,
                       const std::string &filename, const std::string &basedir,
                       size_t reqBytes, bool checkSize) {
   out.clear();
@@ -458,11 +476,11 @@ bool LoadExternalFile(std::vector<unsigned char> &out, std::string &err,
   }
 
   f.seekg(0, f.end);
-  size_t sz = f.tellg();
+  size_t sz = static_cast<size_t>(f.tellg());
   std::vector<unsigned char> buf(sz);
 
   f.seekg(0, f.beg);
-  f.read(reinterpret_cast<char *>(&buf.at(0)), sz);
+  f.read(reinterpret_cast<char *>(&buf.at(0)), static_cast<std::streamsize>(sz));
   f.close();
 
   if (checkSize) {
@@ -482,7 +500,7 @@ bool LoadExternalFile(std::vector<unsigned char> &out, std::string &err,
   return true;
 }
 
-bool IsDataURI(const std::string &in) {
+static bool IsDataURI(const std::string &in) {
   std::string header = "data:application/octet-stream;base64,";
   if (in.find(header) == 0) {
     return true;
@@ -501,7 +519,7 @@ bool IsDataURI(const std::string &in) {
   return false;
 }
 
-bool DecodeDataURI(std::vector<unsigned char> &out, const std::string &in,
+static bool DecodeDataURI(std::vector<unsigned char> &out, const std::string &in,
                    size_t reqBytes, bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
   std::string data;
@@ -541,7 +559,7 @@ bool DecodeDataURI(std::vector<unsigned char> &out, const std::string &in,
   return false;
 }
 
-bool ParseBooleanProperty(bool &ret, std::string &err,
+static bool ParseBooleanProperty(bool &ret, std::string &err,
                           const picojson::object &o,
                           const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
@@ -564,7 +582,7 @@ bool ParseBooleanProperty(bool &ret, std::string &err,
   return true;
 }
 
-bool ParseNumberProperty(double &ret, std::string &err,
+static bool ParseNumberProperty(double &ret, std::string &err,
                          const picojson::object &o, const std::string &property,
                          bool required) {
   picojson::object::const_iterator it = o.find(property);
@@ -587,7 +605,7 @@ bool ParseNumberProperty(double &ret, std::string &err,
   return true;
 }
 
-bool ParseNumberArrayProperty(std::vector<double> &ret, std::string &err,
+static bool ParseNumberArrayProperty(std::vector<double> &ret, std::string &err,
                               const picojson::object &o,
                               const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
@@ -620,7 +638,7 @@ bool ParseNumberArrayProperty(std::vector<double> &ret, std::string &err,
   return true;
 }
 
-bool ParseStringProperty(std::string &ret, std::string &err,
+static bool ParseStringProperty(std::string &ret, std::string &err,
                          const picojson::object &o, const std::string &property,
                          bool required) {
   picojson::object::const_iterator it = o.find(property);
@@ -643,7 +661,7 @@ bool ParseStringProperty(std::string &ret, std::string &err,
   return true;
 }
 
-bool ParseStringArrayProperty(std::vector<std::string> &ret, std::string &err,
+static bool ParseStringArrayProperty(std::vector<std::string> &ret, std::string &err,
                               const picojson::object &o,
                               const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
@@ -676,7 +694,7 @@ bool ParseStringArrayProperty(std::vector<std::string> &ret, std::string &err,
   return true;
 }
 
-bool ParseAsset(Asset &asset, std::string &err, const picojson::object &o) {
+static bool ParseAsset(Asset &asset, std::string &err, const picojson::object &o) {
   ParseStringProperty(asset.generator, err, o, "generator", false);
   ParseBooleanProperty(asset.premultipliedAlpha, err, o, "premultipliedAlpha",
                        false);
@@ -697,7 +715,7 @@ bool ParseAsset(Asset &asset, std::string &err, const picojson::object &o) {
   return true;
 }
 
-bool ParseImage(Image &image, std::string &err, const picojson::object &o,
+static bool ParseImage(Image &image, std::string &err, const picojson::object &o,
                 const std::string &basedir) {
   std::string uri;
   if (!ParseStringProperty(uri, err, o, "uri", true)) {
@@ -740,7 +758,7 @@ bool ParseImage(Image &image, std::string &err, const picojson::object &o,
   image.width = w;
   image.height = h;
   image.component = comp;
-  image.image.resize(w * h * comp);
+  image.image.resize(static_cast<size_t>(w * h * comp));
   std::copy(data, data + w * h * comp, image.image.begin());
 
   return true;
