@@ -146,6 +146,8 @@ static void DumpNode(const tinygltf::Node &node, int indent) {
 static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
   std::cout << Indent(indent) << "material : " << primitive.material
             << std::endl;
+  std::cout << Indent(indent) << "indices : " << primitive.indices
+            << std::endl;
   std::cout << Indent(indent) << "mode     : " << PrintMode(primitive.mode)
             << "(" << primitive.mode << ")" << std::endl;
   std::cout << Indent(indent)
