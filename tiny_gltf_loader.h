@@ -1,7 +1,7 @@
 //
 // Tiny glTF loader.
 //
-// Copyright (c) 2015, Syoyo Fujita.
+// Copyright (c) 2015-2016, Syoyo Fujita.
 // All rights reserved.
 // (Licensed under 2-clause BSD liecense)
 //
@@ -1124,8 +1124,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
         if (err) {
           std::stringstream ss;
           ss << "Invalid `byteLength'. Must be equal or less than binary size: "
-                "`byteLength' = " << byteLength
-             << ", binary size = " << bin_size << std::endl;
+                "`byteLength' = "
+             << byteLength << ", binary size = " << bin_size << std::endl;
           (*err) += ss.str();
         }
         return false;
@@ -1589,6 +1589,12 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     picojson::object::const_iterator it(root.begin());
     picojson::object::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!((it->second).is<picojson::object>())) {
+        if (err) {
+          (*err) += "`scenes' does not contain an object.";
+        }
+        return false;
+      }
       const picojson::object &o = (it->second).get<picojson::object>();
       std::vector<std::string> nodes;
       if (!ParseStringArrayProperty(&nodes, err, o, "nodes", false)) {
