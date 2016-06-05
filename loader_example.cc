@@ -29,6 +29,16 @@ static std::string PrintMode(int mode) {
   return "**UNKNOWN**";
 }
 
+static std::string PrintTarget(int target) {
+  if (target == 34962) {
+    return "GL_ARRAY_BUFFER";
+  } else if (target == 34963) {
+    return "GL_ELEMENT_ARRAY_BUFFER";
+  } else {
+    return "**UNKNOWN**";
+  }
+}
+
 static std::string PrintType(int ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return "SCALAR";
@@ -266,6 +276,8 @@ static void Dump(const tinygltf::Scene &scene) {
       std::cout << Indent(2) << "byteLength   : " << it->second.byteLength
                 << std::endl;
       std::cout << Indent(2) << "byteOffset   : " << it->second.byteOffset
+                << std::endl;
+      std::cout << Indent(2) << "target       : " << PrintTarget(it->second.target)
                 << std::endl;
     }
   }
