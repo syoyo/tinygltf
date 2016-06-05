@@ -142,7 +142,9 @@ bool LinkShader(GLuint &prog, GLuint &vertShader, GLuint &fragShader) {
 
 void reshapeFunc(GLFWwindow *window, int w, int h) {
   (void)window;
-  glViewport(0, 0, w, h);
+  int fb_w, fb_h;
+  glfwGetFramebufferSize(window, &fb_w, &fb_h);
+  glViewport(0, 0, fb_w, fb_h);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   gluPerspective(45.0, (float)w / (float)h, 0.1f, 1000.0f);
