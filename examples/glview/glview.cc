@@ -237,6 +237,7 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
     for (; it != itEnd; it++) {
       const tinygltf::BufferView &bufferView = it->second;
       if (bufferView.target == 0) {
+        std::cout << "WARN: bufferView.target is zero" << std::endl;
         continue; // Unsupported bufferView.
       }
 
@@ -244,6 +245,7 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
       GLBufferState state;
       glGenBuffers(1, &state.vb);
       glBindBuffer(bufferView.target, state.vb);
+      std::cout << "buffer.size= " << buffer.data.size() << ", byteOffset = " << bufferView.byteOffset << std::endl;
       glBufferData(bufferView.target, bufferView.byteLength,
                    &buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
       glBindBuffer(bufferView.target, 0);
@@ -351,6 +353,8 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
         count = 3;
       } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
         count = 4;
+      } else {
+        assert(0);
       }
       // it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
       if ((it->first.compare("POSITION") == 0) ||
@@ -382,7 +386,9 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
       mode = GL_LINES;
     } else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) {
       mode = GL_LINE_LOOP;
-    };
+    } else {
+      assert(0);
+    }
     glDrawElements(mode, indexAccessor.count, indexAccessor.componentType,
                    BUFFER_OFFSET(indexAccessor.byteOffset));
     CheckErrors("draw elements");
@@ -535,6 +541,8 @@ int main(int argc, char **argv) {
 
   SetupGLState(scene, progId);
   CheckErrors("SetupGLState");
+
+  std::cout << "# of meshes = " << scene.meshes.size() << std::endl;
 
   while (glfwWindowShouldClose(window) == GL_FALSE) {
     glfwPollEvents();
