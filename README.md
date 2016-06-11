@@ -29,6 +29,7 @@
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
+* [writer](examples/writer) : Simple glTF writer(serialize `tinygltf::Scene` class) 
 
 ## TODOs
 
