@@ -15,10 +15,15 @@ Simple OpenGL viewer for glTF geometry.
     > premake4 gmake
     $ make
 
-### Windows(not tested)
+### Windows(not tested well)
+
+Edit glew and glfw path in `premake4.lua`, then
 
     > premake5.exe vs2013
-    Open .sln in Visual Studio 2013
+
+Open .sln in Visual Studio 2013
+
+When running .exe, glew and glfw dll must exist in the working directory.
 
 ## TODO
 
