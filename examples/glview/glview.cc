@@ -142,7 +142,9 @@ bool LinkShader(GLuint &prog, GLuint &vertShader, GLuint &fragShader) {
 
 void reshapeFunc(GLFWwindow *window, int w, int h) {
   (void)window;
-  glViewport(0, 0, w, h);
+  int fb_w, fb_h;
+  glfwGetFramebufferSize(window, &fb_w, &fb_h);
+  glViewport(0, 0, fb_w, fb_h);
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
   gluPerspective(45.0, (float)w / (float)h, 0.1f, 1000.0f);
@@ -235,6 +237,7 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
     for (; it != itEnd; it++) {
       const tinygltf::BufferView &bufferView = it->second;
       if (bufferView.target == 0) {
+        std::cout << "WARN: bufferView.target is zero" << std::endl;
         continue; // Unsupported bufferView.
       }
 
@@ -242,6 +245,7 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
       GLBufferState state;
       glGenBuffers(1, &state.vb);
       glBindBuffer(bufferView.target, state.vb);
+      std::cout << "buffer.size= " << buffer.data.size() << ", byteOffset = " << bufferView.byteOffset << std::endl;
       glBufferData(bufferView.target, bufferView.byteLength,
                    &buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
       glBindBuffer(bufferView.target, 0);
@@ -349,17 +353,22 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
         count = 3;
       } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
         count = 4;
+      } else {
+        assert(0);
       }
       // it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
       if ((it->first.compare("POSITION") == 0) ||
           (it->first.compare("NORMAL") == 0) ||
           (it->first.compare("TEXCOORD_0") == 0)) {
-        glVertexAttribPointer(
-            gGLProgramState.attribs[it->first], count, accessor.componentType,
-            GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
-        CheckErrors("vertex attrib pointer");
-        glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
-        CheckErrors("enable vertex attrib array");
+
+		if (gGLProgramState.attribs[it->first] >= 0) {
+			glVertexAttribPointer(
+				gGLProgramState.attribs[it->first], count, accessor.componentType,
+				GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
+			CheckErrors("vertex attrib pointer");
+			glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
+			CheckErrors("enable vertex attrib array");
+		}
       }
     }
 
@@ -380,7 +389,9 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
       mode = GL_LINES;
     } else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) {
       mode = GL_LINE_LOOP;
-    };
+    } else {
+      assert(0);
+    }
     glDrawElements(mode, indexAccessor.count, indexAccessor.componentType,
                    BUFFER_OFFSET(indexAccessor.byteOffset));
     CheckErrors("draw elements");
@@ -395,7 +406,9 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
         if ((it->first.compare("POSITION") == 0) ||
             (it->first.compare("NORMAL") == 0) ||
             (it->first.compare("TEXCOORD_0") == 0)) {
-          glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+		  if (gGLProgramState.attribs[it->first] >= 0) {
+	        glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+		  }
         }
       }
     }
@@ -489,7 +502,7 @@ int main(int argc, char **argv) {
   glfwSetMouseButtonCallback(window, clickFunc);
   glfwSetCursorPosCallback(window, motionFunc);
 
-  glewExperimental = true;
+  glewExperimental = true; // This may be only true for linux environment.
   if (glewInit() != GLEW_OK) {
     std::cerr << "Failed to initialize GLEW." << std::endl;
     return -1;
@@ -515,15 +528,10 @@ int main(int argc, char **argv) {
   CheckErrors("link");
 
   {
+    // At least `in_vertex` should be used in the shader.
     GLint vtxLoc = glGetAttribLocation(progId, "in_vertex");
     if (vtxLoc < 0) {
       printf("vertex loc not found.\n");
-      exit(-1);
-    }
-
-    GLint tnLoc = glGetAttribLocation(progId, "in_normal");
-    if (tnLoc < 0) {
-      printf("normal loc not found.\n");
       exit(-1);
     }
   }
@@ -533,6 +541,8 @@ int main(int argc, char **argv) {
 
   SetupGLState(scene, progId);
   CheckErrors("SetupGLState");
+
+  std::cout << "# of meshes = " << scene.meshes.size() << std::endl;
 
   while (glfwWindowShouldClose(window) == GL_FALSE) {
     glfwPollEvents();
