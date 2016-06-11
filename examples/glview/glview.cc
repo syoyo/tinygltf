@@ -360,12 +360,15 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
       if ((it->first.compare("POSITION") == 0) ||
           (it->first.compare("NORMAL") == 0) ||
           (it->first.compare("TEXCOORD_0") == 0)) {
-        glVertexAttribPointer(
-            gGLProgramState.attribs[it->first], count, accessor.componentType,
-            GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
-        CheckErrors("vertex attrib pointer");
-        glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
-        CheckErrors("enable vertex attrib array");
+
+		if (gGLProgramState.attribs[it->first] >= 0) {
+			glVertexAttribPointer(
+				gGLProgramState.attribs[it->first], count, accessor.componentType,
+				GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
+			CheckErrors("vertex attrib pointer");
+			glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
+			CheckErrors("enable vertex attrib array");
+		}
       }
     }
 
@@ -403,7 +406,9 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
         if ((it->first.compare("POSITION") == 0) ||
             (it->first.compare("NORMAL") == 0) ||
             (it->first.compare("TEXCOORD_0") == 0)) {
-          glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+		  if (gGLProgramState.attribs[it->first] >= 0) {
+	        glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+		  }
         }
       }
     }
@@ -497,7 +502,7 @@ int main(int argc, char **argv) {
   glfwSetMouseButtonCallback(window, clickFunc);
   glfwSetCursorPosCallback(window, motionFunc);
 
-  glewExperimental = true;
+  glewExperimental = true; // This may be only true for linux environment.
   if (glewInit() != GLEW_OK) {
     std::cerr << "Failed to initialize GLEW." << std::endl;
     return -1;
@@ -523,15 +528,10 @@ int main(int argc, char **argv) {
   CheckErrors("link");
 
   {
+    // At least `in_vertex` should be used in the shader.
     GLint vtxLoc = glGetAttribLocation(progId, "in_vertex");
     if (vtxLoc < 0) {
       printf("vertex loc not found.\n");
-      exit(-1);
-    }
-
-    GLint tnLoc = glGetAttribLocation(progId, "in_normal");
-    if (tnLoc < 0) {
-      printf("normal loc not found.\n");
       exit(-1);
     }
   }
