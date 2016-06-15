@@ -1,7 +1,7 @@
 //
 // Tiny glTF loader.
 //
-// Copyright (c) 2015-2016, Syoyo Fujita.
+// Copyright (c) 2015-2016, Syoyo Fujita and many contributors.
 // All rights reserved.
 // (Licensed under 2-clause BSD liecense)
 //
@@ -31,6 +31,8 @@
 //
 //
 // Version:
+//  - v0.9.4 Support parsing `shader`, `program` and `tecnique` thanks to @lukesanantonio
+//  - v0.9.3 Support binary glTF
 //  - v0.9.2 Support parsing `texture`
 //  - v0.9.1 Support loading glTF asset from memory
 //  - v0.9.0 Initial
@@ -245,8 +247,7 @@ typedef struct {
   std::vector<std::string> attributes;
 } Program;
 
-typedef struct
-{
+typedef struct {
   int count;
   std::string node;
   std::string semantic;
@@ -939,10 +940,8 @@ static bool ParseStringArrayProperty(std::vector<std::string> *ret,
 }
 
 static bool ParseStringMapProperty(std::map<std::string, std::string> *ret,
-                                   std::string *err,
-                                   const picojson::object &o,
-                                   const std::string &property,
-                                   bool required) {
+                                   std::string *err, const picojson::object &o,
+                                   const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -969,11 +968,11 @@ static bool ParseStringMapProperty(std::map<std::string, std::string> *ret,
   picojson::object::const_iterator dictIt(dict.begin());
   picojson::object::const_iterator dictItEnd(dict.end());
 
-  for(; dictIt != dictItEnd; ++dictIt) {
+  for (; dictIt != dictItEnd; ++dictIt) {
     // Check that the value is a string.
-    if(!dictIt->second.is<std::string>()) {
-      if(required) {
-        if(err) {
+    if (!dictIt->second.is<std::string>()) {
+      if (required) {
+        if (err) {
           (*err) += "'" + property + "' value is not a string.\n";
         }
       }
@@ -1140,7 +1139,7 @@ static bool ParseImage(Image *image, std::string *err,
     if (IsDataURI(uri)) {
       if (!DecodeDataURI(&img, uri, 0, false)) {
         if (err) {
-          (*err) += "Failed to decode 'uri'.\n";
+          (*err) += "Failed to decode 'uri' for image parameter.\n";
         }
         return false;
       }
@@ -1148,13 +1147,13 @@ static bool ParseImage(Image *image, std::string *err,
       // Assume external file
       if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
         if (err) {
-          (*err) += "Failed to load external 'uri'.\n";
+          (*err) += "Failed to load external 'uri'. for image parameter\n";
         }
         return false;
       }
       if (img.empty()) {
         if (err) {
-          (*err) += "File is empty.\n";
+          (*err) += "Image is empty.\n";
         }
         return false;
       }
@@ -1250,8 +1249,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
         if (err) {
           std::stringstream ss;
           ss << "Invalid `byteLength'. Must be equal or less than binary size: "
-                "`byteLength' = "
-             << byteLength << ", binary size = " << bin_size << std::endl;
+                "`byteLength' = " << byteLength
+             << ", binary size = " << bin_size << std::endl;
           (*err) += ss.str();
         }
         return false;
@@ -1434,8 +1433,8 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   primitive->indices = "";
   ParseStringProperty(&primitive->indices, err, o, "indices", false);
 
-  if(!ParseStringMapProperty(&primitive->attributes, err, o,
-                             "attributes", true)) {
+  if (!ParseStringMapProperty(&primitive->attributes, err, o, "attributes",
+                              true)) {
     return false;
   }
 
@@ -1452,7 +1451,8 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
         (primObject->second).get<picojson::array>();
     for (size_t i = 0; i < primArray.size(); i++) {
       Primitive primitive;
-      if(ParsePrimitive(&primitive, err, primArray[i].get<picojson::object>())){
+      if (ParsePrimitive(&primitive, err,
+                         primArray[i].get<picojson::object>())) {
         // Only add the primitive if the parsing succeeds.
         mesh->primitives.push_back(primitive);
       }
@@ -1494,8 +1494,7 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
 
 static bool ParseParameterProperty(Parameter *param, std::string *err,
                                    const picojson::object &o,
-                                   const std::string &prop, bool required)
-{
+                                   const std::string &prop, bool required) {
   double num_val;
 
   // A parameter value can either be a string or an array of either a boolean or
@@ -1506,15 +1505,16 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
   if (ParseStringProperty(&param->string_value, err, o, prop, false)) {
     // Found string property.
     return true;
-  } else if (ParseNumberArrayProperty(&param->number_array, err,o,prop,false)) {
+  } else if (ParseNumberArrayProperty(&param->number_array, err, o, prop,
+                                      false)) {
     // Found a number array.
     return true;
   } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
     param->number_array.push_back(num_val);
     return true;
   } else {
-    if(required) {
-      if(err) {
+    if (required) {
+      if (err) {
         (*err) += "parameter must be a string or number / number array.\n";
       }
     }
@@ -1531,7 +1531,6 @@ static bool ParseMaterial(Material *material, std::string *err,
   picojson::object::const_iterator valuesIt = o.find("values");
 
   if ((valuesIt != o.end()) && (valuesIt->second).is<picojson::object>()) {
-
     const picojson::object &values_object =
         (valuesIt->second).get<picojson::object>();
 
@@ -1540,7 +1539,8 @@ static bool ParseMaterial(Material *material, std::string *err,
 
     for (; it != itEnd; it++) {
       Parameter param;
-      if(ParseParameterProperty(&param, err, values_object, it->first, false)) {
+      if (ParseParameterProperty(&param, err, values_object, it->first,
+                                 false)) {
         material->values[it->first] = param;
       }
     }
@@ -1550,34 +1550,81 @@ static bool ParseMaterial(Material *material, std::string *err,
 }
 
 static bool ParseShader(Shader *shader, std::string *err,
-                        const picojson::object &o, const std::string &basedir) {
+                        const picojson::object &o, const std::string &basedir,
+                        bool is_binary = false,
+                        const unsigned char *bin_data = NULL,
+                        size_t bin_size = 0) {
   std::string uri;
   if (!ParseStringProperty(&uri, err, o, "uri", true)) {
     return false;
   }
 
-  // Load shader source from data uri
-  // TODO: Support ascii or utf-8 data uris.
-  if (IsDataURI(uri)) {
-    if (!DecodeDataURI(&shader->source, uri, 0, false)) {
-      if (err) {
-        (*err) += "Failed to decode 'uri'.\n";
+  if (is_binary) {
+    // Still binary glTF accepts external dataURI. First try external resources.
+    bool loaded = false;
+    if (IsDataURI(uri)) {
+      loaded = DecodeDataURI(&shader->source, uri, 0, false);
+    } else {
+      // Assume external .bin file.
+      loaded = LoadExternalFile(&shader->source, err, uri, basedir, 0, false);
+    }
+
+    if (!loaded) {
+      // load data from (embedded) binary data
+
+      if ((bin_size == 0) || (bin_data == NULL)) {
+        if (err) {
+          (*err) += "Invalid binary data.\n";
+        }
+        return false;
       }
-      return false;
+
+      // There should be "extensions" property.
+      // "extensions":{"KHR_binary_glTF":{"bufferView": "id", ...
+
+      std::string buffer_view;
+      std::string mime_type;
+      int image_width;
+      int image_height;
+      bool ret = ParseKHRBinaryExtension(o, err, &buffer_view, &mime_type,
+                                         &image_width, &image_height);
+      if (!ret) {
+        return false;
+      }
+
+      if (uri.compare("data:,") == 0) {
+        // ok
+      } else {
+        if (err) {
+          (*err) += "Invalid URI for binary data.\n";
+        }
+        return false;
+      }
     }
   } else {
-    // Assume external file
-    if (!LoadExternalFile(&shader->source, err, uri, basedir, 0, false)) {
-      if (err) {
-        (*err) += "Failed to load external 'uri'.\n";
+    // Load shader source from data uri
+    // TODO: Support ascii or utf-8 data uris.
+    if (IsDataURI(uri)) {
+      if (!DecodeDataURI(&shader->source, uri, 0, false)) {
+        if (err) {
+          (*err) += "Failed to decode 'uri' for shader parameter.\n";
+        }
+        return false;
       }
-      return false;
-    }
-    if (shader->source.empty()) {
-      if (err) {
-        (*err) += "File is empty.\n";
+    } else {
+      // Assume external file
+      if (!LoadExternalFile(&shader->source, err, uri, basedir, 0, false)) {
+        if (err) {
+          (*err) += "Failed to load external 'uri' for shader parameter.\n";
+        }
+        return false;
       }
-      return false;
+      if (shader->source.empty()) {
+        if (err) {
+          (*err) += "shader is empty.\n";  // This may be OK?
+        }
+        return false;
+      }
     }
   }
 
@@ -1592,14 +1639,15 @@ static bool ParseShader(Shader *shader, std::string *err,
 }
 
 static bool ParseProgram(Program *program, std::string *err,
-                        const picojson::object &o) {
+                         const picojson::object &o) {
   ParseStringProperty(&program->name, err, o, "name", false);
 
-  if(!ParseStringProperty(&program->vertexShader, err,o, "vertexShader",true)) {
+  if (!ParseStringProperty(&program->vertexShader, err, o, "vertexShader",
+                           true)) {
     return false;
   }
-  if(!ParseStringProperty(&program->fragmentShader, err, o,
-                          "fragmentShader", true)) {
+  if (!ParseStringProperty(&program->fragmentShader, err, o, "fragmentShader",
+                           true)) {
     return false;
   }
 
@@ -1612,12 +1660,11 @@ static bool ParseProgram(Program *program, std::string *err,
 
 static bool ParseTechniqueParameter(TechniqueParameter *param, std::string *err,
                                     const picojson::object &o) {
-
   double count = 1;
   ParseNumberProperty(&count, err, o, "count", false);
 
   double type;
-  if(!ParseNumberProperty(&type, err, o, "type", true)) {
+  if (!ParseNumberProperty(&type, err, o, "type", true)) {
     return false;
   }
 
@@ -1636,7 +1683,7 @@ static bool ParseTechnique(Technique *technique, std::string *err,
                            const picojson::object &o) {
   ParseStringProperty(&technique->name, err, o, "name", false);
 
-  if(!ParseStringProperty(&technique->program, err, o, "program", true)) {
+  if (!ParseStringProperty(&technique->program, err, o, "program", true)) {
     return false;
   }
 
@@ -1648,7 +1695,6 @@ static bool ParseTechnique(Technique *technique, std::string *err,
 
   // Verify parameters is an object
   if ((paramsIt != o.end()) && (paramsIt->second).is<picojson::object>()) {
-
     // For each parameter in params_object.
     const picojson::object &params_object =
         (paramsIt->second).get<picojson::object>();
@@ -1660,11 +1706,11 @@ static bool ParseTechnique(Technique *technique, std::string *err,
       TechniqueParameter param;
 
       // Skip non-objects
-      if(!it->second.is<picojson::object>()) continue;
+      if (!it->second.is<picojson::object>()) continue;
 
       // Parse the technique parameter
-      const picojson::object& param_obj = it->second.get<picojson::object>();
-      if(ParseTechniqueParameter(&param, err, param_obj)) {
+      const picojson::object &param_obj = it->second.get<picojson::object>();
+      if (ParseTechniqueParameter(&param, err, param_obj)) {
         // Add if successful
         technique->parameters[it->first] = param;
       }
@@ -1928,7 +1974,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
-  // 9. Parse Texture
+  // 10. Parse Texture
   if (v.contains("textures") && v.get("textures").is<picojson::object>()) {
     const picojson::object &root = v.get("textures").get<picojson::object>();
 
@@ -1945,17 +1991,16 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
-  // 10. Parse Shader
+  // 11. Parse Shader
   if (v.contains("shaders") && v.get("shaders").is<picojson::object>()) {
     const picojson::object &root = v.get("shaders").get<picojson::object>();
 
     picojson::object::const_iterator it(root.begin());
     picojson::object::const_iterator itEnd(root.end());
-    for(; it != itEnd; ++it)
-    {
+    for (; it != itEnd; ++it) {
       Shader shader;
-      if(!ParseShader(&shader, err, (it->second).get<picojson::object>(),
-                      base_dir)) {
+      if (!ParseShader(&shader, err, (it->second).get<picojson::object>(),
+                       base_dir, is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
@@ -1963,16 +2008,15 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
-  // 11. Parse Program
+  // 12. Parse Program
   if (v.contains("programs") && v.get("programs").is<picojson::object>()) {
     const picojson::object &root = v.get("programs").get<picojson::object>();
 
     picojson::object::const_iterator it(root.begin());
     picojson::object::const_iterator itEnd(root.end());
-    for(; it != itEnd; ++it)
-    {
+    for (; it != itEnd; ++it) {
       Program program;
-      if(!ParseProgram(&program, err, (it->second).get<picojson::object>())) {
+      if (!ParseProgram(&program, err, (it->second).get<picojson::object>())) {
         return false;
       }
 
@@ -1980,17 +2024,16 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
-  // 12. Parse Technique
+  // 13. Parse Technique
   if (v.contains("techniques") && v.get("techniques").is<picojson::object>()) {
     const picojson::object &root = v.get("techniques").get<picojson::object>();
 
     picojson::object::const_iterator it(root.begin());
     picojson::object::const_iterator itEnd(root.end());
-    for(; it != itEnd; ++it)
-    {
+    for (; it != itEnd; ++it) {
       Technique technique;
-      if(!ParseTechnique(&technique, err,
-                         (it->second).get<picojson::object>())) {
+      if (!ParseTechnique(&technique, err,
+                          (it->second).get<picojson::object>())) {
         return false;
       }
 
