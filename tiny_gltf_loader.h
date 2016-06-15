@@ -860,6 +860,54 @@ static bool ParseStringArrayProperty(std::vector<std::string> *ret,
   return true;
 }
 
+static bool ParseStringMapProperty(std::map<std::string, std::string> *ret,
+                                   std::string *err,
+                                   const picojson::object &o,
+                                   const std::string &property,
+                                   bool required) {
+  picojson::object::const_iterator it = o.find(property);
+  if (it == o.end()) {
+    if (required) {
+      if (err) {
+        (*err) += "'" + property + "' property is missing.\n";
+      }
+    }
+    return false;
+  }
+
+  // Make sure we are dealing with an object / dictionary.
+  if (!it->second.is<picojson::object>()) {
+    if (required) {
+      if (err) {
+        (*err) += "'" + property + "' property is not an object.\n";
+      }
+    }
+    return false;
+  }
+
+  ret->clear();
+  const picojson::object &dict = it->second.get<picojson::object>();
+
+  picojson::object::const_iterator dictIt(dict.begin());
+  picojson::object::const_iterator dictItEnd(dict.end());
+
+  for(; dictIt != dictItEnd; ++dictIt) {
+    // Check that the value is a string.
+    if(!dictIt->second.is<std::string>()) {
+      if(required) {
+        if(err) {
+          (*err) += "'" + property + "' value is not a string.\n";
+        }
+      }
+      return false;
+    }
+
+    // Insert into the list.
+    (*ret)[dictIt->first] = dictIt->second.get<std::string>();
+  }
+  return true;
+}
+
 static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
                                     std::string *buffer_view,
                                     std::string *mime_type, int *image_width,
@@ -1308,26 +1356,9 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   primitive->indices = "";
   ParseStringProperty(&primitive->indices, err, o, "indices", false);
 
-  primitive->attributes.clear();
-  picojson::object::const_iterator attribsObject = o.find("attributes");
-  if ((attribsObject != o.end()) &&
-      (attribsObject->second).is<picojson::object>()) {
-    const picojson::object &attribs =
-        (attribsObject->second).get<picojson::object>();
-    picojson::object::const_iterator it(attribs.begin());
-    picojson::object::const_iterator itEnd(attribs.end());
-    for (; it != itEnd; it++) {
-      const std::string &name = it->first;
-      if (!(it->second).is<std::string>()) {
-        if (err) {
-          (*err) += "attribute expects string value.\n";
-        }
-        return false;
-      }
-      const std::string &value = (it->second).get<std::string>();
-
-      primitive->attributes[name] = value;
-    }
+  if(!ParseStringMapProperty(&primitive->attributes, err, o,
+                             "attributes", true)) {
+    return false;
   }
 
   return true;
