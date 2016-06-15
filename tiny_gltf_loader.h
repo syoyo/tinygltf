@@ -1343,8 +1343,10 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
         (primObject->second).get<picojson::array>();
     for (size_t i = 0; i < primArray.size(); i++) {
       Primitive primitive;
-      ParsePrimitive(&primitive, err, primArray[i].get<picojson::object>());
-      mesh->primitives.push_back(primitive);
+      if(ParsePrimitive(&primitive, err, primArray[i].get<picojson::object>())){
+        // Only add the primitive if the parsing succeeds.
+        mesh->primitives.push_back(primitive);
+      }
     }
   }
 
