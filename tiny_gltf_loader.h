@@ -613,7 +613,7 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   std::string filepath = FindFile(paths, filename);
   if (filepath.empty()) {
     if (err) {
-      (*err) += "File not found : " + filename;
+      (*err) += "File not found : " + filename + "\n";
     }
     return false;
   }
@@ -621,7 +621,7 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   std::ifstream f(filepath.c_str(), std::ifstream::binary);
   if (!f) {
     if (err) {
-      (*err) += "File open error : " + filepath;
+      (*err) += "File open error : " + filepath + "\n";
     }
     return false;
   }
