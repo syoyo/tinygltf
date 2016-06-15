@@ -34,7 +34,7 @@
 ## TODOs
 
 * [ ] Support multiple scenes in `.gltf`
-* [ ] Parse `animation`, `program`, `sampler`, `shader`, `technique`
+* [ ] Parse `animation`, `sampler`
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
