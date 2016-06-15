@@ -11,7 +11,7 @@ import subprocess
 # -- config -----------------------
 
 # Absolute path pointing to your cloned git repo of https://github.com/KhronosGroup/glTF/sampleModels
-base_model_dir = "/Users/syoyo/work/glTF/sampleModels"
+base_model_dir = "/home/syoyo/work/glTF/sampleModels"
 
 kinds = [ "glTF", "glTF-Binary", "glTF-Embedded", "glTF-MaterialsCommon"]
 # ---------------------------------
@@ -22,7 +22,7 @@ success = []
 def run(filename):
 
     print("Testing: " + filename)
-    cmd = ["./example", filename]
+    cmd = ["./loader_example", filename]
     try:
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
