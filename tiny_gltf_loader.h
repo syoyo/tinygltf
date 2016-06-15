@@ -716,6 +716,11 @@ static bool IsDataURI(const std::string &in) {
     return true;
   }
 
+  header = "data:text/plain;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+
   return false;
 }
 
@@ -739,6 +744,13 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
     header = "data:image/png;base64,";
     if (in.find(header) == 0) {
       data = base64_decode(in.substr(header.size()));  // cut mime string.
+    }
+  }
+
+  if (data.empty()) {
+    header = "data:text/plain;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size()));
     }
   }
 
