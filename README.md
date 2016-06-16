@@ -87,6 +87,6 @@ Git clone https://github.com/KhronosGroup/glTF to your local dir.
 
 ### Run test
 
-After building `loader_test`, edit `test_runner.py`, then,
+After building `loader_example`, edit `test_runner.py`, then,
 
     $ python test_runner.py
