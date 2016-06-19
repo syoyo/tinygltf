@@ -69,6 +69,17 @@ namespace tinygltf {
 #define TINYGLTF_COMPONENT_TYPE_FLOAT (5126)
 #define TINYGLTF_COMPONENT_TYPE_DOUBLE (5127)
 
+#define TINYGLTF_TEXTURE_FILTER_NEAREST (9728)
+#define TINYGLTF_TEXTURE_FILTER_LINEAR (9729)
+#define TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST (9984)
+#define TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST (9985)
+#define TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR (9986)
+#define TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR (9987)
+
+#define TINYGLTF_TEXTURE_WRAP_RPEAT (10497)
+#define TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE (33071)
+#define TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT (33071)
+
 // Redeclarations of the above for technique.parameters.
 #define TINYGLTF_PARAMETER_TYPE_BYTE (5120)
 #define TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE (5121)
@@ -149,6 +160,15 @@ typedef struct {
   std::map<std::string, AnimationSampler> samplers;
   ParameterMap parameters;
 } Animation;
+
+typedef struct {
+  std::string name;
+  int minFilter;
+  int magFilter;
+  int wrapS;
+  int wrapT;
+  int wrapR;  // TinyGLTF extension
+} Sampler;
 
 typedef struct {
   std::string name;
@@ -309,6 +329,7 @@ class Scene {
   std::map<std::string, Shader> shaders;
   std::map<std::string, Program> programs;
   std::map<std::string, Technique> techniques;
+  std::map<std::string, Sampler> samplers;
   std::map<std::string, std::vector<std::string> > scenes;  // list of nodes
 
   std::string defaultScene;
@@ -1856,6 +1877,28 @@ static bool ParseAnimation(Animation *animation, std::string *err,
   return true;
 }
 
+static bool ParseSampler(Sampler *sampler, std::string *err,
+                         const picojson::object &o) {
+  ParseStringProperty(&sampler->name, err, o, "name", false);
+
+  double minFilter =
+      static_cast<double>(TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR);
+  double magFilter = static_cast<double>(TINYGLTF_TEXTURE_FILTER_LINEAR);
+  double wrapS = static_cast<double>(TINYGLTF_TEXTURE_WRAP_RPEAT);
+  double wrapT = static_cast<double>(TINYGLTF_TEXTURE_WRAP_RPEAT);
+  ParseNumberProperty(&minFilter, err, o, "minFilter", false);
+  ParseNumberProperty(&magFilter, err, o, "magFilter", false);
+  ParseNumberProperty(&wrapS, err, o, "wrapS", false);
+  ParseNumberProperty(&wrapT, err, o, "wrapT", false);
+
+  sampler->minFilter = static_cast<int>(minFilter);
+  sampler->magFilter = static_cast<int>(magFilter);
+  sampler->wrapS = static_cast<int>(wrapS);
+  sampler->wrapT = static_cast<int>(wrapT);
+
+  return true;
+}
+
 bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
                                     const char *str, unsigned int length,
                                     const std::string &base_dir) {
@@ -2194,6 +2237,21 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
+  // 15. Parse Sampler
+  if (v.contains("samplers") && v.get("samplers").is<picojson::object>()) {
+    const picojson::object &root = v.get("samplers").get<picojson::object>();
+
+    picojson::object::const_iterator it(root.begin());
+    picojson::object::const_iterator itEnd(root.end());
+    for (; it != itEnd; ++it) {
+      Sampler sampler;
+      if (!ParseSampler(&sampler, err, (it->second).get<picojson::object>())) {
+        return false;
+      }
+
+      scene->samplers[it->first] = sampler;
+    }
+  }
   return true;
 }
 
