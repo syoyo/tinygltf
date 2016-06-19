@@ -140,6 +140,36 @@ static std::string PrintParameterType(int ty) {
 
   return "**UNKNOWN**";
 }
+
+static std::string PrintWrapMode(int mode) {
+  if (mode == TINYGLTF_TEXTURE_WRAP_RPEAT) {
+    return "REPEAT";
+  } else if (mode == TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE) {
+    return "CLAMP_TO_EDGE";
+  } else if (mode == TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT) {
+    return "MIRRORED_REPEAT";
+  }
+
+  return "**UNKNOWN**";
+}
+
+static std::string PrintFilterMode(int mode) {
+  if (mode == TINYGLTF_TEXTURE_FILTER_NEAREST) {
+    return "NEAREST";
+  } else if (mode == TINYGLTF_TEXTURE_FILTER_LINEAR) {
+    return "LINEAR";
+  } else if (mode == TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST) {
+    return "NEAREST_MIPMAP_NEAREST";
+  } else if (mode == TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR) {
+    return "NEAREST_MIPMAP_LINEAR";
+  } else if (mode == TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_NEAREST) {
+    return "LINEAR_MIPMAP_NEAREST";
+  } else if (mode == TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR) {
+    return "LINEAR_MIPMAP_LINEAR";
+  }
+  return "**UNKNOWN**";
+}
+
 static std::string PrintFloatArray(const std::vector<double> &arr) {
   if (arr.size() == 0) {
     return "";
@@ -606,6 +636,31 @@ static void Dump(const tinygltf::Scene &scene) {
       std::cout << Indent(2) << "uniforms(items=" << it->second.uniforms.size()
                 << ")" << std::endl;
       DumpStringMap(it->second.uniforms, 3);
+    }
+  }
+
+  {
+    std::map<std::string, tinygltf::Sampler>::const_iterator it(
+        scene.samplers.begin());
+    std::map<std::string, tinygltf::Sampler>::const_iterator itEnd(
+        scene.samplers.end());
+
+    std::cout << "samplers(items=" << scene.samplers.size() << ")" << std::endl;
+
+    for (; it != itEnd; it++) {
+      std::cout << Indent(1) << "name (id)    : " << it->first << std::endl;
+      std::cout << Indent(2)
+                << "minFilter    : " << PrintFilterMode(it->second.minFilter)
+                << std::endl;
+      std::cout << Indent(2)
+                << "magFilter    : " << PrintFilterMode(it->second.magFilter)
+                << std::endl;
+      std::cout << Indent(2)
+                << "wrapS        : " << PrintWrapMode(it->second.wrapS)
+                << std::endl;
+      std::cout << Indent(2)
+                << "wrapT        : " << PrintWrapMode(it->second.wrapT)
+                << std::endl;
     }
   }
 }
