@@ -31,7 +31,8 @@
 //
 //
 // Version:
-//  - v0.9.4 Support parsing `shader`, `program` and `tecnique` thanks to @lukesanantonio
+//  - v0.9.4 Support parsing `shader`, `program` and `tecnique` thanks to
+//  @lukesanantonio
 //  - v0.9.3 Support binary glTF
 //  - v0.9.2 Support parsing `texture`
 //  - v0.9.1 Support loading glTF asset from memory
@@ -129,6 +130,25 @@ typedef struct {
 } Parameter;
 
 typedef std::map<std::string, Parameter> ParameterMap;
+
+typedef struct {
+  std::string sampler;
+  std::string target_id;
+  std::string target_path;
+} AnimationChannel;
+
+typedef struct {
+  std::string input;
+  std::string interpolation;
+  std::string output;
+} AnimationSampler;
+
+typedef struct {
+  std::string name;
+  std::vector<AnimationChannel> channels;
+  std::map<std::string, AnimationSampler> samplers;
+  ParameterMap parameters;
+} Animation;
 
 typedef struct {
   std::string name;
@@ -278,6 +298,7 @@ class Scene {
   ~Scene() {}
 
   std::map<std::string, Accessor> accessors;
+  std::map<std::string, Animation> animations;
   std::map<std::string, Buffer> buffers;
   std::map<std::string, BufferView> bufferViews;
   std::map<std::string, Material> materials;
@@ -1249,8 +1270,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
         if (err) {
           std::stringstream ss;
           ss << "Invalid `byteLength'. Must be equal or less than binary size: "
-                "`byteLength' = " << byteLength
-             << ", binary size = " << bin_size << std::endl;
+                "`byteLength' = "
+             << byteLength << ", binary size = " << bin_size << std::endl;
           (*err) += ss.str();
         }
         return false;
@@ -1720,6 +1741,121 @@ static bool ParseTechnique(Technique *technique, std::string *err,
   return true;
 }
 
+static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
+                                  const picojson::object &o) {
+  if (!ParseStringProperty(&channel->sampler, err, o, "sampler", true)) {
+    if (err) {
+      (*err) += "`sampler` field is missing in animation channels\n";
+    }
+    return false;
+  }
+
+  picojson::object::const_iterator targetIt = o.find("target");
+  if ((targetIt != o.end()) && (targetIt->second).is<picojson::object>()) {
+    const picojson::object &target_object =
+        (targetIt->second).get<picojson::object>();
+
+    if (!ParseStringProperty(&channel->target_id, err, target_object, "id",
+                             true)) {
+      if (err) {
+        (*err) += "`id` field is missing in animation.channels.target\n";
+      }
+      return false;
+    }
+
+    if (!ParseStringProperty(&channel->target_path, err, target_object, "path",
+                             true)) {
+      if (err) {
+        (*err) += "`path` field is missing in animation.channels.target\n";
+      }
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool ParseAnimation(Animation *animation, std::string *err,
+                           const picojson::object &o) {
+  {
+    picojson::object::const_iterator channelsIt = o.find("channels");
+    if ((channelsIt != o.end()) && (channelsIt->second).is<picojson::array>()) {
+      const picojson::array &channelArray =
+          (channelsIt->second).get<picojson::array>();
+      for (size_t i = 0; i < channelArray.size(); i++) {
+        AnimationChannel channel;
+        if (ParseAnimationChannel(&channel, err,
+                                  channelArray[i].get<picojson::object>())) {
+          // Only add the channel if the parsing succeeds.
+          animation->channels.push_back(channel);
+        }
+      }
+    }
+  }
+
+  {
+    picojson::object::const_iterator samplerIt = o.find("samplers");
+    if ((samplerIt != o.end()) && (samplerIt->second).is<picojson::object>()) {
+      const picojson::object &sampler_object =
+          (samplerIt->second).get<picojson::object>();
+
+      picojson::object::const_iterator it = sampler_object.begin();
+      picojson::object::const_iterator itEnd = sampler_object.end();
+
+      for (; it != itEnd; it++) {
+        // Skip non-objects
+        if (!it->second.is<picojson::object>()) continue;
+
+        const picojson::object &s = it->second.get<picojson::object>();
+
+        AnimationSampler sampler;
+        if (!ParseStringProperty(&sampler.input, err, s, "input", true)) {
+          if (err) {
+            (*err) += "`input` field is missing in animation.sampler\n";
+          }
+          return false;
+        }
+        if (!ParseStringProperty(&sampler.interpolation, err, s,
+                                 "interpolation", true)) {
+          if (err) {
+            (*err) += "`interpolation` field is missing in animation.sampler\n";
+          }
+          return false;
+        }
+        if (!ParseStringProperty(&sampler.output, err, s, "output", true)) {
+          if (err) {
+            (*err) += "`output` field is missing in animation.sampler\n";
+          }
+          return false;
+        }
+
+        animation->samplers[it->first] = sampler;
+      }
+    }
+  }
+
+  picojson::object::const_iterator parametersIt = o.find("parameters");
+  if ((parametersIt != o.end()) &&
+      (parametersIt->second).is<picojson::object>()) {
+    const picojson::object &parameters_object =
+        (parametersIt->second).get<picojson::object>();
+
+    picojson::object::const_iterator it(parameters_object.begin());
+    picojson::object::const_iterator itEnd(parameters_object.end());
+
+    for (; it != itEnd; it++) {
+      Parameter param;
+      if (ParseParameterProperty(&param, err, parameters_object, it->first,
+                                 false)) {
+        animation->parameters[it->first] = param;
+      }
+    }
+  }
+  ParseStringProperty(&animation->name, err, o, "name", false);
+
+  return true;
+}
+
 bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
                                     const char *str, unsigned int length,
                                     const std::string &base_dir) {
@@ -2038,6 +2174,23 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
       }
 
       scene->techniques[it->first] = technique;
+    }
+  }
+
+  // 14. Parse Animation
+  if (v.contains("animations") && v.get("animations").is<picojson::object>()) {
+    const picojson::object &root = v.get("animations").get<picojson::object>();
+
+    picojson::object::const_iterator it(root.begin());
+    picojson::object::const_iterator itEnd(root.end());
+    for (; it != itEnd; ++it) {
+      Animation animation;
+      if (!ParseAnimation(&animation, err,
+                          (it->second).get<picojson::object>())) {
+        return false;
+      }
+
+      scene->animations[it->first] = animation;
     }
   }
 
