@@ -33,8 +33,9 @@
 
 ## TODOs
 
+* [ ] Write C++ code generator from json schema for robust parsing.
 * [ ] Support multiple scenes in `.gltf`
-* [ ] Parse `sampler`
+* [ ] Parse `sampler`, `skin`
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
