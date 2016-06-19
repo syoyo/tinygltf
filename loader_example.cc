@@ -2,8 +2,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "tiny_gltf_loader.h"
 
-#include <fstream>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 
 static std::string GetFilePathExtension(const std::string &FileName) {
@@ -179,7 +179,7 @@ static std::string Indent(int indent) {
   return s;
 }
 
-static std::string PrintParameterValue(const tinygltf::Parameter& param) {
+static std::string PrintParameterValue(const tinygltf::Parameter &param) {
   if (!param.number_array.empty()) {
     return PrintFloatArray(param.number_array);
   } else {
@@ -222,16 +222,14 @@ static void DumpStringMap(const std::map<std::string, std::string> &map,
   std::map<std::string, std::string>::const_iterator it(map.begin());
   std::map<std::string, std::string>::const_iterator itEnd(map.end());
   for (; it != itEnd; it++) {
-    std::cout << Indent(indent) << it->first << ": " << it->second
-              << std::endl;
+    std::cout << Indent(indent) << it->first << ": " << it->second << std::endl;
   }
 }
 
 static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
   std::cout << Indent(indent) << "material : " << primitive.material
             << std::endl;
-  std::cout << Indent(indent) << "indices : " << primitive.indices
-            << std::endl;
+  std::cout << Indent(indent) << "indices : " << primitive.indices << std::endl;
   std::cout << Indent(indent) << "mode     : " << PrintMode(primitive.mode)
             << "(" << primitive.mode << ")" << std::endl;
   std::cout << Indent(indent)
@@ -242,16 +240,13 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
 
 static void DumpTechniqueParameter(const tinygltf::TechniqueParameter &param,
                                    int indent) {
-  std::cout << Indent(indent) << "count    : " << param.count
-            << std::endl;
-  std::cout << Indent(indent) << "node     : " << param.node
-            << std::endl;
-  std::cout << Indent(indent) << "semantic : " << param.semantic
-            << std::endl;
+  std::cout << Indent(indent) << "count    : " << param.count << std::endl;
+  std::cout << Indent(indent) << "node     : " << param.node << std::endl;
+  std::cout << Indent(indent) << "semantic : " << param.semantic << std::endl;
   std::cout << Indent(indent) << "type     : " << PrintParameterType(param.type)
             << std::endl;
-  std::cout << Indent(indent) << "value    : "
-            << PrintParameterValue(param.value) << std::endl;
+  std::cout << Indent(indent)
+            << "value    : " << PrintParameterValue(param.value) << std::endl;
 }
 
 static void Dump(const tinygltf::Scene &scene) {
@@ -288,8 +283,10 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
-    std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
-    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
+    std::map<std::string, tinygltf::Mesh>::const_iterator it(
+        scene.meshes.begin());
+    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(
+        scene.meshes.end());
     std::cout << "meshes(item=" << scene.meshes.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name     : " << it->second.name << std::endl;
@@ -304,10 +301,11 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
-    std::map<std::string, tinygltf::Accessor>::const_iterator it(scene.accessors.begin());
+    std::map<std::string, tinygltf::Accessor>::const_iterator it(
+        scene.accessors.begin());
     std::map<std::string, tinygltf::Accessor>::const_iterator itEnd(
         scene.accessors.end());
-    std::cout << "accessos(items=" << scene.accessors.size() << ")"
+    std::cout << "accessors(items=" << scene.accessors.size() << ")"
               << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
@@ -344,6 +342,64 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
+    std::map<std::string, tinygltf::Animation>::const_iterator it(
+        scene.animations.begin());
+    std::map<std::string, tinygltf::Animation>::const_iterator itEnd(
+        scene.animations.end());
+    std::cout << "animations(items=" << scene.animations.size() << ")"
+              << std::endl;
+    for (; it != itEnd; it++) {
+      std::cout << Indent(1) << "name         : " << it->first << std::endl;
+
+      std::cout << Indent(1) << "channels : [ " << std::endl;
+      for (size_t i = 0; i < it->second.channels.size(); i++) {
+        std::cout << Indent(2)
+                  << "sampler     : " << it->second.channels[i].sampler
+                  << std::endl;
+        std::cout << Indent(2)
+                  << "target.id   : " << it->second.channels[i].target_id
+                  << std::endl;
+        std::cout << Indent(2)
+                  << "target.path : " << it->second.channels[i].target_path
+                  << std::endl;
+        std::cout << ((i != (it->second.channels.size() - 1)) ? "  , " : "");
+      }
+      std::cout << "  ]" << std::endl;
+
+      std::map<std::string, tinygltf::AnimationSampler>::const_iterator
+          samplerIt(it->second.samplers.begin());
+      std::map<std::string, tinygltf::AnimationSampler>::const_iterator
+          samplerItEnd(it->second.samplers.end());
+      std::cout << Indent(1) << "samplers(items=" << it->second.samplers.size()
+                << ")" << std::endl;
+      for (; samplerIt != samplerItEnd; samplerIt++) {
+        std::cout << Indent(1) << "name          : " << samplerIt->first
+                  << std::endl;
+        std::cout << Indent(2) << "input         : " << samplerIt->second.input
+                  << std::endl;
+        std::cout << Indent(2)
+                  << "interpolation : " << samplerIt->second.interpolation
+                  << std::endl;
+        std::cout << Indent(2) << "output        : " << samplerIt->second.output
+                  << std::endl;
+      }
+
+      {
+        std::cout << Indent(1)
+                  << "parameters(items=" << it->second.parameters.size() << ")"
+                  << std::endl;
+        tinygltf::ParameterMap::const_iterator p(it->second.parameters.begin());
+        tinygltf::ParameterMap::const_iterator pEnd(
+            it->second.parameters.end());
+        for (; p != pEnd; p++) {
+          std::cout << Indent(2) << p->first << ": "
+                    << PrintParameterValue(p->second) << std::endl;
+        }
+      }
+    }
+  }
+
+  {
     std::map<std::string, tinygltf::BufferView>::const_iterator it(
         scene.bufferViews.begin());
     std::map<std::string, tinygltf::BufferView>::const_iterator itEnd(
@@ -358,14 +414,17 @@ static void Dump(const tinygltf::Scene &scene) {
                 << std::endl;
       std::cout << Indent(2) << "byteOffset   : " << it->second.byteOffset
                 << std::endl;
-      std::cout << Indent(2) << "target       : " << PrintTarget(it->second.target)
+      std::cout << Indent(2)
+                << "target       : " << PrintTarget(it->second.target)
                 << std::endl;
     }
   }
 
   {
-    std::map<std::string, tinygltf::Buffer>::const_iterator it(scene.buffers.begin());
-    std::map<std::string, tinygltf::Buffer>::const_iterator itEnd(scene.buffers.end());
+    std::map<std::string, tinygltf::Buffer>::const_iterator it(
+        scene.buffers.begin());
+    std::map<std::string, tinygltf::Buffer>::const_iterator itEnd(
+        scene.buffers.end());
     std::cout << "buffers(items=" << scene.buffers.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
@@ -375,7 +434,8 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
-    std::map<std::string, tinygltf::Material>::const_iterator it(scene.materials.begin());
+    std::map<std::string, tinygltf::Material>::const_iterator it(
+        scene.materials.begin());
     std::map<std::string, tinygltf::Material>::const_iterator itEnd(
         scene.materials.end());
     std::cout << "materials(items=" << scene.materials.size() << ")"
@@ -397,8 +457,10 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
-    std::map<std::string, tinygltf::Node>::const_iterator it(scene.nodes.begin());
-    std::map<std::string, tinygltf::Node>::const_iterator itEnd(scene.nodes.end());
+    std::map<std::string, tinygltf::Node>::const_iterator it(
+        scene.nodes.begin());
+    std::map<std::string, tinygltf::Node>::const_iterator itEnd(
+        scene.nodes.end());
     std::cout << "nodes(items=" << scene.nodes.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
@@ -408,8 +470,10 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
-    std::map<std::string, tinygltf::Image>::const_iterator it(scene.images.begin());
-    std::map<std::string, tinygltf::Image>::const_iterator itEnd(scene.images.end());
+    std::map<std::string, tinygltf::Image>::const_iterator it(
+        scene.images.begin());
+    std::map<std::string, tinygltf::Image>::const_iterator itEnd(
+        scene.images.end());
     std::cout << "images(items=" << scene.images.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name         : " << it->first << std::endl;
@@ -424,8 +488,10 @@ static void Dump(const tinygltf::Scene &scene) {
   }
 
   {
-    std::map<std::string, tinygltf::Texture>::const_iterator it(scene.textures.begin());
-    std::map<std::string, tinygltf::Texture>::const_iterator itEnd(scene.textures.end());
+    std::map<std::string, tinygltf::Texture>::const_iterator it(
+        scene.textures.begin());
+    std::map<std::string, tinygltf::Texture>::const_iterator itEnd(
+        scene.textures.end());
     std::cout << "textures(items=" << scene.textures.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name           : " << it->first << std::endl;
@@ -446,15 +512,16 @@ static void Dump(const tinygltf::Scene &scene) {
 
   {
     std::map<std::string, tinygltf::Shader>::const_iterator it(
-      scene.shaders.begin());
+        scene.shaders.begin());
     std::map<std::string, tinygltf::Shader>::const_iterator itEnd(
-      scene.shaders.end());
+        scene.shaders.end());
 
     std::cout << "shaders(items=" << scene.shaders.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
       std::cout << Indent(1) << "name (id)      : " << it->first << std::endl;
-      std::cout << Indent(2) << "type           : "
-                << PrintShaderType(it->second.type) << std::endl;
+      std::cout << Indent(2)
+                << "type           : " << PrintShaderType(it->second.type)
+                << std::endl;
 
       std::cout << Indent(2) << "name (json)    : " << it->second.name
                 << std::endl;
@@ -464,9 +531,9 @@ static void Dump(const tinygltf::Scene &scene) {
       shader_source.resize(shader_source.size() + it->second.source.size());
 
       std::vector<unsigned char>::const_iterator sourceIt(
-        it->second.source.begin());
+          it->second.source.begin());
       std::vector<unsigned char>::const_iterator sourceItEnd(
-        it->second.source.end());
+          it->second.source.end());
 
       for (; sourceIt != sourceItEnd; ++sourceIt) {
         shader_source += *sourceIt;
@@ -474,16 +541,16 @@ static void Dump(const tinygltf::Scene &scene) {
           shader_source += Indent(3);
         }
       }
-      std::cout << Indent(2) << "source         :\n" << shader_source
-                << std::endl;
+      std::cout << Indent(2) << "source         :\n"
+                << shader_source << std::endl;
     }
   }
 
   {
     std::map<std::string, tinygltf::Program>::const_iterator it(
-      scene.programs.begin());
+        scene.programs.begin());
     std::map<std::string, tinygltf::Program>::const_iterator itEnd(
-      scene.programs.end());
+        scene.programs.end());
 
     std::cout << "programs(items=" << scene.programs.size() << ")" << std::endl;
     for (; it != itEnd; it++) {
@@ -501,9 +568,9 @@ static void Dump(const tinygltf::Scene &scene) {
 
   {
     std::map<std::string, tinygltf::Technique>::const_iterator it(
-      scene.techniques.begin());
+        scene.techniques.begin());
     std::map<std::string, tinygltf::Technique>::const_iterator itEnd(
-      scene.techniques.end());
+        scene.techniques.end());
 
     std::cout << "techniques(items=" << scene.techniques.size() << ")"
               << std::endl;
@@ -516,15 +583,16 @@ static void Dump(const tinygltf::Scene &scene) {
       std::cout << Indent(2) << "name (json)  : " << it->second.name
                 << std::endl;
 
-      std::cout << Indent(2) << "parameters(items="
-                << it->second.parameters.size() << ")" << std::endl;
+      std::cout << Indent(2)
+                << "parameters(items=" << it->second.parameters.size() << ")"
+                << std::endl;
 
       std::map<std::string, tinygltf::TechniqueParameter>::const_iterator
-        paramIt(it->second.parameters.begin());
+          paramIt(it->second.parameters.begin());
       std::map<std::string, tinygltf::TechniqueParameter>::const_iterator
-        paramItEnd(it->second.parameters.end());
+          paramItEnd(it->second.parameters.end());
 
-      for(; paramIt != paramItEnd; ++paramIt) {
+      for (; paramIt != paramItEnd; ++paramIt) {
         std::cout << Indent(3) << "name     : " << paramIt->first << std::endl;
         DumpTechniqueParameter(paramIt->second, 4);
       }
@@ -535,13 +603,11 @@ static void Dump(const tinygltf::Scene &scene) {
 
       DumpStringMap(it->second.attributes, 3);
 
-      std::cout << Indent(2)
-                << "uniforms(items=" << it->second.uniforms.size() << ")"
-                << std::endl;
+      std::cout << Indent(2) << "uniforms(items=" << it->second.uniforms.size()
+                << ")" << std::endl;
       DumpStringMap(it->second.uniforms, 3);
     }
   }
-
 }
 
 int main(int argc, char **argv) {
