@@ -566,7 +566,7 @@ static void Dump(const tinygltf::Scene &scene) {
           it->second.source.end());
 
       for (; sourceIt != sourceItEnd; ++sourceIt) {
-        shader_source += *sourceIt;
+        shader_source += static_cast<char>(*sourceIt);
         if (*sourceIt == '\n') {
           shader_source += Indent(3);
         }
