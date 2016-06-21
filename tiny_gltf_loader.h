@@ -168,6 +168,7 @@ typedef struct {
   int wrapS;
   int wrapT;
   int wrapR;  // TinyGLTF extension
+  int pad0;
 } Sampler;
 
 typedef struct {
@@ -277,6 +278,7 @@ typedef struct {
 typedef struct {
   std::string name;
   int type;
+  int pad0;
   std::vector<unsigned char> source;
 } Shader;
 
@@ -289,9 +291,11 @@ typedef struct {
 
 typedef struct {
   int count;
+  int pad0;
   std::string node;
   std::string semantic;
   int type;
+  int pad1;
   Parameter value;
 } TechniqueParameter;
 
