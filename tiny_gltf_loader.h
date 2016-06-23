@@ -2286,6 +2286,13 @@ bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
   size_t sz = static_cast<size_t>(f.tellg());
   std::vector<char> buf(sz);
 
+  if (sz == 0) {
+    if (err) {
+      (*err) = "Empty file.";
+    }
+    return false;
+  }
+
   f.seekg(0, f.beg);
   f.read(&buf.at(0), static_cast<std::streamsize>(sz));
   f.close();
