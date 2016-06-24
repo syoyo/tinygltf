@@ -346,6 +346,18 @@ class Scene {
   Asset asset;
 };
 
+enum SectionCheck
+{
+  NO_REQUIRE = 0x00,
+  REQUIRE_SCENE = 0x01,
+  REQUIRE_SCENES = 0x02,
+  REQUIRE_NODES = 0x04,
+  REQUIRE_ACCESSORS = 0x08,
+  REQUIRE_BUFFERS = 0x10,
+  REQUIRE_BUFFER_VIEWS = 0x20,
+  REQUIRE_ALL = 0x3f
+};
+
 class TinyGLTFLoader {
  public:
   TinyGLTFLoader() : bin_data_(NULL), bin_size_(0), is_binary_(false) {
@@ -356,19 +368,22 @@ class TinyGLTFLoader {
   /// Loads glTF ASCII asset from a file.
   /// Returns false and set error string to `err` if there's an error.
   bool LoadASCIIFromFile(Scene *scene, std::string *err,
-                         const std::string &filename);
+                         const std::string &filename,
+                         unsigned int check_sections = REQUIRE_ALL);
 
   /// Loads glTF ASCII asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
   bool LoadASCIIFromString(Scene *scene, std::string *err, const char *str,
                            const unsigned int length,
-                           const std::string &base_dir);
+                           const std::string &base_dir,
+                           unsigned int check_sections = REQUIRE_ALL);
 
   /// Loads glTF binary asset from a file.
   /// Returns false and set error string to `err` if there's an error.
   bool LoadBinaryFromFile(Scene *scene, std::string *err,
-                          const std::string &filename);
+                          const std::string &filename,
+                          unsigned int check_sections = REQUIRE_ALL);
 
   /// Loads glTF binary asset from memory.
   /// `length` = strlen(str);
@@ -376,14 +391,16 @@ class TinyGLTFLoader {
   bool LoadBinaryFromMemory(Scene *scene, std::string *err,
                             const unsigned char *bytes,
                             const unsigned int length,
-                            const std::string &base_dir = "");
+                            const std::string &base_dir = "",
+                            unsigned int check_sections = REQUIRE_ALL);
 
  private:
   /// Loads glTF asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
   bool LoadFromString(Scene *scene, std::string *err, const char *str,
-                      const unsigned int length, const std::string &base_dir);
+                      const unsigned int length, const std::string &base_dir,
+                      unsigned int check_sections);
 
   const unsigned char *bin_data_;
   size_t bin_size_;
@@ -1910,7 +1927,8 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
 
 bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
                                     const char *str, unsigned int length,
-                                    const std::string &base_dir) {
+                                    const std::string &base_dir,
+                                    unsigned int check_sections) {
   picojson::value v;
   std::string perr = picojson::parse(v, str, str + length);
 
@@ -1923,7 +1941,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 
   if (v.contains("scene") && v.get("scene").is<std::string>()) {
     // OK
-  } else {
+  } else if (check_sections & REQUIRE_SCENE) {
     if (err) {
       (*err) += "\"scene\" object not found in .gltf\n";
     }
@@ -1932,7 +1950,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 
   if (v.contains("scenes") && v.get("scenes").is<picojson::object>()) {
     // OK
-  } else {
+  } else if (check_sections & REQUIRE_SCENES) {
     if (err) {
       (*err) += "\"scenes\" object not found in .gltf\n";
     }
@@ -1941,7 +1959,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 
   if (v.contains("nodes") && v.get("nodes").is<picojson::object>()) {
     // OK
-  } else {
+  } else if (check_sections & REQUIRE_NODES) {
     if (err) {
       (*err) += "\"nodes\" object not found in .gltf\n";
     }
@@ -1950,7 +1968,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 
   if (v.contains("accessors") && v.get("accessors").is<picojson::object>()) {
     // OK
-  } else {
+  } else if (check_sections & REQUIRE_ACCESSORS) {
     if (err) {
       (*err) += "\"accessors\" object not found in .gltf\n";
     }
@@ -1959,7 +1977,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 
   if (v.contains("buffers") && v.get("buffers").is<picojson::object>()) {
     // OK
-  } else {
+  } else if (check_sections & REQUIRE_BUFFERS) {
     if (err) {
       (*err) += "\"buffers\" object not found in .gltf\n";
     }
@@ -1969,7 +1987,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
   if (v.contains("bufferViews") &&
       v.get("bufferViews").is<picojson::object>()) {
     // OK
-  } else {
+  } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
     if (err) {
       (*err) += "\"bufferViews\" object not found in .gltf\n";
     }
@@ -2266,16 +2284,18 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
 
 bool TinyGLTFLoader::LoadASCIIFromString(Scene *scene, std::string *err,
                                          const char *str, unsigned int length,
-                                         const std::string &base_dir) {
+                                         const std::string &base_dir,
+                                         unsigned int check_sections) {
   is_binary_ = false;
   bin_data_ = NULL;
   bin_size_ = 0;
 
-  return LoadFromString(scene, err, str, length, base_dir);
+  return LoadFromString(scene, err, str, length, base_dir, check_sections);
 }
 
 bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
-                                       const std::string &filename) {
+                                       const std::string &filename,
+                                       unsigned int check_sections) {
   std::stringstream ss;
 
   std::ifstream f(filename.c_str());
@@ -2304,8 +2324,10 @@ bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
 
   std::string basedir = GetBaseDir(filename);
 
-  bool ret = LoadASCIIFromString(
-      scene, err, &buf.at(0), static_cast<unsigned int>(buf.size()), basedir);
+  bool ret = LoadASCIIFromString(scene, err, &buf.at(0),
+                                 static_cast<unsigned int>(buf.size()), basedir,
+                                 check_sections);
+
 
   return ret;
 }
@@ -2313,7 +2335,8 @@ bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
 bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
                                           const unsigned char *bytes,
                                           unsigned int size,
-                                          const std::string &base_dir) {
+                                          const std::string &base_dir,
+                                          unsigned int check_sections) {
   if (size < 20) {
     if (err) {
       (*err) = "Too short data size for glTF Binary.";
@@ -2365,7 +2388,7 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
 
   bool ret =
       LoadFromString(scene, err, reinterpret_cast<const char *>(&bytes[20]),
-                     scene_length, base_dir);
+                     scene_length, base_dir, check_sections);
   if (!ret) {
     return ret;
   }
@@ -2374,7 +2397,8 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
 }
 
 bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
-                                        const std::string &filename) {
+                                        const std::string &filename,
+                                        unsigned int check_sections) {
   std::stringstream ss;
 
   std::ifstream f(filename.c_str());
@@ -2398,7 +2422,7 @@ bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
 
   bool ret = LoadBinaryFromMemory(
       scene, err, reinterpret_cast<unsigned char *>(&buf.at(0)),
-      static_cast<unsigned int>(buf.size()), basedir);
+      static_cast<unsigned int>(buf.size()), basedir, check_sections);
 
   return ret;
 }
