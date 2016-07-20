@@ -380,13 +380,13 @@ bool SaveGLTF(const std::string& output_filename,
 
   picojson::value v = picojson::value(root);
 
-  std::ofstream ifs(output_filename);
+  std::ofstream ifs(output_filename.c_str());
   if (ifs.bad()) {
     std::cerr << "Failed to open " << output_filename << std::endl;
     return false;
   }
 
-  std::string s = v.serialize();
+  std::string s = v.serialize(/* pretty */true);
   ifs.write(s.data(), s.size());
   ifs.close();
 
