@@ -2401,7 +2401,7 @@ bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
                                         unsigned int check_sections) {
   std::stringstream ss;
 
-  std::ifstream f(filename.c_str());
+  std::ifstream f(filename.c_str(), std::ios::binary);
   if (!f) {
     ss << "Failed to open file: " << filename << std::endl;
     if (err) {
