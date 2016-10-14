@@ -31,11 +31,14 @@
 #include <Alembic/AbcCoreOgawa/All.h>
 #include <Alembic/AbcGeom/All.h>
 
+#define PICOJSON_USE_INT64
 #include "../../picojson.h"
 
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
+
+#include "../../tiny_gltf_loader.h" // To import some TINYGLTF_*** macros.
 
 // @todo { texcoords, normals }
 typedef struct
@@ -337,8 +340,8 @@ static bool SaveGLTF(const std::string& output_filename,
     root["assets"] = picojson::value(asset);
   }
 
-  picojson::object buffers;
   {
+    picojson::object buffers;
     {
       std::string vertices_b64data = base64_encode(reinterpret_cast<unsigned char const*>(mesh.vertices.data()), mesh.vertices.size() * sizeof(float));
       picojson::object buf;
@@ -359,12 +362,122 @@ static bool SaveGLTF(const std::string& output_filename,
       buf["uri"] = picojson::value(
           std::string("data:application/octet-stream;base64,") + faces_b64data);
       buf["byteLength"] =
-          picojson::value(static_cast<double>(mesh.vertices.size() * sizeof(unsigned int)));
+          picojson::value(static_cast<double>(mesh.faces.size() * sizeof(unsigned int)));
       
       buffers["indices"] = picojson::value(buf); 
     }
+    root["buffers"] = picojson::value(buffers);
   }
-  root["buffers"] = picojson::value(buffers);
+
+  {
+    picojson::object buffer_views;
+    {
+      picojson::object buffer_view_vertices;
+      buffer_view_vertices["buffer"] = picojson::value(std::string("vertices"));    
+      buffer_view_vertices["byteLength"] = picojson::value(static_cast<double>(mesh.vertices.size() * sizeof(float)));
+      buffer_view_vertices["byteOffset"] = picojson::value(static_cast<double>(0));
+      buffer_view_vertices["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
+
+      buffer_views["bufferView_vertices"] = picojson::value(buffer_view_vertices);
+    }
+
+    {
+      picojson::object buffer_view_indices;
+      buffer_view_indices["buffer"] = picojson::value(std::string("indices"));    
+      buffer_view_indices["byteLength"] = picojson::value(static_cast<double>(mesh.faces.size() * sizeof(unsigned int)));
+      buffer_view_indices["byteOffset"] = picojson::value(static_cast<double>(0));
+      buffer_view_indices["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER));
+
+      buffer_views["bufferView_indices"] = picojson::value(buffer_view_indices);
+    }
+
+    root["bufferViews"] = picojson::value(buffer_views);
+  }
+
+  {
+    picojson::object attributes;
+  
+    attributes["POSITION"] = picojson::value(std::string("accessor_vertices"));
+    
+    picojson::object primitive;
+    primitive["attributes"] = picojson::value(attributes);
+    primitive["indices"] = picojson::value("accessor_indices");
+    primitive["material"] = picojson::value("material_1");
+    primitive["mode"] = picojson::value(static_cast<int64_t>(TINYGLTF_MODE_TRIANGLES));
+
+    picojson::array primitive_array;
+    primitive_array.push_back(picojson::value(primitive));
+
+    picojson::object m;
+    m["primitives"] = picojson::value(primitive_array);
+
+    picojson::object meshes;
+    meshes["mesh_1"] = picojson::value(m);
+
+    
+    root["meshes"] = picojson::value(meshes);
+  }
+
+  {
+    picojson::object accessors;
+    picojson::object accessor_vertices;
+    picojson::object accessor_indices;
+    
+    accessor_vertices["bufferView"] = picojson::value(std::string("bufferView_vertices"));
+    accessor_vertices["byteOffset"] = picojson::value(static_cast<int64_t>(0));
+    accessor_vertices["byteStride"] = picojson::value(static_cast<double>(3 * sizeof(float)));
+    accessor_vertices["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
+    accessor_vertices["count"] = picojson::value(static_cast<int64_t>(mesh.vertices.size()));
+    accessor_vertices["type"] = picojson::value(std::string("VEC3"));
+    accessors["accessor_vertices"] = picojson::value(accessor_vertices);
+
+    accessor_indices["bufferView"] = picojson::value(std::string("bufferView_indices"));
+    accessor_indices["byteOffset"] = picojson::value(static_cast<int64_t>(0));
+    accessor_indices["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT));
+    accessor_indices["count"] = picojson::value(static_cast<int64_t>(mesh.faces.size()));
+    accessor_indices["type"] = picojson::value(std::string("SCALAR"));
+    accessors["accessor_indices"] = picojson::value(accessor_indices);
+    root["accessors"] = picojson::value(accessors);
+  }
+
+  {
+    // Use Default Material(Do not supply `material.technique`)
+    picojson::object default_material;
+    picojson::object materials;
+
+    materials["material_1"] = picojson::value(default_material);
+
+    root["materials"] = picojson::value(materials);
+
+  }
+
+  {
+    picojson::object nodes;
+    picojson::object node;
+    picojson::array  meshes;
+
+    meshes.push_back(picojson::value(std::string("mesh_1")));
+
+    node["meshes"] = picojson::value(meshes);
+
+    nodes["node_1"] = picojson::value(node);
+    root["nodes"] = picojson::value(nodes);
+  }
+
+  {
+    picojson::object defaultScene;
+    picojson::array nodes;
+    
+    nodes.push_back(picojson::value(std::string("node_1")));
+
+    defaultScene["nodes"] = picojson::value(nodes);
+
+    root["scene"] = picojson::value("defaultScene");
+    picojson::object scenes;
+    scenes["defaultScene"] = picojson::value(defaultScene);
+    root["scenes"] = picojson::value(scenes);
+  }
+
 
   // @todo {}
   picojson::object shaders;
@@ -422,7 +535,11 @@ int main(int argc, char** argv) {
 
   if (foundMesh) {
     bool ret = SaveGLTF(gltf_filename, mesh);
-    return ret ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (ret) {
+      std::cout << "Wrote " << gltf_filename << std::endl;
+    } else {
+      return EXIT_FAILURE;
+    }
   } else {
     std::cout << "No polygon mesh found in Alembic file" << std::endl;
   }
