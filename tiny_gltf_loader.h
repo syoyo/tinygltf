@@ -78,7 +78,7 @@ namespace tinygltf {
 
 #define TINYGLTF_TEXTURE_WRAP_RPEAT (10497)
 #define TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE (33071)
-#define TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT (33071)
+#define TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT (33648)
 
 // Redeclarations of the above for technique.parameters.
 #define TINYGLTF_PARAMETER_TYPE_BYTE (5120)
@@ -2403,7 +2403,7 @@ bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
                                         unsigned int check_sections) {
   std::stringstream ss;
 
-  std::ifstream f(filename.c_str());
+  std::ifstream f(filename.c_str(), std::ios::binary);
   if (!f) {
     ss << "Failed to open file: " << filename << std::endl;
     if (err) {
