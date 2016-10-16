@@ -42,7 +42,7 @@
 
 ## License
 
-TinyGLTFLoader is licensed under 2-clause BSD.
+TinyGLTFLoader is licensed under MIT license.
 
 TinyGLTFLoader uses the following third party libraries.
 
