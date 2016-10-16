@@ -200,7 +200,7 @@ static std::string PrintStringArray(const std::vector<std::string> &arr) {
   return ss.str();
 }
 
-static std::string Indent(int indent) {
+static std::string Indent(const int indent) {
   std::string s;
   for (int i = 0; i < indent; i++) {
     s += "  ";
@@ -215,6 +215,30 @@ static std::string PrintParameterValue(const tinygltf::Parameter &param) {
   } else {
     return param.string_value;
   }
+}
+
+static std::string PrintValue(const std::string& name, const tinygltf::Value &value, const int indent) {
+  std::stringstream ss;
+
+  if (value.IsObject()) {
+    const tinygltf::Value::Object& o = value.Get<tinygltf::Value::Object>();
+    tinygltf::Value::Object::const_iterator it(o.begin());
+    tinygltf::Value::Object::const_iterator itEnd(o.end());
+    for (; it != itEnd; it++) {
+      ss << PrintValue(name, it->second, indent + 1);
+    }
+  } else if (value.IsString()) {
+    ss << Indent(indent) << name << " : " << value.Get<std::string>() << std::endl;
+  } else if (value.IsBool()) {
+    ss << Indent(indent) << name << " : " << value.Get<bool>() << std::endl;
+  } else if (value.IsNumber()) {
+    ss << Indent(indent) << name << " : " << value.Get<double>() << std::endl;
+  } else if (value.IsInt()) {
+    ss << Indent(indent) << name << " : " << value.Get<int64_t>() << std::endl;
+  }
+  // @todo { binary, array }
+
+  return ss.str();
 }
 
 static void DumpNode(const tinygltf::Node &node, int indent) {
@@ -266,6 +290,10 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
             << "attributes(items=" << primitive.attributes.size() << ")"
             << std::endl;
   DumpStringMap(primitive.attributes, indent + 1);
+
+  std::cout << Indent(indent)
+            << "extras :" << std::endl
+            << PrintValue("extras", primitive.extras, indent+1) << std::endl;
 }
 
 static void DumpTechniqueParameter(const tinygltf::TechniqueParameter &param,

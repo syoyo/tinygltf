@@ -1,36 +1,31 @@
 //
 // Tiny glTF loader.
 //
-// Copyright (c) 2015-2016, Syoyo Fujita and many contributors.
-// All rights reserved.
-// (Licensed under 2-clause BSD liecense)
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
+// The MIT License (MIT)
 //
-// 1. Redistributions of source code must retain the above copyright notice,
-// this
-//    list of conditions and the following disclaimer.
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-//    this list of conditions and the following disclaimer in the documentation
-//    and/or other materials provided with the distribution.
+// Copyright (c) 2015 - 2016 Syoyo Fujita and many contributors.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND
-// ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-// WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
-// FOR
-// ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-// DAMAGES
-// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-// LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-// ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
 //
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
 // Version:
+//  - v0.9.5 Support parsing `extras` parameter.
 //  - v0.9.4 Support parsing `shader`, `program` and `tecnique` thanks to
 //  @lukesanantonio
 //  - v0.9.3 Support binary glTF
@@ -38,7 +33,7 @@
 //  - v0.9.1 Support loading glTF asset from memory
 //  - v0.9.0 Initial
 //
-// Tiny glTF loader is using following libraries:
+// Tiny glTF loader is using following third party libraries:
 //
 //  - picojson: C++ JSON library.
 //  - base64: base64 decode/encode library.
@@ -47,6 +42,7 @@
 #ifndef TINY_GLTF_LOADER_H_
 #define TINY_GLTF_LOADER_H_
 
+#include <cassert>
 #include <map>
 #include <string>
 #include <vector>
@@ -140,6 +136,139 @@ namespace tinygltf {
 #define TINYGLTF_SHADER_TYPE_VERTEX_SHADER (35633)
 #define TINYGLTF_SHADER_TYPE_FRAGMENT_SHADER (35632)
 
+typedef enum {
+  NULL_TYPE = 0,
+  NUMBER_TYPE = 1,
+  INT_TYPE = 2,
+  BOOL_TYPE = 3,
+  STRING_TYPE = 4,
+  ARRAY_TYPE = 5,
+  BINARY_TYPE = 6,
+  OBJECT_TYPE = 7
+} Type;
+
+// Simple class to represent JSON object
+class Value {
+ public:
+  typedef std::vector<Value> Array;
+  typedef std::map<std::string, Value> Object;
+
+  Value() : type_(NULL_TYPE) {}
+
+  explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
+  explicit Value(int64_t i) : type_(INT_TYPE) { int64_value_ = i; }
+  explicit Value(double n) : type_(NUMBER_TYPE) { number_value_ = n; }
+  explicit Value(const std::string &s) : type_(STRING_TYPE) {
+    string_value_ = s;
+  }
+  explicit Value(const uint8_t *p, uint64_t n) : type_(BINARY_TYPE) {
+    binary_value_.resize(n);
+    memcpy(binary_value_.data(), p, n);
+  }
+  explicit Value(const Array &a) : type_(ARRAY_TYPE) {
+    array_value_ = Array(a);
+  }
+  explicit Value(const Object &o) : type_(OBJECT_TYPE) {
+    object_value_ = Object(o);
+  }
+  ~Value() {}
+
+  char Type() const { return static_cast<const char>(type_); }
+
+  bool IsBool() const { return (type_ == BOOL_TYPE); }
+
+  bool IsInt() const { return (type_ == INT_TYPE); }
+
+  bool IsNumber() const { return (type_ == NUMBER_TYPE); }
+
+  bool IsString() const { return (type_ == STRING_TYPE); }
+
+  bool IsBinary() const { return (type_ == BINARY_TYPE); }
+
+  bool IsArray() const { return (type_ == ARRAY_TYPE); }
+
+  bool IsObject() const { return (type_ == OBJECT_TYPE); }
+
+  // Accessor
+  template <typename T>
+  const T &Get() const;
+  template <typename T>
+  T &Get();
+
+  // Lookup value from an array
+  const Value &Get(int64_t idx) const {
+    static Value &null_value = *(new Value());
+    assert(IsArray());
+    assert(idx >= 0);
+    return (static_cast<uint64_t>(idx) < array_value_.size())
+               ? array_value_[static_cast<uint64_t>(idx)]
+               : null_value;
+  }
+
+  // Lookup value from a key-value pair
+  const Value &Get(const std::string &key) const {
+    static Value &null_value = *(new Value());
+    assert(IsObject());
+    Object::const_iterator it = object_value_.find(key);
+    return (it != object_value_.end()) ? it->second : null_value;
+  }
+
+  size_t ArrayLen() const {
+    if (!IsArray()) return 0;
+    return array_value_.size();
+  }
+
+  // Valid only for object type.
+  bool Has(const std::string &key) const {
+    if (!IsObject()) return false;
+    Object::const_iterator it = object_value_.find(key);
+    return (it != object_value_.end()) ? true : false;
+  }
+
+  // List keys
+  std::vector<std::string> Keys() const {
+    std::vector<std::string> keys;
+    if (!IsObject()) return keys;  // empty
+
+    for (Object::const_iterator it = object_value_.begin();
+         it != object_value_.end(); ++it) {
+      keys.push_back(it->first);
+    }
+
+    return keys;
+  }
+
+ protected:
+  int64_t int64_value_;
+  double number_value_;
+  std::string string_value_;
+  std::vector<uint8_t> binary_value_;
+  Array array_value_;
+  Object object_value_;
+  bool boolean_value_;
+  char pad[3];
+
+  int type_;
+};
+
+#define TINYGLTF_VALUE_GET(ctype, var)            \
+  template <>                                     \
+  inline const ctype &Value::Get<ctype>() const { \
+    return var;                                   \
+  }                                               \
+  template <>                                     \
+  inline ctype &Value::Get<ctype>() {             \
+    return var;                                   \
+  }
+TINYGLTF_VALUE_GET(bool, boolean_value_)
+TINYGLTF_VALUE_GET(double, number_value_)
+TINYGLTF_VALUE_GET(int64_t, int64_value_)
+TINYGLTF_VALUE_GET(std::string, string_value_)
+TINYGLTF_VALUE_GET(std::vector<uint8_t>, binary_value_)
+TINYGLTF_VALUE_GET(Value::Array, array_value_)
+TINYGLTF_VALUE_GET(Value::Object, object_value_)
+#undef TINYGLTF_VALUE_GET
+
 typedef struct {
   std::string string_value;
   std::vector<double> number_array;
@@ -151,12 +280,14 @@ typedef struct {
   std::string sampler;
   std::string target_id;
   std::string target_path;
+  Value extras;
 } AnimationChannel;
 
 typedef struct {
   std::string input;
   std::string interpolation;
   std::string output;
+  Value extras;
 } AnimationSampler;
 
 typedef struct {
@@ -164,6 +295,7 @@ typedef struct {
   std::vector<AnimationChannel> channels;
   std::map<std::string, AnimationSampler> samplers;
   ParameterMap parameters;
+  Value extras;
 } Animation;
 
 typedef struct {
@@ -174,6 +306,7 @@ typedef struct {
   int wrapT;
   int wrapR;  // TinyGLTF extension
   int pad0;
+  Value extras;
 } Sampler;
 
 typedef struct {
@@ -186,6 +319,8 @@ typedef struct {
 
   std::string bufferView;  // KHR_binary_glTF extenstion.
   std::string mimeType;    // KHR_binary_glTF extenstion.
+
+  Value extras;
 } Image;
 
 typedef struct {
@@ -196,12 +331,15 @@ typedef struct {
   int target;
   int type;
   std::string name;
+  Value extras;
 } Texture;
 
 typedef struct {
   std::string name;
   std::string technique;
   ParameterMap values;
+
+  Value extras;
 } Material;
 
 typedef struct {
@@ -211,6 +349,7 @@ typedef struct {
   size_t byteLength;   // default: 0
   int target;
   int pad0;
+  Value extras;
 } BufferView;
 
 typedef struct {
@@ -225,6 +364,7 @@ typedef struct {
   int pad1;
   std::vector<double> minValues;  // Optional
   std::vector<double> maxValues;  // Optional
+  Value extras;
 } Accessor;
 
 class Camera {
@@ -252,11 +392,14 @@ typedef struct {
   std::string indices;   // The ID of the accessor that contains the indices.
   int mode;              // one of TINYGLTF_MODE_***
   int pad0;
+
+  Value extras;  // "extra" property
 } Primitive;
 
 typedef struct {
   std::string name;
   std::vector<Primitive> primitives;
+  Value extras;
 } Mesh;
 
 class Node {
@@ -273,11 +416,14 @@ class Node {
   std::vector<double> translation;  // length must be 0 or 3
   std::vector<double> matrix;       // length must be 0 or 16
   std::vector<std::string> meshes;
+
+  Value extras;
 };
 
 typedef struct {
   std::string name;
   std::vector<unsigned char> data;
+  Value extras;
 } Buffer;
 
 typedef struct {
@@ -285,6 +431,8 @@ typedef struct {
   int type;
   int pad0;
   std::vector<unsigned char> source;
+
+  Value extras;
 } Shader;
 
 typedef struct {
@@ -292,6 +440,8 @@ typedef struct {
   std::string vertexShader;
   std::string fragmentShader;
   std::vector<std::string> attributes;
+
+  Value extras;
 } Program;
 
 typedef struct {
@@ -310,6 +460,8 @@ typedef struct {
   std::map<std::string, TechniqueParameter> parameters;
   std::map<std::string, std::string> attributes;
   std::map<std::string, std::string> uniforms;
+
+  Value extras;
 } Technique;
 
 typedef struct {
@@ -319,6 +471,7 @@ typedef struct {
   std::string profile_version;
   bool premultipliedAlpha;
   char pad[7];
+  Value extras;
 } Asset;
 
 class Scene {
@@ -344,6 +497,8 @@ class Scene {
   std::string defaultScene;
 
   Asset asset;
+
+  Value extras;
 };
 
 enum SectionCheck {
@@ -411,11 +566,11 @@ class TinyGLTFLoader {
 
 #ifdef TINYGLTF_LOADER_IMPLEMENTATION
 #include <algorithm>
-#include <cassert>
+//#include <cassert>
 #include <fstream>
 #include <sstream>
 
-#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
+#ifdef __clang__
 // Disable some warnings for external files.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wfloat-equal"
@@ -429,9 +584,10 @@ class TinyGLTFLoader {
 #pragma clang diagnostic ignored "-Wpadded"
 #endif
 
+#define PICOJSON_USE_INT64
 #include "./picojson.h"
 #include "./stb_image.h"
-#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
+#ifdef __clang__
 #pragma clang diagnostic pop
 #endif
 
@@ -603,7 +759,7 @@ std::string base64_decode(std::string const &s);
 
 */
 
-#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
@@ -664,7 +820,7 @@ std::string base64_decode(std::string const &encoded_string) {
 
   return ret;
 }
-#ifdef TINYGLTF_APPLY_CLANG_WEVERYTHING
+#ifdef __clang__
 #pragma clang diagnostic pop
 #endif
 
@@ -835,6 +991,48 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
     out->resize(data.size());
   }
   std::copy(data.begin(), data.end(), out->begin());
+  return true;
+}
+
+static void ParseObjectProperty(Value *ret, const picojson::object &o) {
+  tinygltf::Value::Object vo;
+  picojson::object::const_iterator it(o.begin());
+  picojson::object::const_iterator itEnd(o.end());
+
+  for (; it != itEnd; it++) {
+    picojson::value v = it->second;
+
+    if (v.is<bool>()) {
+      vo[it->first] = tinygltf::Value(v.get<bool>());
+    } else if (v.is<double>()) {
+      vo[it->first] = tinygltf::Value(v.get<double>());
+    } else if (v.is<int64_t>()) {
+      vo[it->first] = tinygltf::Value(v.get<int64_t>());
+    } else if (v.is<std::string>()) {
+      vo[it->first] = tinygltf::Value(v.get<std::string>());
+    } else if (v.is<picojson::object>()) {
+      tinygltf::Value child_value;
+      ParseObjectProperty(&child_value, v.get<picojson::object>());
+    }
+    // TODO(syoyo) binary, array
+  }
+
+  (*ret) = tinygltf::Value(vo);
+}
+
+static bool ParseExtrasProperty(Value *ret, const picojson::object &o) {
+  picojson::object::const_iterator it = o.find("extras");
+  if (it == o.end()) {
+    return false;
+  }
+
+  // FIXME(syoyo) Currently we only support `object` type for extras property.
+  if (!it->second.is<picojson::object>()) {
+    return false;
+  }
+
+  ParseObjectProperty(ret, it->second.get<picojson::object>());
+
   return true;
 }
 
@@ -1480,6 +1678,8 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
     }
   }
 
+  ParseExtrasProperty(&(accessor->extras), o);
+
   return true;
 }
 
@@ -1509,6 +1709,8 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
 
   ParseStringMapProperty(&primitive->attributes, err, o, "attributes", false);
 
+  ParseExtrasProperty(&(primitive->extras), o);
+
   return true;
 }
 
@@ -1529,6 +1731,8 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
       }
     }
   }
+
+  ParseExtrasProperty(&(mesh->extras), o);
 
   return true;
 }
@@ -1559,6 +1763,8 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
       node->children.push_back(childrenNode);
     }
   }
+
+  ParseExtrasProperty(&(node->extras), o);
 
   return true;
 }
@@ -1616,6 +1822,8 @@ static bool ParseMaterial(Material *material, std::string *err,
       }
     }
   }
+
+  ParseExtrasProperty(&(material->extras), o);
 
   return true;
 }
@@ -1706,6 +1914,8 @@ static bool ParseShader(Shader *shader, std::string *err,
 
   shader->type = static_cast<int>(type);
 
+  ParseExtrasProperty(&(shader->extras), o);
+
   return true;
 }
 
@@ -1725,6 +1935,8 @@ static bool ParseProgram(Program *program, std::string *err,
   // I suppose the list of attributes isn't needed, but a technique doesn't
   // really make sense without it.
   ParseStringArrayProperty(&program->attributes, err, o, "attributes", false);
+
+  ParseExtrasProperty(&(program->extras), o);
 
   return true;
 }
@@ -1788,6 +2000,8 @@ static bool ParseTechnique(Technique *technique, std::string *err,
     }
   }
 
+  ParseExtrasProperty(&(technique->extras), o);
+
   return true;
 }
 
@@ -1821,6 +2035,8 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
       return false;
     }
   }
+
+  ParseExtrasProperty(&(channel->extras), o);
 
   return true;
 }
@@ -1903,6 +2119,8 @@ static bool ParseAnimation(Animation *animation, std::string *err,
   }
   ParseStringProperty(&animation->name, err, o, "name", false);
 
+  ParseExtrasProperty(&(animation->extras), o);
+
   return true;
 }
 
@@ -1924,6 +2142,8 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
   sampler->magFilter = static_cast<int>(magFilter);
   sampler->wrapS = static_cast<int>(wrapS);
   sampler->wrapT = static_cast<int>(wrapT);
+
+  ParseExtrasProperty(&(sampler->extras), o);
 
   return true;
 }
