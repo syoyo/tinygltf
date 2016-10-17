@@ -55,8 +55,13 @@ typedef struct {
   std::map<std::string, GLint> uniforms;
 } GLProgramState;
 
+typedef struct {
+  GLuint vb;  // vertex buffer
+} GLCurvesState;
+
 std::map<std::string, GLBufferState> gBufferState;
 std::map<std::string, GLMeshState> gMeshState;
+std::map<std::string, GLCurvesState> gCurvesMesh;
 GLProgramState gGLProgramState;
 
 void CheckErrors(std::string desc) {
@@ -320,17 +325,257 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
   gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
 };
 
+// Setup curves geometry extension 
+static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
+
+  // Find curves primitive.
+  {
+    std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
+    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
+
+    for (; it != itEnd; it++) {
+      const tinygltf::Mesh &mesh = it->second;
+
+      // Currently we only support one primitive per mesh.
+      if (mesh.primitives.size() > 1) {
+        continue;
+      }
+
+      for (size_t primId = 0; primId < mesh.primitives.size(); primId++) {
+        const tinygltf::Primitive &primitive = mesh.primitives[primId];
+
+        gMeshState[mesh.name].diffuseTex[primId] = 0;
+
+        if (primitive.material.empty()) {
+          continue;
+        }
+
+        printf("curve...?\n");
+        bool has_curves = false;
+        if (primitive.extras.IsObject()) {
+          if (primitive.extras.Has("ext_mode")) {
+            const tinygltf::Value::Object &o = primitive.extras.Get<tinygltf::Value::Object>();
+            const tinygltf::Value &ext_mode = o.find("ext_mode")->second;
+
+            if (ext_mode.IsString()) {
+              const std::string& str = ext_mode.Get<std::string>();
+              if (str.compare("curves") == 0) {
+                has_curves = true;
+              }
+            }
+          }
+        }
+
+        if (!has_curves) {
+          continue;
+        }
+
+        // Construct curves buffer
+        const tinygltf::Accessor &vtx_accessor = scene.accessors[primitive.attributes.find("POSITION")->second];
+        const tinygltf::Accessor &nverts_accessor = scene.accessors[primitive.attributes.find("NVERTS")->second];
+        const tinygltf::BufferView &vtx_bufferView = scene.bufferViews[vtx_accessor.bufferView];
+        const tinygltf::BufferView &nverts_bufferView = scene.bufferViews[nverts_accessor.bufferView];
+        const tinygltf::Buffer &vtx_buffer = scene.buffers[vtx_bufferView.buffer];
+        const tinygltf::Buffer &nverts_buffer = scene.buffers[nverts_bufferView.buffer];
+
+        std::cout << "vtx_bufferView = " << vtx_accessor.bufferView << std::endl;
+        std::cout << "nverts_bufferView = " << nverts_accessor.bufferView << std::endl;
+        std::cout << "vtx_buffer.size = " << vtx_buffer.data.size() << std::endl;
+        std::cout << "nverts_buffer.size = " << nverts_buffer.data.size() << std::endl;
+
+        const int *nverts = reinterpret_cast<const int*>(nverts_buffer.data.data());
+        const float *vtx  = reinterpret_cast<const float*>(vtx_buffer.data.data());
+
+        // Convert to GL_LINES data.
+        std::vector<float> line_pts;
+        size_t vtx_offset = 0;
+        for (int k = 0; k < static_cast<int>(nverts_accessor.count); k++) {
+            for (int n = 0; n < nverts[k] - 1; n++) {
+              //std::cout << "vn[" << k << "] " << nverts[k] << std::endl;
+
+              line_pts.push_back(vtx[3 * (vtx_offset + n) + 0]);
+              line_pts.push_back(vtx[3 * (vtx_offset + n) + 1]);
+              line_pts.push_back(vtx[3 * (vtx_offset + n) + 2]);
+
+              line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 0]);
+              line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 1]);
+              line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 2]);
+            }
+
+            vtx_offset += nverts[k];
+        }
+
+        GLCurvesState state;
+        glGenBuffers(1, &state.vb);
+        glBindBuffer(GL_ARRAY_BUFFER, state.vb);
+        glBufferData(GL_ARRAY_BUFFER, line_pts.size() * sizeof(float),
+                     line_pts.data(), GL_STATIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+        // Material
+        tinygltf::Material &mat = scene.materials[primitive.material];
+        printf("material.name = %s\n", mat.name.c_str());
+        if (mat.values.find("diffuse") != mat.values.end()) {
+          std::string diffuseTexName = mat.values["diffuse"].string_value;
+          if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
+            tinygltf::Texture &tex = scene.textures[diffuseTexName];
+            if (scene.images.find(tex.source) != scene.images.end()) {
+              tinygltf::Image &image = scene.images[tex.source];
+              GLuint texId;
+              glGenTextures(1, &texId);
+              glBindTexture(tex.target, texId);
+              glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+              glTexParameterf(tex.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+              glTexParameterf(tex.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+              // Ignore Texture.fomat.
+              GLenum format = GL_RGBA;
+              if (image.component == 3) {
+                format = GL_RGB;
+              }
+              glTexImage2D(tex.target, 0, tex.internalFormat, image.width,
+                           image.height, 0, format, tex.type,
+                           &image.image.at(0));
+
+              CheckErrors("texImage2D");
+              glBindTexture(tex.target, 0);
+
+              printf("TexId = %d\n", texId);
+              gMeshState[mesh.name].diffuseTex[primId] = texId;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  glUseProgram(progId);
+  GLint vtloc = glGetAttribLocation(progId, "in_vertex");
+  GLint nrmloc = glGetAttribLocation(progId, "in_normal");
+  GLint uvloc = glGetAttribLocation(progId, "in_texcoord");
+
+  GLint diffuseTexLoc = glGetUniformLocation(progId, "diffuseTex");
+
+  gGLProgramState.attribs["POSITION"] = vtloc;
+  gGLProgramState.attribs["NORMAL"] = nrmloc;
+  gGLProgramState.attribs["TEXCOORD_0"] = uvloc;
+  gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
+};
+
 void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
 
   if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
     glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0); // TEXTURE0
   }
 
+  // Skip curves primitive.
+  if (gCurvesMesh.find(mesh.name) != gCurvesMesh.end()) {
+    return;
+  }
+
   for (size_t i = 0; i < mesh.primitives.size(); i++) {
     const tinygltf::Primitive &primitive = mesh.primitives[i];
 
+
     if (primitive.indices.empty())
       return;
+
+    std::map<std::string, std::string>::const_iterator it(
+        primitive.attributes.begin());
+    std::map<std::string, std::string>::const_iterator itEnd(
+        primitive.attributes.end());
+
+    // Assume TEXTURE_2D target for the texture object.
+    glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
+
+    for (; it != itEnd; it++) {
+      const tinygltf::Accessor &accessor = scene.accessors[it->second];
+      glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
+      CheckErrors("bind buffer");
+      int count = 1;
+      if (accessor.type == TINYGLTF_TYPE_SCALAR) {
+        count = 1;
+      } else if (accessor.type == TINYGLTF_TYPE_VEC2) {
+        count = 2;
+      } else if (accessor.type == TINYGLTF_TYPE_VEC3) {
+        count = 3;
+      } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
+        count = 4;
+      } else {
+        assert(0);
+      }
+      // it->first would be "POSITION", "NORMAL", "TEXCOORD_0", ...
+      if ((it->first.compare("POSITION") == 0) ||
+          (it->first.compare("NORMAL") == 0) ||
+          (it->first.compare("TEXCOORD_0") == 0)) {
+
+		if (gGLProgramState.attribs[it->first] >= 0) {
+			glVertexAttribPointer(
+				gGLProgramState.attribs[it->first], count, accessor.componentType,
+				GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
+			CheckErrors("vertex attrib pointer");
+			glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
+			CheckErrors("enable vertex attrib array");
+		}
+      }
+    }
+
+    const tinygltf::Accessor &indexAccessor = scene.accessors[primitive.indices];
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                 gBufferState[indexAccessor.bufferView].vb);
+    CheckErrors("bind buffer");
+    int mode = -1;
+    if (primitive.mode == TINYGLTF_MODE_TRIANGLES) {
+      mode = GL_TRIANGLES;
+    } else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_STRIP) {
+      mode = GL_TRIANGLE_STRIP;
+    } else if (primitive.mode == TINYGLTF_MODE_TRIANGLE_FAN) {
+      mode = GL_TRIANGLE_FAN;
+    } else if (primitive.mode == TINYGLTF_MODE_POINTS) {
+      mode = GL_POINTS;
+    } else if (primitive.mode == TINYGLTF_MODE_LINE) {
+      mode = GL_LINES;
+    } else if (primitive.mode == TINYGLTF_MODE_LINE_LOOP) {
+      mode = GL_LINE_LOOP;
+    } else {
+      assert(0);
+    }
+    glDrawElements(mode, indexAccessor.count, indexAccessor.componentType,
+                   BUFFER_OFFSET(indexAccessor.byteOffset));
+    CheckErrors("draw elements");
+
+    {
+      std::map<std::string, std::string>::const_iterator it(
+          primitive.attributes.begin());
+      std::map<std::string, std::string>::const_iterator itEnd(
+          primitive.attributes.end());
+
+      for (; it != itEnd; it++) {
+        if ((it->first.compare("POSITION") == 0) ||
+            (it->first.compare("NORMAL") == 0) ||
+            (it->first.compare("TEXCOORD_0") == 0)) {
+		  if (gGLProgramState.attribs[it->first] >= 0) {
+	        glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+		  }
+        }
+      }
+    }
+  }
+}
+
+void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
+
+  if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
+    glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0); // TEXTURE0
+  }
+
+  if (gCurvesMesh.find(mesh.name) == gCurvesMesh.end()) {
+    return;
+  }
+
+  for (size_t i = 0; i < mesh.primitives.size(); i++) {
+    const tinygltf::Primitive &primitive = mesh.primitives[i];
+
 
     std::map<std::string, std::string>::const_iterator it(
         primitive.attributes.begin());
@@ -540,6 +785,7 @@ int main(int argc, char **argv) {
   CheckErrors("useProgram");
 
   SetupGLState(scene, progId);
+  SetupCurvesState(scene, progId);
   CheckErrors("SetupGLState");
 
   std::cout << "# of meshes = " << scene.meshes.size() << std::endl;

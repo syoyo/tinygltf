@@ -811,7 +811,7 @@ static bool SaveCurvesToGLTF(const std::string& output_filename,
     //primitive["indices"] = picojson::value("accessor_indices");
     primitive["material"] = picojson::value("material_1");
     primitive["mode"] = picojson::value(static_cast<int64_t>(TINYGLTF_MODE_POINTS)); // Use GL_POINTS for backward compatibility
-    primitive["extra"] = picojson::value(extra);
+    primitive["extras"] = picojson::value(extra);
 
 
     picojson::array primitive_array;
