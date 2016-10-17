@@ -1697,14 +1697,6 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   ParseNumberProperty(&mode, err, o, "mode", false);
 
   int primMode = static_cast<int>(mode);
-  if (primMode != TINYGLTF_MODE_TRIANGLES) {
-    if (err) {
-      (*err) +=
-          "Currently TinyGLTFLoader doesn not support primitive mode other \n"
-          "than TRIANGLES.\n";
-    }
-    return false;
-  }
   primitive->mode = primMode;
 
   primitive->indices = "";
