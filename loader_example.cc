@@ -234,7 +234,7 @@ static std::string PrintValue(const std::string& name, const tinygltf::Value &va
   } else if (value.IsNumber()) {
     ss << Indent(indent) << name << " : " << value.Get<double>() << std::endl;
   } else if (value.IsInt()) {
-    ss << Indent(indent) << name << " : " << value.Get<int64_t>() << std::endl;
+    ss << Indent(indent) << name << " : " << value.Get<int>() << std::endl;
   }
   // @todo { binary, array }
 

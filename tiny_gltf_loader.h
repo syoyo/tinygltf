@@ -43,13 +43,10 @@
 #define TINY_GLTF_LOADER_H_
 
 #include <cassert>
+#include <cstring>
 #include <map>
 #include <string>
 #include <vector>
-#include <cstring>
-
-#define __STDC_FORMAT_MACROS
-#include <inttypes.h>
 
 namespace tinygltf {
 
@@ -160,12 +157,12 @@ class Value {
   Value() : type_(NULL_TYPE) {}
 
   explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
-  explicit Value(int64_t i) : type_(INT_TYPE) { int64_value_ = i; }
+  explicit Value(int i) : type_(INT_TYPE) { int_value_ = i; }
   explicit Value(double n) : type_(NUMBER_TYPE) { number_value_ = n; }
   explicit Value(const std::string &s) : type_(STRING_TYPE) {
     string_value_ = s;
   }
-  explicit Value(const uint8_t *p, uint64_t n) : type_(BINARY_TYPE) {
+  explicit Value(const unsigned char *p, size_t n) : type_(BINARY_TYPE) {
     binary_value_.resize(n);
     memcpy(binary_value_.data(), p, n);
   }
@@ -175,7 +172,6 @@ class Value {
   explicit Value(const Object &o) : type_(OBJECT_TYPE) {
     object_value_ = Object(o);
   }
-  ~Value() {}
 
   char Type() const { return static_cast<const char>(type_); }
 
@@ -200,12 +196,12 @@ class Value {
   T &Get();
 
   // Lookup value from an array
-  const Value &Get(int64_t idx) const {
+  const Value &Get(int idx) const {
     static Value &null_value = *(new Value());
     assert(IsArray());
     assert(idx >= 0);
-    return (static_cast<uint64_t>(idx) < array_value_.size())
-               ? array_value_[static_cast<uint64_t>(idx)]
+    return (static_cast<size_t>(idx) < array_value_.size())
+               ? array_value_[static_cast<size_t>(idx)]
                : null_value;
   }
 
@@ -243,16 +239,18 @@ class Value {
   }
 
  protected:
-  int64_t int64_value_;
+  int type_;
+
+  int int_value_;
   double number_value_;
   std::string string_value_;
-  std::vector<uint8_t> binary_value_;
+  std::vector<unsigned char> binary_value_;
   Array array_value_;
   Object object_value_;
   bool boolean_value_;
   char pad[3];
 
-  int type_;
+  int pad0;
 };
 
 #define TINYGLTF_VALUE_GET(ctype, var)            \
@@ -266,9 +264,9 @@ class Value {
   }
 TINYGLTF_VALUE_GET(bool, boolean_value_)
 TINYGLTF_VALUE_GET(double, number_value_)
-TINYGLTF_VALUE_GET(int64_t, int64_value_)
+TINYGLTF_VALUE_GET(int, int_value_)
 TINYGLTF_VALUE_GET(std::string, string_value_)
-TINYGLTF_VALUE_GET(std::vector<uint8_t>, binary_value_)
+TINYGLTF_VALUE_GET(std::vector<unsigned char>, binary_value_)
 TINYGLTF_VALUE_GET(Value::Array, array_value_)
 TINYGLTF_VALUE_GET(Value::Object, object_value_)
 #undef TINYGLTF_VALUE_GET
@@ -1011,7 +1009,8 @@ static void ParseObjectProperty(Value *ret, const picojson::object &o) {
     } else if (v.is<double>()) {
       vo[it->first] = tinygltf::Value(v.get<double>());
     } else if (v.is<int64_t>()) {
-      vo[it->first] = tinygltf::Value(v.get<int64_t>());
+      vo[it->first] =
+          tinygltf::Value(static_cast<int>(v.get<int64_t>()));  // truncate
     } else if (v.is<std::string>()) {
       vo[it->first] = tinygltf::Value(v.get<std::string>());
     } else if (v.is<picojson::object>()) {
