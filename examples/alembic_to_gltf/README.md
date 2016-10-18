@@ -8,6 +8,7 @@
 
 * Alembic data with Ogawa backend only
 * Simple poly mesh only
+* Simple curve only
 * Static mesh only(Use first time sample. no animation)
 
 ## Compile
@@ -43,7 +44,7 @@ Here is an example JSON description of curves primitive.
             },
             "material": "material_1",
             "mode": 0,
-            "extra" {
+            "extras" {
               "ext_mode" : "curves"
             } 
           }
