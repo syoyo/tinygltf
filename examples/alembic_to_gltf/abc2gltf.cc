@@ -40,8 +40,55 @@
 
 #include "../../tiny_gltf_loader.h" // To import some TINYGLTF_*** macros.
 
-typedef struct
+class Node
 {
+ public:
+  Node() {}
+  virtual ~Node();
+
+  Node(const Node& rhs) {
+    name = rhs.name;
+    for (size_t i = 0; i < 16; i++) {
+      xform[i] = rhs.xform[i];
+    } 
+  }
+
+  Node &operator=(const Node& rhs) {
+    name = rhs.name;
+    for (size_t i = 0; i < 16; i++) {
+      xform[i] = rhs.xform[i];
+    } 
+ 
+    return (*this);
+  }
+
+  std::string name;
+  double xform[16];
+};
+
+Node::~Node()
+{
+
+}
+
+class Mesh : public Node
+{
+ public:
+  Mesh() {}
+  virtual ~Mesh();
+
+  Mesh &operator=(const Mesh& rhs) {
+    vertices = rhs.vertices;
+    normals = rhs.normals;
+    facevarying_normals = rhs.facevarying_normals;
+    texcoords = rhs.texcoords;
+    facevarying_texcoords = rhs.facevarying_texcoords;
+    faces = rhs.faces;
+ 
+    return (*this);
+  }
+
+
   std::vector<float> vertices;
 
   // Either `normals` or `facevarying_normals` is filled.
@@ -53,24 +100,72 @@ typedef struct
   std::vector<float> facevarying_texcoords;
 
   std::vector<unsigned int> faces;
-} Mesh;
+};
+
+Mesh::~Mesh()
+{
+
+}
 
 // Curves are represented as an array of curve.
 // i'th curve has nverts[i] points.
 // TODO(syoyo) knots, order to support NURBS curve.
-typedef struct
+class Curves : public Node
 {
+ public:
+  Curves() {}
+  virtual ~Curves();
+
+  Curves &operator=(const Curves& rhs) {
+    points = rhs.points;
+    nverts = rhs.nverts;
+ 
+    return (*this);
+  }
+
   std::vector<float> points;
   std::vector<int> nverts;  // # of vertices per strand(curve).
-} Curves;
+};
+
+Curves::~Curves()
+{
+}
 
 // Points represent particle data.
 // TODO(syoyo)
-typedef struct
+class Points : public Node
 {
+ public:
+  Points() {}
+  ~Points();
+
+  Points &operator=(const Points& rhs) {
+    points = rhs.points;
+    radiuss = rhs.radiuss;
+ 
+    return (*this);
+  }
+
   std::vector<float> points;
   std::vector<float> radiuss;
-} Points;
+};
+
+Points::~Points()
+{
+
+}
+
+// TODO(Nurbs)
+
+typedef struct
+{
+  std::map<std::string, Mesh> mesh_map;
+  std::map<std::string, Curves> curves_map;
+  //std::map<std::string, Points> points_map;
+
+  std::map<std::string, Node> node_map;
+
+} Scene;
 
 // ----------------------------------------------------------------
 // writer module
@@ -394,9 +489,8 @@ static void readPolyUVs(
 }
 
 
-// Traverse Alembic object tree and extract mesh object.
-// Currently we only extract first found geometry object.
-static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::stringstream& ss, bool& foundMesh, bool &foundCurves, const Alembic::AbcGeom::IObject& obj, const std::string& indent) {
+// Traverse Alembic object tree and extract scene data.
+static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, const Alembic::AbcGeom::IObject& obj, const std::string& indent) {
 
   std::string path = obj.getFullName();
 
@@ -414,7 +508,46 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
     Alembic::AbcGeom::ICompoundProperty cprops = obj.getChild(i).getProperties();
     VisitProperties(ss, props, indent);
 
-    if ((!foundMesh) && (Alembic::AbcGeom::IPolyMesh::matches(header))) {
+    if (Alembic::AbcGeom::IXform::matches(header)) {
+
+      Alembic::AbcGeom::IXform xform( obj, header.getName() );
+
+      if ( xform.getSchema().isConstant() )
+      {
+          Alembic::AbcGeom::M44d static_matrix = xform.getSchema().getValue().getMatrix();
+          ss << "IXform static: " << header.getName() << ", " << static_matrix << std::endl;
+
+          Node node;
+          node.name = header.getName();
+          node.xform[0] = static_matrix[0][0];
+          node.xform[1] = static_matrix[0][1];
+          node.xform[2] = static_matrix[0][2];
+          node.xform[3] = static_matrix[0][3];
+          node.xform[4] = static_matrix[1][0];
+          node.xform[5] = static_matrix[1][1];
+          node.xform[6] = static_matrix[1][2];
+          node.xform[7] = static_matrix[1][3];
+          node.xform[8] = static_matrix[2][0];
+          node.xform[9] = static_matrix[2][1];
+          node.xform[10] = static_matrix[2][2];
+          node.xform[11] = static_matrix[2][3];
+          node.xform[12] = static_matrix[3][0];
+          node.xform[13] = static_matrix[3][1];
+          node.xform[14] = static_matrix[3][2];
+          node.xform[15] = static_matrix[3][3];
+
+      } else {
+
+        Alembic::AbcGeom::ISampleSelector samplesel(
+            0.0, Alembic::AbcGeom::ISampleSelector::kNearIndex);
+        Alembic::AbcGeom::IXformSchema& ps = xform.getSchema();
+        Alembic::AbcGeom::M44d matrix = ps.getValue( samplesel ).getMatrix();
+        ss << matrix << std::endl;
+
+      }
+
+      ss << " Child: xform" << std::endl;
+    } else if (Alembic::AbcGeom::IPolyMesh::matches(header)) {
       // Polygon
       Alembic::AbcGeom::IPolyMesh pmesh(obj, header.getName());
 
@@ -426,6 +559,7 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
       std::cout << "  # of samples = " << ps.getNumSamples() << std::endl;
 
       if (ps.getNumSamples() > 0) {
+        Mesh mesh;
         ps.get(psample, samplesel);
         Alembic::Abc::P3fArraySamplePtr P = psample.getPositions();
         std::cout << "  # of positions   = " << P->size() << std::endl;
@@ -440,7 +574,7 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
         readPolyNormals(&normals, &facevarying_normals, normals_param);
         std::cout << "  # of normals   = " << (normals.size() / 3) << std::endl;
         std::cout << "  # of facevarying normals   = " << (facevarying_normals.size() / 3) << std::endl;
-        mesh->normals = normals;
+        mesh.normals = normals;
         
 
         // UV
@@ -450,8 +584,8 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
         readPolyUVs(&uvs, &facevarying_uvs,  uvs_param);
         std::cout << "  # of uvs   = " << (uvs.size() / 2) << std::endl;
         std::cout << "  # of facevarying_uvs   = " << (facevarying_uvs.size() / 2) << std::endl;
-        mesh->texcoords = uvs;
-        mesh->facevarying_texcoords = facevarying_uvs;
+        mesh.texcoords = uvs;
+        mesh.facevarying_texcoords = facevarying_uvs;
 
         std::vector<unsigned int> faces; // temp
         bool ret = BuildFaceSet(faces, P, psample.getFaceIndices(), psample.getFaceCounts());
@@ -459,17 +593,18 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
           std::cout << "  No faces in polymesh" << std::endl;
         }
 
-        mesh->vertices.resize(3 * P->size());
-        memcpy(mesh->vertices.data(), P->get(), sizeof(float) * 3 * P->size());
-        mesh->faces = faces;
+        mesh.vertices.resize(3 * P->size());
+        memcpy(mesh.vertices.data(), P->get(), sizeof(float) * 3 * P->size());
+        mesh.faces = faces;
 
-        foundMesh = true;
+        assert(scene->mesh_map.find(path) == scene->mesh_map.end());
+        scene->mesh_map[path] = mesh;
         return;
  
       } else {
         std::cout << "Warning: # of samples = 0" << std::endl;
       }
-    } else if ((!foundCurves) && Alembic::AbcGeom::ICurves::matches(header)) {
+    } else if (Alembic::AbcGeom::ICurves::matches(header)) {
       // Curves
       Alembic::AbcGeom::ICurves curve(obj, header.getName());
 
@@ -481,6 +616,7 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
       std::cout << "  # of samples = " << ps.getNumSamples() << std::endl;
 
       if (ps.getNumSamples() > 0) {
+        Curves curves;
         ps.get(psample, samplesel);
 
         const size_t num_curves = psample.getNumCurves();
@@ -496,35 +632,38 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
         if (orders) std::cout << "  # of orders= " << orders->size() << std::endl;
         std::cout << "  # of nvs= " << num_vertices->size() << std::endl;
 
-        curves->points.resize(3 * P->size());
-        memcpy(curves->points.data(), P->get(), sizeof(float) * 3 * P->size());
+        curves.points.resize(3 * P->size());
+        memcpy(curves.points.data(), P->get(), sizeof(float) * 3 * P->size());
 
-        //for (size_t k = 0; k < P->size(); k++) {
-        //  std::cout << "P[" << k << "] " << (*P)[k].x << ", " << (*P)[k].y << ", " << (*P)[k].z << std::endl;
-        //}
-
-        //if (knots) {
-        //for (size_t k = 0; k < knots->size(); k++) {
-        //  std::cout << "knots[" << k << "] " << (*knots)[k] << std::endl;
-        //}
-        //}
-
-        //if (orders) { 
-        //for (size_t k = 0; k < orders->size(); k++) {
-        //  std::cout << "orders[" << k << "] " << (*orders)[k] << std::endl;
-        //}
-        //}
-
-        //for (size_t k = 0; k < num_vertices->size(); k++) {
-        //  std::cout << "nv[" << k << "] " << (*num_vertices)[k] << std::endl;
-        //}
-        
-        if (num_vertices) {
-          curves->nverts.resize(num_vertices->size());
-          memcpy(curves->nverts.data(), num_vertices->get(), sizeof(int) * num_vertices->size());
+#if 1
+        for (size_t k = 0; k < P->size(); k++) {
+          std::cout << "P[" << k << "] " << (*P)[k].x << ", " << (*P)[k].y << ", " << (*P)[k].z << std::endl;
         }
 
-        foundCurves = true;
+        if (knots) {
+        for (size_t k = 0; k < knots->size(); k++) {
+          std::cout << "knots[" << k << "] " << (*knots)[k] << std::endl;
+        }
+        }
+
+        if (orders) { 
+        for (size_t k = 0; k < orders->size(); k++) {
+          std::cout << "orders[" << k << "] " << (*orders)[k] << std::endl;
+        }
+        }
+
+        for (size_t k = 0; k < num_vertices->size(); k++) {
+          std::cout << "nv[" << k << "] " << (*num_vertices)[k] << std::endl;
+        }
+#endif
+        
+        if (num_vertices) {
+          curves.nverts.resize(num_vertices->size());
+          memcpy(curves.nverts.data(), num_vertices->get(), sizeof(int) * num_vertices->size());
+        }
+
+        assert(scene->curves_map.find(path) == scene->curves_map.end());
+        scene->curves_map[path] = curves;
         return;
  
       } else {
@@ -533,7 +672,7 @@ static void VisitObjectAndExtractObject(Mesh* mesh, Curves* curves, std::strings
 
     }
 
-    VisitObjectAndExtractObject(mesh, curves, ss, foundMesh, foundCurves, Alembic::AbcGeom::IObject(obj, obj.getChildHeader(i).getName()), indent);
+    VisitObjectAndExtractScene(scene, ss, Alembic::AbcGeom::IObject(obj, obj.getChildHeader(i).getName()), indent);
   }
 }
 
@@ -923,6 +1062,20 @@ static bool SaveCurvesToGLTF(const std::string& output_filename,
   return true;
 }
 
+// Flatten multiple Curves object to one Curves.
+static void FlattenCurves(Curves *flatten_curves, const Scene &scene)
+{
+  flatten_curves->name = "flatten_curves";
+
+  std::map<std::string, Curves>::const_iterator it(scene.curves_map.begin());
+  std::map<std::string, Curves>::const_iterator itEnd(scene.curves_map.end());
+
+  for (; it != itEnd; it++) {
+    const Curves &curves = it->second;
+    std::copy(curves.points.begin(), curves.points.end(), std::back_inserter(flatten_curves->points));
+    std::copy(curves.nverts.begin(), curves.nverts.end(), std::back_inserter(flatten_curves->nverts));
+  }
+}
 
 int main(int argc, char** argv) {
   std::string abc_filename;
@@ -943,15 +1096,15 @@ int main(int argc, char** argv) {
 
   std::cout << "# of children " << root.getNumChildren() << std::endl;
 
+  Scene scene;
   std::stringstream ss;
-  Mesh mesh;
-  Curves curves;
-  bool foundMesh = false;
-  bool foundCurves = false;
-  VisitObjectAndExtractObject(&mesh, &curves, ss, foundMesh, foundCurves, root, /* indent */"  ");
+  VisitObjectAndExtractScene(&scene, ss, root, /* indent */"  ");
 
   std::cout << ss.str() << std::endl;
 
+  if (scene.curves_map.size() > 0) {
+  }
+#if 0
   if (foundMesh) {
     bool ret = SaveMeshToGLTF(gltf_filename, mesh);
     if (ret) {
@@ -971,6 +1124,7 @@ int main(int argc, char** argv) {
       return EXIT_FAILURE;
     }
   }
+#endif
 
   return EXIT_SUCCESS;
 }
