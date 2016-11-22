@@ -43,7 +43,27 @@
 class Node
 {
  public:
-  Node() {}
+  Node() {
+    xform[0] = 1.0;
+    xform[1] = 0.0;
+    xform[2] = 0.0;
+    xform[3] = 0.0;
+
+    xform[4] = 0.0;
+    xform[5] = 1.0;
+    xform[6] = 0.0;
+    xform[7] = 0.0;
+
+    xform[8] = 0.0;
+    xform[9] = 0.0;
+    xform[10] = 1.0;
+    xform[11] = 0.0;
+
+    xform[12] = 0.0;
+    xform[13] = 0.0;
+    xform[14] = 0.0;
+    xform[15] = 1.0;
+  }
   virtual ~Node();
 
   Node(const Node& rhs) {
@@ -51,6 +71,8 @@ class Node
     for (size_t i = 0; i < 16; i++) {
       xform[i] = rhs.xform[i];
     } 
+
+    children = rhs.children;
   }
 
   Node &operator=(const Node& rhs) {
@@ -59,11 +81,15 @@ class Node
       xform[i] = rhs.xform[i];
     } 
  
+    children = rhs.children;
+
     return (*this);
   }
 
   std::string name;
   double xform[16];
+
+  std::vector<Node *> children;
 };
 
 Node::~Node()
@@ -159,11 +185,11 @@ Points::~Points()
 
 typedef struct
 {
-  std::map<std::string, Mesh> mesh_map;
-  std::map<std::string, Curves> curves_map;
+  std::map<std::string, Mesh*> mesh_map;
+  std::map<std::string, Curves*> curves_map;
   //std::map<std::string, Points> points_map;
 
-  std::map<std::string, Node> node_map;
+  std::map<std::string, Node*> node_map;
 
 } Scene;
 
@@ -490,7 +516,7 @@ static void readPolyUVs(
 
 
 // Traverse Alembic object tree and extract scene data.
-static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, const Alembic::AbcGeom::IObject& obj, const std::string& indent) {
+static void VisitObjectAndExtractScene(Node* node_out, std::stringstream& ss, const Alembic::AbcGeom::IObject& obj, const std::string& indent) {
 
   std::string path = obj.getFullName();
 
@@ -501,6 +527,8 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
   Alembic::AbcGeom::ICompoundProperty props = obj.getProperties();
   VisitProperties(ss, props, indent);
 
+  ss << "# of children = " << obj.getNumChildren() << std::endl;
+
   for (size_t i = 0; i < obj.getNumChildren(); i++) {
     const Alembic::AbcGeom::ObjectHeader& header = obj.getChildHeader(i);
     ss << " Child: header = " << header.getName() << std::endl;
@@ -508,7 +536,10 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
     Alembic::AbcGeom::ICompoundProperty cprops = obj.getChild(i).getProperties();
     VisitProperties(ss, props, indent);
 
+    Node *node = NULL;
+
     if (Alembic::AbcGeom::IXform::matches(header)) {
+      ss << "    IXform" << std::endl;
 
       Alembic::AbcGeom::IXform xform( obj, header.getName() );
 
@@ -517,24 +548,26 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
           Alembic::AbcGeom::M44d static_matrix = xform.getSchema().getValue().getMatrix();
           ss << "IXform static: " << header.getName() << ", " << static_matrix << std::endl;
 
-          Node node;
-          node.name = header.getName();
-          node.xform[0] = static_matrix[0][0];
-          node.xform[1] = static_matrix[0][1];
-          node.xform[2] = static_matrix[0][2];
-          node.xform[3] = static_matrix[0][3];
-          node.xform[4] = static_matrix[1][0];
-          node.xform[5] = static_matrix[1][1];
-          node.xform[6] = static_matrix[1][2];
-          node.xform[7] = static_matrix[1][3];
-          node.xform[8] = static_matrix[2][0];
-          node.xform[9] = static_matrix[2][1];
-          node.xform[10] = static_matrix[2][2];
-          node.xform[11] = static_matrix[2][3];
-          node.xform[12] = static_matrix[3][0];
-          node.xform[13] = static_matrix[3][1];
-          node.xform[14] = static_matrix[3][2];
-          node.xform[15] = static_matrix[3][3];
+          Node *xform_node = new Node();
+          xform_node->name = header.getName();
+          xform_node->xform[0] = static_matrix[0][0];
+          xform_node->xform[1] = static_matrix[0][1];
+          xform_node->xform[2] = static_matrix[0][2];
+          xform_node->xform[3] = static_matrix[0][3];
+          xform_node->xform[4] = static_matrix[1][0];
+          xform_node->xform[5] = static_matrix[1][1];
+          xform_node->xform[6] = static_matrix[1][2];
+          xform_node->xform[7] = static_matrix[1][3];
+          xform_node->xform[8] = static_matrix[2][0];
+          xform_node->xform[9] = static_matrix[2][1];
+          xform_node->xform[10] = static_matrix[2][2];
+          xform_node->xform[11] = static_matrix[2][3];
+          xform_node->xform[12] = static_matrix[3][0];
+          xform_node->xform[13] = static_matrix[3][1];
+          xform_node->xform[14] = static_matrix[3][2];
+          xform_node->xform[15] = static_matrix[3][3];
+
+          node = xform_node;
 
       } else {
 
@@ -548,6 +581,8 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
 
       ss << " Child: xform" << std::endl;
     } else if (Alembic::AbcGeom::IPolyMesh::matches(header)) {
+      ss << "    IPolyMesh" << std::endl;
+
       // Polygon
       Alembic::AbcGeom::IPolyMesh pmesh(obj, header.getName());
 
@@ -559,7 +594,7 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
       std::cout << "  # of samples = " << ps.getNumSamples() << std::endl;
 
       if (ps.getNumSamples() > 0) {
-        Mesh mesh;
+        Mesh *mesh = new Mesh();
         ps.get(psample, samplesel);
         Alembic::Abc::P3fArraySamplePtr P = psample.getPositions();
         std::cout << "  # of positions   = " << P->size() << std::endl;
@@ -574,7 +609,7 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
         readPolyNormals(&normals, &facevarying_normals, normals_param);
         std::cout << "  # of normals   = " << (normals.size() / 3) << std::endl;
         std::cout << "  # of facevarying normals   = " << (facevarying_normals.size() / 3) << std::endl;
-        mesh.normals = normals;
+        mesh->normals = normals;
         
 
         // UV
@@ -584,8 +619,8 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
         readPolyUVs(&uvs, &facevarying_uvs,  uvs_param);
         std::cout << "  # of uvs   = " << (uvs.size() / 2) << std::endl;
         std::cout << "  # of facevarying_uvs   = " << (facevarying_uvs.size() / 2) << std::endl;
-        mesh.texcoords = uvs;
-        mesh.facevarying_texcoords = facevarying_uvs;
+        mesh->texcoords = uvs;
+        mesh->facevarying_texcoords = facevarying_uvs;
 
         std::vector<unsigned int> faces; // temp
         bool ret = BuildFaceSet(faces, P, psample.getFaceIndices(), psample.getFaceCounts());
@@ -593,18 +628,22 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
           std::cout << "  No faces in polymesh" << std::endl;
         }
 
-        mesh.vertices.resize(3 * P->size());
-        memcpy(mesh.vertices.data(), P->get(), sizeof(float) * 3 * P->size());
-        mesh.faces = faces;
+        mesh->vertices.resize(3 * P->size());
+        memcpy(mesh->vertices.data(), P->get(), sizeof(float) * 3 * P->size());
+        mesh->faces = faces;
 
-        assert(scene->mesh_map.find(path) == scene->mesh_map.end());
-        scene->mesh_map[path] = mesh;
-        return;
+        node = mesh;
+
+        //assert(scene->mesh_map.find(path) == scene->mesh_map.end());
+        //scene->mesh_map[path] = mesh;
+        //return;
  
       } else {
         std::cout << "Warning: # of samples = 0" << std::endl;
       }
     } else if (Alembic::AbcGeom::ICurves::matches(header)) {
+      ss << "    ICurves" << std::endl;
+
       // Curves
       Alembic::AbcGeom::ICurves curve(obj, header.getName());
 
@@ -662,18 +701,90 @@ static void VisitObjectAndExtractScene(Scene* scene, std::stringstream& ss, cons
           memcpy(curves.nverts.data(), num_vertices->get(), sizeof(int) * num_vertices->size());
         }
 
-        assert(scene->curves_map.find(path) == scene->curves_map.end());
-        scene->curves_map[path] = curves;
-        return;
+        //assert(scene->curves_map.find(path) == scene->curves_map.end());
+        //scene->curves_map[path] = curves;
+        //return;
  
       } else {
         std::cout << "Warning: # of samples = 0" << std::endl;
       }
 
+    } else if (Alembic::AbcGeom::IFaceSet::matches(header)) {
+      ss << "    IFaceSet" << std::endl;
+    } else {
+      ss << "    TODO" << std::endl;
     }
 
-    VisitObjectAndExtractScene(scene, ss, Alembic::AbcGeom::IObject(obj, obj.getChildHeader(i).getName()), indent);
+    if (node) {
+      // Visit child.
+      VisitObjectAndExtractScene(node, ss, Alembic::AbcGeom::IObject(obj, obj.getChildHeader(i).getName()), indent);
+    }
+
+    node_out->children.push_back(node);
   }
+}
+
+static bool SaveSceneToGLTF(picojson::object *out, const Scene &scene)
+{
+  {
+    std::map<std::string, Node*>::const_iterator it(scene.node_map.begin());
+    std::map<std::string, Node*>::const_iterator it_end(scene.node_map.end());
+
+    picojson::object nodes;
+
+    for (; it != it_end; it++) {
+      picojson::object node;
+
+      // FIXME: Hierarchial
+      picojson::array  meshes;
+
+      meshes.push_back(picojson::value(std::string("mesh_1")));
+
+      node["meshes"] = picojson::value(meshes);
+
+      // Xform
+      // TODO(syoyo): Support Translation, Scale, Rotate, etc.
+      {
+        picojson::array xform;
+        for (size_t i = 0; i < 16; i++) {
+          xform.push_back(picojson::value((it->second)->xform[i]));
+        }
+        node["matrix"] = picojson::value(xform);
+      }
+
+      nodes["node_1"] = picojson::value(node);
+      (*out)["nodes"] = picojson::value(nodes);
+    }
+  }
+
+  {
+    picojson::object defaultScene;
+    picojson::array nodes;
+    
+    nodes.push_back(picojson::value(std::string("node_1")));
+
+    defaultScene["nodes"] = picojson::value(nodes);
+
+    (*out)["scene"] = picojson::value("defaultScene");
+    picojson::object scenes;
+    scenes["defaultScene"] = picojson::value(defaultScene);
+    (*out)["scenes"] = picojson::value(scenes);
+  }
+
+
+  // @todo {}
+  picojson::object shaders;
+  picojson::object programs;
+  picojson::object techniques;
+  picojson::object materials;
+  picojson::object skins;
+  (*out)["shaders"] = picojson::value(shaders);
+  (*out)["programs"] = picojson::value(programs);
+  (*out)["techniques"] = picojson::value(techniques);
+  (*out)["materials"] = picojson::value(materials);
+  (*out)["skins"] = picojson::value(skins);
+
+  return true;
 }
 
 static bool SaveMeshToGLTF(const std::string& output_filename,
@@ -803,46 +914,6 @@ static bool SaveMeshToGLTF(const std::string& output_filename,
     root["materials"] = picojson::value(materials);
 
   }
-
-  {
-    picojson::object nodes;
-    picojson::object node;
-    picojson::array  meshes;
-
-    meshes.push_back(picojson::value(std::string("mesh_1")));
-
-    node["meshes"] = picojson::value(meshes);
-
-    nodes["node_1"] = picojson::value(node);
-    root["nodes"] = picojson::value(nodes);
-  }
-
-  {
-    picojson::object defaultScene;
-    picojson::array nodes;
-    
-    nodes.push_back(picojson::value(std::string("node_1")));
-
-    defaultScene["nodes"] = picojson::value(nodes);
-
-    root["scene"] = picojson::value("defaultScene");
-    picojson::object scenes;
-    scenes["defaultScene"] = picojson::value(defaultScene);
-    root["scenes"] = picojson::value(scenes);
-  }
-
-
-  // @todo {}
-  picojson::object shaders;
-  picojson::object programs;
-  picojson::object techniques;
-  picojson::object materials;
-  picojson::object skins;
-  root["shaders"] = picojson::value(shaders);
-  root["programs"] = picojson::value(programs);
-  root["techniques"] = picojson::value(techniques);
-  root["materials"] = picojson::value(materials);
-  root["skins"] = picojson::value(skins);
 
   std::ofstream ifs(output_filename.c_str());
   if (ifs.bad()) {
@@ -1062,13 +1133,14 @@ static bool SaveCurvesToGLTF(const std::string& output_filename,
   return true;
 }
 
+#if 0
 // Flatten multiple Curves object to one Curves.
 static void FlattenCurves(Curves *flatten_curves, const Scene &scene)
 {
   flatten_curves->name = "flatten_curves";
 
-  std::map<std::string, Curves>::const_iterator it(scene.curves_map.begin());
-  std::map<std::string, Curves>::const_iterator itEnd(scene.curves_map.end());
+  std::map<std::string, Curves*>::const_iterator it(scene.curves_map.begin());
+  std::map<std::string, Curves*>::const_iterator itEnd(scene.curves_map.end());
 
   for (; it != itEnd; it++) {
     const Curves &curves = it->second;
@@ -1076,6 +1148,7 @@ static void FlattenCurves(Curves *flatten_curves, const Scene &scene)
     std::copy(curves.nverts.begin(), curves.nverts.end(), std::back_inserter(flatten_curves->nverts));
   }
 }
+#endif
 
 int main(int argc, char** argv) {
   std::string abc_filename;
@@ -1098,7 +1171,8 @@ int main(int argc, char** argv) {
 
   Scene scene;
   std::stringstream ss;
-  VisitObjectAndExtractScene(&scene, ss, root, /* indent */"  ");
+  Node node;
+  VisitObjectAndExtractScene(&node, ss, root, /* indent */"  ");
 
   std::cout << ss.str() << std::endl;
 
