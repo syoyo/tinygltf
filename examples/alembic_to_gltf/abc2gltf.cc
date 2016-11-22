@@ -830,24 +830,27 @@ static bool ConvertNodeToGLTF(picojson::object *out, const Node *node)
 
 static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene)
 {
-  picojson::object defaultScene;
-  picojson::array nodes;
+  assert(scene.root_node);
 
-  if (scene.root_node) {
-
+  picojson::object nodes;
+  picojson::array node_names;
+  {
     picojson::object node;
 
     ConvertNodeToGLTF(&node, scene.root_node);
 
-    nodes.push_back(picojson::value(node));
-
+    nodes[scene.root_node->name] = picojson::value(node);
+    node_names.push_back(picojson::value(scene.root_node->name));
   }
+  (*out)["nodes"] = picojson::value(nodes);
 
-  defaultScene["nodes"] = picojson::value(nodes);
+  picojson::object scenes;
+  picojson::object defaultScene;
+  defaultScene["nodes"] = picojson::value(node_names);
+  scenes["defaultScene"] = picojson::value(defaultScene);
 
   (*out)["scene"] = picojson::value("defaultScene");
-  picojson::object scenes;
-  scenes["defaultScene"] = picojson::value(defaultScene);
+
   (*out)["scenes"] = picojson::value(scenes);
 
 
