@@ -237,7 +237,7 @@ void motionFunc(GLFWwindow *window, double mouse_x, double mouse_y) {
   prevMouseY = mouse_y;
 }
 
-static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
+static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
   // Buffer
   {
     std::map<std::string, tinygltf::BufferView>::const_iterator it(
@@ -746,7 +746,7 @@ int main(int argc, char **argv) {
   glUseProgram(progId);
   CheckErrors("useProgram");
 
-  SetupGLState(scene, progId);
+  SetupMeshState(scene, progId);
   SetupCurvesState(scene, progId);
   CheckErrors("SetupGLState");
 
