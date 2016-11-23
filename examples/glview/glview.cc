@@ -1,11 +1,11 @@
-#include <vector>
-#include <string>
+#include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <limits>
-#include <cassert>
-#include <cmath>
+#include <string>
+#include <vector>
 
 #include <GL/glew.h>
 
@@ -20,14 +20,14 @@
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
-#define CheckGLErrors(desc)                                                    \
-  {                                                                            \
-    GLenum e = glGetError();                                                   \
-    if (e != GL_NO_ERROR) {                                                    \
-      printf("OpenGL error in \"%s\": %d (%d) %s:%d\n", desc, e, e, __FILE__,  \
-             __LINE__);                                                        \
-      exit(20);                                                                \
-    }                                                                          \
+#define CheckGLErrors(desc)                                                   \
+  {                                                                           \
+    GLenum e = glGetError();                                                  \
+    if (e != GL_NO_ERROR) {                                                   \
+      printf("OpenGL error in \"%s\": %d (%d) %s:%d\n", desc, e, e, __FILE__, \
+             __LINE__);                                                       \
+      exit(20);                                                               \
+    }                                                                         \
   }
 
 #define CAM_Z (3.0f)
@@ -47,7 +47,7 @@ GLFWwindow *window;
 typedef struct { GLuint vb; } GLBufferState;
 
 typedef struct {
-  std::vector<GLuint> diffuseTex; // for each primitive in mesh
+  std::vector<GLuint> diffuseTex;  // for each primitive in mesh
 } GLMeshState;
 
 typedef struct {
@@ -56,8 +56,8 @@ typedef struct {
 } GLProgramState;
 
 typedef struct {
-  GLuint vb;  // vertex buffer
-  size_t count; // byte count
+  GLuint vb;     // vertex buffer
+  size_t count;  // byte count
 } GLCurvesState;
 
 std::map<std::string, GLBufferState> gBufferState;
@@ -79,8 +79,8 @@ static std::string GetFilePathExtension(const std::string &FileName) {
   return "";
 }
 
-bool LoadShader(GLenum shaderType, // GL_VERTEX_SHADER or GL_FRAGMENT_SHADER(or
-                                   // maybe GL_COMPUTE_SHADER)
+bool LoadShader(GLenum shaderType,  // GL_VERTEX_SHADER or GL_FRAGMENT_SHADER(or
+                                    // maybe GL_COMPUTE_SHADER)
                 GLuint &shader, const char *shaderSourceFilename) {
   GLint val = 0;
 
@@ -170,9 +170,7 @@ void keyboardFunc(GLFWwindow *window, int key, int scancode, int action,
     if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE) {
       glfwSetWindowShouldClose(window, GL_TRUE);
     }
-
   }
-
 }
 
 void clickFunc(GLFWwindow *window, int button, int action, int mods) {
@@ -189,14 +187,15 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
     if (action == GLFW_PRESS) {
       int id = -1;
       // int id = ui.Proc(x, y);
-      if (id < 0) { // outside of UI
+      if (id < 0) {  // outside of UI
         trackball(prev_quat, 0.0, 0.0, 0.0, 0.0);
       }
     } else if (action == GLFW_RELEASE) {
       mouseLeftPressed = false;
     }
   }
-  if ((button == GLFW_MOUSE_BUTTON_RIGHT) || ((button == GLFW_MOUSE_BUTTON_LEFT) && ctrlPressed)) {
+  if ((button == GLFW_MOUSE_BUTTON_RIGHT) ||
+      ((button == GLFW_MOUSE_BUTTON_LEFT) && ctrlPressed)) {
     if (action == GLFW_PRESS) {
       mouseRightPressed = true;
       mouseLeftPressed = false;
@@ -205,7 +204,8 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
       mouseRightPressed = false;
     }
   }
-  if ((button == GLFW_MOUSE_BUTTON_MIDDLE) || ((button == GLFW_MOUSE_BUTTON_LEFT) && shiftPressed)) {
+  if ((button == GLFW_MOUSE_BUTTON_MIDDLE) ||
+      ((button == GLFW_MOUSE_BUTTON_LEFT) && shiftPressed)) {
     if (action == GLFW_PRESS) {
       mouseMiddlePressed = true;
       mouseLeftPressed = false;
@@ -255,14 +255,15 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
       const tinygltf::BufferView &bufferView = it->second;
       if (bufferView.target == 0) {
         std::cout << "WARN: bufferView.target is zero" << std::endl;
-        continue; // Unsupported bufferView.
+        continue;  // Unsupported bufferView.
       }
 
       const tinygltf::Buffer &buffer = scene.buffers[bufferView.buffer];
       GLBufferState state;
       glGenBuffers(1, &state.vb);
       glBindBuffer(bufferView.target, state.vb);
-      std::cout << "buffer.size= " << buffer.data.size() << ", byteOffset = " << bufferView.byteOffset << std::endl;
+      std::cout << "buffer.size= " << buffer.data.size()
+                << ", byteOffset = " << bufferView.byteOffset << std::endl;
       glBufferData(bufferView.target, bufferView.byteLength,
                    &buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
       glBindBuffer(bufferView.target, 0);
@@ -273,8 +274,10 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
 
   // Texture
   {
-    std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
-    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
+    std::map<std::string, tinygltf::Mesh>::const_iterator it(
+        scene.meshes.begin());
+    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(
+        scene.meshes.end());
 
     for (; it != itEnd; it++) {
       const tinygltf::Mesh &mesh = it->second;
@@ -289,7 +292,7 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
           continue;
         }
         tinygltf::Material &mat = scene.materials[primitive.material];
-        //printf("material.name = %s\n", mat.name.c_str());
+        // printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
           std::string diffuseTexName = mat.values["diffuse"].string_value;
           if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
@@ -339,13 +342,14 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
   gGLProgramState.uniforms["isCurvesLoc"] = isCurvesLoc;
 };
 
-// Setup curves geometry extension 
+// Setup curves geometry extension
 static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
-
   // Find curves primitive.
   {
-    std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
-    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
+    std::map<std::string, tinygltf::Mesh>::const_iterator it(
+        scene.meshes.begin());
+    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(
+        scene.meshes.end());
 
     for (; it != itEnd; it++) {
       const tinygltf::Mesh &mesh = it->second;
@@ -367,11 +371,12 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
         bool has_curves = false;
         if (primitive.extras.IsObject()) {
           if (primitive.extras.Has("ext_mode")) {
-            const tinygltf::Value::Object &o = primitive.extras.Get<tinygltf::Value::Object>();
+            const tinygltf::Value::Object &o =
+                primitive.extras.Get<tinygltf::Value::Object>();
             const tinygltf::Value &ext_mode = o.find("ext_mode")->second;
 
             if (ext_mode.IsString()) {
-              const std::string& str = ext_mode.Get<std::string>();
+              const std::string &str = ext_mode.Get<std::string>();
               if (str.compare("curves") == 0) {
                 has_curves = true;
               }
@@ -384,47 +389,58 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
         }
 
         // Construct curves buffer
-        const tinygltf::Accessor &vtx_accessor = scene.accessors[primitive.attributes.find("POSITION")->second];
-        const tinygltf::Accessor &nverts_accessor = scene.accessors[primitive.attributes.find("NVERTS")->second];
-        const tinygltf::BufferView &vtx_bufferView = scene.bufferViews[vtx_accessor.bufferView];
-        const tinygltf::BufferView &nverts_bufferView = scene.bufferViews[nverts_accessor.bufferView];
-        const tinygltf::Buffer &vtx_buffer = scene.buffers[vtx_bufferView.buffer];
-        const tinygltf::Buffer &nverts_buffer = scene.buffers[nverts_bufferView.buffer];
+        const tinygltf::Accessor &vtx_accessor =
+            scene.accessors[primitive.attributes.find("POSITION")->second];
+        const tinygltf::Accessor &nverts_accessor =
+            scene.accessors[primitive.attributes.find("NVERTS")->second];
+        const tinygltf::BufferView &vtx_bufferView =
+            scene.bufferViews[vtx_accessor.bufferView];
+        const tinygltf::BufferView &nverts_bufferView =
+            scene.bufferViews[nverts_accessor.bufferView];
+        const tinygltf::Buffer &vtx_buffer =
+            scene.buffers[vtx_bufferView.buffer];
+        const tinygltf::Buffer &nverts_buffer =
+            scene.buffers[nverts_bufferView.buffer];
 
-        //std::cout << "vtx_bufferView = " << vtx_accessor.bufferView << std::endl;
-        //std::cout << "nverts_bufferView = " << nverts_accessor.bufferView << std::endl;
-        //std::cout << "vtx_buffer.size = " << vtx_buffer.data.size() << std::endl;
-        //std::cout << "nverts_buffer.size = " << nverts_buffer.data.size() << std::endl;
+        // std::cout << "vtx_bufferView = " << vtx_accessor.bufferView <<
+        // std::endl;
+        // std::cout << "nverts_bufferView = " << nverts_accessor.bufferView <<
+        // std::endl;
+        // std::cout << "vtx_buffer.size = " << vtx_buffer.data.size() <<
+        // std::endl;
+        // std::cout << "nverts_buffer.size = " << nverts_buffer.data.size() <<
+        // std::endl;
 
-        const int *nverts = reinterpret_cast<const int*>(nverts_buffer.data.data());
-        const float *vtx  = reinterpret_cast<const float*>(vtx_buffer.data.data());
+        const int *nverts =
+            reinterpret_cast<const int *>(nverts_buffer.data.data());
+        const float *vtx =
+            reinterpret_cast<const float *>(vtx_buffer.data.data());
 
         // Convert to GL_LINES data.
         std::vector<float> line_pts;
         size_t vtx_offset = 0;
         for (int k = 0; k < static_cast<int>(nverts_accessor.count); k++) {
-            for (int n = 0; n < nverts[k] - 1; n++) {
-              //std::cout << "vn[" << k << "] " << nverts[k] << std::endl;
+          for (int n = 0; n < nverts[k] - 1; n++) {
+            // std::cout << "vn[" << k << "] " << nverts[k] << std::endl;
 
-              line_pts.push_back(vtx[3 * (vtx_offset + n) + 0]);
-              line_pts.push_back(vtx[3 * (vtx_offset + n) + 1]);
-              line_pts.push_back(vtx[3 * (vtx_offset + n) + 2]);
+            line_pts.push_back(vtx[3 * (vtx_offset + n) + 0]);
+            line_pts.push_back(vtx[3 * (vtx_offset + n) + 1]);
+            line_pts.push_back(vtx[3 * (vtx_offset + n) + 2]);
 
-              line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 0]);
-              line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 1]);
-              line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 2]);
+            line_pts.push_back(vtx[3 * (vtx_offset + n + 1) + 0]);
+            line_pts.push_back(vtx[3 * (vtx_offset + n + 1) + 1]);
+            line_pts.push_back(vtx[3 * (vtx_offset + n + 1) + 2]);
 
-              //std::cout << "p0 " << vtx[3 * (vtx_offset + n) + 0] << ", "
-              //                  << vtx[3 * (vtx_offset + n) + 1] << ", "
-              //                  << vtx[3 * (vtx_offset + n) + 2] << std::endl;
+            // std::cout << "p0 " << vtx[3 * (vtx_offset + n) + 0] << ", "
+            //                  << vtx[3 * (vtx_offset + n) + 1] << ", "
+            //                  << vtx[3 * (vtx_offset + n) + 2] << std::endl;
 
-              //std::cout << "p1 " << vtx[3 * (vtx_offset + n+1) + 0] << ", "
-              //                  << vtx[3 * (vtx_offset + n+1) + 1] << ", "
-              //                  << vtx[3 * (vtx_offset + n+1) + 2] << std::endl;
+            // std::cout << "p1 " << vtx[3 * (vtx_offset + n+1) + 0] << ", "
+            //                  << vtx[3 * (vtx_offset + n+1) + 1] << ", "
+            //                  << vtx[3 * (vtx_offset + n+1) + 2] << std::endl;
+          }
 
-            }
-
-            vtx_offset += nverts[k];
+          vtx_offset += nverts[k];
         }
 
         GLCurvesState state;
@@ -433,13 +449,13 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
         glBufferData(GL_ARRAY_BUFFER, line_pts.size() * sizeof(float),
                      line_pts.data(), GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-        
-        state.count = line_pts.size() / 3 / 2; // 2 = GL_LINES
+
+        state.count = line_pts.size() / 3 / 2;  // 2 = GL_LINES
         gCurvesMesh[mesh.name] = state;
 
         // Material
         tinygltf::Material &mat = scene.materials[primitive.material];
-        //printf("material.name = %s\n", mat.name.c_str());
+        // printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
           std::string diffuseTexName = mat.values["diffuse"].string_value;
           if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
@@ -489,28 +505,24 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
   gGLProgramState.uniforms["uIsCurves"] = isCurvesLoc;
 };
 
-void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
-
+static void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
   // Skip curves primitive.
   if (gCurvesMesh.find(mesh.name) != gCurvesMesh.end()) {
     return;
   }
 
   if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
-    glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0); // TEXTURE0
+    glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0);  // TEXTURE0
   }
 
   if (gGLProgramState.uniforms["isCurvesLoc"] >= 0) {
     glUniform1i(gGLProgramState.uniforms["isCurvesLoc"], 0);
   }
 
-
   for (size_t i = 0; i < mesh.primitives.size(); i++) {
     const tinygltf::Primitive &primitive = mesh.primitives[i];
 
-
-    if (primitive.indices.empty())
-      return;
+    if (primitive.indices.empty()) return;
 
     std::map<std::string, std::string>::const_iterator it(
         primitive.attributes.begin());
@@ -541,11 +553,11 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
       if ((it->first.compare("POSITION") == 0) ||
           (it->first.compare("NORMAL") == 0) ||
           (it->first.compare("TEXCOORD_0") == 0)) {
-
         if (gGLProgramState.attribs[it->first] >= 0) {
-          glVertexAttribPointer(
-            gGLProgramState.attribs[it->first], count, accessor.componentType,
-            GL_FALSE, accessor.byteStride, BUFFER_OFFSET(accessor.byteOffset));
+          glVertexAttribPointer(gGLProgramState.attribs[it->first], count,
+                                accessor.componentType, GL_FALSE,
+                                accessor.byteStride,
+                                BUFFER_OFFSET(accessor.byteOffset));
           CheckErrors("vertex attrib pointer");
           glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
           CheckErrors("enable vertex attrib array");
@@ -553,7 +565,8 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
       }
     }
 
-    const tinygltf::Accessor &indexAccessor = scene.accessors[primitive.indices];
+    const tinygltf::Accessor &indexAccessor =
+        scene.accessors[primitive.indices];
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                  gBufferState[indexAccessor.bufferView].vb);
     CheckErrors("bind buffer");
@@ -587,17 +600,16 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
         if ((it->first.compare("POSITION") == 0) ||
             (it->first.compare("NORMAL") == 0) ||
             (it->first.compare("TEXCOORD_0") == 0)) {
-		  if (gGLProgramState.attribs[it->first] >= 0) {
-	        glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
-		  }
+          if (gGLProgramState.attribs[it->first] >= 0) {
+            glDisableVertexAttribArray(gGLProgramState.attribs[it->first]);
+          }
         }
       }
     }
   }
 }
 
-void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
-
+static void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
   (void)scene;
 
   if (gCurvesMesh.find(mesh.name) == gCurvesMesh.end()) {
@@ -612,9 +624,8 @@ void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
 
   if (gGLProgramState.attribs["POSITION"] >= 0) {
     glBindBuffer(GL_ARRAY_BUFFER, state.vb);
-    glVertexAttribPointer(
-      gGLProgramState.attribs["POSITION"], 3, GL_FLOAT,
-      GL_FALSE, /* stride */0, BUFFER_OFFSET(0));
+    glVertexAttribPointer(gGLProgramState.attribs["POSITION"], 3, GL_FLOAT,
+                          GL_FALSE, /* stride */ 0, BUFFER_OFFSET(0));
     CheckErrors("curve: vertex attrib pointer");
     glEnableVertexAttribArray(gGLProgramState.attribs["POSITION"]);
     CheckErrors("curve: enable vertex attrib array");
@@ -623,11 +634,64 @@ void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
   glDrawArrays(GL_LINES, 0, state.count);
 
   if (gGLProgramState.attribs["POSITION"] >= 0) {
-      glDisableVertexAttribArray(gGLProgramState.attribs["POSITION"]);
+    glDisableVertexAttribArray(gGLProgramState.attribs["POSITION"]);
   }
 }
 
-void DrawScene(tinygltf::Scene &scene) {
+// Hierarchically draw nodes
+static void DrawNode(tinygltf::Scene &scene, const tinygltf::Node &node) {
+  // Apply xform
+
+  glPushMatrix();
+  if (node.matrix.size() == 16) {
+    // Use `matrix' attribute
+    glMultMatrixd(node.matrix.data());
+  } else {
+    // Assume Trans x Rotate x Scale order
+    if (node.scale.size() == 3) {
+      glScaled(node.scale[0], node.scale[1], node.scale[2]);
+    }
+
+    if (node.rotation.size() == 4) {
+      glRotated(node.rotation[0], node.rotation[1], node.rotation[2],
+                node.rotation[3]);
+    }
+
+    if (node.translation.size() == 3) {
+      glTranslated(node.translation[0], node.translation[1],
+                   node.translation[2]);
+    }
+  }
+
+    std::cout << "node " << node.name << ", Meshes " << node.meshes.size() << std::endl;
+
+  for (size_t i = 0; i < node.meshes.size(); i++) {
+    std::map<std::string, tinygltf::Mesh>::const_iterator it =
+        scene.meshes.find(node.meshes[i]);
+
+    if (it != scene.meshes.end()) {
+      std::cout << it->first << std::endl;
+      // FIXME(syoyo): Refactor.
+      DrawCurves(scene, it->second);
+      DrawMesh(scene, it->second);
+    }
+  }
+
+  // Draw child nodes.
+  for (size_t i = 0; i < node.children.size(); i++) {
+    std::map<std::string, tinygltf::Node>::const_iterator it =
+        scene.nodes.find(node.children[i]);
+
+    if (it != scene.nodes.end()) {
+      DrawNode(scene, it->second);
+    }
+  }
+
+  glPopMatrix();
+}
+
+static void DrawScene(tinygltf::Scene &scene) {
+#if 0
   std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
   std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
 
@@ -635,6 +699,22 @@ void DrawScene(tinygltf::Scene &scene) {
     DrawMesh(scene, it->second);
     DrawCurves(scene, it->second);
   }
+#else
+  std::map<std::string, std::vector<std::string> >::const_iterator it =
+      scene.scenes.find(scene.defaultScene);
+  if (it == scene.scenes.end()) return;
+
+  for (size_t i = 0; i < it->second.size(); i++) {
+    std::map<std::string, tinygltf::Node>::const_iterator node_it =
+        scene.nodes.find((it->second)[i]);
+
+    if (node_it == scene.nodes.end()) continue;
+
+    std::cout << "root: " << node_it->first << std::endl;
+
+    DrawNode(scene, node_it->second);
+  }
+#endif
 }
 
 static void Init() {
@@ -651,6 +731,16 @@ static void Init() {
   up[0] = 0.0f;
   up[1] = 1.0f;
   up[2] = 0.0f;
+}
+
+static void PrintNodes(const tinygltf::Scene &scene) {
+  std::map<std::string, tinygltf::Node>::const_iterator it(scene.nodes.begin());
+  std::map<std::string, tinygltf::Node>::const_iterator itEnd(
+      scene.nodes.end());
+
+  for (; it != itEnd; it++) {
+    std::cout << "node.name : " << it->second.name << std::endl;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -689,6 +779,9 @@ int main(int argc, char **argv) {
 
   Init();
 
+  // DBG
+  PrintNodes(scene);
+
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;
     return -1;
@@ -697,8 +790,7 @@ int main(int argc, char **argv) {
   char title[1024];
   sprintf(title, "Simple glTF viewer: %s", input_filename.c_str());
 
-  window = glfwCreateWindow(width, height, title, NULL,
-                            NULL);
+  window = glfwCreateWindow(width, height, title, NULL, NULL);
   if (window == NULL) {
     std::cerr << "Failed to open GLFW window. " << std::endl;
     glfwTerminate();
@@ -715,7 +807,7 @@ int main(int argc, char **argv) {
   glfwSetMouseButtonCallback(window, clickFunc);
   glfwSetCursorPosCallback(window, motionFunc);
 
-  glewExperimental = true; // This may be only true for linux environment.
+  glewExperimental = true;  // This may be only true for linux environment.
   if (glewInit() != GLEW_OK) {
     std::cerr << "Failed to initialize GLEW." << std::endl;
     return -1;
