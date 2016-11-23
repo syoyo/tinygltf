@@ -38,7 +38,7 @@
 #pragma clang diagnostic pop
 #endif
 
-#include "../../tiny_gltf_loader.h" // To import some TINYGLTF_*** macros.
+#include "../../tiny_gltf_loader.h"  // To import some TINYGLTF_*** macros.
 
 template <typename T = float>
 class real3 {
@@ -129,19 +129,17 @@ inline T vdot(real3<T> a, real3<T> b) {
 
 typedef real3<float> float3;
 
-class Node
-{
+class Node {
  public:
-  Node() {
-  }
+  Node() {}
   virtual ~Node();
 
-  Node(const Node& rhs) {
+  Node(const Node &rhs) {
     name = rhs.name;
     children = rhs.children;
   }
 
-  Node &operator=(const Node& rhs) {
+  Node &operator=(const Node &rhs) {
     name = rhs.name;
     children = rhs.children;
 
@@ -153,8 +151,7 @@ class Node
   std::vector<Node *> children;
 };
 
-static void CalcNormal(float3& N, float3 v0, float3 v1, float3 v2)
-{
+static void CalcNormal(float3 &N, float3 v0, float3 v1, float3 v2) {
   float3 v10 = v1 - v0;
   float3 v20 = v2 - v0;
 
@@ -162,16 +159,22 @@ static void CalcNormal(float3& N, float3 v0, float3 v1, float3 v2)
   N = vnormalize(N);
 }
 
-static void ComputeGeometricNormals(std::vector<float> *normals_out, const unsigned char *data, const size_t vertex_stride, const unsigned int *indices, const size_t num_indices) {
-
+static void ComputeGeometricNormals(std::vector<float> *normals_out,
+                                    const unsigned char *data,
+                                    const size_t vertex_stride,
+                                    const unsigned int *indices,
+                                    const size_t num_indices) {
   for (size_t i = 0; i < num_indices / 3; i++) {
-    const unsigned int i0  = indices[3 * i + 0];
-    const unsigned int i1  = indices[3 * i + 1];
-    const unsigned int i2  = indices[3 * i + 2];
+    const unsigned int i0 = indices[3 * i + 0];
+    const unsigned int i1 = indices[3 * i + 1];
+    const unsigned int i2 = indices[3 * i + 2];
 
-    const float *p0 = reinterpret_cast<const float *>(&data[vertex_stride * i0]);
-    const float *p1 = reinterpret_cast<const float *>(&data[vertex_stride * i1]);
-    const float *p2 = reinterpret_cast<const float *>(&data[vertex_stride * i2]);
+    const float *p0 =
+        reinterpret_cast<const float *>(&data[vertex_stride * i0]);
+    const float *p1 =
+        reinterpret_cast<const float *>(&data[vertex_stride * i1]);
+    const float *p2 =
+        reinterpret_cast<const float *>(&data[vertex_stride * i2]);
 
     float3 v0(p0[0], p0[1], p0[2]);
     float3 v1(p1[0], p1[1], p1[2]);
@@ -179,7 +182,7 @@ static void ComputeGeometricNormals(std::vector<float> *normals_out, const unsig
 
     float3 n;
     CalcNormal(n, v0, v1, v2);
-    printf("n = %f, %f, %f\n", n[0], n[1], n[2]);
+    // printf("n = %f, %f, %f\n", n[0], n[1], n[2]);
 
     (*normals_out)[3 * i0 + 0] += n[0];
     (*normals_out)[3 * i0 + 1] += n[1];
@@ -194,21 +197,18 @@ static void ComputeGeometricNormals(std::vector<float> *normals_out, const unsig
 
   // normalize
   for (size_t i = 0; i < normals_out->size() / 3; i++) {
-    float3 n((*normals_out)[3 * i + 0], (*normals_out)[3 * i + 1], (*normals_out)[3 * i + 2]); 
+    float3 n((*normals_out)[3 * i + 0], (*normals_out)[3 * i + 1],
+             (*normals_out)[3 * i + 2]);
     n = vnormalize(n);
     (*normals_out)[3 * i + 0] = n[0];
     (*normals_out)[3 * i + 1] = n[1];
     (*normals_out)[3 * i + 2] = n[2];
-  } 
+  }
 }
 
-Node::~Node()
-{
+Node::~Node() {}
 
-}
-
-class Xform : public Node
-{
+class Xform : public Node {
  public:
   Xform() : Node() {
     xform[0] = 1.0;
@@ -235,35 +235,28 @@ class Xform : public Node
   virtual ~Xform();
 
   Xform &operator=(const Xform &rhs) {
-
     if (this != &rhs) {
       Node::operator=(rhs);
 
       for (size_t i = 0; i < 16; i++) {
         xform[i] = rhs.xform[i];
-      } 
+      }
     }
 
     return (*this);
   }
- 
-
 
   double xform[16];
 };
 
-Xform::~Xform()
-{
+Xform::~Xform() {}
 
-}
-
-class Mesh : public Node
-{
+class Mesh : public Node {
  public:
   Mesh() : Node() {}
   virtual ~Mesh();
 
-  Mesh &operator=(const Mesh& rhs) {
+  Mesh &operator=(const Mesh &rhs) {
     if (this != &rhs) {
       Node::operator=(rhs);
 
@@ -274,10 +267,9 @@ class Mesh : public Node
       facevarying_texcoords = rhs.facevarying_texcoords;
       faces = rhs.faces;
     }
- 
+
     return (*this);
   }
-
 
   std::vector<float> vertices;
 
@@ -292,28 +284,24 @@ class Mesh : public Node
   std::vector<unsigned int> faces;
 };
 
-Mesh::~Mesh()
-{
-
-}
+Mesh::~Mesh() {}
 
 // Curves are represented as an array of curve.
 // i'th curve has nverts[i] points.
 // TODO(syoyo) knots, order to support NURBS curve.
-class Curves : public Node
-{
+class Curves : public Node {
  public:
   Curves() : Node() {}
   virtual ~Curves();
 
-  Curves &operator=(const Curves& rhs) {
+  Curves &operator=(const Curves &rhs) {
     if (this != &rhs) {
       Node::operator=(rhs);
 
       points = rhs.points;
       nverts = rhs.nverts;
     }
- 
+
     return (*this);
   }
 
@@ -321,26 +309,23 @@ class Curves : public Node
   std::vector<int> nverts;  // # of vertices per strand(curve).
 };
 
-Curves::~Curves()
-{
-}
+Curves::~Curves() {}
 
 // Points represent particle data.
 // TODO(syoyo)
-class Points : public Node
-{
+class Points : public Node {
  public:
   Points() : Node() {}
   ~Points();
 
-  Points &operator=(const Points& rhs) {
+  Points &operator=(const Points &rhs) {
     if (this != &rhs) {
       Node::operator=(rhs);
 
       points = rhs.points;
       radiuss = rhs.radiuss;
     }
- 
+
     return (*this);
   }
 
@@ -348,59 +333,52 @@ class Points : public Node
   std::vector<float> radiuss;
 };
 
-Points::~Points()
-{
-
-}
+Points::~Points() {}
 
 // TODO(Nurbs)
 
-class Scene
-{
+class Scene {
  public:
   Scene() : root_node(NULL) {}
-  ~Scene() {
-    Destroy();
-  }
+  ~Scene() { Destroy(); }
 
   void Destroy() {
     delete root_node;
     root_node = NULL;
 
     {
-      std::map<std::string, const Xform*>::const_iterator it(xform_map.begin());
+      std::map<std::string, const Xform *>::const_iterator it(
+          xform_map.begin());
       for (; it != xform_map.end(); it++) {
         delete it->second;
       }
     }
 
     {
-      std::map<std::string, const Mesh*>::const_iterator it(mesh_map.begin());
+      std::map<std::string, const Mesh *>::const_iterator it(mesh_map.begin());
       for (; it != mesh_map.end(); it++) {
         delete it->second;
       }
     }
 
     {
-      std::map<std::string, const Curves*>::const_iterator it(curves_map.begin());
+      std::map<std::string, const Curves *>::const_iterator it(
+          curves_map.begin());
       for (; it != curves_map.end(); it++) {
         delete it->second;
       }
     }
-    
   }
 
-
-  std::map<std::string, const Xform*> xform_map;
-  std::map<std::string, const Mesh*> mesh_map;
-  std::map<std::string, const Curves*> curves_map;
-  //std::map<std::string, Points> points_map;
+  std::map<std::string, const Xform *> xform_map;
+  std::map<std::string, const Mesh *> mesh_map;
+  std::map<std::string, const Curves *> curves_map;
+  // std::map<std::string, Points> points_map;
 
   std::map<std::string, int> id_map;
 
-  const Node* root_node;
-  //std::map<std::string, Node*> node_map;
-
+  const Node *root_node;
+  // std::map<std::string, Node*> node_map;
 };
 
 // ----------------------------------------------------------------
@@ -413,8 +391,8 @@ static const char *base64_chars =
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789+/";
 
-static std::string base64_encode(unsigned char const* bytes_to_encode,
-                          size_t in_len) {
+static std::string base64_encode(unsigned char const *bytes_to_encode,
+                                 size_t in_len) {
   std::string ret;
   int i = 0;
   int j = 0;
@@ -454,7 +432,8 @@ static std::string base64_encode(unsigned char const* bytes_to_encode,
   return ret;
 }
 
-//static bool EncodeFloatArray(picojson::array* arr, const std::vector<float>& values) {
+// static bool EncodeFloatArray(picojson::array* arr, const std::vector<float>&
+// values) {
 //  for (size_t i = 0; i < values.size(); i++) {
 //    arr->push_back(picojson::value(values[i]));
 //  }
@@ -465,13 +444,15 @@ static std::string base64_encode(unsigned char const* bytes_to_encode,
 
 // ---------------------------------------------------------------------------
 
-static const char* g_sep = ":";
+static const char *g_sep = ":";
 
-static void VisitProperties(std::stringstream& ss, Alembic::AbcGeom::ICompoundProperty parent, const std::string& indent);
+static void VisitProperties(std::stringstream &ss,
+                            Alembic::AbcGeom::ICompoundProperty parent,
+                            const std::string &indent);
 
 template <class PROP>
-static void VisitSimpleProperty(std::stringstream& ss, PROP i_prop,
-                                const std::string& indent) {
+static void VisitSimpleProperty(std::stringstream &ss, PROP i_prop,
+                                const std::string &indent) {
   std::string ptype = "ScalarProperty ";
   if (i_prop.isArray()) {
     ptype = "ArrayProperty ";
@@ -492,9 +473,9 @@ static void VisitSimpleProperty(std::stringstream& ss, PROP i_prop,
      << mdstring << g_sep << "numsamps=" << i_prop.getNumSamples() << std::endl;
 }
 
-static void VisitCompoundProperty(std::stringstream& ss,
+static void VisitCompoundProperty(std::stringstream &ss,
                                   Alembic::Abc::ICompoundProperty i_prop,
-                                  const std::string& indent) {
+                                  const std::string &indent) {
   std::string io_indent = indent + "  ";
 
   std::string interp = "schema=";
@@ -506,11 +487,11 @@ static void VisitCompoundProperty(std::stringstream& ss,
   VisitProperties(ss, i_prop, io_indent);
 }
 
-void VisitProperties(std::stringstream& ss,
+void VisitProperties(std::stringstream &ss,
                      Alembic::AbcGeom::ICompoundProperty parent,
-                     const std::string& indent) {
+                     const std::string &indent) {
   for (size_t i = 0; i < parent.getNumProperties(); i++) {
-    const Alembic::Abc::PropertyHeader& header = parent.getPropertyHeader(i);
+    const Alembic::Abc::PropertyHeader &header = parent.getPropertyHeader(i);
 
     if (header.isCompound()) {
       VisitCompoundProperty(
@@ -528,103 +509,85 @@ void VisitProperties(std::stringstream& ss,
   }
 }
 
-static bool
-BuildFaceSet(
-    std::vector<unsigned int>& faces,
-    Alembic::Abc::P3fArraySamplePtr   iP,
-    Alembic::Abc::Int32ArraySamplePtr iIndices,
-    Alembic::Abc::Int32ArraySamplePtr iCounts)
-{
+static bool BuildFaceSet(std::vector<unsigned int> &faces,
+                         Alembic::Abc::P3fArraySamplePtr iP,
+                         Alembic::Abc::Int32ArraySamplePtr iIndices,
+                         Alembic::Abc::Int32ArraySamplePtr iCounts) {
+  faces.clear();
 
-    faces.clear();
+  // Get the number of each thing.
+  size_t numFaces = iCounts->size();
+  size_t numIndices = iIndices->size();
+  size_t numPoints = iP->size();
+  if (numFaces < 1 || numIndices < 1 || numPoints < 1) {
+    // Invalid.
+    std::cerr << "Mesh update quitting because bad arrays"
+              << ", numFaces = " << numFaces << ", numIndices = " << numIndices
+              << ", numPoints = " << numPoints << std::endl;
+    return false;
+  }
 
-    // Get the number of each thing.
-    size_t numFaces = iCounts->size();
-    size_t numIndices = iIndices->size();
-    size_t numPoints = iP->size();
-    if ( numFaces < 1 ||
-         numIndices < 1 ||
-         numPoints < 1 )
-    {
-        // Invalid.
-        std::cerr << "Mesh update quitting because bad arrays"
-                  << ", numFaces = " << numFaces
-                  << ", numIndices = " << numIndices
-                  << ", numPoints = " << numPoints
-                  << std::endl;
-        return false;
+  // Make triangles.
+  size_t faceIndexBegin = 0;
+  size_t faceIndexEnd = 0;
+  for (size_t face = 0; face < numFaces; ++face) {
+    faceIndexBegin = faceIndexEnd;
+    size_t count = static_cast<size_t>((*iCounts)[face]);
+    faceIndexEnd = faceIndexBegin + count;
+
+    // Check this face is valid
+    if (faceIndexEnd > numIndices || faceIndexEnd < faceIndexBegin) {
+      std::cerr << "Mesh update quitting on face: " << face
+                << " because of wonky numbers"
+                << ", faceIndexBegin = " << faceIndexBegin
+                << ", faceIndexEnd = " << faceIndexEnd
+                << ", numIndices = " << numIndices << ", count = " << count
+                << std::endl;
+
+      // Just get out, make no more triangles.
+      break;
     }
 
-    // Make triangles.
-    size_t faceIndexBegin = 0;
-    size_t faceIndexEnd = 0;
-    for ( size_t face = 0; face < numFaces; ++face )
-    {
-        faceIndexBegin = faceIndexEnd;
-        size_t count = static_cast<size_t>((*iCounts)[face]);
-        faceIndexEnd = faceIndexBegin + count;
-
-        // Check this face is valid
-        if ( faceIndexEnd > numIndices ||
-             faceIndexEnd < faceIndexBegin )
-        {
-            std::cerr << "Mesh update quitting on face: "
-                      << face
-                      << " because of wonky numbers"
-                      << ", faceIndexBegin = " << faceIndexBegin
-                      << ", faceIndexEnd = " << faceIndexEnd
-                      << ", numIndices = " << numIndices
-                      << ", count = " << count
-                      << std::endl;
-
-            // Just get out, make no more triangles.
-            break;
-        }
-
-        // Checking indices are valid.
-        bool goodFace = true;
-        for ( size_t fidx = faceIndexBegin;
-              fidx < faceIndexEnd; ++fidx )
-        {
-            if ( static_cast<size_t>(( (*iIndices)[fidx] )) >= numPoints )
-            {
-                std::cout << "Mesh update quitting on face: "
-                          << face
-                          << " because of bad indices"
-                          << ", indexIndex = " << fidx
-                          << ", vertexIndex = " << (*iIndices)[fidx]
-                          << ", numPoints = " << numPoints
-                          << std::endl;
-                goodFace = false;
-                break;
-            }
-        }
-
-        // Make triangles to fill this face.
-        if ( goodFace && count > 2 )
-        {
-            faces.push_back(static_cast<unsigned int>((*iIndices)[faceIndexBegin+0]));
-            faces.push_back(static_cast<unsigned int>((*iIndices)[faceIndexBegin+1]));
-            faces.push_back(static_cast<unsigned int>((*iIndices)[faceIndexBegin+2]));
-
-            for ( size_t c = 3; c < count; ++c )
-            {
-                faces.push_back(static_cast<unsigned int>((*iIndices)[faceIndexBegin+0]));
-                faces.push_back(static_cast<unsigned int>((*iIndices)[faceIndexBegin+c-1]));
-                faces.push_back(static_cast<unsigned int>((*iIndices)[faceIndexBegin+c]));
-            }
-        }
+    // Checking indices are valid.
+    bool goodFace = true;
+    for (size_t fidx = faceIndexBegin; fidx < faceIndexEnd; ++fidx) {
+      if (static_cast<size_t>(((*iIndices)[fidx])) >= numPoints) {
+        std::cout << "Mesh update quitting on face: " << face
+                  << " because of bad indices"
+                  << ", indexIndex = " << fidx
+                  << ", vertexIndex = " << (*iIndices)[fidx]
+                  << ", numPoints = " << numPoints << std::endl;
+        goodFace = false;
+        break;
+      }
     }
 
-    return true;
+    // Make triangles to fill this face.
+    if (goodFace && count > 2) {
+      faces.push_back(
+          static_cast<unsigned int>((*iIndices)[faceIndexBegin + 0]));
+      faces.push_back(
+          static_cast<unsigned int>((*iIndices)[faceIndexBegin + 1]));
+      faces.push_back(
+          static_cast<unsigned int>((*iIndices)[faceIndexBegin + 2]));
 
+      for (size_t c = 3; c < count; ++c) {
+        faces.push_back(
+            static_cast<unsigned int>((*iIndices)[faceIndexBegin + 0]));
+        faces.push_back(
+            static_cast<unsigned int>((*iIndices)[faceIndexBegin + c - 1]));
+        faces.push_back(
+            static_cast<unsigned int>((*iIndices)[faceIndexBegin + c]));
+      }
+    }
+  }
+
+  return true;
 }
 
-static void readPolyNormals(
-  std::vector<float> *normals,
-  std::vector<float> *facevarying_normals,
-  Alembic::AbcGeom::IN3fGeomParam normals_param)
-{
+static void readPolyNormals(std::vector<float> *normals,
+                            std::vector<float> *facevarying_normals,
+                            Alembic::AbcGeom::IN3fGeomParam normals_param) {
   normals->clear();
   facevarying_normals->clear();
 
@@ -634,8 +597,7 @@ static void readPolyNormals(
 
   if ((normals_param.getScope() != Alembic::AbcGeom::kVertexScope) &&
       (normals_param.getScope() != Alembic::AbcGeom::kVaryingScope) &&
-      (normals_param.getScope() != Alembic::AbcGeom::kFacevaryingScope))
-  {
+      (normals_param.getScope() != Alembic::AbcGeom::kFacevaryingScope)) {
     std::cout << "Normal vector has an unsupported scope" << std::endl;
     return;
   }
@@ -659,25 +621,23 @@ static void readPolyNormals(
 
   if (normals_param.getScope() == Alembic::AbcGeom::kFacevaryingScope) {
     for (size_t i = 0; i < sample_size; i++) {
-      facevarying_normals->push_back((*P)[i].x); 
-      facevarying_normals->push_back((*P)[i].y); 
-      facevarying_normals->push_back((*P)[i].z); 
+      facevarying_normals->push_back((*P)[i].x);
+      facevarying_normals->push_back((*P)[i].y);
+      facevarying_normals->push_back((*P)[i].z);
     }
   } else {
     for (size_t i = 0; i < sample_size; i++) {
-      normals->push_back((*P)[i].x); 
-      normals->push_back((*P)[i].y); 
-      normals->push_back((*P)[i].z); 
+      normals->push_back((*P)[i].x);
+      normals->push_back((*P)[i].y);
+      normals->push_back((*P)[i].z);
     }
   }
 }
 
 // @todo { Support multiple UVset. }
-static void readPolyUVs(
-  std::vector<float> *uvs,
-  std::vector<float> *facevarying_uvs,
-  Alembic::AbcGeom::IV2fGeomParam uvs_param)
-{
+static void readPolyUVs(std::vector<float> *uvs,
+                        std::vector<float> *facevarying_uvs,
+                        Alembic::AbcGeom::IV2fGeomParam uvs_param) {
   uvs->clear();
   facevarying_uvs->clear();
 
@@ -686,8 +646,9 @@ static void readPolyUVs(
   }
 
   if (uvs_param.getNumSamples() > 0) {
-      std::string uv_set_name = Alembic::Abc::GetSourceName(uvs_param.getMetaData());
-      std::cout << "UVset : " << uv_set_name << std::endl;
+    std::string uv_set_name =
+        Alembic::Abc::GetSourceName(uvs_param.getMetaData());
+    std::cout << "UVset : " << uv_set_name << std::endl;
   }
 
   if (uvs_param.isConstant()) {
@@ -713,21 +674,21 @@ static void readPolyUVs(
 
   if (uvs_param.getScope() == Alembic::AbcGeom::kFacevaryingScope) {
     for (size_t i = 0; i < sample_size; i++) {
-      facevarying_uvs->push_back((*P)[i].x); 
-      facevarying_uvs->push_back((*P)[i].y); 
+      facevarying_uvs->push_back((*P)[i].x);
+      facevarying_uvs->push_back((*P)[i].y);
     }
   } else {
     for (size_t i = 0; i < sample_size; i++) {
-      uvs->push_back((*P)[i].x); 
-      uvs->push_back((*P)[i].y); 
+      uvs->push_back((*P)[i].x);
+      uvs->push_back((*P)[i].y);
     }
   }
 }
 
-
 // Traverse Alembic object tree and extract data.
-static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, const Alembic::AbcGeom::IObject& obj, const std::string& indent) {
-
+static void VisitObjectAndExtractNode(Node *node_out, std::stringstream &ss,
+                                      const Alembic::AbcGeom::IObject &obj,
+                                      const std::string &indent) {
   std::string path = obj.getFullName();
   node_out->name = path;
 
@@ -741,10 +702,11 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
   ss << "# of children = " << obj.getNumChildren() << std::endl;
 
   for (size_t i = 0; i < obj.getNumChildren(); i++) {
-    const Alembic::AbcGeom::ObjectHeader& header = obj.getChildHeader(i);
+    const Alembic::AbcGeom::ObjectHeader &header = obj.getChildHeader(i);
     ss << " Child: header = " << header.getName() << std::endl;
 
-    Alembic::AbcGeom::ICompoundProperty cprops = obj.getChild(i).getProperties();
+    Alembic::AbcGeom::ICompoundProperty cprops =
+        obj.getChild(i).getProperties();
     VisitProperties(ss, props, indent);
 
     Node *node = NULL;
@@ -752,42 +714,41 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
     if (Alembic::AbcGeom::IXform::matches(header)) {
       ss << "    IXform" << std::endl;
 
-      Alembic::AbcGeom::IXform xform( obj, header.getName() );
+      Alembic::AbcGeom::IXform xform(obj, header.getName());
 
-      if ( xform.getSchema().isConstant() )
-      {
-          Alembic::AbcGeom::M44d static_matrix = xform.getSchema().getValue().getMatrix();
-          ss << "IXform static: " << header.getName() << ", " << static_matrix << std::endl;
+      if (xform.getSchema().isConstant()) {
+        Alembic::AbcGeom::M44d static_matrix =
+            xform.getSchema().getValue().getMatrix();
+        ss << "IXform static: " << header.getName() << ", " << static_matrix
+           << std::endl;
 
-          Xform *xform_node = new Xform();
-          xform_node->name = header.getName();
-          xform_node->xform[0] = static_matrix[0][0];
-          xform_node->xform[1] = static_matrix[0][1];
-          xform_node->xform[2] = static_matrix[0][2];
-          xform_node->xform[3] = static_matrix[0][3];
-          xform_node->xform[4] = static_matrix[1][0];
-          xform_node->xform[5] = static_matrix[1][1];
-          xform_node->xform[6] = static_matrix[1][2];
-          xform_node->xform[7] = static_matrix[1][3];
-          xform_node->xform[8] = static_matrix[2][0];
-          xform_node->xform[9] = static_matrix[2][1];
-          xform_node->xform[10] = static_matrix[2][2];
-          xform_node->xform[11] = static_matrix[2][3];
-          xform_node->xform[12] = static_matrix[3][0];
-          xform_node->xform[13] = static_matrix[3][1];
-          xform_node->xform[14] = static_matrix[3][2];
-          xform_node->xform[15] = static_matrix[3][3];
+        Xform *xform_node = new Xform();
+        xform_node->name = header.getName();
+        xform_node->xform[0] = static_matrix[0][0];
+        xform_node->xform[1] = static_matrix[0][1];
+        xform_node->xform[2] = static_matrix[0][2];
+        xform_node->xform[3] = static_matrix[0][3];
+        xform_node->xform[4] = static_matrix[1][0];
+        xform_node->xform[5] = static_matrix[1][1];
+        xform_node->xform[6] = static_matrix[1][2];
+        xform_node->xform[7] = static_matrix[1][3];
+        xform_node->xform[8] = static_matrix[2][0];
+        xform_node->xform[9] = static_matrix[2][1];
+        xform_node->xform[10] = static_matrix[2][2];
+        xform_node->xform[11] = static_matrix[2][3];
+        xform_node->xform[12] = static_matrix[3][0];
+        xform_node->xform[13] = static_matrix[3][1];
+        xform_node->xform[14] = static_matrix[3][2];
+        xform_node->xform[15] = static_matrix[3][3];
 
-          node = xform_node;
+        node = xform_node;
 
       } else {
-
         Alembic::AbcGeom::ISampleSelector samplesel(
             0.0, Alembic::AbcGeom::ISampleSelector::kNearIndex);
-        Alembic::AbcGeom::IXformSchema& ps = xform.getSchema();
-        Alembic::AbcGeom::M44d matrix = ps.getValue( samplesel ).getMatrix();
+        Alembic::AbcGeom::IXformSchema &ps = xform.getSchema();
+        Alembic::AbcGeom::M44d matrix = ps.getValue(samplesel).getMatrix();
         ss << matrix << std::endl;
-
       }
 
       ss << " Child: xform" << std::endl;
@@ -800,7 +761,7 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
       Alembic::AbcGeom::ISampleSelector samplesel(
           0.0, Alembic::AbcGeom::ISampleSelector::kNearIndex);
       Alembic::AbcGeom::IPolyMeshSchema::Sample psample;
-      Alembic::AbcGeom::IPolyMeshSchema& ps = pmesh.getSchema();
+      Alembic::AbcGeom::IPolyMeshSchema &ps = pmesh.getSchema();
 
       std::cout << "  # of samples = " << ps.getNumSamples() << std::endl;
 
@@ -812,8 +773,9 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
         std::cout << "  # of face counts = " << psample.getFaceCounts()->size()
                   << std::endl;
 
-        std::vector<unsigned int> faces; // temp
-        bool ret = BuildFaceSet(faces, P, psample.getFaceIndices(), psample.getFaceCounts());
+        std::vector<unsigned int> faces;  // temp
+        bool ret = BuildFaceSet(faces, P, psample.getFaceIndices(),
+                                psample.getFaceCounts());
         if (!ret) {
           std::cout << "  No faces in polymesh" << std::endl;
         }
@@ -828,26 +790,32 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
         std::vector<float> facevarying_normals;
         readPolyNormals(&normals, &facevarying_normals, normals_param);
         std::cout << "  # of normals   = " << (normals.size() / 3) << std::endl;
-        std::cout << "  # of facevarying normals   = " << (facevarying_normals.size() / 3) << std::endl;
+        std::cout << "  # of facevarying normals   = "
+                  << (facevarying_normals.size() / 3) << std::endl;
 
-        // TODO(syoyo): Do not generate normals when `facevarying_normals' exists.
-        if (normals.empty() && (!mesh->vertices.empty()) && (!mesh->faces.empty())) { 
+        // TODO(syoyo): Do not generate normals when `facevarying_normals'
+        // exists.
+        if (normals.empty() && (!mesh->vertices.empty()) &&
+            (!mesh->faces.empty())) {
           // Compute geometric normal.
-          normals.resize(3 * P->size(), 0.0f); 
+          normals.resize(3 * P->size(), 0.0f);
           std::cout << "Compute normals" << std::endl;
-          ComputeGeometricNormals(&normals, reinterpret_cast<const unsigned char*>(P->get()), /* stride */sizeof(float) * 3, &mesh->faces.at(0), mesh->faces.size());
+          ComputeGeometricNormals(
+              &normals, reinterpret_cast<const unsigned char *>(P->get()),
+              /* stride */ sizeof(float) * 3, &mesh->faces.at(0),
+              mesh->faces.size());
         }
 
         mesh->normals = normals;
-        
 
         // UV
         Alembic::AbcGeom::IV2fGeomParam uvs_param = ps.getUVsParam();
         std::vector<float> uvs;
         std::vector<float> facevarying_uvs;
-        readPolyUVs(&uvs, &facevarying_uvs,  uvs_param);
+        readPolyUVs(&uvs, &facevarying_uvs, uvs_param);
         std::cout << "  # of uvs   = " << (uvs.size() / 2) << std::endl;
-        std::cout << "  # of facevarying_uvs   = " << (facevarying_uvs.size() / 2) << std::endl;
+        std::cout << "  # of facevarying_uvs   = "
+                  << (facevarying_uvs.size() / 2) << std::endl;
         mesh->texcoords = uvs;
         mesh->facevarying_texcoords = facevarying_uvs;
 
@@ -865,7 +833,7 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
       Alembic::AbcGeom::ISampleSelector samplesel(
           0.0, Alembic::AbcGeom::ISampleSelector::kNearIndex);
       Alembic::AbcGeom::ICurvesSchema::Sample psample;
-      Alembic::AbcGeom::ICurvesSchema& ps = curve.getSchema();
+      Alembic::AbcGeom::ICurvesSchema &ps = curve.getSchema();
 
       std::cout << "  # of samples = " << ps.getNumSamples() << std::endl;
 
@@ -880,10 +848,12 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
         Alembic::Abc::FloatArraySamplePtr knots = psample.getKnots();
         Alembic::Abc::UcharArraySamplePtr orders = psample.getOrders();
 
-        Alembic::Abc::Int32ArraySamplePtr num_vertices = psample.getCurvesNumVertices();
+        Alembic::Abc::Int32ArraySamplePtr num_vertices =
+            psample.getCurvesNumVertices();
 
         if (knots) std::cout << "  # of knots= " << knots->size() << std::endl;
-        if (orders) std::cout << "  # of orders= " << orders->size() << std::endl;
+        if (orders)
+          std::cout << "  # of orders= " << orders->size() << std::endl;
         std::cout << "  # of nvs= " << num_vertices->size() << std::endl;
 
         curves->points.resize(3 * P->size());
@@ -910,10 +880,11 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
           std::cout << "nv[" << k << "] " << (*num_vertices)[k] << std::endl;
         }
 #endif
-        
+
         if (num_vertices) {
           curves->nverts.resize(num_vertices->size());
-          memcpy(curves->nverts.data(), num_vertices->get(), sizeof(int) * num_vertices->size());
+          memcpy(curves->nverts.data(), num_vertices->get(),
+                 sizeof(int) * num_vertices->size());
         }
 
         node = curves;
@@ -930,22 +901,24 @@ static void VisitObjectAndExtractNode(Node* node_out, std::stringstream& ss, con
 
     if (node) {
       // Visit child.
-      VisitObjectAndExtractNode(node, ss, Alembic::AbcGeom::IObject(obj, obj.getChildHeader(i).getName()), indent);
+      VisitObjectAndExtractNode(
+          node, ss,
+          Alembic::AbcGeom::IObject(obj, obj.getChildHeader(i).getName()),
+          indent);
     }
 
     node_out->children.push_back(node);
   }
 }
 
-static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene, const Node *node)
-{
-
+static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene,
+                              const Node *node) {
   assert(node);
   assert(!node->name.empty());
 
   // FIXME(syoyo): Add serialization method for each class.
-  if (dynamic_cast<const Xform*>(node)) {
-    const Xform *xform = dynamic_cast<const Xform*>(node);
+  if (dynamic_cast<const Xform *>(node)) {
+    const Xform *xform = dynamic_cast<const Xform *>(node);
 
     std::cout << "root xform" << node->name << std::endl;
 
@@ -960,16 +933,18 @@ static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene, const N
 
     if (xform->children.size() > 0) {
       for (size_t i = 0; i < xform->children.size(); i++) {
-        if (dynamic_cast<const Mesh*>(xform->children[i])) {
-          std::map<std::string, int>::const_iterator it = scene.id_map.find(xform->children[i]->name);
+        if (dynamic_cast<const Mesh *>(xform->children[i])) {
+          std::map<std::string, int>::const_iterator it =
+              scene.id_map.find(xform->children[i]->name);
           assert(it != scene.id_map.end());
           std::stringstream ss;
           ss << "_" << it->second;
           const std::string prefix = ss.str();
 
           json_meshes.push_back(picojson::value(std::string("mesh") + prefix));
-        } else if (dynamic_cast<const Curves*>(xform->children[i])) {
-          std::map<std::string, int>::const_iterator it = scene.id_map.find(xform->children[i]->name);
+        } else if (dynamic_cast<const Curves *>(xform->children[i])) {
+          std::map<std::string, int>::const_iterator it =
+              scene.id_map.find(xform->children[i]->name);
           assert(it != scene.id_map.end());
           std::stringstream ss;
           ss << "_" << it->second;
@@ -988,15 +963,19 @@ static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene, const N
       for (size_t i = 0; i < xform->children.size(); i++) {
         if (xform->children[i]) {
           picojson::object json_child_node;
-          ConvertNodeToGLTF(&json_child_node, scene, xform->children[i]);
-          json_children.push_back(picojson::value(json_child_node));
+          bool ret = ConvertNodeToGLTF(&json_child_node, scene, xform->children[i]);
+          if (ret) {
+            json_children.push_back(picojson::value(json_child_node));
+          }
         }
       }
-    
-      json_node["children"] = picojson::value(json_children);
+
+      if (!json_children.empty()) {
+        json_node["children"] = picojson::value(json_children);
+      }
     }
 
-    (*out)[node->name] = picojson::value(json_node);
+    (*out) = json_node;
   } else {
     return false;
   }
@@ -1004,8 +983,7 @@ static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene, const N
   return true;
 }
 
-static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene)
-{
+static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene) {
   assert(scene.root_node);
 
   // Nodes
@@ -1030,7 +1008,6 @@ static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene)
 
   (*out)["scenes"] = picojson::value(scenes);
 
-
   // @todo {}
   picojson::object shaders;
   picojson::object programs;
@@ -1046,8 +1023,11 @@ static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene)
   return true;
 }
 
-static bool ConvertMeshToGLTF(picojson::object *buffers_out, picojson::object *buffer_views_out, picojson::object *meshes_out, picojson::object *accessors_out, const Mesh& mesh, const int id)
-{
+static bool ConvertMeshToGLTF(picojson::object *buffers_out,
+                              picojson::object *buffer_views_out,
+                              picojson::object *meshes_out,
+                              picojson::object *accessors_out, const Mesh &mesh,
+                              const int id) {
   std::stringstream prefix_ss;
   prefix_ss << "_" << id;
 
@@ -1056,93 +1036,118 @@ static bool ConvertMeshToGLTF(picojson::object *buffers_out, picojson::object *b
   {
     // Position
     {
-      std::string vertices_b64data = base64_encode(reinterpret_cast<unsigned char const*>(mesh.vertices.data()), mesh.vertices.size() * sizeof(float));
+      std::string vertices_b64data = base64_encode(
+          reinterpret_cast<unsigned char const *>(mesh.vertices.data()),
+          mesh.vertices.size() * sizeof(float));
       picojson::object buf;
 
       buf["type"] = picojson::value("arraybuffer");
-      buf["uri"] = picojson::value(
-          std::string("data:application/octet-stream;base64,") + vertices_b64data);
-      buf["byteLength"] =
-          picojson::value(static_cast<double>(mesh.vertices.size() * sizeof(float)));
-      
-      (*buffers_out)["vertices" + prefix] = picojson::value(buf); 
+      buf["uri"] =
+          picojson::value(std::string("data:application/octet-stream;base64,") +
+                          vertices_b64data);
+      buf["byteLength"] = picojson::value(
+          static_cast<double>(mesh.vertices.size() * sizeof(float)));
+
+      (*buffers_out)["vertices" + prefix] = picojson::value(buf);
     }
 
     // Normal
     if (!mesh.normals.empty()) {
-      std::string normals_b64data = base64_encode(reinterpret_cast<unsigned char const*>(mesh.normals.data()), mesh.normals.size() * sizeof(float));
+      std::string normals_b64data = base64_encode(
+          reinterpret_cast<unsigned char const *>(mesh.normals.data()),
+          mesh.normals.size() * sizeof(float));
       picojson::object buf;
 
       buf["type"] = picojson::value("arraybuffer");
-      buf["uri"] = picojson::value(
-          std::string("data:application/octet-stream;base64,") + normals_b64data);
-      buf["byteLength"] =
-          picojson::value(static_cast<double>(mesh.normals.size() * sizeof(float)));
-      
-      (*buffers_out)["normals" + prefix] = picojson::value(buf); 
+      buf["uri"] =
+          picojson::value(std::string("data:application/octet-stream;base64,") +
+                          normals_b64data);
+      buf["byteLength"] = picojson::value(
+          static_cast<double>(mesh.normals.size() * sizeof(float)));
+
+      (*buffers_out)["normals" + prefix] = picojson::value(buf);
     }
 
     {
-      std::string faces_b64data = base64_encode(reinterpret_cast<unsigned char const*>(mesh.faces.data()), mesh.faces.size() * sizeof(unsigned int));
+      std::string faces_b64data = base64_encode(
+          reinterpret_cast<unsigned char const *>(mesh.faces.data()),
+          mesh.faces.size() * sizeof(unsigned int));
       picojson::object buf;
 
       buf["type"] = picojson::value("arraybuffer");
       buf["uri"] = picojson::value(
           std::string("data:application/octet-stream;base64,") + faces_b64data);
-      buf["byteLength"] =
-          picojson::value(static_cast<double>(mesh.faces.size() * sizeof(unsigned int)));
-      
-      (*buffers_out)["indices" + prefix] = picojson::value(buf); 
+      buf["byteLength"] = picojson::value(
+          static_cast<double>(mesh.faces.size() * sizeof(unsigned int)));
+
+      (*buffers_out)["indices" + prefix] = picojson::value(buf);
     }
   }
 
   {
     {
       picojson::object buffer_view_vertices;
-      buffer_view_vertices["buffer"] = picojson::value(std::string("vertices") + prefix);    
-      buffer_view_vertices["byteLength"] = picojson::value(static_cast<double>(mesh.vertices.size() * sizeof(float)));
-      buffer_view_vertices["byteOffset"] = picojson::value(static_cast<double>(0));
-      buffer_view_vertices["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
+      buffer_view_vertices["buffer"] =
+          picojson::value(std::string("vertices") + prefix);
+      buffer_view_vertices["byteLength"] = picojson::value(
+          static_cast<double>(mesh.vertices.size() * sizeof(float)));
+      buffer_view_vertices["byteOffset"] =
+          picojson::value(static_cast<double>(0));
+      buffer_view_vertices["target"] =
+          picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
 
-      (*buffer_views_out)["bufferView_vertices" + prefix] = picojson::value(buffer_view_vertices);
+      (*buffer_views_out)["bufferView_vertices" + prefix] =
+          picojson::value(buffer_view_vertices);
     }
 
     if (!mesh.normals.empty()) {
       picojson::object buffer_view_normals;
-      buffer_view_normals["buffer"] = picojson::value(std::string("normals") + prefix);    
-      buffer_view_normals["byteLength"] = picojson::value(static_cast<double>(mesh.normals.size() * sizeof(float)));
-      buffer_view_normals["byteOffset"] = picojson::value(static_cast<double>(0));
-      buffer_view_normals["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
+      buffer_view_normals["buffer"] =
+          picojson::value(std::string("normals") + prefix);
+      buffer_view_normals["byteLength"] = picojson::value(
+          static_cast<double>(mesh.normals.size() * sizeof(float)));
+      buffer_view_normals["byteOffset"] =
+          picojson::value(static_cast<double>(0));
+      buffer_view_normals["target"] =
+          picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
 
-      (*buffer_views_out)["bufferView_normals" + prefix] = picojson::value(buffer_view_normals);
+      (*buffer_views_out)["bufferView_normals" + prefix] =
+          picojson::value(buffer_view_normals);
     }
 
     {
       picojson::object buffer_view_indices;
-      buffer_view_indices["buffer"] = picojson::value(std::string("indices") + prefix);    
-      buffer_view_indices["byteLength"] = picojson::value(static_cast<double>(mesh.faces.size() * sizeof(unsigned int)));
-      buffer_view_indices["byteOffset"] = picojson::value(static_cast<double>(0));
-      buffer_view_indices["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER));
+      buffer_view_indices["buffer"] =
+          picojson::value(std::string("indices") + prefix);
+      buffer_view_indices["byteLength"] = picojson::value(
+          static_cast<double>(mesh.faces.size() * sizeof(unsigned int)));
+      buffer_view_indices["byteOffset"] =
+          picojson::value(static_cast<double>(0));
+      buffer_view_indices["target"] = picojson::value(
+          static_cast<int64_t>(TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER));
 
-      (*buffer_views_out)["bufferView_indices" + prefix] = picojson::value(buffer_view_indices);
+      (*buffer_views_out)["bufferView_indices" + prefix] =
+          picojson::value(buffer_view_indices);
     }
-
   }
 
   {
     picojson::object attributes;
-  
-    attributes["POSITION"] = picojson::value(std::string("accessor_vertices") + prefix);
+
+    attributes["POSITION"] =
+        picojson::value(std::string("accessor_vertices") + prefix);
     if (!mesh.normals.empty()) {
-      attributes["NORMAL"] = picojson::value(std::string("accessor_normals") + prefix);
+      attributes["NORMAL"] =
+          picojson::value(std::string("accessor_normals") + prefix);
     }
 
-    
     picojson::object primitive;
     primitive["attributes"] = picojson::value(attributes);
     primitive["indices"] = picojson::value("accessor_indices" + prefix);
-    primitive["material"] = picojson::value("material_1"); // FIXME(syoyo): Assign material.
-    primitive["mode"] = picojson::value(static_cast<int64_t>(TINYGLTF_MODE_TRIANGLES));
+    primitive["material"] =
+        picojson::value("material_1");  // FIXME(syoyo): Assign material.
+    primitive["mode"] =
+        picojson::value(static_cast<int64_t>(TINYGLTF_MODE_TRIANGLES));
 
     picojson::array primitive_array;
     primitive_array.push_back(picojson::value(primitive));
@@ -1153,171 +1158,200 @@ static bool ConvertMeshToGLTF(picojson::object *buffers_out, picojson::object *b
 
     picojson::object meshes;
     (*meshes_out)["mesh" + prefix] = picojson::value(m);
-
   }
 
   {
     picojson::object accessors;
-    
+
     {
       picojson::object accessor_vertices;
-      accessor_vertices["bufferView"] = picojson::value(std::string("bufferView_vertices" + prefix));
-      accessor_vertices["byteOffset"] = picojson::value(static_cast<int64_t>(0));
-      accessor_vertices["byteStride"] = picojson::value(static_cast<double>(3 * sizeof(float)));
-      accessor_vertices["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
-      accessor_vertices["count"] = picojson::value(static_cast<int64_t>(mesh.vertices.size()));
+      accessor_vertices["bufferView"] =
+          picojson::value(std::string("bufferView_vertices" + prefix));
+      accessor_vertices["byteOffset"] =
+          picojson::value(static_cast<int64_t>(0));
+      accessor_vertices["byteStride"] =
+          picojson::value(static_cast<double>(3 * sizeof(float)));
+      accessor_vertices["componentType"] =
+          picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
+      accessor_vertices["count"] =
+          picojson::value(static_cast<int64_t>(mesh.vertices.size()));
       accessor_vertices["type"] = picojson::value(std::string("VEC3"));
-      (*accessors_out)["accessor_vertices" + prefix] = picojson::value(accessor_vertices);
+      (*accessors_out)["accessor_vertices" + prefix] =
+          picojson::value(accessor_vertices);
     }
-    
+
     if (!mesh.normals.empty()) {
       picojson::object accessor_normals;
-      accessor_normals["bufferView"] = picojson::value(std::string("bufferView_normals" + prefix));
+      accessor_normals["bufferView"] =
+          picojson::value(std::string("bufferView_normals" + prefix));
       accessor_normals["byteOffset"] = picojson::value(static_cast<int64_t>(0));
-      accessor_normals["byteStride"] = picojson::value(static_cast<double>(3 * sizeof(float)));
-      accessor_normals["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
-      accessor_normals["count"] = picojson::value(static_cast<int64_t>(mesh.vertices.size()));
+      accessor_normals["byteStride"] =
+          picojson::value(static_cast<double>(3 * sizeof(float)));
+      accessor_normals["componentType"] =
+          picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
+      accessor_normals["count"] =
+          picojson::value(static_cast<int64_t>(mesh.vertices.size()));
       accessor_normals["type"] = picojson::value(std::string("VEC3"));
-      (*accessors_out)["accessor_normals" + prefix] = picojson::value(accessor_normals);
+      (*accessors_out)["accessor_normals" + prefix] =
+          picojson::value(accessor_normals);
     }
 
     {
       picojson::object accessor_indices;
-      accessor_indices["bufferView"] = picojson::value(std::string("bufferView_indices" + prefix));
+      accessor_indices["bufferView"] =
+          picojson::value(std::string("bufferView_indices" + prefix));
       accessor_indices["byteOffset"] = picojson::value(static_cast<int64_t>(0));
-      accessor_indices["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT));
-      accessor_indices["count"] = picojson::value(static_cast<int64_t>(mesh.faces.size()));
+      accessor_indices["componentType"] = picojson::value(
+          static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT));
+      accessor_indices["count"] =
+          picojson::value(static_cast<int64_t>(mesh.faces.size()));
       accessor_indices["type"] = picojson::value(std::string("SCALAR"));
-      (*accessors_out)["accessor_indices" + prefix] = picojson::value(accessor_indices);
+      (*accessors_out)["accessor_indices" + prefix] =
+          picojson::value(accessor_indices);
     }
   }
 
   return true;
 }
 
-static bool ConvertCurvesToGLTF(picojson::object *buffers_out, picojson::object *buffer_views_out, picojson::object *meshes_out, picojson::object *accessors_out, const Curves& curves, const int id)
-{
+static bool ConvertCurvesToGLTF(picojson::object *buffers_out,
+                                picojson::object *buffer_views_out,
+                                picojson::object *meshes_out,
+                                picojson::object *accessors_out,
+                                const Curves &curves, const int id) {
   std::stringstream prefix_ss;
   prefix_ss << "_" << id;
 
   const std::string prefix = prefix_ss.str();
 
-  {
-    {
-      {
-        std::string b64data = base64_encode(reinterpret_cast<unsigned char const*>(curves.points.data()), curves.points.size() * sizeof(float));
-        picojson::object buf;
+  {{{std::string b64data = base64_encode(
+         reinterpret_cast<unsigned char const *>(curves.points.data()),
+         curves.points.size() * sizeof(float));
+  picojson::object buf;
 
-        buf["type"] = picojson::value("arraybuffer");
-        buf["uri"] = picojson::value(
-            std::string("data:application/octet-stream;base64,") + b64data);
-        buf["byteLength"] =
-            picojson::value(static_cast<double>(curves.points.size() * sizeof(float)));
-        
-        (*buffers_out)["points" + prefix] = picojson::value(buf); 
-      }
+  buf["type"] = picojson::value("arraybuffer");
+  buf["uri"] = picojson::value(
+      std::string("data:application/octet-stream;base64,") + b64data);
+  buf["byteLength"] = picojson::value(
+      static_cast<double>(curves.points.size() * sizeof(float)));
 
-      // Out extension
-      {
-        std::string b64data = base64_encode(reinterpret_cast<unsigned char const*>(curves.nverts.data()), curves.nverts.size() * sizeof(int));
-        picojson::object buf;
-
-        buf["type"] = picojson::value("arraybuffer");
-        buf["uri"] = picojson::value(
-            std::string("data:application/octet-stream;base64,") + b64data);
-        buf["byteLength"] =
-            picojson::value(static_cast<double>(curves.nverts.size() * sizeof(int)));
-        
-        (*buffers_out)["nverts" + prefix] = picojson::value(buf); 
-      }
-
-    }
-  }
-
-  {
-    {
-      {
-        picojson::object buffer_view_points;
-        buffer_view_points["buffer"] = picojson::value(std::string("points") + prefix);    
-        buffer_view_points["byteLength"] = picojson::value(static_cast<double>(curves.points.size() * sizeof(float)));
-        buffer_view_points["byteOffset"] = picojson::value(static_cast<double>(0));
-        buffer_view_points["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
-        (*buffer_views_out)["bufferView_points" + prefix] = picojson::value(buffer_view_points);
-      }
-
-      {
-        picojson::object buffer_view_nverts;
-        buffer_view_nverts["buffer"] = picojson::value(std::string("nverts") + prefix);    
-        buffer_view_nverts["byteLength"] = picojson::value(static_cast<double>(curves.nverts.size() * sizeof(int)));
-        buffer_view_nverts["byteOffset"] = picojson::value(static_cast<double>(0));
-        buffer_view_nverts["target"] = picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
-        (*buffer_views_out)["bufferView_nverts" + prefix] = picojson::value(buffer_view_nverts);
-      }
-
-    }
-
-  }
-
-  {
-    picojson::object attributes;
-  
-    attributes["POSITION"] = picojson::value(std::string("accessor_points") + prefix);
-    attributes["NVERTS"] = picojson::value(std::string("accessor_nverts") + prefix);
-
-    // Extra information for curves primtive.
-    picojson::object extra;
-    extra["ext_mode"] = picojson::value("curves");
-    
-    picojson::object primitive;
-    primitive["attributes"] = picojson::value(attributes);
-    //primitive["indices"] = picojson::value("accessor_indices");
-    primitive["material"] = picojson::value("material_1");
-    primitive["mode"] = picojson::value(static_cast<int64_t>(TINYGLTF_MODE_POINTS)); // Use GL_POINTS for backward compatibility
-    primitive["extras"] = picojson::value(extra);
-
-
-    picojson::array primitive_array;
-    primitive_array.push_back(picojson::value(primitive));
-
-    picojson::object m;
-    m["name"] = picojson::value(curves.name);
-    m["primitives"] = picojson::value(primitive_array);
-
-    picojson::object meshes;
-    (*meshes_out)["mesh" + prefix] = picojson::value(m);
-
-  }
-
-  {
-    {
-      picojson::object accessor_points;
-      accessor_points["bufferView"] = picojson::value(std::string("bufferView_points") + prefix);
-      accessor_points["byteOffset"] = picojson::value(static_cast<int64_t>(0));
-      accessor_points["byteStride"] = picojson::value(static_cast<double>(3 * sizeof(float)));
-      accessor_points["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
-      accessor_points["count"] = picojson::value(static_cast<int64_t>(curves.points.size()));
-      accessor_points["type"] = picojson::value(std::string("VEC3"));
-      (*accessors_out)["accessor_points" + prefix] = picojson::value(accessor_points);
-    }
-
-    {
-      picojson::object accessor_nverts;
-      accessor_nverts["bufferView"] = picojson::value(std::string("bufferView_nverts") + prefix);
-      accessor_nverts["byteOffset"] = picojson::value(static_cast<int64_t>(0));
-      accessor_nverts["byteStride"] = picojson::value(static_cast<double>(sizeof(int)));
-      accessor_nverts["componentType"] = picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_INT));
-      accessor_nverts["count"] = picojson::value(static_cast<int64_t>(curves.nverts.size()));
-      accessor_nverts["type"] = picojson::value(std::string("SCALAR"));
-      (*accessors_out)["accessor_nverts" + prefix] = picojson::value(accessor_nverts);
-    }
-
-  }
-
-  return true;
+  (*buffers_out)["points" + prefix] = picojson::value(buf);
 }
 
-static bool SaveSceneToGLTF(const std::string& output_filename,
-              const Scene& scene) {
+// Out extension
+{
+  std::string b64data = base64_encode(
+      reinterpret_cast<unsigned char const *>(curves.nverts.data()),
+      curves.nverts.size() * sizeof(int));
+  picojson::object buf;
+
+  buf["type"] = picojson::value("arraybuffer");
+  buf["uri"] = picojson::value(
+      std::string("data:application/octet-stream;base64,") + b64data);
+  buf["byteLength"] =
+      picojson::value(static_cast<double>(curves.nverts.size() * sizeof(int)));
+
+  (*buffers_out)["nverts" + prefix] = picojson::value(buf);
+}
+}
+}
+
+{{{picojson::object buffer_view_points;
+buffer_view_points["buffer"] = picojson::value(std::string("points") + prefix);
+buffer_view_points["byteLength"] =
+    picojson::value(static_cast<double>(curves.points.size() * sizeof(float)));
+buffer_view_points["byteOffset"] = picojson::value(static_cast<double>(0));
+buffer_view_points["target"] =
+    picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
+(*buffer_views_out)["bufferView_points" + prefix] =
+    picojson::value(buffer_view_points);
+}
+
+{
+  picojson::object buffer_view_nverts;
+  buffer_view_nverts["buffer"] =
+      picojson::value(std::string("nverts") + prefix);
+  buffer_view_nverts["byteLength"] =
+      picojson::value(static_cast<double>(curves.nverts.size() * sizeof(int)));
+  buffer_view_nverts["byteOffset"] = picojson::value(static_cast<double>(0));
+  buffer_view_nverts["target"] =
+      picojson::value(static_cast<int64_t>(TINYGLTF_TARGET_ARRAY_BUFFER));
+  (*buffer_views_out)["bufferView_nverts" + prefix] =
+      picojson::value(buffer_view_nverts);
+}
+}
+}
+
+{
+  picojson::object attributes;
+
+  attributes["POSITION"] =
+      picojson::value(std::string("accessor_points") + prefix);
+  attributes["NVERTS"] =
+      picojson::value(std::string("accessor_nverts") + prefix);
+
+  // Extra information for curves primtive.
+  picojson::object extra;
+  extra["ext_mode"] = picojson::value("curves");
+
+  picojson::object primitive;
+  primitive["attributes"] = picojson::value(attributes);
+  // primitive["indices"] = picojson::value("accessor_indices");
+  primitive["material"] = picojson::value("material_1");
+  primitive["mode"] = picojson::value(static_cast<int64_t>(
+      TINYGLTF_MODE_POINTS));  // Use GL_POINTS for backward compatibility
+  primitive["extras"] = picojson::value(extra);
+
+  picojson::array primitive_array;
+  primitive_array.push_back(picojson::value(primitive));
+
+  picojson::object m;
+  m["name"] = picojson::value(curves.name);
+  m["primitives"] = picojson::value(primitive_array);
+
+  picojson::object meshes;
+  (*meshes_out)["mesh" + prefix] = picojson::value(m);
+}
+
+{
+  {
+    picojson::object accessor_points;
+    accessor_points["bufferView"] =
+        picojson::value(std::string("bufferView_points") + prefix);
+    accessor_points["byteOffset"] = picojson::value(static_cast<int64_t>(0));
+    accessor_points["byteStride"] =
+        picojson::value(static_cast<double>(3 * sizeof(float)));
+    accessor_points["componentType"] =
+        picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_FLOAT));
+    accessor_points["count"] =
+        picojson::value(static_cast<int64_t>(curves.points.size()));
+    accessor_points["type"] = picojson::value(std::string("VEC3"));
+    (*accessors_out)["accessor_points" + prefix] =
+        picojson::value(accessor_points);
+  }
+
+  {
+    picojson::object accessor_nverts;
+    accessor_nverts["bufferView"] =
+        picojson::value(std::string("bufferView_nverts") + prefix);
+    accessor_nverts["byteOffset"] = picojson::value(static_cast<int64_t>(0));
+    accessor_nverts["byteStride"] =
+        picojson::value(static_cast<double>(sizeof(int)));
+    accessor_nverts["componentType"] =
+        picojson::value(static_cast<int64_t>(TINYGLTF_COMPONENT_TYPE_INT));
+    accessor_nverts["count"] =
+        picojson::value(static_cast<int64_t>(curves.nverts.size()));
+    accessor_nverts["type"] = picojson::value(std::string("SCALAR"));
+    (*accessors_out)["accessor_nverts" + prefix] =
+        picojson::value(accessor_nverts);
+  }
+}
+
+return true;
+}
+
+static bool SaveSceneToGLTF(const std::string &output_filename,
+                            const Scene &scene) {
   picojson::object root;
 
   ConvertSceneToGLTF(&root, scene);
@@ -1341,34 +1375,36 @@ static bool SaveSceneToGLTF(const std::string& output_filename,
   picojson::object accessors;
 
   // PolyMesh
-  std::map<std::string, const Mesh*>::const_iterator mesh_it(scene.mesh_map.begin());
+  std::map<std::string, const Mesh *>::const_iterator mesh_it(
+      scene.mesh_map.begin());
   for (; mesh_it != scene.mesh_map.end(); mesh_it++) {
-    const Mesh& mesh = *(mesh_it->second);
+    const Mesh &mesh = *(mesh_it->second);
 
     assert(scene.id_map.find(mesh.name) != scene.id_map.end());
 
     const int id = (scene.id_map.find(mesh.name))->second;
 
-    bool ret = ConvertMeshToGLTF(&buffers, &buffer_views, &meshes, &accessors, mesh, id);
+    bool ret = ConvertMeshToGLTF(&buffers, &buffer_views, &meshes, &accessors,
+                                 mesh, id);
     assert(ret);
     (void)ret;
-
   }
 
   // Curves
-  std::map<std::string, const Curves*>::const_iterator curves_it(scene.curves_map.begin());
+  std::map<std::string, const Curves *>::const_iterator curves_it(
+      scene.curves_map.begin());
   for (; curves_it != scene.curves_map.end(); curves_it++) {
-    const Curves& curves = *(curves_it->second);
+    const Curves &curves = *(curves_it->second);
 
     assert(scene.id_map.find(curves_it->first) != scene.id_map.end());
 
     const int id = (scene.id_map.find(curves.name))->second;
 
     std::cout << "Curves: " << curves.name << std::endl;
-    bool ret = ConvertCurvesToGLTF(&buffers, &buffer_views, &meshes, &accessors, curves, id);
+    bool ret = ConvertCurvesToGLTF(&buffers, &buffer_views, &meshes, &accessors,
+                                   curves, id);
     assert(ret);
     (void)ret;
-
   }
 
   root["buffers"] = picojson::value(buffers);
@@ -1384,9 +1420,7 @@ static bool SaveSceneToGLTF(const std::string& output_filename,
     materials["material_1"] = picojson::value(default_material);
 
     root["materials"] = picojson::value(materials);
-
   }
-
 
   std::ofstream ifs(output_filename.c_str());
   if (ifs.bad()) {
@@ -1396,7 +1430,7 @@ static bool SaveSceneToGLTF(const std::string& output_filename,
 
   picojson::value v = picojson::value(root);
 
-  std::string s = v.serialize(/* pretty */true);
+  std::string s = v.serialize(/* pretty */ true);
   ifs.write(s.data(), static_cast<ssize_t>(s.size()));
   ifs.close();
 
@@ -1405,8 +1439,7 @@ static bool SaveSceneToGLTF(const std::string& output_filename,
 
 // Flatten node tree.
 // Also assign ID for each graphics primitive.
-static void ConvertNodeToScene(Scene *scene, int *id, const Node *node)
-{
+static void ConvertNodeToScene(Scene *scene, int *id, const Node *node) {
   if (!node) return;
 
   std::cout << "node " << node->name << std::endl;
@@ -1418,27 +1451,26 @@ static void ConvertNodeToScene(Scene *scene, int *id, const Node *node)
     } else {
       // Assume child xform node
       assert(scene->xform_map.find(node->name) == scene->xform_map.end());
-      scene->xform_map[node->name] = dynamic_cast<const Xform*>(node);
-      //scene->id_map[node->name] = (*id)++;
+      scene->xform_map[node->name] = dynamic_cast<const Xform *>(node);
+      // scene->id_map[node->name] = (*id)++;
     }
-     
+
   } else if (dynamic_cast<const Mesh *>(node)) {
     assert(scene->mesh_map.find(node->name) == scene->mesh_map.end());
-    scene->mesh_map[node->name] = dynamic_cast<const Mesh*>(node);
+    scene->mesh_map[node->name] = dynamic_cast<const Mesh *>(node);
     scene->id_map[node->name] = (*id)++;
   } else if (dynamic_cast<const Curves *>(node)) {
     assert(scene->curves_map.find(node->name) == scene->curves_map.end());
-    scene->curves_map[node->name] = dynamic_cast<const Curves*>(node);
+    scene->curves_map[node->name] = dynamic_cast<const Curves *>(node);
     scene->id_map[node->name] = (*id)++;
   }
 
   for (size_t i = 0; i < node->children.size(); i++) {
     ConvertNodeToScene(scene, id, node->children[i]);
   }
-
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   std::string abc_filename;
   std::string gltf_filename;
 
@@ -1459,12 +1491,12 @@ int main(int argc, char** argv) {
 
   Scene scene;
   std::stringstream ss;
-  Node* node = new Node();
-  VisitObjectAndExtractNode(node, ss, root, /* indent */"  ");
+  Node *node = new Node();
+  VisitObjectAndExtractNode(node, ss, root, /* indent */ "  ");
 
-  //std::cout << ss.str() << std::endl;
+  // std::cout << ss.str() << std::endl;
 
-  int id = 1; // ID starts from 1.
+  int id = 1;  // ID starts from 1.
   ConvertNodeToScene(&scene, &id, node);
   delete node;
 
