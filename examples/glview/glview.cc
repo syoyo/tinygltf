@@ -184,6 +184,8 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
 
   if ((button == GLFW_MOUSE_BUTTON_LEFT) && (!shiftPressed) && (!ctrlPressed)) {
     mouseLeftPressed = true;
+    mouseMiddlePressed = false;
+    mouseRightPressed = false;
     if (action == GLFW_PRESS) {
       int id = -1;
       // int id = ui.Proc(x, y);
@@ -197,6 +199,8 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
   if ((button == GLFW_MOUSE_BUTTON_RIGHT) || ((button == GLFW_MOUSE_BUTTON_LEFT) && ctrlPressed)) {
     if (action == GLFW_PRESS) {
       mouseRightPressed = true;
+      mouseLeftPressed = false;
+      mouseMiddlePressed = false;
     } else if (action == GLFW_RELEASE) {
       mouseRightPressed = false;
     }
@@ -204,6 +208,8 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
   if ((button == GLFW_MOUSE_BUTTON_MIDDLE) || ((button == GLFW_MOUSE_BUTTON_LEFT) && shiftPressed)) {
     if (action == GLFW_PRESS) {
       mouseMiddlePressed = true;
+      mouseLeftPressed = false;
+      mouseRightPressed = false;
     } else if (action == GLFW_RELEASE) {
       mouseMiddlePressed = false;
     }
