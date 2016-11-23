@@ -973,6 +973,7 @@ static bool ConvertMeshToGLTF(picojson::object *buffers_out, picojson::object *b
     primitive_array.push_back(picojson::value(primitive));
 
     picojson::object m;
+    m["name"] = picojson::value(mesh.name);
     m["primitives"] = picojson::value(primitive_array);
 
     picojson::object meshes;
@@ -1089,6 +1090,7 @@ static bool ConvertCurvesToGLTF(picojson::object *buffers_out, picojson::object 
     primitive_array.push_back(picojson::value(primitive));
 
     picojson::object m;
+    m["name"] = picojson::value(curves.name);
     m["primitives"] = picojson::value(primitive_array);
 
     picojson::object meshes;
@@ -1277,30 +1279,6 @@ int main(int argc, char** argv) {
   delete node;
 
   SaveSceneToGLTF(gltf_filename, scene);
-
-#if 0
-  if (scene.curves_map.size() > 0) {
-  }
-  if (foundMesh) {
-    bool ret = SaveMeshToGLTF(gltf_filename, mesh);
-    if (ret) {
-      std::cout << "Wrote " << gltf_filename << std::endl;
-    } else {
-      return EXIT_FAILURE;
-    }
-  } else {
-    std::cout << "No polygon mesh found in Alembic file" << std::endl;
-  }
-
-  if (foundCurves) {
-    bool ret = SaveCurvesToGLTF(gltf_filename, curves);
-    if (ret) {
-      std::cout << "Wrote " << gltf_filename << std::endl;
-    } else {
-      return EXIT_FAILURE;
-    }
-  }
-#endif
 
   return EXIT_SUCCESS;
 }
