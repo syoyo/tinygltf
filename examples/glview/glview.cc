@@ -283,7 +283,7 @@ static void SetupGLState(tinygltf::Scene &scene, GLuint progId) {
           continue;
         }
         tinygltf::Material &mat = scene.materials[primitive.material];
-        printf("material.name = %s\n", mat.name.c_str());
+        //printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
           std::string diffuseTexName = mat.values["diffuse"].string_value;
           if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
@@ -358,7 +358,6 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
           continue;
         }
 
-        printf("curve...?\n");
         bool has_curves = false;
         if (primitive.extras.IsObject()) {
           if (primitive.extras.Has("ext_mode")) {
@@ -373,7 +372,6 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
             }
           }
         }
-        printf("has_curves = %d\n", has_curves);
 
         if (!has_curves) {
           continue;
@@ -410,6 +408,14 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
               line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 1]);
               line_pts.push_back(vtx[3 * (vtx_offset + n+1) + 2]);
 
+              //std::cout << "p0 " << vtx[3 * (vtx_offset + n) + 0] << ", "
+              //                  << vtx[3 * (vtx_offset + n) + 1] << ", "
+              //                  << vtx[3 * (vtx_offset + n) + 2] << std::endl;
+
+              //std::cout << "p1 " << vtx[3 * (vtx_offset + n+1) + 0] << ", "
+              //                  << vtx[3 * (vtx_offset + n+1) + 1] << ", "
+              //                  << vtx[3 * (vtx_offset + n+1) + 2] << std::endl;
+
             }
 
             vtx_offset += nverts[k];
@@ -427,7 +433,7 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
 
         // Material
         tinygltf::Material &mat = scene.materials[primitive.material];
-        printf("material.name = %s\n", mat.name.c_str());
+        //printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
           std::string diffuseTexName = mat.values["diffuse"].string_value;
           if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
