@@ -167,17 +167,22 @@ void keyboardFunc(GLFWwindow *window, int key, int scancode, int action,
   (void)mods;
   if (action == GLFW_PRESS || action == GLFW_REPEAT) {
     // Close window
-    if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE)
+    if (key == GLFW_KEY_Q || key == GLFW_KEY_ESCAPE) {
       glfwSetWindowShouldClose(window, GL_TRUE);
+    }
+
   }
+
 }
 
 void clickFunc(GLFWwindow *window, int button, int action, int mods) {
-  (void)mods;
   double x, y;
   glfwGetCursorPos(window, &x, &y);
 
-  if (button == GLFW_MOUSE_BUTTON_LEFT) {
+  bool shiftPressed = (mods & GLFW_MOD_SHIFT);
+  bool ctrlPressed = (mods & GLFW_MOD_CONTROL);
+
+  if ((button == GLFW_MOUSE_BUTTON_LEFT) && (!shiftPressed) && (!ctrlPressed)) {
     mouseLeftPressed = true;
     if (action == GLFW_PRESS) {
       int id = -1;
@@ -189,14 +194,14 @@ void clickFunc(GLFWwindow *window, int button, int action, int mods) {
       mouseLeftPressed = false;
     }
   }
-  if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+  if ((button == GLFW_MOUSE_BUTTON_RIGHT) || ((button == GLFW_MOUSE_BUTTON_LEFT) && ctrlPressed)) {
     if (action == GLFW_PRESS) {
       mouseRightPressed = true;
     } else if (action == GLFW_RELEASE) {
       mouseRightPressed = false;
     }
   }
-  if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+  if ((button == GLFW_MOUSE_BUTTON_MIDDLE) || ((button == GLFW_MOUSE_BUTTON_LEFT) && shiftPressed)) {
     if (action == GLFW_PRESS) {
       mouseMiddlePressed = true;
     } else if (action == GLFW_RELEASE) {
@@ -368,6 +373,7 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
             }
           }
         }
+        printf("has_curves = %d\n", has_curves);
 
         if (!has_curves) {
           continue;
@@ -503,6 +509,7 @@ void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
     glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
 
     for (; it != itEnd; it++) {
+      assert(scene.accessors.find(it->second) != scene.accessors.end());
       const tinygltf::Accessor &accessor = scene.accessors[it->second];
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
