@@ -421,7 +421,6 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
         size_t vtx_offset = 0;
         for (int k = 0; k < static_cast<int>(nverts_accessor.count); k++) {
           for (int n = 0; n < nverts[k] - 1; n++) {
-            // std::cout << "vn[" << k << "] " << nverts[k] << std::endl;
 
             line_pts.push_back(vtx[3 * (vtx_offset + n) + 0]);
             line_pts.push_back(vtx[3 * (vtx_offset + n) + 1]);
@@ -450,7 +449,7 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
                      line_pts.data(), GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-        state.count = line_pts.size() / 3 / 2;  // 2 = GL_LINES
+        state.count = line_pts.size() / 3;
         gCurvesMesh[mesh.name] = state;
 
         // Material
@@ -663,14 +662,14 @@ static void DrawNode(tinygltf::Scene &scene, const tinygltf::Node &node) {
     }
   }
 
-    std::cout << "node " << node.name << ", Meshes " << node.meshes.size() << std::endl;
+  //std::cout << "node " << node.name << ", Meshes " << node.meshes.size() << std::endl;
 
   for (size_t i = 0; i < node.meshes.size(); i++) {
     std::map<std::string, tinygltf::Mesh>::const_iterator it =
         scene.meshes.find(node.meshes[i]);
 
     if (it != scene.meshes.end()) {
-      std::cout << it->first << std::endl;
+      //std::cout << it->first << std::endl;
       // FIXME(syoyo): Refactor.
       DrawCurves(scene, it->second);
       DrawMesh(scene, it->second);
@@ -710,7 +709,7 @@ static void DrawScene(tinygltf::Scene &scene) {
 
     if (node_it == scene.nodes.end()) continue;
 
-    std::cout << "root: " << node_it->first << std::endl;
+    //std::cout << "root: " << node_it->first << std::endl;
 
     DrawNode(scene, node_it->second);
   }
