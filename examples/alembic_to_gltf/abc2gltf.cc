@@ -911,7 +911,7 @@ static void VisitObjectAndExtractNode(Node *node_out, std::stringstream &ss,
   }
 }
 
-static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene,
+static bool ConvertNodeToGLTF(picojson::object *root_out, const Scene &scene,
                               const Node *node) {
   assert(node);
   assert(!node->name.empty());
@@ -963,9 +963,10 @@ static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene,
       for (size_t i = 0; i < xform->children.size(); i++) {
         if (xform->children[i]) {
           picojson::object json_child_node;
-          bool ret = ConvertNodeToGLTF(&json_child_node, scene, xform->children[i]);
+          bool ret = ConvertNodeToGLTF(root_out, scene, xform->children[i]);
           if (ret) {
-            json_children.push_back(picojson::value(json_child_node));
+            assert(!(xform->children[i]->name.empty()));
+            json_children.push_back(picojson::value(xform->children[i]->name));
           }
         }
       }
@@ -975,7 +976,7 @@ static bool ConvertNodeToGLTF(picojson::object *out, const Scene &scene,
       }
     }
 
-    (*out) = json_node;
+    (*root_out)[node->name] = picojson::value(json_node);
   } else {
     return false;
   }
@@ -990,11 +991,11 @@ static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene) {
   picojson::object nodes;
   picojson::array node_names;
   {
-    picojson::object node;
+    //picojson::object node;
 
-    ConvertNodeToGLTF(&node, scene, scene.root_node);
+    ConvertNodeToGLTF(&nodes, scene, scene.root_node);
 
-    nodes[scene.root_node->name] = picojson::value(node);
+    //nodes[scene.root_node->name] = picojson::value(node);
     node_names.push_back(picojson::value(scene.root_node->name));
   }
   (*out)["nodes"] = picojson::value(nodes);
