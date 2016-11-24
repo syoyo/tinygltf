@@ -30,6 +30,8 @@
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
 * [writer](examples/writer) : Simple glTF writer(serialize `tinygltf::Scene` class) 
+* [alembic_to_gltf](examples/alembic_to_gltf) : Simple Alembic to glTF converter. 
+* [cyhair_to_gltf](examples/cyhair_to_gltf) : Simple CyHair(hair curves) to glTF converter.
 
 ## TODOs
 
@@ -84,7 +86,7 @@ if (!ret) {
 ### Setup
 
 Python 2.6 or 2.7 required.
-Git clone https://github.com/KhronosGroup/glTF to your local dir.
+Git clone https://github.com/KhronosGroup/glTF-Sample-Models to your local dir.
 
 ### Run test
 
