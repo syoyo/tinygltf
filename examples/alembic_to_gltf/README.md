@@ -55,8 +55,6 @@ Here is an example JSON description of curves primitive.
 
 ## TODO
 
-* [ ] Support normals and texcoords
-* [ ] Support mutiple meshes
+* [ ] Support facevarying normals and texcoords/facevarying texcoords.
 * [ ] Support animation(time samples)
-* [ ] Support scene graph(node hierarchy)
 * [ ] Support Point and SubD?
