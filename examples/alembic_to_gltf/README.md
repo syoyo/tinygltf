@@ -2,7 +2,9 @@
 
 ## Features
 
+* Node hierarchy(Xform).
 * Polygon mesh.
+* Curves(as an extension)
 
 ## Limitations
 
