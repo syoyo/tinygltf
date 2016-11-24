@@ -835,59 +835,62 @@ static void VisitObjectAndExtractNode(Node *node_out, std::stringstream &ss,
       Alembic::AbcGeom::ICurvesSchema::Sample psample;
       Alembic::AbcGeom::ICurvesSchema &ps = curve.getSchema();
 
-      std::cout << "  # of samples = " << ps.getNumSamples() << std::endl;
+      std::cout << "Curve:  # of samples = " << ps.getNumSamples() << std::endl;
 
       if (ps.getNumSamples() > 0) {
-        Curves *curves = new Curves();
         ps.get(psample, samplesel);
 
         const size_t num_curves = psample.getNumCurves();
         std::cout << "  # of curves = " << num_curves << std::endl;
 
-        Alembic::Abc::P3fArraySamplePtr P = psample.getPositions();
-        Alembic::Abc::FloatArraySamplePtr knots = psample.getKnots();
-        Alembic::Abc::UcharArraySamplePtr orders = psample.getOrders();
+        if (num_curves > 0) {
+          Curves *curves = new Curves();
 
-        Alembic::Abc::Int32ArraySamplePtr num_vertices =
-            psample.getCurvesNumVertices();
+          Alembic::Abc::P3fArraySamplePtr P = psample.getPositions();
+          Alembic::Abc::FloatArraySamplePtr knots = psample.getKnots();
+          Alembic::Abc::UcharArraySamplePtr orders = psample.getOrders();
 
-        if (knots) std::cout << "  # of knots= " << knots->size() << std::endl;
-        if (orders)
-          std::cout << "  # of orders= " << orders->size() << std::endl;
-        std::cout << "  # of nvs= " << num_vertices->size() << std::endl;
+          Alembic::Abc::Int32ArraySamplePtr num_vertices =
+              psample.getCurvesNumVertices();
 
-        curves->points.resize(3 * P->size());
-        memcpy(curves->points.data(), P->get(), sizeof(float) * 3 * P->size());
+          if (knots) std::cout << "  # of knots= " << knots->size() << std::endl;
+          if (orders)
+            std::cout << "  # of orders= " << orders->size() << std::endl;
+          std::cout << "  # of nvs= " << num_vertices->size() << std::endl;
+
+          curves->points.resize(3 * P->size());
+          memcpy(curves->points.data(), P->get(), sizeof(float) * 3 * P->size());
 
 #if 0
-        for (size_t k = 0; k < P->size(); k++) {
-          std::cout << "P[" << k << "] " << (*P)[k].x << ", " << (*P)[k].y << ", " << (*P)[k].z << std::endl;
-        }
+          for (size_t k = 0; k < P->size(); k++) {
+            std::cout << "P[" << k << "] " << (*P)[k].x << ", " << (*P)[k].y << ", " << (*P)[k].z << std::endl;
+          }
 
-        if (knots) {
-        for (size_t k = 0; k < knots->size(); k++) {
-          std::cout << "knots[" << k << "] " << (*knots)[k] << std::endl;
-        }
-        }
+          if (knots) {
+          for (size_t k = 0; k < knots->size(); k++) {
+            std::cout << "knots[" << k << "] " << (*knots)[k] << std::endl;
+          }
+          }
 
-        if (orders) { 
-        for (size_t k = 0; k < orders->size(); k++) {
-          std::cout << "orders[" << k << "] " << (*orders)[k] << std::endl;
-        }
-        }
+          if (orders) { 
+          for (size_t k = 0; k < orders->size(); k++) {
+            std::cout << "orders[" << k << "] " << (*orders)[k] << std::endl;
+          }
+          }
 
-        for (size_t k = 0; k < num_vertices->size(); k++) {
-          std::cout << "nv[" << k << "] " << (*num_vertices)[k] << std::endl;
-        }
+          for (size_t k = 0; k < num_vertices->size(); k++) {
+            std::cout << "nv[" << k << "] " << (*num_vertices)[k] << std::endl;
+          }
 #endif
 
-        if (num_vertices) {
-          curves->nverts.resize(num_vertices->size());
-          memcpy(curves->nverts.data(), num_vertices->get(),
-                 sizeof(int) * num_vertices->size());
-        }
+          if (num_vertices) {
+            curves->nverts.resize(num_vertices->size());
+            memcpy(curves->nverts.data(), num_vertices->get(),
+                   sizeof(int) * num_vertices->size());
+          }
 
-        node = curves;
+          node = curves;
+        }
 
       } else {
         std::cout << "Warning: # of samples = 0" << std::endl;
@@ -991,11 +994,11 @@ static bool ConvertSceneToGLTF(picojson::object *out, const Scene &scene) {
   picojson::object nodes;
   picojson::array node_names;
   {
-    //picojson::object node;
+    // picojson::object node;
 
     ConvertNodeToGLTF(&nodes, scene, scene.root_node);
 
-    //nodes[scene.root_node->name] = picojson::value(node);
+    // nodes[scene.root_node->name] = picojson::value(node);
     node_names.push_back(picojson::value(scene.root_node->name));
   }
   (*out)["nodes"] = picojson::value(nodes);
