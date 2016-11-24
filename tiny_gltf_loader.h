@@ -893,6 +893,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
   }
 
   if (w < 1 || h < 1) {
+    free(data);
     if (err) {
       (*err) += "Unknown image format.\n";
     }
@@ -901,6 +902,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
 
   if (req_width > 0) {
     if (req_width != w) {
+      free(data);
       if (err) {
         (*err) += "Image width mismatch.\n";
       }
@@ -910,6 +912,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
 
   if (req_height > 0) {
     if (req_height != h) {
+      free(data);
       if (err) {
         (*err) += "Image height mismatch.\n";
       }
@@ -922,6 +925,8 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
   image->component = comp;
   image->image.resize(static_cast<size_t>(w * h * comp));
   std::copy(data, data + w * h * comp, image->image.begin());
+
+  free(data);
 
   return true;
 }
