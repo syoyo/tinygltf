@@ -1021,6 +1021,7 @@ static void ParseObjectProperty(Value *ret, const picojson::object &o) {
     } else if (v.is<picojson::object>()) {
       tinygltf::Value child_value;
       ParseObjectProperty(&child_value, v.get<picojson::object>());
+      vo[it->first] = child_value;
     }
     // TODO(syoyo) binary, array
   }
