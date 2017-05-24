@@ -429,44 +429,6 @@ typedef struct {
 } Buffer;
 
 typedef struct {
-  std::string name;
-  int type;
-  int pad0;
-  std::vector<unsigned char> source;
-
-  Value extras;
-} Shader;
-
-typedef struct {
-  std::string name;
-  std::string vertexShader;
-  std::string fragmentShader;
-  std::vector<std::string> attributes;
-
-  Value extras;
-} Program;
-
-typedef struct {
-  int count;
-  int pad0;
-  std::string node;
-  std::string semantic;
-  int type;
-  int pad1;
-  Parameter value;
-} TechniqueParameter;
-
-typedef struct {
-  std::string name;
-  std::string program;
-  std::map<std::string, TechniqueParameter> parameters;
-  std::map<std::string, std::string> attributes;
-  std::map<std::string, std::string> uniforms;
-
-  Value extras;
-} Technique;
-
-typedef struct {
   std::string generator;
   std::string version;
   std::string profile_api;
@@ -490,9 +452,6 @@ class Scene {
   std::map<std::string, Node> nodes;
   std::map<std::string, Texture> textures;
   std::map<std::string, Image> images;
-  std::map<std::string, Shader> shaders;
-  std::map<std::string, Program> programs;
-  std::map<std::string, Technique> techniques;
   std::map<std::string, Sampler> samplers;
   std::map<std::string, std::vector<std::string> > scenes;  // list of nodes
 
@@ -1178,93 +1137,6 @@ static bool ParseStringProperty(
   return true;
 }
 
-static bool ParseStringArrayProperty(std::vector<std::string> *ret,
-                                     std::string *err,
-                                     const picojson::object &o,
-                                     const std::string &property,
-                                     bool required) {
-  picojson::object::const_iterator it = o.find(property);
-  if (it == o.end()) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is missing.\n";
-      }
-    }
-    return false;
-  }
-
-  if (!it->second.is<picojson::array>()) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is not an array.\n";
-      }
-    }
-    return false;
-  }
-
-  ret->clear();
-  const picojson::array &arr = it->second.get<picojson::array>();
-  for (size_t i = 0; i < arr.size(); i++) {
-    if (!arr[i].is<std::string>()) {
-      if (required) {
-        if (err) {
-          (*err) += "'" + property + "' property is not a string.\n";
-        }
-      }
-      return false;
-    }
-    ret->push_back(arr[i].get<std::string>());
-  }
-
-  return true;
-}
-
-static bool ParseStringMapProperty(std::map<std::string, std::string> *ret,
-                                   std::string *err, const picojson::object &o,
-                                   const std::string &property, bool required) {
-  picojson::object::const_iterator it = o.find(property);
-  if (it == o.end()) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is missing.\n";
-      }
-    }
-    return false;
-  }
-
-  // Make sure we are dealing with an object / dictionary.
-  if (!it->second.is<picojson::object>()) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is not an object.\n";
-      }
-    }
-    return false;
-  }
-
-  ret->clear();
-  const picojson::object &dict = it->second.get<picojson::object>();
-
-  picojson::object::const_iterator dictIt(dict.begin());
-  picojson::object::const_iterator dictItEnd(dict.end());
-
-  for (; dictIt != dictItEnd; ++dictIt) {
-    // Check that the value is a string.
-    if (!dictIt->second.is<std::string>()) {
-      if (required) {
-        if (err) {
-          (*err) += "'" + property + "' value is not a string.\n";
-        }
-      }
-      return false;
-    }
-
-    // Insert into the list.
-    (*ret)[dictIt->first] = dictIt->second.get<std::string>();
-  }
-  return true;
-}
-
 static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
                                     std::string *buffer_view,
                                     std::string *mime_type, int *image_width,
@@ -1829,183 +1701,6 @@ static bool ParseMaterial(Material *material, std::string *err,
   return true;
 }
 
-static bool ParseShader(Shader *shader, std::string *err,
-                        const picojson::object &o, const std::string &basedir,
-                        bool is_binary = false,
-                        const unsigned char *bin_data = NULL,
-                        size_t bin_size = 0) {
-  std::string uri;
-  if (!ParseStringProperty(&uri, err, o, "uri", true)) {
-    return false;
-  }
-
-  if (is_binary) {
-    // Still binary glTF accepts external dataURI. First try external resources.
-    bool loaded = false;
-    if (IsDataURI(uri)) {
-      loaded = DecodeDataURI(&shader->source, uri, 0, false);
-    } else {
-      // Assume external .bin file.
-      loaded = LoadExternalFile(&shader->source, err, uri, basedir, 0, false);
-    }
-
-    if (!loaded) {
-      // load data from (embedded) binary data
-
-      if ((bin_size == 0) || (bin_data == NULL)) {
-        if (err) {
-          (*err) += "Invalid binary data.\n";
-        }
-        return false;
-      }
-
-      // There should be "extensions" property.
-      // "extensions":{"KHR_binary_glTF":{"bufferView": "id", ...
-
-      std::string buffer_view;
-      std::string mime_type;
-      int image_width;
-      int image_height;
-      bool ret = ParseKHRBinaryExtension(o, err, &buffer_view, &mime_type,
-                                         &image_width, &image_height);
-      if (!ret) {
-        return false;
-      }
-
-      if (uri.compare("data:,") == 0) {
-        // ok
-      } else {
-        if (err) {
-          (*err) += "Invalid URI for binary data.\n";
-        }
-        return false;
-      }
-    }
-  } else {
-    // Load shader source from data uri
-    // TODO(syoyo): Support ascii or utf-8 data uris.
-    if (IsDataURI(uri)) {
-      if (!DecodeDataURI(&shader->source, uri, 0, false)) {
-        if (err) {
-          (*err) += "Failed to decode 'uri' for shader parameter.\n";
-        }
-        return false;
-      }
-    } else {
-      // Assume external file
-      if (!LoadExternalFile(&shader->source, err, uri, basedir, 0, false)) {
-        if (err) {
-          (*err) += "Failed to load external 'uri' for shader parameter.\n";
-        }
-        return false;
-      }
-      if (shader->source.empty()) {
-        if (err) {
-          (*err) += "shader is empty.\n";  // This may be OK?
-        }
-        return false;
-      }
-    }
-  }
-
-  double type;
-  if (!ParseNumberProperty(&type, err, o, "type", true)) {
-    return false;
-  }
-
-  shader->type = static_cast<int>(type);
-
-  ParseExtrasProperty(&(shader->extras), o);
-
-  return true;
-}
-
-static bool ParseProgram(Program *program, std::string *err,
-                         const picojson::object &o) {
-  ParseStringProperty(&program->name, err, o, "name", false);
-
-  if (!ParseStringProperty(&program->vertexShader, err, o, "vertexShader",
-                           true)) {
-    return false;
-  }
-  if (!ParseStringProperty(&program->fragmentShader, err, o, "fragmentShader",
-                           true)) {
-    return false;
-  }
-
-  // I suppose the list of attributes isn't needed, but a technique doesn't
-  // really make sense without it.
-  ParseStringArrayProperty(&program->attributes, err, o, "attributes", false);
-
-  ParseExtrasProperty(&(program->extras), o);
-
-  return true;
-}
-
-static bool ParseTechniqueParameter(TechniqueParameter *param, std::string *err,
-                                    const picojson::object &o) {
-  double count = 1;
-  ParseNumberProperty(&count, err, o, "count", false);
-
-  double type;
-  if (!ParseNumberProperty(&type, err, o, "type", true)) {
-    return false;
-  }
-
-  ParseStringProperty(&param->node, err, o, "node", false);
-  ParseStringProperty(&param->semantic, err, o, "semantic", false);
-
-  ParseParameterProperty(&param->value, err, o, "value", false);
-
-  param->count = static_cast<int>(count);
-  param->type = static_cast<int>(type);
-
-  return true;
-}
-
-static bool ParseTechnique(Technique *technique, std::string *err,
-                           const picojson::object &o) {
-  ParseStringProperty(&technique->name, err, o, "name", false);
-
-  if (!ParseStringProperty(&technique->program, err, o, "program", true)) {
-    return false;
-  }
-
-  ParseStringMapProperty(&technique->attributes, err, o, "attributes", false);
-  ParseStringMapProperty(&technique->uniforms, err, o, "uniforms", false);
-
-  technique->parameters.clear();
-  picojson::object::const_iterator paramsIt = o.find("parameters");
-
-  // Verify parameters is an object
-  if ((paramsIt != o.end()) && (paramsIt->second).is<picojson::object>()) {
-    // For each parameter in params_object.
-    const picojson::object &params_object =
-        (paramsIt->second).get<picojson::object>();
-
-    picojson::object::const_iterator it(params_object.begin());
-    picojson::object::const_iterator itEnd(params_object.end());
-
-    for (; it != itEnd; it++) {
-      TechniqueParameter param;
-
-      // Skip non-objects
-      if (!it->second.is<picojson::object>()) continue;
-
-      // Parse the technique parameter
-      const picojson::object &param_obj = it->second.get<picojson::object>();
-      if (ParseTechniqueParameter(&param, err, param_obj)) {
-        // Add if successful
-        technique->parameters[it->first] = param;
-      }
-    }
-  }
-
-  ParseExtrasProperty(&(technique->extras), o);
-
-  return true;
-}
-
 static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
                                   const picojson::object &o) {
   if (!ParseStringProperty(&channel->sampler, err, o, "sampler", true)) {
@@ -2421,57 +2116,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
-  // 11. Parse Shader
-  if (v.contains("shaders") && v.get("shaders").is<picojson::object>()) {
-    const picojson::object &root = v.get("shaders").get<picojson::object>();
-
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      Shader shader;
-      if (!ParseShader(&shader, err, (it->second).get<picojson::object>(),
-                       base_dir, is_binary_, bin_data_, bin_size_)) {
-        return false;
-      }
-
-      scene->shaders[it->first] = shader;
-    }
-  }
-
-  // 12. Parse Program
-  if (v.contains("programs") && v.get("programs").is<picojson::object>()) {
-    const picojson::object &root = v.get("programs").get<picojson::object>();
-
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      Program program;
-      if (!ParseProgram(&program, err, (it->second).get<picojson::object>())) {
-        return false;
-      }
-
-      scene->programs[it->first] = program;
-    }
-  }
-
-  // 13. Parse Technique
-  if (v.contains("techniques") && v.get("techniques").is<picojson::object>()) {
-    const picojson::object &root = v.get("techniques").get<picojson::object>();
-
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      Technique technique;
-      if (!ParseTechnique(&technique, err,
-                          (it->second).get<picojson::object>())) {
-        return false;
-      }
-
-      scene->techniques[it->first] = technique;
-    }
-  }
-
-  // 14. Parse Animation
+  // 11. Parse Animation
   if (v.contains("animations") && v.get("animations").is<picojson::object>()) {
     const picojson::object &root = v.get("animations").get<picojson::object>();
 
@@ -2488,7 +2133,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     }
   }
 
-  // 15. Parse Sampler
+  // 12. Parse Sampler
   if (v.contains("samplers") && v.get("samplers").is<picojson::object>()) {
     const picojson::object &root = v.get("samplers").get<picojson::object>();
 
