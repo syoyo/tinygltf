@@ -403,11 +403,20 @@ class Camera {
   std::string name;
   bool isOrthographic;  // false = perspective.
 
-  // Some common properties.
+  // Orthographic properties
+  float xMag; // required
+  float yMag; // required
+  float zFar; // required
+  float zNear; //required
+
+  // Perspective properties
   float aspectRatio;
-  float yFov;
-  float zFar;
-  float zNear;
+  float yfov; // required
+  float zfar;
+  float znear; // required
+
+  ParameterMap extensions;
+  Value extras;
 };
 
 struct Primitive {
