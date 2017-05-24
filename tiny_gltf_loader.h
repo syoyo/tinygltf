@@ -278,63 +278,84 @@ typedef struct {
 
 typedef std::map<std::string, Parameter> ParameterMap;
 
-typedef struct {
-  std::string sampler;
-  std::string target_id;
-  std::string target_path;
+struct AnimationChannel {
+  int sampler; // required
+  int target_node; // required (index of the node to target)
+  std::string target_path; // required in ["translation", "rotation", "scale", "weights"]
   Value extras;
-} AnimationChannel;
 
-typedef struct {
-  std::string input;
-  std::string interpolation;
-  std::string output;
-  Value extras;
-} AnimationSampler;
+  AnimationChannel()
+  {
+    sampler = -1;
+    target_node = -1;
+  }
+};
+
+struct AnimationSampler {
+  int input; // required
+  std::string interpolation; // in ["LINEAR", "STEP", "CATMULLROMSPLINE", "CUBICSPLINE"], default "LINEAR"
+  int output; // required
+
+  AnimationSampler()
+  {
+    input = -1;
+    output = -1;
+  }
+};
 
 typedef struct {
   std::string name;
   std::vector<AnimationChannel> channels;
-  std::map<std::string, AnimationSampler> samplers;
-  ParameterMap parameters;
+  std::vector<AnimationSampler> samplers;
   Value extras;
 } Animation;
 
-typedef struct {
+struct Sampler {
   std::string name;
-  int minFilter;
-  int magFilter;
-  int wrapS;
-  int wrapT;
+  int minFilter; // ["NEAREST", "LINEAR", "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_NEAREST", "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_LINEAR"]
+  int magFilter; // ["NEAREST", "LINEAR"]
+  int wrapS; // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default "REPEAT"
+  int wrapT; // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default "REPEAT"
   int wrapR;  // TinyGLTF extension
   int pad0;
   Value extras;
-} Sampler;
 
-typedef struct {
+  Sampler()
+  {
+    wrapS = TINYGLTF_TEXTURE_WRAP_RPEAT;
+    wrapT = TINYGLTF_TEXTURE_WRAP_RPEAT;
+  }
+};
+
+struct Image{
   std::string name;
   int width;
   int height;
   int component;
   int pad0;
   std::vector<unsigned char> image;
-
-  std::string bufferView;  // KHR_binary_glTF extenstion.
-  std::string mimeType;    // KHR_binary_glTF extenstion.
-
+  int bufferView;  // (required if no uri)
+  std::string mimeType;    // (required if no uri) ["image/jpeg", "image/png"]
+  std::string uri; // (reqiored if no mimeType)
   Value extras;
-} Image;
 
-typedef struct {
-  int format;
-  int internalFormat;
-  std::string sampler;  // Required
-  std::string source;   // Required
-  int target;
-  int type;
-  std::string name;
+  Image()
+  {
+    bufferView = -1;
+  }
+};
+
+struct Texture {
+  int sampler;
+  int source;   // Required (not specified in the spec ?)
   Value extras;
-} Texture;
+
+  Texture()
+  {
+    sampler = -1;
+    source =-1;
+  }
+};
 
 typedef struct {
   std::string name;
@@ -344,30 +365,35 @@ typedef struct {
   Value extras;
 } Material;
 
-typedef struct {
+struct BufferView{
   std::string name;
-  std::string buffer;  // Required
-  size_t byteOffset;   // Required
-  size_t byteLength;   // default: 0
-  int target;
+  int buffer;  // Required
+  size_t byteOffset;   // minimum 0, default 0
+  size_t byteLength;   // required, minimum 1
+  size_t byteStride;  // minimum 4, maximum 252 (multiple of 4)
+  int target; // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
   int pad0;
   Value extras;
-} BufferView;
+};
 
-typedef struct {
-  std::string bufferView;
+struct Accessor {
+  int bufferView; // optional in spec but required here since sparse accessor are not supported
   std::string name;
   size_t byteOffset;
   size_t byteStride;
-  int componentType;  // One of TINYGLTF_COMPONENT_TYPE_***
-  int pad0;
-  size_t count;
-  int type;  // One of TINYGLTF_TYPE_***
-  int pad1;
-  std::vector<double> minValues;  // Optional
-  std::vector<double> maxValues;  // Optional
+  int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
+  size_t count; // required
+  int type;  // (required) One of TINYGLTF_TYPE_***   ..
   Value extras;
-} Accessor;
+
+  std::vector<double> minValues;  // required
+  std::vector<double> maxValues;  // required
+
+  Accessor()
+  {
+    bufferView = -1;
+  }
+};
 
 class Camera {
  public:
@@ -384,35 +410,45 @@ class Camera {
   float zNear;
 };
 
-typedef struct {
-  std::map<std::string, std::string> attributes;  // A dictionary object of
-                                                  // strings, where each string
-                                                  // is the ID of the accessor
-                                                  // containing an attribute.
-  std::string material;  // The ID of the material to apply to this primitive
-                         // when rendering.
-  std::string indices;   // The ID of the accessor that contains the indices.
-  int mode;              // one of TINYGLTF_MODE_***
-  int pad0;
+struct Primitive {
+  std::map<std::string, int> attributes;  // (required) A dictionary object of
+                                          // integer, where each integer
+                                          // is the index of the accessor
+                                          // containing an attribute.
+  int material;  // The index of the material to apply to this primitive
+                      // when rendering.
+  int indices;   // The index of the accessor that contains the indices.
+  int mode;      // one of TINYGLTF_MODE_***
+  Value extras;
 
-  Value extras;  // "extra" property
-} Primitive;
+  Primitive()
+  {
+    material = -1;
+    indices = -1;
+  }
+};
 
 typedef struct {
   std::string name;
   std::vector<Primitive> primitives;
+  ParameterMap extensions;
   Value extras;
 } Mesh;
 
 class Node {
  public:
-  Node() {}
+  Node()
+  {
+    mesh = -1;
+  }
+
   ~Node() {}
 
-  std::string camera;  // camera object referenced by this node.
+  int camera;  // the index of the camera referenced by this node
 
   std::string name;
-  std::vector<std::string> children;
+  int mesh;
+  std::vector<int> children;
   std::vector<double> rotation;     // length must be 0 or 4
   std::vector<double> scale;        // length must be 0 or 3
   std::vector<double> translation;  // length must be 0 or 3
@@ -425,6 +461,7 @@ class Node {
 typedef struct {
   std::string name;
   std::vector<unsigned char> data;
+  std::string uri; // considered as required here but not in the spec (need to clarify)
   Value extras;
 } Buffer;
 
@@ -438,24 +475,33 @@ typedef struct {
   Value extras;
 } Asset;
 
-class Scene {
+struct Scene {
+  std::string name;
+  std::vector<int> nodes;
+
+  ParameterMap extensions;
+  ParameterMap extras;
+};
+
+class Model {
  public:
-  Scene() {}
-  ~Scene() {}
+  Model() {}
+  ~Model() {}
 
-  std::map<std::string, Accessor> accessors;
-  std::map<std::string, Animation> animations;
-  std::map<std::string, Buffer> buffers;
-  std::map<std::string, BufferView> bufferViews;
-  std::map<std::string, Material> materials;
-  std::map<std::string, Mesh> meshes;
-  std::map<std::string, Node> nodes;
-  std::map<std::string, Texture> textures;
-  std::map<std::string, Image> images;
-  std::map<std::string, Sampler> samplers;
-  std::map<std::string, std::vector<std::string> > scenes;  // list of nodes
+  std::vector<Accessor> accessors;
+  std::vector<Animation> animations;
+  std::vector<Buffer> buffers;
+  std::vector<BufferView> bufferViews;
+  std::vector<Material> materials;
+  std::vector<Mesh> meshes;
+  std::vector<Node> nodes;
+  std::vector<Texture> textures;
+  std::vector<Image> images;
+  std::vector<Sampler> samplers;
+  std::vector<Scene> scenes;
 
-  std::string defaultScene;
+  int defaultScene;
+  std::vector<std::string> extensionsUsed;
 
   Asset asset;
 
@@ -482,28 +528,28 @@ class TinyGLTFLoader {
 
   /// Loads glTF ASCII asset from a file.
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadASCIIFromFile(Scene *scene, std::string *err,
+  bool LoadASCIIFromFile(Model *model, std::string *err,
                          const std::string &filename,
                          unsigned int check_sections = REQUIRE_ALL);
 
   /// Loads glTF ASCII asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadASCIIFromString(Scene *scene, std::string *err, const char *str,
+  bool LoadASCIIFromString(Model *model, std::string *err, const char *str,
                            const unsigned int length,
                            const std::string &base_dir,
                            unsigned int check_sections = REQUIRE_ALL);
 
   /// Loads glTF binary asset from a file.
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadBinaryFromFile(Scene *scene, std::string *err,
+  bool LoadBinaryFromFile(Model *model, std::string *err,
                           const std::string &filename,
                           unsigned int check_sections = REQUIRE_ALL);
 
   /// Loads glTF binary asset from memory.
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadBinaryFromMemory(Scene *scene, std::string *err,
+  bool LoadBinaryFromMemory(Model *model, std::string *err,
                             const unsigned char *bytes,
                             const unsigned int length,
                             const std::string &base_dir = "",
@@ -513,7 +559,7 @@ class TinyGLTFLoader {
   /// Loads glTF asset from string(memory).
   /// `length` = strlen(str);
   /// Returns false and set error string to `err` if there's an error.
-  bool LoadFromString(Scene *scene, std::string *err, const char *str,
+  bool LoadFromString(Model *model, std::string *err, const char *str,
                       const unsigned int length, const std::string &base_dir,
                       unsigned int check_sections);
 
@@ -1137,8 +1183,53 @@ static bool ParseStringProperty(
   return true;
 }
 
+static bool ParseStringIntProperty(std::map<std::string, int> *ret,
+                                   std::string *err, const picojson::object &o,
+                                   const std::string &property, bool required) {
+  picojson::object::const_iterator it = o.find(property);
+  if (it == o.end()) {
+    if (required) {
+      if (err) {
+        (*err) += "'" + property + "' property is missing.\n";
+      }
+    }
+    return false;
+  }
+
+  // Make sure we are dealing with an object / dictionary.
+  if (!it->second.is<picojson::object>()) {
+    if (required) {
+      if (err) {
+        (*err) += "'" + property + "' property is not an object.\n";
+      }
+    }
+    return false;
+  }
+
+  ret->clear();
+  const picojson::object &dict = it->second.get<picojson::object>();
+
+  picojson::object::const_iterator dictIt(dict.begin());
+  picojson::object::const_iterator dictItEnd(dict.end());
+
+  for (; dictIt != dictItEnd; ++dictIt) {
+    if (!dictIt->second.is<int>()) {
+      if (required) {
+        if (err) {
+          (*err) += "'" + property + "' value is not an int.\n";
+        }
+      }
+      return false;
+    }
+
+    // Insert into the list.
+    (*ret)[dictIt->first] = static_cast<int>(dictIt->second.get<double>());
+  }
+  return true;
+}
+
 static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
-                                    std::string *buffer_view,
+                                    double *buffer_view,
                                     std::string *mime_type, int *image_width,
                                     int *image_height) {
   picojson::object j = o;
@@ -1176,7 +1267,7 @@ static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
 
   picojson::object k = ext["KHR_binary_glTF"].get<picojson::object>();
 
-  if (!ParseStringProperty(buffer_view, err, k, "bufferView", true)) {
+  if (!ParseNumberProperty(buffer_view, err, k, "bufferView", true)) {
     return false;
   }
 
@@ -1227,8 +1318,16 @@ static bool ParseImage(Image *image, std::string *err,
                        const picojson::object &o, const std::string &basedir,
                        bool is_binary, const unsigned char *bin_data,
                        size_t bin_size) {
+  // A glTF image must either reference a bufferView or an image uri
+  double bufferView = -1;
+  bool isEmbedded = ParseNumberProperty(&bufferView, err, o, "bufferView", true);
+  isEmbedded = isEmbedded && static_cast<int>(bufferView) != -1;
+
   std::string uri;
-  if (!ParseStringProperty(&uri, err, o, "uri", true)) {
+  if (!ParseStringProperty(&uri, err, o, "uri", true) && !isEmbedded) {
+    if (err) {
+      (*err) += "Invalid image data (required data is missing).\n";
+    }
     return false;
   }
 
@@ -1259,7 +1358,7 @@ static bool ParseImage(Image *image, std::string *err,
       // There should be "extensions" property.
       // "extensions":{"KHR_binary_glTF":{"bufferView": "id", ...
 
-      std::string buffer_view;
+      double buffer_view = -1.0;
       std::string mime_type;
       int image_width;
       int image_height;
@@ -1280,7 +1379,7 @@ static bool ParseImage(Image *image, std::string *err,
 
       // Just only save some information here. Loading actual image data from
       // bufferView is done in other place.
-      image->bufferView = buffer_view;
+      image->bufferView = static_cast<int>(buffer_view);
       image->mimeType = mime_type;
       image->width = image_width;
       image->height = image_height;
@@ -1320,33 +1419,16 @@ static bool ParseTexture(Texture *texture, std::string *err,
                          const picojson::object &o,
                          const std::string &basedir) {
   (void)basedir;
+  double sampler = -1.0;
+  double source = -1.0;
+  ParseNumberProperty(&sampler, err, o, "sampler", false);
 
-  if (!ParseStringProperty(&texture->sampler, err, o, "sampler", true)) {
+  if (!ParseNumberProperty(&source, err, o, "source", true)) {
     return false;
   }
 
-  if (!ParseStringProperty(&texture->source, err, o, "source", true)) {
-    return false;
-  }
-
-  ParseStringProperty(&texture->name, err, o, "name", false);
-
-  double format = TINYGLTF_TEXTURE_FORMAT_RGBA;
-  ParseNumberProperty(&format, err, o, "format", false);
-
-  double internalFormat = TINYGLTF_TEXTURE_FORMAT_RGBA;
-  ParseNumberProperty(&internalFormat, err, o, "internalFormat", false);
-
-  double target = TINYGLTF_TEXTURE_TARGET_TEXTURE2D;
-  ParseNumberProperty(&target, err, o, "target", false);
-
-  double type = TINYGLTF_TEXTURE_TYPE_UNSIGNED_BYTE;
-  ParseNumberProperty(&type, err, o, "type", false);
-
-  texture->format = static_cast<int>(format);
-  texture->internalFormat = static_cast<int>(internalFormat);
-  texture->target = static_cast<int>(target);
-  texture->type = static_cast<int>(type);
+  texture->sampler = static_cast<int>(sampler);
+  texture->source = static_cast<int>(source);
 
   return true;
 }
@@ -1445,8 +1527,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 
 static bool ParseBufferView(BufferView *bufferView, std::string *err,
                             const picojson::object &o) {
-  std::string buffer;
-  if (!ParseStringProperty(&buffer, err, o, "buffer", true)) {
+  double buffer = -1.0;
+  if (!ParseNumberProperty(&buffer, err, o, "buffer", true)) {
     return false;
   }
 
@@ -1455,8 +1537,13 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
     return false;
   }
 
-  double byteLength = 0.0;
-  ParseNumberProperty(&byteLength, err, o, "byteLength", false);
+  double byteLength = 1.0;
+  if(!ParseNumberProperty(&byteLength, err, o, "byteLength", true)) {
+    return false;
+  }
+
+  double byteStride = 4.0;
+  ParseNumberProperty(&byteLength, err, o, "byteStride", false);
 
   double target = 0.0;
   ParseNumberProperty(&target, err, o, "target", false);
@@ -1471,26 +1558,27 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
 
   ParseStringProperty(&bufferView->name, err, o, "name", false);
 
-  bufferView->buffer = buffer;
+  bufferView->buffer = static_cast<int>(buffer);
   bufferView->byteOffset = static_cast<size_t>(byteOffset);
   bufferView->byteLength = static_cast<size_t>(byteLength);
+  bufferView->byteStride = static_cast<size_t>(byteStride);
 
   return true;
 }
 
 static bool ParseAccessor(Accessor *accessor, std::string *err,
                           const picojson::object &o) {
-  std::string bufferView;
-  if (!ParseStringProperty(&bufferView, err, o, "bufferView", true)) {
+  double bufferView = -1.0;
+  if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true)) {
     return false;
   }
 
-  double byteOffset;
+  double byteOffset = 0.0;
   if (!ParseNumberProperty(&byteOffset, err, o, "byteOffset", true)) {
     return false;
   }
 
-  double componentType;
+  double componentType = 0.0;
   if (!ParseNumberProperty(&componentType, err, o, "componentType", true)) {
     return false;
   }
@@ -1535,11 +1623,16 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
   accessor->minValues.clear();
   accessor->maxValues.clear();
-  ParseNumberArrayProperty(&accessor->minValues, err, o, "min", false);
-  ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", false);
+  if(!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", true)) {
+    return false;
+  }
+
+  if(!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", true)) {
+    return false;
+  }
 
   accessor->count = static_cast<size_t>(count);
-  accessor->bufferView = bufferView;
+  accessor->bufferView = static_cast<int>(bufferView);
   accessor->byteOffset = static_cast<size_t>(byteOffset);
   accessor->byteStride = static_cast<size_t>(byteStride);
 
@@ -1566,21 +1659,23 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
 static bool ParsePrimitive(Primitive *primitive, std::string *err,
                            const picojson::object &o) {
-  if (!ParseStringProperty(&primitive->material, err, o, "material", true,
-                           "mesh.primitive")) {
-    return false;
-  }
+  double material = -1.0;
+  ParseNumberProperty(&material, err, o, "material", false);
+  primitive->material = static_cast<int>(material);
 
   double mode = static_cast<double>(TINYGLTF_MODE_TRIANGLES);
   ParseNumberProperty(&mode, err, o, "mode", false);
 
   int primMode = static_cast<int>(mode);
-  primitive->mode = primMode;
+  primitive->mode = primMode; // Why only triangled were supported ?
 
-  primitive->indices = "";
-  ParseStringProperty(&primitive->indices, err, o, "indices", false);
-
-  ParseStringMapProperty(&primitive->attributes, err, o, "attributes", false);
+  double indices = -1.0;
+  ParseNumberProperty(&indices, err, o, "indices", false);
+  primitive->indices = static_cast<int>(indices);
+  if (!ParseStringIntProperty(&primitive->attributes, err, o, "attributes",
+                              true)) {
+    return false;
+  }
 
   ParseExtrasProperty(&(primitive->extras), o);
 
@@ -1613,11 +1708,21 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
 static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
   ParseStringProperty(&node->name, err, o, "name", false);
 
-  ParseNumberArrayProperty(&node->rotation, err, o, "rotation", false);
-  ParseNumberArrayProperty(&node->scale, err, o, "scale", false);
-  ParseNumberArrayProperty(&node->translation, err, o, "translation", false);
-  ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false);
-  ParseStringArrayProperty(&node->meshes, err, o, "meshes", false);
+  // Matrix and T/R/S are exclusive
+  if(!ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false)) {
+
+    ParseNumberArrayProperty(&node->rotation, err, o, "rotation", false);
+    ParseNumberArrayProperty(&node->scale, err, o, "scale", false);
+    ParseNumberArrayProperty(&node->translation, err, o, "translation", false);
+  }
+
+  double camera = -1.0;
+  ParseNumberProperty(&camera, err, o, "camera", false);
+  node->camera = static_cast<int>(camera);
+
+  double mesh = -1.0;
+  ParseNumberProperty(&mesh, err, o, "mesh", false);
+  node->mesh = mesh;
 
   node->children.clear();
   picojson::object::const_iterator childrenObject = o.find("children");
@@ -1626,13 +1731,13 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
     const picojson::array &childrenArray =
         (childrenObject->second).get<picojson::array>();
     for (size_t i = 0; i < childrenArray.size(); i++) {
-      if (!childrenArray[i].is<std::string>()) {
+      if (!childrenArray[i].is<int>()) {
         if (err) {
           (*err) += "Invalid `children` array.\n";
         }
         return false;
       }
-      const std::string &childrenNode = childrenArray[i].get<std::string>();
+      const int &childrenNode = static_cast<int>(childrenArray[i].get<double>());
       node->children.push_back(childrenNode);
     }
   }
@@ -1703,7 +1808,9 @@ static bool ParseMaterial(Material *material, std::string *err,
 
 static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
                                   const picojson::object &o) {
-  if (!ParseStringProperty(&channel->sampler, err, o, "sampler", true)) {
+  double samplerIndex = -1.0;
+  double targetIndex = -1.0;
+  if (!ParseNumberProperty(&samplerIndex, err, o, "sampler", true)) {
     if (err) {
       (*err) += "`sampler` field is missing in animation channels\n";
     }
@@ -1715,7 +1822,7 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
     const picojson::object &target_object =
         (targetIt->second).get<picojson::object>();
 
-    if (!ParseStringProperty(&channel->target_id, err, target_object, "id",
+    if (!ParseNumberProperty(&targetIndex, err, target_object, "node",
                              true)) {
       if (err) {
         (*err) += "`id` field is missing in animation.channels.target\n";
@@ -1731,6 +1838,9 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
       return false;
     }
   }
+
+  channel->sampler = static_cast<int>(samplerIndex);
+  channel->target_node = static_cast<int>(targetIndex);
 
   ParseExtrasProperty(&(channel->extras), o);
 
@@ -1757,21 +1867,20 @@ static bool ParseAnimation(Animation *animation, std::string *err,
 
   {
     picojson::object::const_iterator samplerIt = o.find("samplers");
-    if ((samplerIt != o.end()) && (samplerIt->second).is<picojson::object>()) {
-      const picojson::object &sampler_object =
-          (samplerIt->second).get<picojson::object>();
+    if ((samplerIt != o.end()) && (samplerIt->second).is<picojson::array>()) {
+      const picojson::array &sampler_array =
+          (samplerIt->second).get<picojson::array>();
 
-      picojson::object::const_iterator it = sampler_object.begin();
-      picojson::object::const_iterator itEnd = sampler_object.end();
+      picojson::array::const_iterator it = sampler_array.begin();
+      picojson::array::const_iterator itEnd = sampler_array.end();
 
       for (; it != itEnd; it++) {
-        // Skip non-objects
-        if (!it->second.is<picojson::object>()) continue;
-
-        const picojson::object &s = it->second.get<picojson::object>();
+        const picojson::object &s = it->get<picojson::object>();
 
         AnimationSampler sampler;
-        if (!ParseStringProperty(&sampler.input, err, s, "input", true)) {
+        double inputIndex = -1.0;
+        double outputIndex = -1.0;
+        if (!ParseNumberProperty(&inputIndex, err, s, "input", true)) {
           if (err) {
             (*err) += "`input` field is missing in animation.sampler\n";
           }
@@ -1784,35 +1893,19 @@ static bool ParseAnimation(Animation *animation, std::string *err,
           }
           return false;
         }
-        if (!ParseStringProperty(&sampler.output, err, s, "output", true)) {
+        if (!ParseNumberProperty(&outputIndex, err, s, "output", true)) {
           if (err) {
             (*err) += "`output` field is missing in animation.sampler\n";
           }
           return false;
         }
-
-        animation->samplers[it->first] = sampler;
+        sampler.input = static_cast<int>(inputIndex);
+        sampler.output = static_cast<int>(outputIndex);
+        animation->samplers.push_back(sampler);
       }
     }
   }
 
-  picojson::object::const_iterator parametersIt = o.find("parameters");
-  if ((parametersIt != o.end()) &&
-      (parametersIt->second).is<picojson::object>()) {
-    const picojson::object &parameters_object =
-        (parametersIt->second).get<picojson::object>();
-
-    picojson::object::const_iterator it(parameters_object.begin());
-    picojson::object::const_iterator itEnd(parameters_object.end());
-
-    for (; it != itEnd; it++) {
-      Parameter param;
-      if (ParseParameterProperty(&param, err, parameters_object, it->first,
-                                 false)) {
-        animation->parameters[it->first] = param;
-      }
-    }
-  }
   ParseStringProperty(&animation->name, err, o, "name", false);
 
   ParseExtrasProperty(&(animation->extras), o);
@@ -1844,7 +1937,7 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
   return true;
 }
 
-bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
+bool TinyGLTFLoader::LoadFromString(Model *model, std::string *err,
                                     const char *str, unsigned int length,
                                     const std::string &base_dir,
                                     unsigned int check_sections) {
@@ -1858,16 +1951,10 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     return false;
   }
 
-  if (v.contains("scene") && v.get("scene").is<std::string>()) {
-    // OK
-  } else if (check_sections & REQUIRE_SCENE) {
-    if (err) {
-      (*err) += "\"scene\" object not found in .gltf\n";
-    }
-    return false;
-  }
+  // scene is not mandatory.
+  //FIXME Maybe a better way to handle it than removing the code
 
-  if (v.contains("scenes") && v.get("scenes").is<picojson::object>()) {
+if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_SCENES) {
     if (err) {
@@ -1876,7 +1963,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     return false;
   }
 
-  if (v.contains("nodes") && v.get("nodes").is<picojson::object>()) {
+  if (v.contains("nodes") && v.get("nodes").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_NODES) {
     if (err) {
@@ -1885,7 +1972,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     return false;
   }
 
-  if (v.contains("accessors") && v.get("accessors").is<picojson::object>()) {
+  if (v.contains("accessors") && v.get("accessors").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_ACCESSORS) {
     if (err) {
@@ -1894,7 +1981,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     return false;
   }
 
-  if (v.contains("buffers") && v.get("buffers").is<picojson::object>()) {
+  if (v.contains("buffers") && v.get("buffers").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_BUFFERS) {
     if (err) {
@@ -1904,7 +1991,7 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
   }
 
   if (v.contains("bufferViews") &&
-      v.get("bufferViews").is<picojson::object>()) {
+      v.get("bufferViews").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
     if (err) {
@@ -1913,168 +2000,184 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
     return false;
   }
 
-  scene->buffers.clear();
-  scene->bufferViews.clear();
-  scene->accessors.clear();
-  scene->meshes.clear();
-  scene->nodes.clear();
-  scene->defaultScene = "";
+  model->buffers.clear();
+  model->bufferViews.clear();
+  model->accessors.clear();
+  model->meshes.clear();
+  model->nodes.clear();
+  model->extensionsUsed.clear();
+  model->defaultScene = -1;
 
   // 0. Parse Asset
   if (v.contains("asset") && v.get("asset").is<picojson::object>()) {
     const picojson::object &root = v.get("asset").get<picojson::object>();
 
-    ParseAsset(&scene->asset, err, root);
+    ParseAsset(&model->asset, err, root);
+  }
+
+  // 0. Parse extensionUsed
+  if (v.contains("extensionsUsed") && v.get("extensionsUsed").is<picojson::array>()) {
+    const picojson::array &root = v.get("extensionsUsed").get<picojson::array>();
+    for(unsigned int i=0; i< root.size(); ++i)
+    {
+      model->extensionsUsed.push_back(root[i].get<std::string>());
+    }
   }
 
   // 1. Parse Buffer
-  if (v.contains("buffers") && v.get("buffers").is<picojson::object>()) {
-    const picojson::object &root = v.get("buffers").get<picojson::object>();
+  if (v.contains("buffers") && v.get("buffers").is<picojson::array>()) {
+    const picojson::array &root = v.get("buffers").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Buffer buffer;
-      if (!ParseBuffer(&buffer, err, (it->second).get<picojson::object>(),
+      if (!ParseBuffer(&buffer, err, it->get<picojson::object>(),
                        base_dir, is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
-      scene->buffers[it->first] = buffer;
+      model->buffers.push_back(buffer);
     }
   }
 
   // 2. Parse BufferView
   if (v.contains("bufferViews") &&
-      v.get("bufferViews").is<picojson::object>()) {
-    const picojson::object &root = v.get("bufferViews").get<picojson::object>();
+      v.get("bufferViews").is<picojson::array>()) {
+    const picojson::array &root = v.get("bufferViews").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       BufferView bufferView;
       if (!ParseBufferView(&bufferView, err,
-                           (it->second).get<picojson::object>())) {
+                           it->get<picojson::object>())) {
         return false;
       }
 
-      scene->bufferViews[it->first] = bufferView;
+      model->bufferViews.push_back(bufferView);
     }
   }
 
   // 3. Parse Accessor
-  if (v.contains("accessors") && v.get("accessors").is<picojson::object>()) {
-    const picojson::object &root = v.get("accessors").get<picojson::object>();
+  if (v.contains("accessors") && v.get("accessors").is<picojson::array>()) {
+    const picojson::array &root = v.get("accessors").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Accessor accessor;
       if (!ParseAccessor(&accessor, err,
-                         (it->second).get<picojson::object>())) {
+                         it->get<picojson::object>())) {
         return false;
       }
 
-      scene->accessors[it->first] = accessor;
+      model->accessors.push_back(accessor);
     }
   }
 
   // 4. Parse Mesh
-  if (v.contains("meshes") && v.get("meshes").is<picojson::object>()) {
-    const picojson::object &root = v.get("meshes").get<picojson::object>();
+  if (v.contains("meshes") && v.get("meshes").is<picojson::array>()) {
+    const picojson::array &root = v.get("meshes").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Mesh mesh;
-      if (!ParseMesh(&mesh, err, (it->second).get<picojson::object>())) {
+      if (!ParseMesh(&mesh, err, it->get<picojson::object>())) {
         return false;
       }
 
-      scene->meshes[it->first] = mesh;
+      model->meshes.push_back(mesh);
     }
   }
 
   // 5. Parse Node
-  if (v.contains("nodes") && v.get("nodes").is<picojson::object>()) {
-    const picojson::object &root = v.get("nodes").get<picojson::object>();
+  if (v.contains("nodes") && v.get("nodes").is<picojson::array>()) {
+    const picojson::array &root = v.get("nodes").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Node node;
-      if (!ParseNode(&node, err, (it->second).get<picojson::object>())) {
+      if (!ParseNode(&node, err, it->get<picojson::object>())) {
         return false;
       }
 
-      scene->nodes[it->first] = node;
+      model->nodes.push_back(node);
     }
   }
 
   // 6. Parse scenes.
-  if (v.contains("scenes") && v.get("scenes").is<picojson::object>()) {
-    const picojson::object &root = v.get("scenes").get<picojson::object>();
+  if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
+    const picojson::array &root = v.get("scenes").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!((it->second).is<picojson::object>())) {
+      if (!(it->is<picojson::object>())) {
         if (err) {
           (*err) += "`scenes' does not contain an object.";
         }
         return false;
       }
-      const picojson::object &o = (it->second).get<picojson::object>();
-      std::vector<std::string> nodes;
-      if (!ParseStringArrayProperty(&nodes, err, o, "nodes", false)) {
+      const picojson::object &o = it->get<picojson::object>();
+      std::vector<double> nodes;
+      if (!ParseNumberArrayProperty(&nodes, err, o, "nodes", false)) {
         return false;
       }
 
-      scene->scenes[it->first] = nodes;
+      Scene scene;
+      ParseStringProperty(&scene.name, err, o, "name", false);
+      std::vector<int> nodesIds(nodes.begin(), nodes.end());
+      scene.nodes = nodesIds;
+
+      model->scenes.push_back(scene);
     }
   }
 
   // 7. Parse default scenes.
-  if (v.contains("scene") && v.get("scene").is<std::string>()) {
-    const std::string defaultScene = v.get("scene").get<std::string>();
+  if (v.contains("scene") && v.get("scene").is<double>()) {
+    const int defaultScene = v.get("scene").get<double>();
 
-    scene->defaultScene = defaultScene;
+    model->defaultScene = static_cast<int>(defaultScene);
   }
 
   // 8. Parse Material
-  if (v.contains("materials") && v.get("materials").is<picojson::object>()) {
-    const picojson::object &root = v.get("materials").get<picojson::object>();
-
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+  if (v.contains("materials") && v.get("materials").is<picojson::array>()) {
+    const picojson::array &root = v.get("materials").get<picojson::array>();
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      picojson::object jsonMaterial = it->get<picojson::object>();
+
       Material material;
-      if (!ParseMaterial(&material, err,
-                         (it->second).get<picojson::object>())) {
+      ParseStringProperty(&material.name, err, jsonMaterial, "name", false);
+
+      if (!ParseMaterial(&material, err, jsonMaterial)) {
         return false;
       }
 
-      scene->materials[it->first] = material;
+      model->materials.push_back(material);
     }
   }
 
   // 9. Parse Image
-  if (v.contains("images") && v.get("images").is<picojson::object>()) {
-    const picojson::object &root = v.get("images").get<picojson::object>();
+  if (v.contains("images") && v.get("images").is<picojson::array>()) {
+    const picojson::array &root = v.get("images").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Image image;
-      if (!ParseImage(&image, err, (it->second).get<picojson::object>(),
+      if (!ParseImage(&image, err, it->get<picojson::object>(),
                       base_dir, is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
-      if (!image.bufferView.empty()) {
+      if (image.bufferView != -1) {
         // Load image from the buffer view.
-        if (scene->bufferViews.find(image.bufferView) ==
-            scene->bufferViews.end()) {
+        if ((size_t)image.bufferView >= model->bufferViews.size()) {
           if (err) {
             std::stringstream ss;
             ss << "bufferView \"" << image.bufferView
@@ -2084,8 +2187,8 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
           return false;
         }
 
-        const BufferView &bufferView = scene->bufferViews[image.bufferView];
-        const Buffer &buffer = scene->buffers[bufferView.buffer];
+        const BufferView &bufferView = model->bufferViews[image.bufferView];
+        const Buffer &buffer = model->buffers[bufferView.buffer];
 
         bool ret = LoadImageData(&image, err, image.width, image.height,
                                  &buffer.data[bufferView.byteOffset],
@@ -2095,24 +2198,24 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
         }
       }
 
-      scene->images[it->first] = image;
+      model->images.push_back(image);
     }
   }
 
   // 10. Parse Texture
-  if (v.contains("textures") && v.get("textures").is<picojson::object>()) {
-    const picojson::object &root = v.get("textures").get<picojson::object>();
+  if (v.contains("textures") && v.get("textures").is<picojson::array>()) {
+    const picojson::array &root = v.get("textures").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Texture texture;
-      if (!ParseTexture(&texture, err, (it->second).get<picojson::object>(),
+      if (!ParseTexture(&texture, err, it->get<picojson::object>(),
                         base_dir)) {
         return false;
       }
 
-      scene->textures[it->first] = texture;
+      model->textures.push_back(texture);
     }
   }
 
@@ -2120,38 +2223,38 @@ bool TinyGLTFLoader::LoadFromString(Scene *scene, std::string *err,
   if (v.contains("animations") && v.get("animations").is<picojson::object>()) {
     const picojson::object &root = v.get("animations").get<picojson::object>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
       Animation animation;
       if (!ParseAnimation(&animation, err,
-                          (it->second).get<picojson::object>())) {
+                          it->get<picojson::object>())) {
         return false;
       }
 
-      scene->animations[it->first] = animation;
+      model->animations.push_back(animation);
     }
   }
 
   // 12. Parse Sampler
-  if (v.contains("samplers") && v.get("samplers").is<picojson::object>()) {
-    const picojson::object &root = v.get("samplers").get<picojson::object>();
+  if (v.contains("samplers") && v.get("samplers").is<picojson::array>()) {
+    const picojson::array &root = v.get("samplers").get<picojson::array>();
 
-    picojson::object::const_iterator it(root.begin());
-    picojson::object::const_iterator itEnd(root.end());
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
       Sampler sampler;
-      if (!ParseSampler(&sampler, err, (it->second).get<picojson::object>())) {
+      if (!ParseSampler(&sampler, err, it->get<picojson::object>())) {
         return false;
       }
 
-      scene->samplers[it->first] = sampler;
+      model->samplers.push_back(sampler);
     }
   }
   return true;
 }
 
-bool TinyGLTFLoader::LoadASCIIFromString(Scene *scene, std::string *err,
+bool TinyGLTFLoader::LoadASCIIFromString(Model *model, std::string *err,
                                          const char *str, unsigned int length,
                                          const std::string &base_dir,
                                          unsigned int check_sections) {
@@ -2159,10 +2262,10 @@ bool TinyGLTFLoader::LoadASCIIFromString(Scene *scene, std::string *err,
   bin_data_ = NULL;
   bin_size_ = 0;
 
-  return LoadFromString(scene, err, str, length, base_dir, check_sections);
+  return LoadFromString(model, err, str, length, base_dir, check_sections);
 }
 
-bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
+bool TinyGLTFLoader::LoadASCIIFromFile(Model *model, std::string *err,
                                        const std::string &filename,
                                        unsigned int check_sections) {
   std::stringstream ss;
@@ -2193,14 +2296,14 @@ bool TinyGLTFLoader::LoadASCIIFromFile(Scene *scene, std::string *err,
 
   std::string basedir = GetBaseDir(filename);
 
-  bool ret = LoadASCIIFromString(scene, err, &buf.at(0),
+  bool ret = LoadASCIIFromString(model, err, &buf.at(0),
                                  static_cast<unsigned int>(buf.size()), basedir,
                                  check_sections);
 
   return ret;
 }
 
-bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
+bool TinyGLTFLoader::LoadBinaryFromMemory(Model *model, std::string *err,
                                           const unsigned char *bytes,
                                           unsigned int size,
                                           const std::string &base_dir,
@@ -2224,21 +2327,21 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
 
   unsigned int version;       // 4 bytes
   unsigned int length;        // 4 bytes
-  unsigned int scene_length;  // 4 bytes
-  unsigned int scene_format;  // 4 bytes;
+  unsigned int model_length;  // 4 bytes
+  unsigned int model_format;  // 4 bytes;
 
   // @todo { Endian swap for big endian machine. }
   memcpy(&version, bytes + 4, 4);
   swap4(&version);
   memcpy(&length, bytes + 8, 4);
   swap4(&length);
-  memcpy(&scene_length, bytes + 12, 4);
-  swap4(&scene_length);
-  memcpy(&scene_format, bytes + 16, 4);
-  swap4(&scene_format);
+  memcpy(&model_length, bytes + 12, 4);
+  swap4(&model_length);
+  memcpy(&model_format, bytes + 16, 4);
+  swap4(&model_format);
 
-  if ((20 + scene_length >= size) || (scene_length < 1) ||
-      (scene_format != 0)) {  // 0 = JSON format.
+  if ((20 + model_length >= size) || (model_length < 1) ||
+      (model_format != 0)) {  // 0 = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
     }
@@ -2247,16 +2350,16 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
 
   // Extract JSON string.
   std::string jsonString(reinterpret_cast<const char *>(&bytes[20]),
-                         scene_length);
+                         model_length);
 
   is_binary_ = true;
-  bin_data_ = bytes + 20 + scene_length;
+  bin_data_ = bytes + 20 + model_length;
   bin_size_ =
-      length - (20 + scene_length);  // extract header + JSON scene data.
+      length - (20 + model_length);  // extract header + JSON scene data.
 
   bool ret =
-      LoadFromString(scene, err, reinterpret_cast<const char *>(&bytes[20]),
-                     scene_length, base_dir, check_sections);
+      LoadFromString(model, err, reinterpret_cast<const char *>(&bytes[20]),
+                     model_length, base_dir, check_sections);
   if (!ret) {
     return ret;
   }
@@ -2264,7 +2367,7 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Scene *scene, std::string *err,
   return true;
 }
 
-bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
+bool TinyGLTFLoader::LoadBinaryFromFile(Model *model, std::string *err,
                                         const std::string &filename,
                                         unsigned int check_sections) {
   std::stringstream ss;
@@ -2289,7 +2392,7 @@ bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
   std::string basedir = GetBaseDir(filename);
 
   bool ret = LoadBinaryFromMemory(
-      scene, err, reinterpret_cast<unsigned char *>(&buf.at(0)),
+      model, err, reinterpret_cast<unsigned char *>(&buf.at(0)),
       static_cast<unsigned int>(buf.size()), basedir, check_sections);
 
   return ret;
