@@ -148,6 +148,13 @@ typedef enum {
   OBJECT_TYPE = 7
 } Type;
 
+#ifdef __clang__
+#pragma clang diagnostic push
+// Suppress warning for : static Value null_value
+// https://stackoverflow.com/questions/15708411/how-to-deal-with-global-constructor-warning-in-clang
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#endif
+
 // Simple class to represent JSON object
 class Value {
  public:
@@ -197,7 +204,7 @@ class Value {
 
   // Lookup value from an array
   const Value &Get(int idx) const {
-    static Value &null_value = *(new Value());
+    static Value null_value;
     assert(IsArray());
     assert(idx >= 0);
     return (static_cast<size_t>(idx) < array_value_.size())
@@ -207,7 +214,7 @@ class Value {
 
   // Lookup value from a key-value pair
   const Value &Get(const std::string &key) const {
-    static Value &null_value = *(new Value());
+    static Value null_value;
     assert(IsObject());
     Object::const_iterator it = object_value_.find(key);
     return (it != object_value_.end()) ? it->second : null_value;
@@ -252,6 +259,10 @@ class Value {
 
   int pad0;
 };
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #define TINYGLTF_VALUE_GET(ctype, var)            \
   template <>                                     \
@@ -566,6 +577,8 @@ class TinyGLTFLoader {
 
 }  // namespace tinygltf
 
+#endif  // TINY_GLTF_LOADER_H_
+
 #ifdef TINYGLTF_LOADER_IMPLEMENTATION
 #include <algorithm>
 //#include <cassert>
@@ -584,6 +597,15 @@ class TinyGLTFLoader {
 #pragma clang diagnostic ignored "-Wreserved-id-macro"
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
 #pragma clang diagnostic ignored "-Wpadded"
+#ifdef __APPLE__
+#if __clang_major__ >= 8 && __clang_minor__ >= 1
+#pragma clang diagnostic ignored "-Wcomma"
+#endif
+#else  // __APPLE__
+#if (__clang_major__ >= 4) || (__clang_major__ >= 3 && __clang_minor__ > 8)
+#pragma clang diagnostic ignored "-Wcomma"
+#endif
+#endif  // __APPLE__
 #endif
 
 #define PICOJSON_USE_INT64
@@ -2653,5 +2675,3 @@ bool TinyGLTFLoader::LoadBinaryFromFile(Scene *scene, std::string *err,
 }  // namespace tinygltf
 
 #endif  // TINYGLTF_LOADER_IMPLEMENTATION
-
-#endif  // TINY_GLTF_LOADER_H_
