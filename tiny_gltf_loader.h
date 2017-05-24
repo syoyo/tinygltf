@@ -312,6 +312,18 @@ typedef struct {
   Value extras;
 } Animation;
 
+struct Skin {
+  std::string name;
+  int inverseBindMatrices; // required here but not in the spec
+  int skeleton; // The index of the node used as a skeleton root
+  std::vector<int> joints; // Indices of skeleton nodes
+
+  Skin()
+  {
+    inverseBindMatrices = -1;
+  }
+};
+
 struct Sampler {
   std::string name;
   int minFilter; // ["NEAREST", "LINEAR", "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_NEAREST", "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_LINEAR"]
@@ -455,7 +467,8 @@ class Node {
  public:
   Node()
   {
-    mesh = -1;
+    mesh = -1,
+    skin = -1;
   }
 
   ~Node() {}
@@ -463,6 +476,7 @@ class Node {
   int camera;  // the index of the camera referenced by this node
 
   std::string name;
+  int skin;
   int mesh;
   std::vector<int> children;
   std::vector<double> rotation;     // length must be 0 or 4
@@ -512,6 +526,7 @@ class Model {
   std::vector<Node> nodes;
   std::vector<Texture> textures;
   std::vector<Image> images;
+  std::vector<Skin> skins;
   std::vector<Sampler> samplers;
   std::vector<Scene> scenes;
 
@@ -1759,6 +1774,10 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
 static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
   ParseStringProperty(&node->name, err, o, "name", false);
 
+  double skin = -1.0;
+  ParseNumberProperty(&skin, err, o, "skin", false);
+  node->skin = static_cast<int>(skin);
+
   // Matrix and T/R/S are exclusive
   if(!ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false)) {
 
@@ -2027,6 +2046,29 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
   sampler->wrapT = static_cast<int>(wrapT);
 
   ParseExtrasProperty(&(sampler->extras), o);
+
+  return true;
+}
+
+static bool ParseSkin(Skin *skin, std::string *err,
+                          const picojson::object &o) {
+
+  ParseStringProperty(&skin->name, err, o, "name", false);
+
+  std::vector<double> joints;
+  if (!ParseNumberArrayProperty(&joints, err, o, "joints", false)) {
+    return false;
+  }
+
+  double skeleton;
+  ParseNumberProperty(&skeleton, err, o, "skeleton", false);
+  skin->skeleton = static_cast<int>(skeleton);
+
+  skin->joints = std::vector<int>(joints.begin(), joints.end());
+
+  double invBind = -1.0;
+  ParseNumberProperty(&invBind, err, o, "inverseBindMatrices", true);
+  skin->inverseBindMatrices = static_cast<int>(invBind);
 
   return true;
 }
@@ -2314,8 +2356,8 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
   }
 
   // 11. Parse Animation
-  if (v.contains("animations") && v.get("animations").is<picojson::object>()) {
-    const picojson::object &root = v.get("animations").get<picojson::object>();
+  if (v.contains("animations") && v.get("animations").is<picojson::array>()) {
+    const picojson::array &root = v.get("animations").get<picojson::array>();
 
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
@@ -2330,7 +2372,24 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     }
   }
 
-  // 12. Parse Sampler
+  // 12. Parse Skin
+  if (v.contains("skins") && v.get("skins").is<picojson::array>()) {
+    const picojson::array &root = v.get("skins").get<picojson::array>();
+
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
+    for (; it != itEnd; ++it) {
+      Skin skin;
+      if (!ParseSkin(&skin, err,
+                          it->get<picojson::object>())) {
+        return false;
+      }
+
+      model->skins.push_back(skin);
+    }
+  }
+
+  // 13. Parse Sampler
   if (v.contains("samplers") && v.get("samplers").is<picojson::array>()) {
     const picojson::array &root = v.get("samplers").get<picojson::array>();
 
