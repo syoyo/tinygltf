@@ -904,12 +904,16 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
                           int req_height, const unsigned char *bytes,
                           int size) {
   int w, h, comp;
+  // if image cannot be decoded, ignore parsing and keep it by its path
+  // don't break in this case
+  //FIXME we should only enter this function if the image is embedded. If image->uri references
+  // an image file, it should be left as it is. Image loading should not be mandatory (to support other formats)
   unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, 0);
   if (!data) {
     if (err) {
       (*err) += "Unknown image format.\n";
     }
-    return false;
+    return true;
   }
 
   if (w < 1 || h < 1) {
@@ -917,7 +921,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
     if (err) {
       (*err) += "Unknown image format.\n";
     }
-    return false;
+    return true;
   }
 
   if (req_width > 0) {
@@ -1438,11 +1442,16 @@ static bool ParseImage(Image *image, std::string *err,
       }
     } else {
       // Assume external file
+
+      // Keep texture path (for textures that cannot be decoded)
+      image->uri = uri;
+
       if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
         if (err) {
           (*err) += "Failed to load external 'uri'. for image parameter\n";
         }
-        return false;
+        // If the image cannot be loaded, keep uri as image->uri.
+        return true;
       }
       if (img.empty()) {
         if (err) {
