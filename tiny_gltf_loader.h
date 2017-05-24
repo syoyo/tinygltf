@@ -272,8 +272,10 @@ TINYGLTF_VALUE_GET(Value::Object, object_value_)
 #undef TINYGLTF_VALUE_GET
 
 typedef struct {
+  bool bool_value;
   std::string string_value;
   std::vector<double> number_array;
+  std::map<std::string, double> json_double_value;
 } Parameter;
 
 typedef std::map<std::string, Parameter> ParameterMap;
@@ -357,13 +359,18 @@ struct Texture {
   }
 };
 
-typedef struct {
+// Each extension should be stored in a ParameterMap.
+// members not in the values could be included in the ParameterMap
+// to keep a single material model
+struct Material {
   std::string name;
-  std::string technique;
-  ParameterMap values;
 
+  ParameterMap values; // PBR metal/roughness workflow
+  ParameterMap additionalValues; // normal/occlusion/emissive values
+  ParameterMap extCommonValues; // KHR_common_material extension
+  ParameterMap extPBRValues;
   Value extras;
-} Material;
+};
 
 struct BufferView{
   std::string name;
@@ -1301,6 +1308,43 @@ static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
   return true;
 }
 
+static bool ParseJSONProperty(std::map<std::string, double> *ret, std::string *err,
+                              const picojson::object &o,
+                              const std::string &property,
+                              bool required)
+{
+  picojson::object::const_iterator it = o.find(property);
+  if(it == o.end())
+  {
+    if (required) {
+      if(err) {
+        (*err) += "'" + property + "' property is missing. \n'";
+      }
+    }
+    return false;
+  }
+
+  if(!it->second.is<picojson::object>()) {
+    if (required) {
+      if (err) {
+        (*err) += "'" + property + "' property is not a JSON object.\n";
+      }
+    }
+    return false;
+  }
+
+  ret->clear();
+  const picojson::object &obj = it->second.get<picojson::object>();
+  picojson::object::const_iterator it2(obj.begin());
+  picojson::object::const_iterator itEnd(obj.end());
+  for (; it2 != itEnd; it2++) {
+    if(it2->second.is<double>())
+      ret->insert(std::pair<std::string, double>(it2->first, it2->second.get<double>()));
+  }
+
+  return true;
+}
+
 static bool ParseAsset(Asset *asset, std::string *err,
                        const picojson::object &o) {
   ParseStringProperty(&asset->generator, err, o, "generator", false);
@@ -1776,6 +1820,10 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
   } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
     param->number_array.push_back(num_val);
     return true;
+  } else if(ParseJSONProperty(&param->json_double_value, err, o, prop, false)) {
+    return true;
+  } else if(ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
+    return true;
   } else {
     if (required) {
       if (err) {
@@ -1787,28 +1835,67 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 }
 
 static bool ParseMaterial(Material *material, std::string *err,
-                          const picojson::object &o) {
-  ParseStringProperty(&material->name, err, o, "name", false);
-  ParseStringProperty(&material->technique, err, o, "technique", false);
+                             const picojson::object &o) {
 
   material->values.clear();
-  picojson::object::const_iterator valuesIt = o.find("values");
+  material->extPBRValues.clear();
+  material->additionalValues.clear();
 
-  if ((valuesIt != o.end()) && (valuesIt->second).is<picojson::object>()) {
-    const picojson::object &values_object =
-        (valuesIt->second).get<picojson::object>();
+  picojson::object::const_iterator it(o.begin());
+  picojson::object::const_iterator itEnd(o.end());
 
-    picojson::object::const_iterator it(values_object.begin());
-    picojson::object::const_iterator itEnd(values_object.end());
+  for (; it != itEnd; it++) {
+    if(it->first == "pbrMetallicRoughness")
+    {
+      if ((it->second).is<picojson::object>()) {
+        const picojson::object &values_object =
+            (it->second).get<picojson::object>();
 
-    for (; it != itEnd; it++) {
-      Parameter param;
-      if (ParseParameterProperty(&param, err, values_object, it->first,
-                                 false)) {
-        material->values[it->first] = param;
+        picojson::object::const_iterator itVal(values_object.begin());
+        picojson::object::const_iterator itEnd(values_object.end());
+
+        for (; itVal != itEnd; itVal++) {
+          Parameter param;
+          if (ParseParameterProperty(&param, err, values_object, itVal->first,
+                                     false)) {
+            material->values[itVal->first] = param;
+          }
+        }
       }
     }
-  }
+    else if(it->first == "extensions")
+    {
+      if ((it->second).is<picojson::object>()) {
+      const picojson::object &extension = (it->second).get<picojson::object>();
+
+      picojson::object::const_iterator extIt = extension.begin();
+      if(!extIt->second.is<picojson::object>())
+        continue;
+
+      const picojson::object &values_object =
+          (extIt->second).get<picojson::object>();
+
+      picojson::object::const_iterator itVal(values_object.begin());
+      picojson::object::const_iterator itEnd(values_object.end());
+
+      for (; itVal != itEnd; itVal++) {
+        Parameter param;
+        if (ParseParameterProperty(&param, err, values_object, itVal->first,
+                                   false)) {
+          material->extPBRValues[itVal->first] = param;
+          }
+        }
+      }
+    }
+    else
+    {
+        Parameter param;
+        if (ParseParameterProperty(&param, err, o, it->first,
+                                   false)) {
+          material->additionalValues[it->first] = param;
+        }
+      }
+    }
 
   ParseExtrasProperty(&(material->extras), o);
 
