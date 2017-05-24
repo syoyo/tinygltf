@@ -482,12 +482,11 @@ typedef struct {
 } Buffer;
 
 typedef struct {
+  std::string version; // required
   std::string generator;
-  std::string version;
-  std::string profile_api;
-  std::string profile_version;
-  bool premultipliedAlpha;
-  char pad[7];
+  std::string minVersion;
+  std::string copyright;
+  ParameterMap extensions;
   Value extras;
 } Asset;
 
@@ -1347,22 +1346,12 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret, std::string *e
 
 static bool ParseAsset(Asset *asset, std::string *err,
                        const picojson::object &o) {
+  ParseStringProperty(&asset->version, err, o, "version", true);
   ParseStringProperty(&asset->generator, err, o, "generator", false);
-  ParseBooleanProperty(&asset->premultipliedAlpha, err, o, "premultipliedAlpha",
-                       false);
+  ParseStringProperty(&asset->minVersion, err, o, "minVersion", false);
 
-  ParseStringProperty(&asset->version, err, o, "version", false);
-
-  picojson::object::const_iterator profile = o.find("profile");
-  if (profile != o.end()) {
-    const picojson::value &v = profile->second;
-    if (v.contains("api") & v.get("api").is<std::string>()) {
-      asset->profile_api = v.get("api").get<std::string>();
-    }
-    if (v.contains("version") & v.get("version").is<std::string>()) {
-      asset->profile_version = v.get("version").get<std::string>();
-    }
-  }
+  // Unity exporter version is added as extra here
+  ParseExtrasProperty(&(asset->extras), o);
 
   return true;
 }
