@@ -42,11 +42,11 @@
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
 
-## License
+## Licenses
 
-TinyGLTFLoader is licensed under MIT license.
+TinyGLTF is licensed under MIT license.
 
-TinyGLTFLoader uses the following third party libraries.
+TinyGLTF uses the following third party libraries.
 
 * picojson.h : Copyright 2009-2010 Cybozu Labs, Inc. Copyright 2011-2014 Kazuho Oku
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
