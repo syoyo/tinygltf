@@ -1,6 +1,6 @@
-# Tiny glTF loader, header only C++ glTF parsing library.
+# Header only C++ tiny glTF library(loader/saver).
 
-`TinyGLTFLoader` is a header only C++ glTF https://github.com/KhronosGroup/glTF parsing library
+`TinyGLTF` is a header only C++ glTF https://github.com/KhronosGroup/glTF library.
 
 ![](images/glview_duck.png)
 
@@ -12,9 +12,10 @@
 
 * Portable C++. C++-03 with STL dependency only.
 * Moderate parsing time and memory consumption.
-* glTF specification v1.0.0
+* glTF specification v2.0.0
   * [x] ASCII glTF
   * [x] Binary glTF(https://github.com/KhronosGroup/glTF/tree/master/extensions/Khronos/KHR_binary_glTF)
+  * [x] PBR material description
 * Buffers
   * [x] Parse BASE64 encoded embedded buffer fata(DataURI).
   * [x] Load `.bin` file.
@@ -29,18 +30,17 @@
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
-* [writer](examples/writer) : Simple glTF writer(serialize `tinygltf::Scene` class) 
+* [writer](examples/writer) : Simple glTF writer(serialize `tinygltf::Model` class) 
 * [alembic_to_gltf](examples/alembic_to_gltf) : Simple Alembic to glTF converter. 
 * [cyhair_to_gltf](examples/cyhair_to_gltf) : Simple CyHair(hair curves) to glTF converter.
 
 ## TODOs
 
 * [ ] Write C++ code generator from json schema for robust parsing.
-* [ ] Support multiple scenes in `.gltf`
-* [ ] Parse `skin`
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
+* [ ] Write tests for `animation` and `skin` 
 
 ## Licenses
 
@@ -56,6 +56,8 @@ TinyGLTF uses the following third party libraries.
 ## Build and example
 
 Copy `stb_image.h`, `picojson.h` and `tiny_gltf_loader.h` to your project.
+
+### Loading glTF 2.0 model
 
 ```
 // Define these only in *one* .cc file.
@@ -80,6 +82,10 @@ if (!ret) {
   return -1;
 }
 ```
+
+### Saving gltTF 2.0 model
+
+T.B.W.
 
 ## Running tests.
 
