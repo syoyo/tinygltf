@@ -12,7 +12,7 @@ import subprocess
 
 # Absolute path pointing to your cloned git repo of https://github.com/KhronosGroup/glTF-Sample-Models
 sample_model_dir = "/home/syoyo/work/glTF-Sample-Models"
-base_model_dir = os.path.join(sample_model_dir, "1.0")
+base_model_dir = os.path.join(sample_model_dir, "2.0")
 
 kinds = [ "glTF", "glTF-Binary", "glTF-Embedded", "glTF-MaterialsCommon"]
 # ---------------------------------
