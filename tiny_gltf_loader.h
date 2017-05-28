@@ -399,6 +399,12 @@ struct BufferView{
   int target; // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
   int pad0;
   Value extras;
+
+  BufferView()
+    : byteOffset(0)
+    , byteStride(4)
+  {}  
+
 };
 
 struct Accessor {
@@ -1620,8 +1626,8 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
     return false;
   }
 
-  double byteOffset;
-  if (!ParseNumberProperty(&byteOffset, err, o, "byteOffset", true)) {
+  double byteOffset = 0.0;
+  if (!ParseNumberProperty(&byteOffset, err, o, "byteOffset", false)) {
     return false;
   }
 
