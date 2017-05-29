@@ -384,7 +384,7 @@ static void Dump(const tinygltf::Model &model) {
       std::cout << Indent(1) << "samplers(items=" << animation.samplers.size()
                 << ")" << std::endl;
       for (size_t j = 0; j < animation.samplers.size(); j++) {
-        const tinygltf::AnimationSampler &sampler = animation.samplers[i];
+        const tinygltf::AnimationSampler &sampler = animation.samplers[j];
         std::cout << Indent(2) << "input         : " << sampler.input
                   << std::endl;
         std::cout << Indent(2)
@@ -514,9 +514,11 @@ int main(int argc, char **argv) {
 
   bool ret = false;
   if (ext.compare("glb") == 0) {
+    std::cout << "Reading binary glTF" << std::endl;
     // assume binary glTF.
     ret = loader.LoadBinaryFromFile(&model, &err, input_filename.c_str());
   } else {
+    std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
     ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
   }
