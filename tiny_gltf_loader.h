@@ -917,6 +917,10 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
 
   f.seekg(0, f.end);
   size_t sz = static_cast<size_t>(f.tellg());
+  if (int(sz) < 0) {
+    // Looks reading directory, not a file.
+    return false;
+  }
   std::vector<unsigned char> buf(sz);
 
   f.seekg(0, f.beg);
@@ -1430,7 +1434,7 @@ static bool ParseImage(Image *image, std::string *err,
   isEmbedded = isEmbedded && static_cast<int>(bufferView) != -1;
 
   std::string uri;
-  if (!ParseStringProperty(&uri, err, o, "uri", true) && !isEmbedded) {
+  if (!ParseStringProperty(&uri, err, o, "uri", true, "Image") && !isEmbedded) {
     if (err) {
       (*err) += "Invalid image data (required data is missing).\n";
     }
@@ -1550,14 +1554,12 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
                         const unsigned char *bin_data = NULL,
                         size_t bin_size = 0) {
   double byteLength;
-  if (!ParseNumberProperty(&byteLength, err, o, "byteLength", true)) {
+  if (!ParseNumberProperty(&byteLength, err, o, "byteLength", true, "Buffer")) {
     return false;
   }
 
   std::string uri;
-  if (!ParseStringProperty(&uri, err, o, "uri", true)) {
-    return false;
-  }
+  ParseStringProperty(&uri, err, o, "uri", false, "Buffer");
 
   picojson::object::const_iterator type = o.find("type");
   if (type != o.end()) {
@@ -1585,7 +1587,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 
       if ((bin_size == 0) || (bin_data == NULL)) {
         if (err) {
-          (*err) += "Invalid binary data.\n";
+          (*err) += "Invalid binary data in `Buffer'.\n";
         }
         return false;
       }
@@ -1609,7 +1611,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 
       } else {
         if (err) {
-          (*err) += "Invalid URI for binary data.\n";
+          (*err) += "Invalid URI for binary data in `Buffer'.\n";
         }
         return false;
       }
@@ -1619,7 +1621,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
     if (IsDataURI(uri)) {
       if (!DecodeDataURI(&buffer->data, uri, bytes, true)) {
         if (err) {
-          (*err) += "Failed to decode 'uri'.\n";
+          (*err) += "Failed to decode 'uri' : " + uri + "\n";
         }
         return false;
       }
@@ -2557,7 +2559,7 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Model *model, std::string *err,
   swap4(&model_format);
 
   if ((20 + model_length >= size) || (model_length < 1) ||
-      (model_format != 0)) {  // 0 = JSON format.
+      (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
     }
