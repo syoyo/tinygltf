@@ -1143,12 +1143,16 @@ static bool ParseBooleanProperty(bool *ret, std::string *err,
 
 static bool ParseNumberProperty(double *ret, std::string *err,
                                 const picojson::object &o,
-                                const std::string &property, bool required) {
+                                const std::string &property, const bool required, const std::string &parent_node = "") {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
-        (*err) += "'" + property + "' property is missing.\n";
+        (*err) += "'" + property + "' property is missing";
+        if (!parent_node.empty()) {
+          (*err) += " in " + parent_node;
+        }
+        (*err) += ".\n";
       }
     }
     return false;
@@ -1173,12 +1177,17 @@ static bool ParseNumberProperty(double *ret, std::string *err,
 static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
                                      const picojson::object &o,
                                      const std::string &property,
-                                     bool required) {
+                                     bool required,
+                                     const std::string &parent_node = "") {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
-        (*err) += "'" + property + "' property is missing.\n";
+        (*err) += "'" + property + "' property is missing";
+        if (!parent_node.empty()) {
+          (*err) += " in " + parent_node;
+        }
+        (*err) += ".\n";
       }
     }
     return false;
@@ -1187,7 +1196,11 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
   if (!it->second.is<picojson::array>()) {
     if (required) {
       if (err) {
-        (*err) += "'" + property + "' property is not an array.\n";
+        (*err) += "'" + property + "' property is not an array";
+        if (!parent_node.empty()) {
+          (*err) += " in " + parent_node;
+        }
+        (*err) += ".\n";
       }
     }
     return false;
@@ -1200,6 +1213,10 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
       if (required) {
         if (err) {
           (*err) += "'" + property + "' property is not a number.\n";
+          if (!parent_node.empty()) {
+            (*err) += " in " + parent_node;
+          }
+          (*err) += ".\n";
         }
       }
       return false;
@@ -1622,17 +1639,15 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 static bool ParseBufferView(BufferView *bufferView, std::string *err,
                             const picojson::object &o) {
   double buffer = -1.0;
-  if (!ParseNumberProperty(&buffer, err, o, "buffer", true)) {
+  if (!ParseNumberProperty(&buffer, err, o, "buffer", true, "BufferView")) {
     return false;
   }
 
   double byteOffset = 0.0;
-  if (!ParseNumberProperty(&byteOffset, err, o, "byteOffset", false)) {
-    return false;
-  }
+  ParseNumberProperty(&byteOffset, err, o, "byteOffset", false);
 
   double byteLength = 1.0;
-  if(!ParseNumberProperty(&byteLength, err, o, "byteLength", true)) {
+  if(!ParseNumberProperty(&byteLength, err, o, "byteLength", true, "BufferView")) {
     return false;
   }
 
@@ -1663,27 +1678,25 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
 static bool ParseAccessor(Accessor *accessor, std::string *err,
                           const picojson::object &o) {
   double bufferView = -1.0;
-  if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true)) {
+  if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true, "Accessor")) {
     return false;
   }
 
   double byteOffset = 0.0;
-  if (!ParseNumberProperty(&byteOffset, err, o, "byteOffset", true)) {
-    return false;
-  }
+  ParseNumberProperty(&byteOffset, err, o, "byteOffset", false, "Accessor");
 
   double componentType = 0.0;
-  if (!ParseNumberProperty(&componentType, err, o, "componentType", true)) {
+  if (!ParseNumberProperty(&componentType, err, o, "componentType", true, "Accessor")) {
     return false;
   }
 
   double count = 0.0;
-  if (!ParseNumberProperty(&count, err, o, "count", true)) {
+  if (!ParseNumberProperty(&count, err, o, "count", true, "Accessor")) {
     return false;
   }
 
   std::string type;
-  if (!ParseStringProperty(&type, err, o, "type", true)) {
+  if (!ParseStringProperty(&type, err, o, "type", true, "Accessor")) {
     return false;
   }
 
@@ -1717,11 +1730,11 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
   accessor->minValues.clear();
   accessor->maxValues.clear();
-  if(!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", true)) {
+  if(!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", true, "Accessor")) {
     return false;
   }
 
-  if(!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", true)) {
+  if(!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", true, "Accessor")) {
     return false;
   }
 
@@ -2103,21 +2116,21 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
 static bool ParseSkin(Skin *skin, std::string *err,
                           const picojson::object &o) {
 
-  ParseStringProperty(&skin->name, err, o, "name", false);
+  ParseStringProperty(&skin->name, err, o, "name", false, "Skin");
 
   std::vector<double> joints;
-  if (!ParseNumberArrayProperty(&joints, err, o, "joints", false)) {
+  if (!ParseNumberArrayProperty(&joints, err, o, "joints", false, "Skin")) {
     return false;
   }
 
   double skeleton;
-  ParseNumberProperty(&skeleton, err, o, "skeleton", false);
+  ParseNumberProperty(&skeleton, err, o, "skeleton", false, "Skin");
   skin->skeleton = static_cast<int>(skeleton);
 
   skin->joints = std::vector<int>(joints.begin(), joints.end());
 
   double invBind = -1.0;
-  ParseNumberProperty(&invBind, err, o, "inverseBindMatrices", true);
+  ParseNumberProperty(&invBind, err, o, "inverseBindMatrices", true, "Skin");
   skin->inverseBindMatrices = static_cast<int>(invBind);
 
   return true;
@@ -2132,7 +2145,7 @@ bool TinyGLTFLoader::LoadFromString(Model *model, std::string *err,
 
   if (!perr.empty()) {
     if (err) {
-      (*err) = perr;
+      (*err) = "JSON parsing error: " + perr;
     }
     return false;
   }
