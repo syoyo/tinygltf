@@ -1558,8 +1558,17 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
     return false;
   }
 
+  // In glTF 2.0, uri is not mandatory anymore
   std::string uri;
   ParseStringProperty(&uri, err, o, "uri", false, "Buffer");
+
+  // having an empty uri for a non embedded image should not be valid
+  if(!is_binary && uri.empty())
+  {
+      if (err) {
+        (*err) += "'uri' is missing from non binary glTF file buffer.\n";
+      }
+  }
 
   picojson::object::const_iterator type = o.find("type");
   if (type != o.end()) {
@@ -1574,15 +1583,14 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
   size_t bytes = static_cast<size_t>(byteLength);
   if (is_binary) {
     // Still binary glTF accepts external dataURI. First try external resources.
-    bool loaded = false;
-    if (IsDataURI(uri)) {
-      loaded = DecodeDataURI(&buffer->data, uri, bytes, true);
-    } else {
-      // Assume external .bin file.
-      loaded = LoadExternalFile(&buffer->data, err, uri, basedir, bytes, true);
-    }
 
-    if (!loaded) {
+    if(!uri.empty())
+    {
+      // External .bin file.
+      LoadExternalFile(&buffer->data, err, uri, basedir, bytes, true);
+    }
+    else
+    {
       // load data from (embedded) binary data
 
       if ((bin_size == 0) || (bin_data == NULL)) {
@@ -1603,18 +1611,10 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
         return false;
       }
 
-      if (uri.compare("data:,") == 0) {
-        // @todo { check uri }
-        buffer->data.resize(static_cast<size_t>(byteLength));
-        memcpy(&(buffer->data.at(0)), bin_data,
-               static_cast<size_t>(byteLength));
-
-      } else {
-        if (err) {
-          (*err) += "Invalid URI for binary data in `Buffer'.\n";
-        }
-        return false;
-      }
+      // Read buffer data
+      buffer->data.resize(static_cast<size_t>(byteLength));
+      memcpy(&(buffer->data.at(0)), bin_data,
+             static_cast<size_t>(byteLength));
     }
 
   } else {
@@ -2571,7 +2571,7 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Model *model, std::string *err,
                          model_length);
 
   is_binary_ = true;
-  bin_data_ = bytes + 20 + model_length;
+  bin_data_ = bytes + 20 + model_length + 8; // 4 bytes (buffer_length) + 4 bytes(buffer_format)
   bin_size_ =
       length - (20 + model_length);  // extract header + JSON scene data.
 
