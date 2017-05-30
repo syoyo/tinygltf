@@ -1311,70 +1311,6 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   return true;
 }
 
-static bool ParseKHRBinaryExtension(const picojson::object &o, std::string *err,
-                                    double *buffer_view,
-                                    std::string *mime_type, int *image_width,
-                                    int *image_height) {
-  picojson::object j = o;
-
-  if (j.find("extensions") == j.end()) {
-    if (err) {
-      (*err) += "`extensions' property is missing.\n";
-    }
-    return false;
-  }
-
-  if (!(j["extensions"].is<picojson::object>())) {
-    if (err) {
-      (*err) += "Invalid `extensions' property.\n";
-    }
-    return false;
-  }
-
-  picojson::object ext = j["extensions"].get<picojson::object>();
-
-  if (ext.find("KHR_binary_glTF") == ext.end()) {
-    if (err) {
-      (*err) +=
-          "`KHR_binary_glTF' property is missing in extension property.\n";
-    }
-    return false;
-  }
-
-  if (!(ext["KHR_binary_glTF"].is<picojson::object>())) {
-    if (err) {
-      (*err) += "Invalid `KHR_binary_glTF' property.\n";
-    }
-    return false;
-  }
-
-  picojson::object k = ext["KHR_binary_glTF"].get<picojson::object>();
-
-  if (!ParseNumberProperty(buffer_view, err, k, "bufferView", true)) {
-    return false;
-  }
-
-  if (mime_type) {
-    ParseStringProperty(mime_type, err, k, "mimeType", false);
-  }
-
-  if (image_width) {
-    double width = 0.0;
-    if (ParseNumberProperty(&width, err, k, "width", false)) {
-      (*image_width) = static_cast<int>(width);
-    }
-  }
-
-  if (image_height) {
-    double height = 0.0;
-    if (ParseNumberProperty(&height, err, k, "height", false)) {
-      (*image_height) = static_cast<int>(height);
-    }
-  }
-
-  return true;
-}
-
 static bool ParseJSONProperty(std::map<std::string, double> *ret, std::string *err,
                               const picojson::object &o,
                               const std::string &property,
@@ -1465,34 +1401,26 @@ static bool ParseImage(Image *image, std::string *err,
         return false;
       }
 
-      // There should be "extensions" property.
-      // "extensions":{"KHR_binary_glTF":{"bufferView": "id", ...
-
       double buffer_view = -1.0;
-      std::string mime_type;
-      int image_width;
-      int image_height;
-      bool ret = ParseKHRBinaryExtension(o, err, &buffer_view, &mime_type,
-                                         &image_width, &image_height);
-      if (!ret) {
+      if (!ParseNumberProperty(&buffer_view, err, o, "bufferView", true)) {
         return false;
       }
 
-      if (uri.compare("data:,") == 0) {
-        // ok
-      } else {
-        if (err) {
-          (*err) += "Invalid URI for binary data.\n";
-        }
-        return false;
-      }
+      std::string mime_type;
+      ParseStringProperty(&mime_type, err, o, "mimeType", false);
+
+      double width = 0.0;
+      ParseNumberProperty(&width, err, o, "width", false);
+
+      double height = 0.0;
+      ParseNumberProperty(&height, err, o, "height", false);
 
       // Just only save some information here. Loading actual image data from
       // bufferView is done in other place.
       image->bufferView = static_cast<int>(buffer_view);
       image->mimeType = mime_type;
-      image->width = image_width;
-      image->height = image_height;
+      image->width = static_cast<int>(width);
+      image->height = static_cast<int>(height);
 
       return true;
     }
