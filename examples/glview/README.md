@@ -27,7 +27,6 @@ When running .exe, glew and glfw dll must exist in the working directory.
 
 ## TODO
 
-* [x] Texture
-  * [ ] Various texture format.
-* [ ] Shader
+* [ ] PBR Material
+  * [ ] PBR Texture.
 * [ ] Animation
