@@ -1,12 +1,10 @@
 # Header only C++ tiny glTF library(loader/saver).
 
-`TinyGLTF` is a header only C++ glTF https://github.com/KhronosGroup/glTF library.
+`TinyGLTF` is a header only C++ glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
-![](images/glview_duck.png)
+[![Build Status](https://travis-ci.org/syoyo/tinygltf.svg?branch=master)](https://travis-ci.org/syoyo/tinygltf)
 
-[![Build Status](https://travis-ci.org/syoyo/tinygltfloader.svg?branch=master)](https://travis-ci.org/syoyo/tinygltfloader)
-
-[![Build status](https://ci.appveyor.com/api/projects/status/i5ku97hf0r0quti3?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltfloader)
+[![Build status](https://ci.appveyor.com/api/projects/status/warngenu9wjjhlm8?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltf)
 
 ## Features
 
@@ -30,14 +28,11 @@
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
-* [writer](examples/writer) : Simple glTF writer(serialize `tinygltf::Model` class) 
-* [alembic_to_gltf](examples/alembic_to_gltf) : Simple Alembic to glTF converter. 
-* [cyhair_to_gltf](examples/cyhair_to_gltf) : Simple CyHair(hair curves) to glTF converter.
 
 ## TODOs
 
 * [ ] Write C++ code generator from json schema for robust parsing.
-* [ ] Write serialization example.
+* [ ] Serialization
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?

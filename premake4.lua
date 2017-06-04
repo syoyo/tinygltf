@@ -3,7 +3,7 @@ sources = {
    }
 
 -- premake4.lua
-solution "TinyGLTFLoaderSolution"
+solution "TinyGLTFSolution"
    configurations { "Release", "Debug" }
 
    if (os.is("windows")) then
@@ -13,7 +13,7 @@ solution "TinyGLTFLoaderSolution"
    end
 
    -- A project defines one build target
-   project "tinygltfloader"
+   project "tinygltf"
       kind "ConsoleApp"
       language "C++"
       files { sources }
@@ -21,9 +21,9 @@ solution "TinyGLTFLoaderSolution"
       configuration "Debug"
          defines { "DEBUG" } -- -DDEBUG
          flags { "Symbols" }
-         targetname "loader_example_tinygltfloader_debug"
+         targetname "loader_example_tinygltf_debug"
 
       configuration "Release"
          -- defines { "NDEBUG" } -- -NDEBUG
          flags { "Symbols", "Optimize" }
-         targetname "loader_example_tinygltfloader"
+         targetname "loader_example_tinygltf"
