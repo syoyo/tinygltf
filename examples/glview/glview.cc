@@ -60,9 +60,9 @@ typedef struct {
   size_t count;  // byte count
 } GLCurvesState;
 
-std::map<std::string, GLBufferState> gBufferState;
+std::map<int, GLBufferState> gBufferState;
 std::map<std::string, GLMeshState> gMeshState;
-std::map<std::string, GLCurvesState> gCurvesMesh;
+std::map<int, GLCurvesState> gCurvesMesh;
 GLProgramState gGLProgramState;
 
 void CheckErrors(std::string desc) {
@@ -243,22 +243,17 @@ void motionFunc(GLFWwindow *window, double mouse_x, double mouse_y) {
   prevMouseY = mouse_y;
 }
 
-static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
+static void SetupMeshState(tinygltf::Model &model, GLuint progId) {
   // Buffer
   {
-    std::map<std::string, tinygltf::BufferView>::const_iterator it(
-        scene.bufferViews.begin());
-    std::map<std::string, tinygltf::BufferView>::const_iterator itEnd(
-        scene.bufferViews.end());
-
-    for (; it != itEnd; it++) {
-      const tinygltf::BufferView &bufferView = it->second;
+    for (size_t i = 0; i < model.bufferViews.size(); i++) {
+      const tinygltf::BufferView &bufferView = model.bufferViews[i];
       if (bufferView.target == 0) {
         std::cout << "WARN: bufferView.target is zero" << std::endl;
         continue;  // Unsupported bufferView.
       }
 
-      const tinygltf::Buffer &buffer = scene.buffers[bufferView.buffer];
+      const tinygltf::Buffer &buffer = model.buffers[bufferView.buffer];
       GLBufferState state;
       glGenBuffers(1, &state.vb);
       glBindBuffer(bufferView.target, state.vb);
@@ -268,19 +263,15 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
                    &buffer.data.at(0) + bufferView.byteOffset, GL_STATIC_DRAW);
       glBindBuffer(bufferView.target, 0);
 
-      gBufferState[it->first] = state;
+      gBufferState[i] = state;
     }
   }
 
+#if 0  // TODO(syoyo): Implement
   // Texture
   {
-    std::map<std::string, tinygltf::Mesh>::const_iterator it(
-        scene.meshes.begin());
-    std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(
-        scene.meshes.end());
-
-    for (; it != itEnd; it++) {
-      const tinygltf::Mesh &mesh = it->second;
+    for (size_t i = 0; i < model.meshes.size(); i++) {
+      const tinygltf::Mesh &mesh = model.meshes[i];
 
       gMeshState[mesh.name].diffuseTex.resize(mesh.primitives.size());
       for (size_t primId = 0; primId < mesh.primitives.size(); primId++) {
@@ -288,17 +279,17 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
 
         gMeshState[mesh.name].diffuseTex[primId] = 0;
 
-        if (primitive.material.empty()) {
+        if (primitive.material < 0) {
           continue;
         }
-        tinygltf::Material &mat = scene.materials[primitive.material];
+        tinygltf::Material &mat = model.materials[primitive.material];
         // printf("material.name = %s\n", mat.name.c_str());
         if (mat.values.find("diffuse") != mat.values.end()) {
           std::string diffuseTexName = mat.values["diffuse"].string_value;
-          if (scene.textures.find(diffuseTexName) != scene.textures.end()) {
-            tinygltf::Texture &tex = scene.textures[diffuseTexName];
-            if (scene.images.find(tex.source) != scene.images.end()) {
-              tinygltf::Image &image = scene.images[tex.source];
+          if (model.textures.find(diffuseTexName) != model.textures.end()) {
+            tinygltf::Texture &tex = model.textures[diffuseTexName];
+            if (scene.images.find(tex.source) != model.images.end()) {
+              tinygltf::Image &image = model.images[tex.source];
               GLuint texId;
               glGenTextures(1, &texId);
               glBindTexture(tex.target, texId);
@@ -326,22 +317,24 @@ static void SetupMeshState(tinygltf::Scene &scene, GLuint progId) {
       }
     }
   }
+#endif
 
   glUseProgram(progId);
   GLint vtloc = glGetAttribLocation(progId, "in_vertex");
   GLint nrmloc = glGetAttribLocation(progId, "in_normal");
   GLint uvloc = glGetAttribLocation(progId, "in_texcoord");
 
-  GLint diffuseTexLoc = glGetUniformLocation(progId, "diffuseTex");
+  // GLint diffuseTexLoc = glGetUniformLocation(progId, "diffuseTex");
   GLint isCurvesLoc = glGetUniformLocation(progId, "uIsCurves");
 
   gGLProgramState.attribs["POSITION"] = vtloc;
   gGLProgramState.attribs["NORMAL"] = nrmloc;
   gGLProgramState.attribs["TEXCOORD_0"] = uvloc;
-  gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
+  // gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
   gGLProgramState.uniforms["isCurvesLoc"] = isCurvesLoc;
 };
 
+#if 0  // TODO(syoyo): Implement
 // Setup curves geometry extension
 static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
   // Find curves primitive.
@@ -503,16 +496,17 @@ static void SetupCurvesState(tinygltf::Scene &scene, GLuint progId) {
   gGLProgramState.uniforms["diffuseTex"] = diffuseTexLoc;
   gGLProgramState.uniforms["uIsCurves"] = isCurvesLoc;
 };
+#endif
 
-static void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
-  // Skip curves primitive.
-  if (gCurvesMesh.find(mesh.name) != gCurvesMesh.end()) {
-    return;
-  }
+static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
+  //// Skip curves primitive.
+  // if (gCurvesMesh.find(mesh.name) != gCurvesMesh.end()) {
+  //  return;
+  //}
 
-  if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
-    glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0);  // TEXTURE0
-  }
+  // if (gGLProgramState.uniforms["diffuseTex"] >= 0) {
+  //  glUniform1i(gGLProgramState.uniforms["diffuseTex"], 0);  // TEXTURE0
+  //}
 
   if (gGLProgramState.uniforms["isCurvesLoc"] >= 0) {
     glUniform1i(gGLProgramState.uniforms["isCurvesLoc"], 0);
@@ -521,19 +515,18 @@ static void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
   for (size_t i = 0; i < mesh.primitives.size(); i++) {
     const tinygltf::Primitive &primitive = mesh.primitives[i];
 
-    if (primitive.indices.empty()) return;
-
-    std::map<std::string, std::string>::const_iterator it(
-        primitive.attributes.begin());
-    std::map<std::string, std::string>::const_iterator itEnd(
-        primitive.attributes.end());
+    if (primitive.indices < 0) return;
 
     // Assume TEXTURE_2D target for the texture object.
-    glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
+    // glBindTexture(GL_TEXTURE_2D, gMeshState[mesh.name].diffuseTex[i]);
+
+    std::map<std::string, int>::const_iterator it(primitive.attributes.begin());
+    std::map<std::string, int>::const_iterator itEnd(
+        primitive.attributes.end());
 
     for (; it != itEnd; it++) {
-      assert(scene.accessors.find(it->second) != scene.accessors.end());
-      const tinygltf::Accessor &accessor = scene.accessors[it->second];
+      assert(it->second >= 0);
+      const tinygltf::Accessor &accessor = model.accessors[it->second];
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
       int count = 1;
@@ -565,7 +558,7 @@ static void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
     }
 
     const tinygltf::Accessor &indexAccessor =
-        scene.accessors[primitive.indices];
+        model.accessors[primitive.indices];
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                  gBufferState[indexAccessor.bufferView].vb);
     CheckErrors("bind buffer");
@@ -590,9 +583,9 @@ static void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
     CheckErrors("draw elements");
 
     {
-      std::map<std::string, std::string>::const_iterator it(
+      std::map<std::string, int>::const_iterator it(
           primitive.attributes.begin());
-      std::map<std::string, std::string>::const_iterator itEnd(
+      std::map<std::string, int>::const_iterator itEnd(
           primitive.attributes.end());
 
       for (; it != itEnd; it++) {
@@ -608,6 +601,7 @@ static void DrawMesh(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
   }
 }
 
+#if 0  // TODO(syoyo): Implement
 static void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
   (void)scene;
 
@@ -636,9 +630,10 @@ static void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
     glDisableVertexAttribArray(gGLProgramState.attribs["POSITION"]);
   }
 }
+#endif
 
 // Hierarchically draw nodes
-static void DrawNode(tinygltf::Scene &scene, const tinygltf::Node &node) {
+static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   // Apply xform
 
   glPushMatrix();
@@ -662,34 +657,23 @@ static void DrawNode(tinygltf::Scene &scene, const tinygltf::Node &node) {
     }
   }
 
-  //std::cout << "node " << node.name << ", Meshes " << node.meshes.size() << std::endl;
+  // std::cout << "node " << node.name << ", Meshes " << node.meshes.size() <<
+  // std::endl;
 
-  for (size_t i = 0; i < node.meshes.size(); i++) {
-    std::map<std::string, tinygltf::Mesh>::const_iterator it =
-        scene.meshes.find(node.meshes[i]);
-
-    if (it != scene.meshes.end()) {
-      //std::cout << it->first << std::endl;
-      // FIXME(syoyo): Refactor.
-      DrawCurves(scene, it->second);
-      DrawMesh(scene, it->second);
-    }
-  }
+  // std::cout << it->first << std::endl;
+  // FIXME(syoyo): Refactor.
+  // DrawCurves(scene, it->second);
+  DrawMesh(model, model.meshes[node.mesh]);
 
   // Draw child nodes.
   for (size_t i = 0; i < node.children.size(); i++) {
-    std::map<std::string, tinygltf::Node>::const_iterator it =
-        scene.nodes.find(node.children[i]);
-
-    if (it != scene.nodes.end()) {
-      DrawNode(scene, it->second);
-    }
+    DrawNode(model, model.nodes[node.children[i]]);
   }
 
   glPopMatrix();
 }
 
-static void DrawScene(tinygltf::Scene &scene) {
+static void DrawModel(tinygltf::Model &model) {
 #if 0
   std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
   std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
@@ -699,19 +683,12 @@ static void DrawScene(tinygltf::Scene &scene) {
     DrawCurves(scene, it->second);
   }
 #else
-  std::map<std::string, std::vector<std::string> >::const_iterator it =
-      scene.scenes.find(scene.defaultScene);
-  if (it == scene.scenes.end()) return;
 
-  for (size_t i = 0; i < it->second.size(); i++) {
-    std::map<std::string, tinygltf::Node>::const_iterator node_it =
-        scene.nodes.find((it->second)[i]);
-
-    if (node_it == scene.nodes.end()) continue;
-
-    //std::cout << "root: " << node_it->first << std::endl;
-
-    DrawNode(scene, node_it->second);
+  // TODO(syoyo): Support non-default scenes.
+  assert(model.defaultScene >= 0);
+  const tinygltf::Scene &scene = model.scenes[model.defaultScene];
+  for (size_t i = 0; i < scene.nodes.size(); i++) {
+    DrawNode(model, model.nodes[scene.nodes[i]]);
   }
 #endif
 }
@@ -733,12 +710,8 @@ static void Init() {
 }
 
 static void PrintNodes(const tinygltf::Scene &scene) {
-  std::map<std::string, tinygltf::Node>::const_iterator it(scene.nodes.begin());
-  std::map<std::string, tinygltf::Node>::const_iterator itEnd(
-      scene.nodes.end());
-
-  for (; it != itEnd; it++) {
-    std::cout << "node.name : " << it->second.name << std::endl;
+  for (size_t i = 0; i < scene.nodes.size(); i++) {
+    std::cout << "node.name : " << scene.nodes[i] << std::endl;
   }
 }
 
@@ -753,7 +726,7 @@ int main(int argc, char **argv) {
     scale = atof(argv[2]);
   }
 
-  tinygltf::Scene scene;
+  tinygltf::Model model;
   tinygltf::TinyGLTFLoader loader;
   std::string err;
   std::string input_filename(argv[1]);
@@ -762,10 +735,10 @@ int main(int argc, char **argv) {
   bool ret = false;
   if (ext.compare("glb") == 0) {
     // assume binary glTF.
-    ret = loader.LoadBinaryFromFile(&scene, &err, input_filename.c_str());
+    ret = loader.LoadBinaryFromFile(&model, &err, input_filename.c_str());
   } else {
     // assume ascii glTF.
-    ret = loader.LoadASCIIFromFile(&scene, &err, input_filename.c_str());
+    ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
   }
 
   if (!err.empty()) {
@@ -779,7 +752,7 @@ int main(int argc, char **argv) {
   Init();
 
   // DBG
-  PrintNodes(scene);
+  PrintNodes(model.scenes[model.defaultScene]);
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;
@@ -843,11 +816,11 @@ int main(int argc, char **argv) {
   glUseProgram(progId);
   CheckErrors("useProgram");
 
-  SetupMeshState(scene, progId);
-  SetupCurvesState(scene, progId);
+  SetupMeshState(model, progId);
+  // SetupCurvesState(model, progId);
   CheckErrors("SetupGLState");
 
-  std::cout << "# of meshes = " << scene.meshes.size() << std::endl;
+  std::cout << "# of meshes = " << model.meshes.size() << std::endl;
 
   while (glfwWindowShouldClose(window) == GL_FALSE) {
     glfwPollEvents();
@@ -871,7 +844,7 @@ int main(int argc, char **argv) {
 
     glScalef(scale, scale, scale);
 
-    DrawScene(scene);
+    DrawModel(model);
 
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();
