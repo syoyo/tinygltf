@@ -579,6 +579,8 @@ class TinyGLTFLoader {
                             const std::string &base_dir = "",
                             unsigned int check_sections = REQUIRE_ALL);
 
+  void setImageFlipEnable(bool flipTexture);
+
  private:
   /// Loads glTF asset from string(memory).
   /// `length` = strlen(str);
@@ -2455,6 +2457,11 @@ bool TinyGLTFLoader::LoadASCIIFromString(Model *model, std::string *err,
   bin_size_ = 0;
 
   return LoadFromString(model, err, str, length, base_dir, check_sections);
+}
+
+void TinyGLTFLoader::setImageFlipEnable(bool flipTexture)
+{
+  stbi_set_flip_vertically_on_load(flipTexture);
 }
 
 bool TinyGLTFLoader::LoadASCIIFromFile(Model *model, std::string *err,
