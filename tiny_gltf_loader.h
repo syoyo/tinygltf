@@ -455,7 +455,6 @@ typedef struct {
   std::string name;
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
-  std::vector<std::map<std::string, int> > targets;
   ParameterMap extensions;
   Value extras;
 } Mesh;
@@ -578,6 +577,8 @@ class TinyGLTFLoader {
                             const unsigned int length,
                             const std::string &base_dir = "",
                             unsigned int check_sections = REQUIRE_ALL);
+
+  void setImageFlipEnable(bool flipTexture);
 
  private:
   /// Loads glTF asset from string(memory).
@@ -1772,6 +1773,25 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
     return false;
   }
 
+  // Look for morph targets
+  picojson::object::const_iterator targetsObject = o.find("targets");
+  if ((targetsObject != o.end()) && (targetsObject->second).is<picojson::array>()) {
+    const picojson::array &targetArray =
+        (targetsObject->second).get<picojson::array>();
+    for (size_t i = 0; i < targetArray.size(); i++) {
+      std::map<std::string, int> targetAttribues;
+
+      const picojson::object &dict = targetArray[i].get<picojson::object>();
+      picojson::object::const_iterator dictIt(dict.begin());
+      picojson::object::const_iterator dictItEnd(dict.end());
+
+      for (; dictIt != dictItEnd; ++dictIt) {
+        targetAttribues[dictIt->first] = static_cast<int>(dictIt->second.get<double>());
+      }
+      primitive->targets.push_back(targetAttribues);
+    }
+  }
+
   ParseExtrasProperty(&(primitive->extras), o);
 
   return true;
@@ -1792,27 +1812,6 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
         // Only add the primitive if the parsing succeeds.
         mesh->primitives.push_back(primitive);
       }
-    }
-  }
-
-  // Look for morph targets
-  picojson::object::const_iterator targetsObject = o.find("targets");
-  if ((targetsObject != o.end()) &&
-      (targetsObject->second).is<picojson::array>()) {
-    const picojson::array &targetArray =
-        (targetsObject->second).get<picojson::array>();
-    for (size_t i = 0; i < targetArray.size(); i++) {
-      std::map<std::string, int> targetAttribues;
-
-      const picojson::object &dict = targetArray[i].get<picojson::object>();
-      picojson::object::const_iterator dictIt(dict.begin());
-      picojson::object::const_iterator dictItEnd(dict.end());
-
-      for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt->first] =
-            static_cast<int>(dictIt->second.get<double>());
-      }
-      mesh->targets.push_back(targetAttribues);
     }
   }
 
@@ -2455,6 +2454,11 @@ bool TinyGLTFLoader::LoadASCIIFromString(Model *model, std::string *err,
   bin_size_ = 0;
 
   return LoadFromString(model, err, str, length, base_dir, check_sections);
+}
+
+void TinyGLTFLoader::setImageFlipEnable(bool flipTexture)
+{
+  stbi_set_flip_vertically_on_load(flipTexture);
 }
 
 bool TinyGLTFLoader::LoadASCIIFromFile(Model *model, std::string *err,
