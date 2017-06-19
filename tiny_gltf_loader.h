@@ -327,6 +327,7 @@ struct Skin {
   Skin()
   {
     inverseBindMatrices = -1;
+    skeleton = -1;
   }
 };
 
@@ -356,7 +357,7 @@ struct Image{
   std::vector<unsigned char> image;
   int bufferView;  // (required if no uri)
   std::string mimeType;    // (required if no uri) ["image/jpeg", "image/png"]
-  std::string uri; // (reqiored if no mimeType)
+  std::string uri; // (required if no mimeType)
   Value extras;
 
   Image()
@@ -367,7 +368,7 @@ struct Image{
 
 struct Texture {
   int sampler;
-  int source;   // Required (not specified in the spec ?)
+  int source;
   Value extras;
 
   Texture()
@@ -408,7 +409,7 @@ struct BufferView{
 };
 
 struct Accessor {
-  int bufferView; // optional in spec but required here since sparse accessor are not supported
+  int bufferView; // optional in spec but required here since sparse accessor are not yet supported
   std::string name;
   size_t byteOffset;
   size_t byteStride;
@@ -474,7 +475,7 @@ struct Primitive {
 typedef struct {
   std::string name;
   std::vector<Primitive> primitives;
-  std::vector<double> weights;  // weights to be applied to the Morph Targets
+  std::vector<double> weights;  // weights to be applied to the morph targets
   ParameterMap extensions;
   Value extras;
 } Mesh;
@@ -1464,9 +1465,7 @@ static bool ParseTexture(Texture *texture, std::string *err,
   double source = -1.0;
   ParseNumberProperty(&sampler, err, o, "sampler", false);
 
-  if (!ParseNumberProperty(&source, err, o, "source", true)) {
-    return false;
-  }
+  ParseNumberProperty(&source, err, o, "source", false);
 
   texture->sampler = static_cast<int>(sampler);
   texture->source = static_cast<int>(source);
@@ -2051,7 +2050,7 @@ static bool ParseSkin(Skin *skin, std::string *err,
     return false;
   }
 
-  double skeleton;
+  double skeleton = -1.0;
   ParseNumberProperty(&skeleton, err, o, "skeleton", false, "Skin");
   skin->skeleton = static_cast<int>(skeleton);
 
