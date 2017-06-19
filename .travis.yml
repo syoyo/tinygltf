@@ -43,4 +43,4 @@ script:
   - export CXX="${CXX}-${COMPILER_VERSION}"
   - ${CC} -v
   - ${CXX} ${EXTRA_CXXFLAGS} -Wall -g -o loader_example loader_example.cc
-  - ./loader_example box.gltf
+  - ./loader_example ./models/Cube/Cube.gltf
