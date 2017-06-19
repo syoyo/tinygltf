@@ -2064,7 +2064,10 @@ static bool ParseSkin(Skin *skin, std::string *err, const picojson::object &o) {
   ParseNumberProperty(&skeleton, err, o, "skeleton", false, "Skin");
   skin->skeleton = static_cast<int>(skeleton);
 
-  skin->joints = std::vector<int>(joints.begin(), joints.end());
+  skin->joints.resize(joints.size());
+  for (size_t i = 0; i < joints.size(); i++) {
+	  skin->joints[i] = static_cast<int>(joints[i]);
+  }
 
   double invBind = -1.0;
   ParseNumberProperty(&invBind, err, o, "inverseBindMatrices", true, "Skin");
@@ -2270,7 +2273,10 @@ bool TinyGLTFLoader::LoadFromString(Model *model, std::string *err,
 
       Scene scene;
       ParseStringProperty(&scene.name, err, o, "name", false);
-      std::vector<int> nodesIds(nodes.begin(), nodes.end());
+	  std::vector<int> nodesIds;
+	  for (size_t i = 0; i < nodes.size(); i++) {
+		  nodesIds.push_back(static_cast<int>(nodes[i]));
+	  }
       scene.nodes = nodesIds;
 
       model->scenes.push_back(scene);
@@ -2632,7 +2638,7 @@ static void SerializeValue(const std::string &key, const Value &value, picojson:
 static void SerializeGltfBufferData(const std::vector<unsigned char> &data, const std::string &binFilePath)
 {
   std::ofstream output(binFilePath.c_str(), std::ofstream::binary);
-  output.write(reinterpret_cast<const char*>(&data[0]), ssize_t(data.size()));
+  output.write(reinterpret_cast<const char*>(&data[0]), std::streamsize(data.size()));
   output.close();
 }
 
