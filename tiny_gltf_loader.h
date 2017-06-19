@@ -548,6 +548,7 @@ class Model {
 
   int defaultScene;
   std::vector<std::string> extensionsUsed;
+  std::vector<std::string> extensionsRequired;
 
   Asset asset;
 
@@ -2132,6 +2133,7 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
   model->meshes.clear();
   model->nodes.clear();
   model->extensionsUsed.clear();
+  model->extensionsRequired.clear();
   model->defaultScene = -1;
 
   // 0. Parse Asset
@@ -2141,12 +2143,19 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     ParseAsset(&model->asset, err, root);
   }
 
-  // 0. Parse extensionUsed
+  // 0. Parse extensionsUsed ans extensionsRequired
   if (v.contains("extensionsUsed") && v.get("extensionsUsed").is<picojson::array>()) {
     const picojson::array &root = v.get("extensionsUsed").get<picojson::array>();
     for(unsigned int i=0; i< root.size(); ++i)
     {
       model->extensionsUsed.push_back(root[i].get<std::string>());
+    }
+  }
+  if (v.contains("extensionsRequired") && v.get("extensionsRequired").is<picojson::array>()) {
+    const picojson::array &root = v.get("extensionsRequired").get<picojson::array>();
+    for(unsigned int i=0; i< root.size(); ++i)
+    {
+      model->extensionsRequired.push_back(root[i].get<std::string>());
     }
   }
 
