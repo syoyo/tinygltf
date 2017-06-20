@@ -1,6 +1,6 @@
-#define TINYGLTF_LOADER_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#include "tiny_gltf_loader.h"
+#include "tiny_gltf.h"
 
 #include <cstdio>
 #include <fstream>
@@ -507,7 +507,7 @@ int main(int argc, char **argv) {
   }
 
   tinygltf::Model model;
-  tinygltf::TinyGLTFLoader loader;
+  tinygltf::TinyGLTF gltf_ctx;
   std::string err;
   std::string input_filename(argv[1]);
   std::string ext = GetFilePathExtension(input_filename);
@@ -516,11 +516,11 @@ int main(int argc, char **argv) {
   if (ext.compare("glb") == 0) {
     std::cout << "Reading binary glTF" << std::endl;
     // assume binary glTF.
-    ret = loader.LoadBinaryFromFile(&model, &err, input_filename.c_str());
+    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, input_filename.c_str());
   } else {
     std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
-    ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
+    ret = gltf_ctx.LoadASCIIFromFile(&model, &err, input_filename.c_str());
   }
 
   if (!err.empty()) {
