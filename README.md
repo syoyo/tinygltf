@@ -1,6 +1,8 @@
 # Header only C++ tiny glTF library(loader/saver).
 
-`TinyGLTF` is a header only C++ glTF https://github.com/KhronosGroup/glTF library.
+**NOTICE! Tiny glTF is still in development and does not provide official release at the morment. Please take a look at `devel` branch**
+ 
+`TinyGLTF` is a header only C++ glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 ![](images/glview_duck.png)
 
