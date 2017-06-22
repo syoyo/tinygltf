@@ -14,9 +14,9 @@
 
 #include "trackball.h"
 
-#define TINYGLTF_LOADER_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#include "tiny_gltf_loader.h"
+#include "tiny_gltf.h"
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -727,7 +727,7 @@ int main(int argc, char **argv) {
   }
 
   tinygltf::Model model;
-  tinygltf::TinyGLTFLoader loader;
+  tinygltf::TinyGLTF loader;
   std::string err;
   std::string input_filename(argv[1]);
   std::string ext = GetFilePathExtension(input_filename);
