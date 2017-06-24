@@ -1581,7 +1581,7 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
   }
 
   double byteStride = 4.0;
-  ParseNumberProperty(&byteLength, err, o, "byteStride", false);
+  ParseNumberProperty(&byteStride, err, o, "byteStride", false);
 
   double target = 0.0;
   ParseNumberProperty(&target, err, o, "target", false);
