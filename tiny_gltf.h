@@ -399,7 +399,6 @@ struct Accessor {
                    // are not supported
   std::string name;
   size_t byteOffset;
-  size_t byteStride;
   int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
   size_t count;       // required
   int type;           // (required) One of TINYGLTF_TYPE_***   ..
@@ -1654,9 +1653,6 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
     return false;
   }
 
-  double byteStride = 0.0;
-  ParseNumberProperty(&byteStride, err, o, "byteStride", false);
-
   ParseStringProperty(&accessor->name, err, o, "name", false);
 
   accessor->minValues.clear();
@@ -1674,7 +1670,6 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
   accessor->count = static_cast<size_t>(count);
   accessor->bufferView = static_cast<int>(bufferView);
   accessor->byteOffset = static_cast<size_t>(byteOffset);
-  accessor->byteStride = static_cast<size_t>(byteStride);
 
   {
     int comp = static_cast<int>(componentType);

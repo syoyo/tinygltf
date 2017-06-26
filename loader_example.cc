@@ -333,8 +333,6 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
       std::cout << Indent(2) << "byteOffset   : " << accessor.byteOffset
                 << std::endl;
-      std::cout << Indent(2) << "byteStride   : " << accessor.byteStride
-                << std::endl;
       std::cout << Indent(2) << "componentType: "
                 << PrintComponentType(accessor.componentType) << "("
                 << accessor.componentType << ")" << std::endl;
