@@ -548,7 +548,7 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
         if (gGLProgramState.attribs[it->first] >= 0) {
           glVertexAttribPointer(gGLProgramState.attribs[it->first], count,
                                 accessor.componentType, GL_FALSE,
-                                accessor.byteStride,
+                                0,
                                 BUFFER_OFFSET(accessor.byteOffset));
           CheckErrors("vertex attrib pointer");
           glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
