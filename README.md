@@ -51,24 +51,24 @@ TinyGLTF uses the following third party libraries.
 
 ## Build and example
 
-Copy `stb_image.h`, `picojson.h` and `tiny_gltf_loader.h` to your project.
+Copy `stb_image.h`, `picojson.h` and `tiny_gltf.h` to your project.
 
 ### Loading glTF 2.0 model
 
 ```
 // Define these only in *one* .cc file.
-#define TINYGLTF_LOADER_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#include "tiny_gltf_loader.h"
+#include "tiny_gltf.h"
 
 using namespace tinygltf;
 
-Scene scene; 
-TinyGLTFLoader loader;
+Model model; 
+TinyGLTF loader;
 std::string err;
   
-bool ret = loader.LoadASCIIFromFile(scene, err, argv[1]);
-//bool ret = loader.LoadBinaryFromFile(scene, err, argv[1]); // for binary glTF(.glb) 
+bool ret = loader.LoadASCIIFromFile(&model, &err, argv[1]);
+//bool ret = loader.LoadBinaryFromFile(&model, &err, argv[1]); // for binary glTF(.glb) 
 if (!err.empty()) {
   printf("Err: %s\n", err.c_str());
 }
