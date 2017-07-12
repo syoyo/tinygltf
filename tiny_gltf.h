@@ -386,12 +386,13 @@ struct BufferView {
   int buffer;         // Required
   size_t byteOffset;  // minimum 0, default 0
   size_t byteLength;  // required, minimum 1
-  size_t byteStride;  // minimum 4, maximum 252 (multiple of 4)
+  size_t byteStride;  // minimum 4, maximum 252 (multiple of 4), default 0 =
+                      // understood to be tightly packed
   int target;         // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
   int pad0;
   Value extras;
 
-  BufferView() : byteOffset(0), byteStride(4) {}
+  BufferView() : byteOffset(0), byteStride(0) {}
 };
 
 struct Accessor {
@@ -399,13 +400,16 @@ struct Accessor {
                    // are not supported
   std::string name;
   size_t byteOffset;
+  bool normalized;    // optinal.
   int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
   size_t count;       // required
   int type;           // (required) One of TINYGLTF_TYPE_***   ..
   Value extras;
 
-  std::vector<double> minValues;  // required
-  std::vector<double> maxValues;  // required
+  std::vector<double> minValues;  // optional
+  std::vector<double> maxValues;  // optional
+
+  // TODO(syoyo): "sparse"
 
   Accessor() { bufferView = -1; }
 };
@@ -1122,12 +1126,18 @@ static bool ParseExtrasProperty(Value *ret, const picojson::object &o) {
 
 static bool ParseBooleanProperty(bool *ret, std::string *err,
                                  const picojson::object &o,
-                                 const std::string &property, bool required) {
+                                 const std::string &property,
+                                 const bool required,
+                                 const std::string &parent_node = "") {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
-        (*err) += "'" + property + "' property is missing.\n";
+        (*err) += "'" + property + "' property is missing";
+        if (!parent_node.empty()) {
+          (*err) += " in " + parent_node;
+        }
+        (*err) += ".\n";
       }
     }
     return false;
@@ -1579,8 +1589,30 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
     return false;
   }
 
-  double byteStride = 4.0;
-  ParseNumberProperty(&byteStride, err, o, "byteStride", false);
+  size_t byteStride = 0;
+  double byteStrideValue = 0.0;
+  if (!ParseNumberProperty(&byteStrideValue, err, o, "byteStride", false)) {
+    // Spec says: When byteStride of referenced bufferView is not defined, it
+    // means that accessor elements are tightly packed, i.e., effective stride
+    // equals the size of the element.
+    // We cannot determine the actual byteStride until Accessor are parsed, thus
+    // set 0(= tightly packed) here(as done in OpenGL's VertexAttribPoiner)
+    byteStride = 0;
+  } else {
+    byteStride = static_cast<size_t>(byteStrideValue);
+  }
+
+  if ((byteStride > 252) || ((byteStride % 4) != 0)) {
+    if (err) {
+      std::stringstream ss;
+      ss << "Invalid `byteStride' value. `byteStride' must be the multiple of "
+            "4 : "
+         << byteStride << std::endl;
+
+      (*err) += ss.str();
+    }
+    return false;
+  }
 
   double target = 0.0;
   ParseNumberProperty(&target, err, o, "target", false);
@@ -1613,6 +1645,9 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
   double byteOffset = 0.0;
   ParseNumberProperty(&byteOffset, err, o, "byteOffset", false, "Accessor");
+
+  bool normalized = false;
+  ParseBooleanProperty(&normalized, err, o, "normalized", false, "Accessor");
 
   double componentType = 0.0;
   if (!ParseNumberProperty(&componentType, err, o, "componentType", true,
@@ -1657,15 +1692,11 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
   accessor->minValues.clear();
   accessor->maxValues.clear();
-  if (!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", true,
-                                "Accessor")) {
-    return false;
-  }
+  ParseNumberArrayProperty(&accessor->minValues, err, o, "min", false,
+                           "Accessor");
 
-  if (!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", true,
-                                "Accessor")) {
-    return false;
-  }
+  ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", false,
+                           "Accessor");
 
   accessor->count = static_cast<size_t>(count);
   accessor->bufferView = static_cast<int>(bufferView);

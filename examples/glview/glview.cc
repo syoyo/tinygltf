@@ -529,15 +529,15 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
       const tinygltf::Accessor &accessor = model.accessors[it->second];
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
-      int count = 1;
+      int size = 1;
       if (accessor.type == TINYGLTF_TYPE_SCALAR) {
-        count = 1;
+        size = 1;
       } else if (accessor.type == TINYGLTF_TYPE_VEC2) {
-        count = 2;
+        size = 2;
       } else if (accessor.type == TINYGLTF_TYPE_VEC3) {
-        count = 3;
+        size = 3;
       } else if (accessor.type == TINYGLTF_TYPE_VEC4) {
-        count = 4;
+        size = 4;
       } else {
         assert(0);
       }
@@ -546,9 +546,9 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
           (it->first.compare("NORMAL") == 0) ||
           (it->first.compare("TEXCOORD_0") == 0)) {
         if (gGLProgramState.attribs[it->first] >= 0) {
-          glVertexAttribPointer(gGLProgramState.attribs[it->first], count,
-                                accessor.componentType, GL_FALSE,
-                                0,
+          glVertexAttribPointer(gGLProgramState.attribs[it->first], size,
+                                accessor.componentType, accessor.normalized ? GL_TRUE : GL_FALSE,
+                                model.bufferViews[accessor.bufferView].byteStride,
                                 BUFFER_OFFSET(accessor.byteOffset));
           CheckErrors("vertex attrib pointer");
           glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
