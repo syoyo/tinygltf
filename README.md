@@ -12,7 +12,7 @@
 * Moderate parsing time and memory consumption.
 * glTF specification v2.0.0
   * [x] ASCII glTF
-  * [x] Binary glTF(https://github.com/KhronosGroup/glTF/tree/master/extensions/Khronos/KHR_binary_glTF)
+  * [x] Binary glTF(GLB)
   * [x] PBR material description
 * Buffers
   * [x] Parse BASE64 encoded embedded buffer fata(DataURI).
