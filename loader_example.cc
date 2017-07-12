@@ -409,6 +409,8 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
       std::cout << Indent(2) << "byteOffset   : " << bufferView.byteOffset
                 << std::endl;
+      std::cout << Indent(2) << "byteStride   : " << bufferView.byteStride
+                << std::endl;
       std::cout << Indent(2)
                 << "target       : " << PrintTarget(bufferView.target)
                 << std::endl;
