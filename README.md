@@ -8,7 +8,7 @@ Work in process(`devel` branch). Very near to release, but need more tests and e
 
 ## Builds
 
-[![Build Status](https://travis-ci.org/syoyo/tinygltf.svg?branch=master)](https://travis-ci.org/syoyo/tinygltf)
+[![Build Status](https://travis-ci.org/syoyo/tinygltf.svg?branch=devel)](https://travis-ci.org/syoyo/tinygltf)
 
 [![Build status](https://ci.appveyor.com/api/projects/status/warngenu9wjjhlm8?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltf)
 
