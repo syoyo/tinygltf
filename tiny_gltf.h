@@ -414,25 +414,43 @@ struct Accessor {
   Accessor() { bufferView = -1; }
 };
 
-class Camera {
- public:
-  Camera() {}
-  ~Camera() {}
+struct PerspectiveCamera {
+  float aspectRatio;  // min > 0
+  float yfov;         // required. min > 0
+  float zfar;         // min > 0
+  float znear;        // required. min > 0
 
-  std::string name;
-  bool isOrthographic;  // false = perspective.
+  PerspectiveCamera()
+      : aspectRatio(0.0f),
+        yfov(0.0f),
+        zfar(0.0f)  // 0 = use infinite projecton matrix
+        ,
+        znear(0.0f) {}
 
-  // Orthographic properties
-  float xMag;   // required
-  float yMag;   // required
-  float zFar;   // required
-  float zNear;  // required
+  ParameterMap extensions;
+  Value extras;
+};
 
-  // Perspective properties
-  float aspectRatio;
-  float yfov;  // required
-  float zfar;
+struct OrthographicCamera {
+  float xmag;   // required. must not be zero.
+  float ymag;   // required. must not be zero.
+  float zfar;   // required. `zfar` must be greater than `znear`.
   float znear;  // required
+
+  OrthographicCamera() : xmag(0.0f), ymag(0.0f), zfar(0.0f), znear(0.0f) {}
+
+  ParameterMap extensions;
+  Value extras;
+};
+
+struct Camera {
+  std::string type;  // required. "perspective" or "orthographic"
+  std::string name;
+
+  PerspectiveCamera perspective;
+  OrthographicCamera orthographic;
+
+  Camera() {}
 
   ParameterMap extensions;
   Value extras;
@@ -470,7 +488,7 @@ typedef struct {
 
 class Node {
  public:
-  Node() : skin(-1), mesh(-1) {}
+  Node() : camera(-1), skin(-1), mesh(-1) {}
 
   ~Node() {}
 
@@ -530,6 +548,7 @@ class Model {
   std::vector<Image> images;
   std::vector<Skin> skins;
   std::vector<Sampler> samplers;
+  std::vector<Camera> cameras;
   std::vector<Scene> scenes;
 
   int defaultScene;
@@ -2112,6 +2131,145 @@ static bool ParseSkin(Skin *skin, std::string *err, const picojson::object &o) {
   return true;
 }
 
+static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
+                                   const picojson::object &o) {
+  double yfov = 0.0;
+  if (!ParseNumberProperty(&yfov, err, o, "yfov", true, "OrthographicCamera")) {
+    return false;
+  }
+
+  double znear = 0.0;
+  if (!ParseNumberProperty(&znear, err, o, "znear", true,
+                           "PerspectiveCamera")) {
+    return false;
+  }
+
+  double aspectRatio = 0.0;  // = invalid
+  ParseNumberProperty(&aspectRatio, err, o, "aspectRatio", false,
+                      "PerspectiveCamera");
+
+  double zfar = 0.0;  // = invalid
+  ParseNumberProperty(&zfar, err, o, "zfar", false, "PerspectiveCamera");
+
+  camera->aspectRatio = float(aspectRatio);
+  camera->zfar = float(zfar);
+  camera->yfov = float(yfov);
+  camera->znear = float(znear);
+
+  ParseExtrasProperty(&(camera->extras), o);
+
+  // TODO(syoyo): Validate parameter values.
+
+  return true;
+}
+
+static bool ParseOrthographicCamera(OrthographicCamera *camera,
+                                    std::string *err,
+                                    const picojson::object &o) {
+  double xmag = 0.0;
+  if (!ParseNumberProperty(&xmag, err, o, "xmag", true, "OrthographicCamera")) {
+    return false;
+  }
+
+  double ymag = 0.0;
+  if (!ParseNumberProperty(&ymag, err, o, "ymag", true, "OrthographicCamera")) {
+    return false;
+  }
+
+  double zfar = 0.0;
+  if (!ParseNumberProperty(&zfar, err, o, "zfar", true, "OrthographicCamera")) {
+    return false;
+  }
+
+  double znear = 0.0;
+  if (!ParseNumberProperty(&znear, err, o, "znear", true,
+                           "OrthographicCamera")) {
+    return false;
+  }
+
+  ParseExtrasProperty(&(camera->extras), o);
+
+  camera->xmag = float(xmag);
+  camera->ymag = float(ymag);
+  camera->zfar = float(zfar);
+  camera->znear = float(znear);
+
+  // TODO(syoyo): Validate parameter values.
+
+  return true;
+}
+
+static bool ParseCamera(Camera *camera, std::string *err,
+                        const picojson::object &o) {
+  if (!ParseStringProperty(&camera->type, err, o, "type", true, "Camera")) {
+    return false;
+  }
+
+  if (camera->type.compare("orthographic") == 0) {
+    if (o.find("orthographic") == o.end()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "Orhographic camera description not found." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
+
+    const picojson::value &v = o.find("orthographic")->second;
+    if (!v.is<picojson::object>()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "\"orthographic\" is not a JSON object." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
+
+    if (!ParseOrthographicCamera(&camera->orthographic, err,
+                                 v.get<picojson::object>())) {
+      return false;
+    }
+  } else if (camera->type.compare("perspective") == 0) {
+    if (o.find("perspective") == o.end()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "Perspective camera description not found." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
+
+    const picojson::value &v = o.find("perspective")->second;
+    if (!v.is<picojson::object>()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "\"perspective\" is not a JSON object." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
+
+    if (!ParsePerspectiveCamera(&camera->perspective, err,
+                                v.get<picojson::object>())) {
+      return false;
+    }
+  } else {
+    if (err) {
+      std::stringstream ss;
+      ss << "Invalid camera type: \"" << camera->type
+         << "\". Must be \"perspective\" or \"orthographic\"" << std::endl;
+      (*err) += ss.str();
+    }
+    return false;
+  }
+
+  ParseStringProperty(&camera->name, err, o, "name", false);
+
+  ParseExtrasProperty(&(camera->extras), o);
+
+  return true;
+}
+
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
                               unsigned int length, const std::string &base_dir,
                               unsigned int check_sections) {
@@ -2177,6 +2335,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   model->bufferViews.clear();
   model->accessors.clear();
   model->meshes.clear();
+  model->cameras.clear();
   model->nodes.clear();
   model->extensionsUsed.clear();
   model->extensionsRequired.clear();
@@ -2447,6 +2606,22 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
       }
 
       model->samplers.push_back(sampler);
+    }
+  }
+
+  // 14. Parse Camera
+  if (v.contains("cameras") && v.get("cameras").is<picojson::array>()) {
+    const picojson::array &root = v.get("cameras").get<picojson::array>();
+
+    picojson::array::const_iterator it(root.begin());
+    picojson::array::const_iterator itEnd(root.end());
+    for (; it != itEnd; ++it) {
+      Camera camera;
+      if (!ParseCamera(&camera, err, it->get<picojson::object>())) {
+        return false;
+      }
+
+      model->cameras.push_back(camera);
     }
   }
   return true;
@@ -2920,6 +3095,10 @@ static void SerializeGltfNode(Node &node, picojson::object &o) {
     SerializeNumberProperty<int>("skin", node.skin, o);
   }
 
+  if (node.camera != -1) {
+    SerializeNumberProperty<int>("camera", node.camera, o);
+  }
+
   SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
 }
@@ -2929,6 +3108,46 @@ static void SerializeGltfSampler(Sampler &sampler, picojson::object &o) {
   SerializeNumberProperty("minFilter", sampler.minFilter, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
+}
+
+static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
+                                            picojson::object &o) {
+  SerializeNumberProperty("zfar", camera.zfar, o);
+  SerializeNumberProperty("znear", camera.znear, o);
+  SerializeNumberProperty("xmag", camera.xmag, o);
+  SerializeNumberProperty("ymag", camera.ymag, o);
+}
+
+static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
+                                           picojson::object &o) {
+  SerializeNumberProperty("zfar", camera.zfar, o);
+  SerializeNumberProperty("znear", camera.znear, o);
+  if (camera.aspectRatio > 0) {
+    SerializeNumberProperty("aspectRatio", camera.aspectRatio, o);
+  }
+
+  if (camera.yfov > 0) {
+    SerializeNumberProperty("yfov", camera.yfov, o);
+  }
+}
+
+static void SerializeGltfCamera(const Camera &camera, picojson::object &o) {
+  SerializeStringProperty("type", camera.type, o);
+  if (!camera.name.empty()) {
+    SerializeStringProperty("name", camera.type, o);
+  }
+
+  if (camera.type.compare("orthographic") == 0) {
+    picojson::object orthographic;
+    SerializeGltfOrthographicCamera(camera.orthographic, orthographic);
+    o.insert(json_object_pair("orthographic", picojson::value(orthographic)));
+  } else if (camera.type.compare("perspective") == 0) {
+    picojson::object perspective;
+    SerializeGltfPerspectiveCamera(camera.perspective, perspective);
+    o.insert(json_object_pair("perspective", picojson::value(perspective)));
+  } else {
+    // ???
+  }
 }
 
 static void SerializeGltfScene(Scene &scene, picojson::object &o) {
@@ -3116,6 +3335,15 @@ bool TinyGLTF::WriteGltfSceneToFile(
     samplers.push_back(picojson::value(sampler));
   }
   output.insert(json_object_pair("samplers", picojson::value(samplers)));
+
+  // CAMERAS
+  picojson::array cameras;
+  for (unsigned int i = 0; i < model->cameras.size(); ++i) {
+    picojson::object camera;
+    SerializeGltfCamera(model->cameras[i], camera);
+    cameras.push_back(picojson::value(camera));
+  }
+  output.insert(json_object_pair("cameras", picojson::value(cameras)));
 
   WriteGltfFile(filename, picojson::value(output).serialize());
   return true;

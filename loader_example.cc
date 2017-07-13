@@ -498,6 +498,38 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
     }
   }
+
+  {
+    std::cout << "cameras(items=" << model.cameras.size() << ")" << std::endl;
+
+    for (size_t i = 0; i < model.cameras.size(); i++) {
+      const tinygltf::Camera &camera = model.cameras[i];
+      std::cout << Indent(1) << "name (id)    : " << camera.name << std::endl;
+      std::cout << Indent(1) << "type         : " << camera.type << std::endl;
+
+      if (camera.type.compare("perspective") == 0) {
+        std::cout << Indent(2)
+                  << "aspectRatio   : " << camera.perspective.aspectRatio
+                  << std::endl;
+        std::cout << Indent(2) << "yfov          : " << camera.perspective.yfov
+                  << std::endl;
+        std::cout << Indent(2) << "zfar          : " << camera.perspective.zfar
+                  << std::endl;
+        std::cout << Indent(2) << "znear         : " << camera.perspective.znear
+                  << std::endl;
+      } else if (camera.type.compare("orthographic") == 0) {
+        std::cout << Indent(2) << "xmag          : " << camera.orthographic.xmag
+                  << std::endl;
+        std::cout << Indent(2) << "ymag          : " << camera.orthographic.ymag
+                  << std::endl;
+        std::cout << Indent(2) << "zfar          : " << camera.orthographic.zfar
+                  << std::endl;
+        std::cout << Indent(2)
+                  << "znear         : " << camera.orthographic.znear
+                  << std::endl;
+      }
+    }
+  }
 }
 
 int main(int argc, char **argv) {
