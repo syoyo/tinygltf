@@ -2,6 +2,12 @@
 
 `TinyGLTF` is a header only C++ glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
+## Status
+
+Work in process(`devel` branch). Very near to release, but need more tests and examples.
+
+## Builds
+
 [![Build Status](https://travis-ci.org/syoyo/tinygltf.svg?branch=master)](https://travis-ci.org/syoyo/tinygltf)
 
 [![Build status](https://ci.appveyor.com/api/projects/status/warngenu9wjjhlm8?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltf)
