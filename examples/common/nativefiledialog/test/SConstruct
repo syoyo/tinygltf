@@ -1,0 +1,70 @@
+#
+# Native file dialog
+#
+# Build tests
+
+target_arch=str(Platform())
+debug = int(ARGUMENTS.get( 'debug', 0 ))
+
+files = {'test_opendialog':         ['test_opendialog.c'],
+         'test_opendialogmultiple': ['test_opendialogmultiple.c'],
+         'test_savedialog':         ['test_savedialog.c']}
+
+test_env = Environment()
+
+
+# Windows runtime library types
+win_rtl = {'debug': '/MDd',     
+           'release': '/MD'}    
+
+
+def set_debug(env):
+    if target_arch == 'win32':
+        env.Append( CFLAGS=['/Z7',       # obj contains full symbols
+                            win_rtl['debug'] ] )
+    else:
+        env.Append( CFLAGS=['-g'] )
+
+
+def set_release(env):
+    if target_arch == 'win32':
+        env.Append( CFLAGS=[win_rtl['release'],
+                            '/O2', 
+                            ])
+    else:
+        env.Append( CFLAGS=['-O3'] )
+
+
+def get_lib_name(base, is_debug):
+    if is_debug:
+        return base + '_d'
+    else:
+        return base
+
+
+if debug:
+    set_debug(test_env)
+else:
+    set_release(test_env)
+
+test_env.Append( CPPPATH=['../src/include'], # API header path only, no internals allowed
+                 LIBPATH=['../src'],
+                 LIBS=get_lib_name('nfd', debug) )
+
+
+# Cocoa OS X builds
+if target_arch == 'darwin':
+    test_env.Append( FRAMEWORKS='AppKit' )
+    test_env.CC='clang -fcolor-diagnostics'
+
+# Linux GTK+ 3 builds
+elif target_arch == 'posix':
+    test_env.ParseConfig( 'pkg-config --cflags --libs gtk+-3.0' )
+
+elif target_arch == 'win32':
+    test_env.Append( 
+        LINKFLAGS=['/NODEFAULTLIB:LIBCMT'])
+
+for codebase in files:
+    output_name = get_lib_name(codebase, debug)
+    test_env.Program( output_name, files[codebase] )
