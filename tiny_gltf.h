@@ -2401,6 +2401,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`buffers' does not contain an JSON object.";
+        }
+        return false;
+      }
       Buffer buffer;
       if (!ParseBuffer(&buffer, err, it->get<picojson::object>(), base_dir,
                        is_binary_, bin_data_, bin_size_)) {
@@ -2418,6 +2424,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`bufferViews' does not contain an JSON object.";
+        }
+        return false;
+      }
       BufferView bufferView;
       if (!ParseBufferView(&bufferView, err, it->get<picojson::object>())) {
         return false;
@@ -2434,6 +2446,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`accessors' does not contain an JSON object.";
+        }
+        return false;
+      }
       Accessor accessor;
       if (!ParseAccessor(&accessor, err, it->get<picojson::object>())) {
         return false;
@@ -2450,6 +2468,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`meshes' does not contain an JSON object.";
+        }
+        return false;
+      }
       Mesh mesh;
       if (!ParseMesh(&mesh, err, it->get<picojson::object>())) {
         return false;
@@ -2466,6 +2490,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`nodes' does not contain an JSON object.";
+        }
+        return false;
+      }
       Node node;
       if (!ParseNode(&node, err, it->get<picojson::object>())) {
         return false;
@@ -2484,7 +2514,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     for (; it != itEnd; it++) {
       if (!(it->is<picojson::object>())) {
         if (err) {
-          (*err) += "`scenes' does not contain an object.";
+          (*err) += "`scenes' does not contain an JSON object.";
         }
         return false;
       }
@@ -2519,6 +2549,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`materials' does not contain an JSON object.";
+        }
+        return false;
+      }
       picojson::object jsonMaterial = it->get<picojson::object>();
 
       Material material;
@@ -2539,6 +2575,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`images' does not contain an JSON object.";
+        }
+        return false;
+      }
       Image image;
       if (!ParseImage(&image, err, it->get<picojson::object>(), base_dir,
                       is_binary_, bin_data_, bin_size_)) {
@@ -2580,6 +2622,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`textures' does not contain an JSON object.";
+        }
+        return false;
+      }
       Texture texture;
       if (!ParseTexture(&texture, err, it->get<picojson::object>(), base_dir)) {
         return false;
@@ -2596,6 +2644,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`animations' does not contain an JSON object.";
+        }
+        return false;
+      }
       Animation animation;
       if (!ParseAnimation(&animation, err, it->get<picojson::object>())) {
         return false;
@@ -2612,6 +2666,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`skins' does not contain an JSON object.";
+        }
+        return false;
+      }
       Skin skin;
       if (!ParseSkin(&skin, err, it->get<picojson::object>())) {
         return false;
@@ -2628,10 +2688,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
-      Sampler sampler;
-      if (!(it->is<picojson::object>())) {
-        continue;
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`samplers' does not contain an JSON object.";
+        }
+        return false;
       }
+      Sampler sampler;
       if (!ParseSampler(&sampler, err, it->get<picojson::object>())) {
         return false;
       }
@@ -2647,6 +2710,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
+      if (!it->is<picojson::object>()) {
+        if (err) {
+          (*err) += "`cameras' does not contain an JSON object.";
+        }
+        return false;
+      }
       Camera camera;
       if (!ParseCamera(&camera, err, it->get<picojson::object>())) {
         return false;
