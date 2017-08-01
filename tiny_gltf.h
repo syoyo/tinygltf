@@ -2278,7 +2278,6 @@ static bool ParseCamera(Camera *camera, std::string *err,
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
                               unsigned int length, const std::string &base_dir,
                               unsigned int check_sections) {
-
   if (length < 4) {
     if (err) {
       (*err) = "JSON string too short.\n";
@@ -2286,12 +2285,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
+  // TODO(syoyo): Add feature not using exception handling.
   picojson::value v;
-  std::string perr = picojson::parse(v, str, str + length);
+  try {
+    std::string perr = picojson::parse(v, str, str + length);
 
-  if (!perr.empty()) {
+    if (!perr.empty()) {
+      if (err) {
+        (*err) = "JSON parsing error: " + perr;
+      }
+      return false;
+    }
+  } catch (std::exception e) {
     if (err) {
-      (*err) = "JSON parsing error: " + perr;
+      (*err) = e.what();
     }
     return false;
   }
@@ -2303,7 +2310,6 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     }
     return false;
   }
-
 
   // scene is not mandatory.
   // FIXME Maybe a better way to handle it than removing the code
