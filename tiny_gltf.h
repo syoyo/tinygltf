@@ -944,6 +944,11 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
     // Looks reading directory, not a file.
     return false;
   }
+
+  if (sz == 0) {
+    // Invalid file size.
+    return false;
+  }
   std::vector<unsigned char> buf(sz);
 
   f.seekg(0, f.beg);
@@ -2273,6 +2278,14 @@ static bool ParseCamera(Camera *camera, std::string *err,
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
                               unsigned int length, const std::string &base_dir,
                               unsigned int check_sections) {
+
+  if (length < 4) {
+    if (err) {
+      (*err) = "JSON string too short.\n";
+    }
+    return false;
+  }
+
   picojson::value v;
   std::string perr = picojson::parse(v, str, str + length);
 
@@ -2282,6 +2295,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     }
     return false;
   }
+
+  if (!v.is<picojson::object>()) {
+    // root is not an object.
+    if (err) {
+      (*err) = "Root element is not a JSON object\n";
+    }
+    return false;
+  }
+
 
   // scene is not mandatory.
   // FIXME Maybe a better way to handle it than removing the code
@@ -2601,6 +2623,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
       Sampler sampler;
+      if (!(it->is<picojson::object>())) {
+        continue;
+      }
       if (!ParseSampler(&sampler, err, it->get<picojson::object>())) {
         return false;
       }
