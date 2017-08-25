@@ -923,7 +923,7 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   paths.push_back(".");
 
   std::string filepath = FindFile(paths, filename);
-  if (filepath.empty()) {
+  if (filepath.empty() || filename.empty()) {
     if (err) {
       (*err) += "File not found : " + filename + "\n";
     }
