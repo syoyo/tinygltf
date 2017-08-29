@@ -1725,7 +1725,7 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
   accessor->count = static_cast<size_t>(count);
   accessor->bufferView = static_cast<int>(bufferView);
   accessor->byteOffset = static_cast<size_t>(byteOffset);
-
+  accessor->normalized = normalized;
   {
     int comp = static_cast<int>(componentType);
     if (comp >= TINYGLTF_COMPONENT_TYPE_BYTE &&
