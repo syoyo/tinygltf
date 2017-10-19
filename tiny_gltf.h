@@ -1307,12 +1307,16 @@ static bool ParseStringProperty(
 
 static bool ParseStringIntProperty(std::map<std::string, int> *ret,
                                    std::string *err, const picojson::object &o,
-                                   const std::string &property, bool required) {
+                                   const std::string &property, bool required, const std::string &parent = "") {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
-        (*err) += "'" + property + "' property is missing.\n";
+        if (!parent.empty()) {
+          (*err) += "'" + property + "' property is missing in " + parent + ".\n";
+        } else {
+          (*err) += "'" + property + "' property is missing.\n";
+        }
       }
     }
     return false;
@@ -1387,9 +1391,9 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
 
 static bool ParseAsset(Asset *asset, std::string *err,
                        const picojson::object &o) {
-  ParseStringProperty(&asset->version, err, o, "version", true);
-  ParseStringProperty(&asset->generator, err, o, "generator", false);
-  ParseStringProperty(&asset->minVersion, err, o, "minVersion", false);
+  ParseStringProperty(&asset->version, err, o, "version", true, "Asset");
+  ParseStringProperty(&asset->generator, err, o, "generator", false, "Asset");
+  ParseStringProperty(&asset->minVersion, err, o, "minVersion", false, "Asset");
 
   // Unity exporter version is added as extra here
   ParseExtrasProperty(&(asset->extras), o);
@@ -1440,7 +1444,7 @@ static bool ParseImage(Image *image, std::string *err,
       }
 
       double buffer_view = -1.0;
-      if (!ParseNumberProperty(&buffer_view, err, o, "bufferView", true)) {
+      if (!ParseNumberProperty(&buffer_view, err, o, "bufferView", true, "Image")) {
         return false;
       }
 
@@ -1478,7 +1482,7 @@ static bool ParseImage(Image *image, std::string *err,
 
       if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
         if (err) {
-          (*err) += "Failed to load external 'uri'. for image parameter\n";
+          (*err) += "Failed to load external 'uri' for image parameter\n";
         }
         // If the image cannot be loaded, keep uri as image->uri.
         return true;
@@ -1580,7 +1584,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
     if (IsDataURI(uri)) {
       if (!DecodeDataURI(&buffer->data, uri, bytes, true)) {
         if (err) {
-          (*err) += "Failed to decode 'uri' : " + uri + "\n";
+          (*err) += "Failed to decode 'uri' : " + uri + " in Buffer\n";
         }
         return false;
       }
@@ -1763,7 +1767,7 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   ParseNumberProperty(&indices, err, o, "indices", false);
   primitive->indices = static_cast<int>(indices);
   if (!ParseStringIntProperty(&primitive->attributes, err, o, "attributes",
-                              true)) {
+                              true, "Primitive")) {
     return false;
   }
 
@@ -1986,7 +1990,7 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
                                   const picojson::object &o) {
   double samplerIndex = -1.0;
   double targetIndex = -1.0;
-  if (!ParseNumberProperty(&samplerIndex, err, o, "sampler", true)) {
+  if (!ParseNumberProperty(&samplerIndex, err, o, "sampler", true, "AnimationChannel")) {
     if (err) {
       (*err) += "`sampler` field is missing in animation channels\n";
     }
@@ -2000,7 +2004,7 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
 
     if (!ParseNumberProperty(&targetIndex, err, target_object, "node", true)) {
       if (err) {
-        (*err) += "`id` field is missing in animation.channels.target\n";
+        (*err) += "`node` field is missing in animation.channels.target\n";
       }
       return false;
     }
