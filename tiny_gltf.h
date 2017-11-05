@@ -661,15 +661,9 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wreserved-id-macro"
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
 #pragma clang diagnostic ignored "-Wpadded"
-#ifdef __APPLE__
-#if __clang_major__ >= 8 && __clang_minor__ >= 1
+#if __has_warning("-Wcomma")
 #pragma clang diagnostic ignored "-Wcomma"
 #endif
-#else  // __APPLE__
-#if (__clang_major__ >= 4) || (__clang_major__ >= 3 && __clang_minor__ > 8)
-#pragma clang diagnostic ignored "-Wcomma"
-#endif
-#endif  // __APPLE__
 #endif
 
 #define PICOJSON_USE_INT64
@@ -680,7 +674,7 @@ class TinyGLTF {
 #endif
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #elif !defined(__ANDROID__)
 #include <wordexp.h>
 #endif
