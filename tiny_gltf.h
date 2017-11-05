@@ -30,7 +30,7 @@
 //
 // Tiny glTF loader is using following third party libraries:
 //
-//  - picojson: C++ JSON library.
+//  - jsonhpp: C++ JSON library.
 //  - base64: base64 decode/encode library.
 //  - stb_image: Image loading library.
 //
@@ -661,19 +661,16 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wreserved-id-macro"
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
 #pragma clang diagnostic ignored "-Wpadded"
-#ifdef __APPLE__
-#if __clang_major__ >= 8 && __clang_minor__ >= 1
+#pragma clang diagnostic ignored "-Wc++98-compat"
+#pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+#pragma clang diagnostic ignored "-Wswitch-enum"
+#pragma clang diagnostic ignored "-Wimplicit-fallthrough"
+#if __has_warning("-Wcomma")
 #pragma clang diagnostic ignored "-Wcomma"
 #endif
-#else  // __APPLE__
-#if (__clang_major__ >= 4) || (__clang_major__ >= 3 && __clang_minor__ > 8)
-#pragma clang diagnostic ignored "-Wcomma"
-#endif
-#endif  // __APPLE__
 #endif
 
-#define PICOJSON_USE_INT64
-#include "./picojson.h"
+#include "./json.hpp"
 #include "./stb_image.h"
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -692,6 +689,8 @@ class TinyGLTF {
 #define TINYGLTF_LITTLE_ENDIAN 1
 #endif
 #endif
+
+using nlohmann::json;
 
 namespace tinygltf {
 
@@ -978,7 +977,7 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
 static bool LoadImageData(Image *image, std::string *err, int req_width,
                           int req_height, const unsigned char *bytes,
                           int size) {
-  std::cout << "size " << size << std::endl;
+  //std::cout << "size " << size << std::endl;
 
   int w, h, comp;
   // if image cannot be decoded, ignore parsing and keep it by its path
@@ -1104,27 +1103,27 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   return true;
 }
 
-static void ParseObjectProperty(Value *ret, const picojson::object &o) {
+static void ParseObjectProperty(Value *ret, const json &o) {
   tinygltf::Value::Object vo;
-  picojson::object::const_iterator it(o.begin());
-  picojson::object::const_iterator itEnd(o.end());
+  json::const_iterator it(o.begin());
+  json::const_iterator itEnd(o.end());
 
   for (; it != itEnd; it++) {
-    picojson::value v = it->second;
+    json v = it.value();
 
-    if (v.is<bool>()) {
-      vo[it->first] = tinygltf::Value(v.get<bool>());
-    } else if (v.is<double>()) {
-      vo[it->first] = tinygltf::Value(v.get<double>());
-    } else if (v.is<int64_t>()) {
-      vo[it->first] =
+    if (v.is_boolean()) {
+      vo[it.key()] = tinygltf::Value(v.get<bool>());
+    } else if (v.is_number()) {
+      vo[it.key()] = tinygltf::Value(v.get<double>());
+    } else if (v.is_number_integer()) {
+      vo[it.key()] =
           tinygltf::Value(static_cast<int>(v.get<int64_t>()));  // truncate
-    } else if (v.is<std::string>()) {
-      vo[it->first] = tinygltf::Value(v.get<std::string>());
-    } else if (v.is<picojson::object>()) {
+    } else if (v.is_string()) {
+      vo[it.key()] = tinygltf::Value(v.get<std::string>());
+    } else if (v.is_object()) {
       tinygltf::Value child_value;
-      ParseObjectProperty(&child_value, v.get<picojson::object>());
-      vo[it->first] = child_value;
+      ParseObjectProperty(&child_value, v);
+      vo[it.key()] = child_value;
     }
     // TODO(syoyo) binary, array
   }
@@ -1132,28 +1131,28 @@ static void ParseObjectProperty(Value *ret, const picojson::object &o) {
   (*ret) = tinygltf::Value(vo);
 }
 
-static bool ParseExtrasProperty(Value *ret, const picojson::object &o) {
-  picojson::object::const_iterator it = o.find("extras");
+static bool ParseExtrasProperty(Value *ret, const json &o) {
+  json::const_iterator it = o.find("extras");
   if (it == o.end()) {
     return false;
   }
 
   // FIXME(syoyo) Currently we only support `object` type for extras property.
-  if (!it->second.is<picojson::object>()) {
+  if (!it.value().is_object()) {
     return false;
   }
 
-  ParseObjectProperty(ret, it->second.get<picojson::object>());
+  ParseObjectProperty(ret, it.value());
 
   return true;
 }
 
 static bool ParseBooleanProperty(bool *ret, std::string *err,
-                                 const picojson::object &o,
+                                 const json &o,
                                  const std::string &property,
                                  const bool required,
                                  const std::string &parent_node = "") {
-  picojson::object::const_iterator it = o.find(property);
+  json::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
@@ -1184,11 +1183,11 @@ static bool ParseBooleanProperty(bool *ret, std::string *err,
 }
 
 static bool ParseNumberProperty(double *ret, std::string *err,
-                                const picojson::object &o,
+                                const json &o,
                                 const std::string &property,
                                 const bool required,
                                 const std::string &parent_node = "") {
-  picojson::object::const_iterator it = o.find(property);
+  json::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
@@ -1219,10 +1218,10 @@ static bool ParseNumberProperty(double *ret, std::string *err,
 }
 
 static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
-                                     const picojson::object &o,
+                                     const json &o,
                                      const std::string &property, bool required,
                                      const std::string &parent_node = "") {
-  picojson::object::const_iterator it = o.find(property);
+  json::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
@@ -1236,7 +1235,7 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
     return false;
   }
 
-  if (!it->second.is<picojson::array>()) {
+  if (!it->second.is<json::array>()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not an array";
@@ -1250,7 +1249,7 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
   }
 
   ret->clear();
-  const picojson::array &arr = it->second.get<picojson::array>();
+  const json::array &arr = it->second.get<json::array>();
   for (size_t i = 0; i < arr.size(); i++) {
     if (!arr[i].is<double>()) {
       if (required) {
@@ -1271,10 +1270,10 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
 }
 
 static bool ParseStringProperty(
-    std::string *ret, std::string *err, const picojson::object &o,
+    std::string *ret, std::string *err, const json &o,
     const std::string &property, bool required,
     const std::string &parent_node = std::string()) {
-  picojson::object::const_iterator it = o.find(property);
+  json::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
@@ -1306,9 +1305,9 @@ static bool ParseStringProperty(
 }
 
 static bool ParseStringIntProperty(std::map<std::string, int> *ret,
-                                   std::string *err, const picojson::object &o,
+                                   std::string *err, const json &o,
                                    const std::string &property, bool required, const std::string &parent = "") {
-  picojson::object::const_iterator it = o.find(property);
+  json::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
@@ -1323,7 +1322,7 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   }
 
   // Make sure we are dealing with an object / dictionary.
-  if (!it->second.is<picojson::object>()) {
+  if (!it->second.is<json>()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not an object.\n";
@@ -1333,10 +1332,10 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   }
 
   ret->clear();
-  const picojson::object &dict = it->second.get<picojson::object>();
+  const json &dict = it->second.get<json>();
 
-  picojson::object::const_iterator dictIt(dict.begin());
-  picojson::object::const_iterator dictItEnd(dict.end());
+  json::const_iterator dictIt(dict.begin());
+  json::const_iterator dictItEnd(dict.end());
 
   for (; dictIt != dictItEnd; ++dictIt) {
     if (!dictIt->second.is<double>()) {
@@ -1355,9 +1354,9 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
 }
 
 static bool ParseJSONProperty(std::map<std::string, double> *ret,
-                              std::string *err, const picojson::object &o,
+                              std::string *err, const json &o,
                               const std::string &property, bool required) {
-  picojson::object::const_iterator it = o.find(property);
+  json::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
       if (err) {
@@ -1367,7 +1366,7 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
     return false;
   }
 
-  if (!it->second.is<picojson::object>()) {
+  if (!it->second.is<json>()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a JSON object.\n";
@@ -1377,9 +1376,9 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
   }
 
   ret->clear();
-  const picojson::object &obj = it->second.get<picojson::object>();
-  picojson::object::const_iterator it2(obj.begin());
-  picojson::object::const_iterator itEnd(obj.end());
+  const json &obj = it->second.get<json>();
+  json::const_iterator it2(obj.begin());
+  json::const_iterator itEnd(obj.end());
   for (; it2 != itEnd; it2++) {
     if (it2->second.is<double>())
       ret->insert(std::pair<std::string, double>(it2->first,
@@ -1390,7 +1389,7 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
 }
 
 static bool ParseAsset(Asset *asset, std::string *err,
-                       const picojson::object &o) {
+                       const json &o) {
   ParseStringProperty(&asset->version, err, o, "version", true, "Asset");
   ParseStringProperty(&asset->generator, err, o, "generator", false, "Asset");
   ParseStringProperty(&asset->minVersion, err, o, "minVersion", false, "Asset");
@@ -1402,7 +1401,7 @@ static bool ParseAsset(Asset *asset, std::string *err,
 }
 
 static bool ParseImage(Image *image, std::string *err,
-                       const picojson::object &o, const std::string &basedir,
+                       const json &o, const std::string &basedir,
                        bool is_binary, const unsigned char *bin_data,
                        size_t bin_size) {
   // A glTF image must either reference a bufferView or an image uri
@@ -1501,7 +1500,7 @@ static bool ParseImage(Image *image, std::string *err,
 }
 
 static bool ParseTexture(Texture *texture, std::string *err,
-                         const picojson::object &o,
+                         const json &o,
                          const std::string &basedir) {
   (void)basedir;
   double sampler = -1.0;
@@ -1517,7 +1516,7 @@ static bool ParseTexture(Texture *texture, std::string *err,
 }
 
 static bool ParseBuffer(Buffer *buffer, std::string *err,
-                        const picojson::object &o, const std::string &basedir,
+                        const json &o, const std::string &basedir,
                         bool is_binary = false,
                         const unsigned char *bin_data = NULL,
                         size_t bin_size = 0) {
@@ -1537,7 +1536,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
     }
   }
 
-  picojson::object::const_iterator type = o.find("type");
+  json::const_iterator type = o.find("type");
   if (type != o.end()) {
     if (type->second.is<std::string>()) {
       const std::string &ty = (type->second).get<std::string>();
@@ -1602,7 +1601,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 }
 
 static bool ParseBufferView(BufferView *bufferView, std::string *err,
-                            const picojson::object &o) {
+                            const json &o) {
   double buffer = -1.0;
   if (!ParseNumberProperty(&buffer, err, o, "buffer", true, "BufferView")) {
     return false;
@@ -1664,7 +1663,7 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
 }
 
 static bool ParseAccessor(Accessor *accessor, std::string *err,
-                          const picojson::object &o) {
+                          const json &o) {
   double bufferView = -1.0;
   if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true,
                            "Accessor")) {
@@ -1752,7 +1751,7 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 }
 
 static bool ParsePrimitive(Primitive *primitive, std::string *err,
-                           const picojson::object &o) {
+                           const json &o) {
   double material = -1.0;
   ParseNumberProperty(&material, err, o, "material", false);
   primitive->material = static_cast<int>(material);
@@ -1772,17 +1771,17 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   }
 
   // Look for morph targets
-  picojson::object::const_iterator targetsObject = o.find("targets");
+  json::const_iterator targetsObject = o.find("targets");
   if ((targetsObject != o.end()) &&
-      (targetsObject->second).is<picojson::array>()) {
-    const picojson::array &targetArray =
-        (targetsObject->second).get<picojson::array>();
+      (targetsObject->second).is<json::array>()) {
+    const json::array &targetArray =
+        (targetsObject->second).get<json::array>();
     for (size_t i = 0; i < targetArray.size(); i++) {
       std::map<std::string, int> targetAttribues;
 
-      const picojson::object &dict = targetArray[i].get<picojson::object>();
-      picojson::object::const_iterator dictIt(dict.begin());
-      picojson::object::const_iterator dictItEnd(dict.end());
+      const json &dict = targetArray[i].get<json>();
+      json::const_iterator dictIt(dict.begin());
+      json::const_iterator dictItEnd(dict.end());
 
       for (; dictIt != dictItEnd; ++dictIt) {
         targetAttribues[dictIt->first] =
@@ -1797,18 +1796,18 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   return true;
 }
 
-static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
+static bool ParseMesh(Mesh *mesh, std::string *err, const json &o) {
   ParseStringProperty(&mesh->name, err, o, "name", false);
 
   mesh->primitives.clear();
-  picojson::object::const_iterator primObject = o.find("primitives");
-  if ((primObject != o.end()) && (primObject->second).is<picojson::array>()) {
-    const picojson::array &primArray =
-        (primObject->second).get<picojson::array>();
+  json::const_iterator primObject = o.find("primitives");
+  if ((primObject != o.end()) && (primObject->second).is<json::array>()) {
+    const json::array &primArray =
+        (primObject->second).get<json::array>();
     for (size_t i = 0; i < primArray.size(); i++) {
       Primitive primitive;
       if (ParsePrimitive(&primitive, err,
-                         primArray[i].get<picojson::object>())) {
+                         primArray[i].get<json>())) {
         // Only add the primitive if the parsing succeeds.
         mesh->primitives.push_back(primitive);
       }
@@ -1816,17 +1815,17 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
   }
 
   // Look for morph targets
-  picojson::object::const_iterator targetsObject = o.find("targets");
+  json::const_iterator targetsObject = o.find("targets");
   if ((targetsObject != o.end()) &&
-      (targetsObject->second).is<picojson::array>()) {
-    const picojson::array &targetArray =
-        (targetsObject->second).get<picojson::array>();
+      (targetsObject->second).is<json::array>()) {
+    const json::array &targetArray =
+        (targetsObject->second).get<json::array>();
     for (size_t i = 0; i < targetArray.size(); i++) {
       std::map<std::string, int> targetAttribues;
 
-      const picojson::object &dict = targetArray[i].get<picojson::object>();
-      picojson::object::const_iterator dictIt(dict.begin());
-      picojson::object::const_iterator dictItEnd(dict.end());
+      const json &dict = targetArray[i].get<json>();
+      json::const_iterator dictIt(dict.begin());
+      json::const_iterator dictItEnd(dict.end());
 
       for (; dictIt != dictItEnd; ++dictIt) {
         targetAttribues[dictIt->first] =
@@ -1844,7 +1843,7 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
   return true;
 }
 
-static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
+static bool ParseNode(Node *node, std::string *err, const json &o) {
   ParseStringProperty(&node->name, err, o, "name", false);
 
   double skin = -1.0;
@@ -1867,11 +1866,11 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
   node->mesh = int(mesh);
 
   node->children.clear();
-  picojson::object::const_iterator childrenObject = o.find("children");
+  json::const_iterator childrenObject = o.find("children");
   if ((childrenObject != o.end()) &&
-      (childrenObject->second).is<picojson::array>()) {
-    const picojson::array &childrenArray =
-        (childrenObject->second).get<picojson::array>();
+      (childrenObject->second).is<json::array>()) {
+    const json::array &childrenArray =
+        (childrenObject->second).get<json::array>();
     for (size_t i = 0; i < childrenArray.size(); i++) {
       if (!childrenArray[i].is<double>()) {
         if (err) {
@@ -1891,7 +1890,7 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
 }
 
 static bool ParseParameterProperty(Parameter *param, std::string *err,
-                                   const picojson::object &o,
+                                   const json &o,
                                    const std::string &prop, bool required) {
   double num_val;
 
@@ -1926,22 +1925,22 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 }
 
 static bool ParseMaterial(Material *material, std::string *err,
-                          const picojson::object &o) {
+                          const json &o) {
   material->values.clear();
   material->extPBRValues.clear();
   material->additionalValues.clear();
 
-  picojson::object::const_iterator it(o.begin());
-  picojson::object::const_iterator itEnd(o.end());
+  json::const_iterator it(o.begin());
+  json::const_iterator itEnd(o.end());
 
   for (; it != itEnd; it++) {
-    if (it->first == "pbrMetallicRoughness") {
-      if ((it->second).is<picojson::object>()) {
-        const picojson::object &values_object =
-            (it->second).get<picojson::object>();
+    if (it.key() == "pbrMetallicRoughness") {
+      if ((it->second).is<json>()) {
+        const json &values_object =
+            (it->second).get<json>();
 
-        picojson::object::const_iterator itVal(values_object.begin());
-        picojson::object::const_iterator itValEnd(values_object.end());
+        json::const_iterator itVal(values_object.begin());
+        json::const_iterator itValEnd(values_object.end());
 
         for (; itVal != itValEnd; itVal++) {
           Parameter param;
@@ -1951,19 +1950,19 @@ static bool ParseMaterial(Material *material, std::string *err,
           }
         }
       }
-    } else if (it->first == "extensions") {
-      if ((it->second).is<picojson::object>()) {
-        const picojson::object &extension =
-            (it->second).get<picojson::object>();
+    } else if (it.key() == "extensions") {
+      if ((it->second).is<json>()) {
+        const json &extension =
+            (it->second).get<json>();
 
-        picojson::object::const_iterator extIt = extension.begin();
-        if (!extIt->second.is<picojson::object>()) continue;
+        json::const_iterator extIt = extension.begin();
+        if (!extIt->second.is<json>()) continue;
 
-        const picojson::object &values_object =
-            (extIt->second).get<picojson::object>();
+        const json &values_object =
+            (extIt->second).get<json>();
 
-        picojson::object::const_iterator itVal(values_object.begin());
-        picojson::object::const_iterator itValEnd(values_object.end());
+        json::const_iterator itVal(values_object.begin());
+        json::const_iterator itValEnd(values_object.end());
 
         for (; itVal != itValEnd; itVal++) {
           Parameter param;
@@ -1975,8 +1974,8 @@ static bool ParseMaterial(Material *material, std::string *err,
       }
     } else {
       Parameter param;
-      if (ParseParameterProperty(&param, err, o, it->first, false)) {
-        material->additionalValues[it->first] = param;
+      if (ParseParameterProperty(&param, err, o, it.key(), false)) {
+        material->additionalValues[it.key()] = param;
       }
     }
   }
@@ -1987,7 +1986,7 @@ static bool ParseMaterial(Material *material, std::string *err,
 }
 
 static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
-                                  const picojson::object &o) {
+                                  const json &o) {
   double samplerIndex = -1.0;
   double targetIndex = -1.0;
   if (!ParseNumberProperty(&samplerIndex, err, o, "sampler", true, "AnimationChannel")) {
@@ -1997,10 +1996,10 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
     return false;
   }
 
-  picojson::object::const_iterator targetIt = o.find("target");
-  if ((targetIt != o.end()) && (targetIt->second).is<picojson::object>()) {
-    const picojson::object &target_object =
-        (targetIt->second).get<picojson::object>();
+  json::const_iterator targetIt = o.find("target");
+  if ((targetIt != o.end()) && (targetIt->second).is<json>()) {
+    const json &target_object =
+        (targetIt->second).get<json>();
 
     if (!ParseNumberProperty(&targetIndex, err, target_object, "node", true)) {
       if (err) {
@@ -2027,16 +2026,16 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
 }
 
 static bool ParseAnimation(Animation *animation, std::string *err,
-                           const picojson::object &o) {
+                           const json &o) {
   {
-    picojson::object::const_iterator channelsIt = o.find("channels");
-    if ((channelsIt != o.end()) && (channelsIt->second).is<picojson::array>()) {
-      const picojson::array &channelArray =
-          (channelsIt->second).get<picojson::array>();
+    json::const_iterator channelsIt = o.find("channels");
+    if ((channelsIt != o.end()) && (channelsIt->second).is<json::array>()) {
+      const json::array &channelArray =
+          (channelsIt->second).get<json::array>();
       for (size_t i = 0; i < channelArray.size(); i++) {
         AnimationChannel channel;
         if (ParseAnimationChannel(&channel, err,
-                                  channelArray[i].get<picojson::object>())) {
+                                  channelArray[i].get<json>())) {
           // Only add the channel if the parsing succeeds.
           animation->channels.push_back(channel);
         }
@@ -2045,16 +2044,16 @@ static bool ParseAnimation(Animation *animation, std::string *err,
   }
 
   {
-    picojson::object::const_iterator samplerIt = o.find("samplers");
-    if ((samplerIt != o.end()) && (samplerIt->second).is<picojson::array>()) {
-      const picojson::array &sampler_array =
-          (samplerIt->second).get<picojson::array>();
+    json::const_iterator samplerIt = o.find("samplers");
+    if ((samplerIt != o.end()) && (samplerIt->second).is<json::array>()) {
+      const json::array &sampler_array =
+          (samplerIt->second).get<json::array>();
 
-      picojson::array::const_iterator it = sampler_array.begin();
-      picojson::array::const_iterator itEnd = sampler_array.end();
+      json::array::const_iterator it = sampler_array.begin();
+      json::array::const_iterator itEnd = sampler_array.end();
 
       for (; it != itEnd; it++) {
-        const picojson::object &s = it->get<picojson::object>();
+        const json &s = it->get<json>();
 
         AnimationSampler sampler;
         double inputIndex = -1.0;
@@ -2093,7 +2092,7 @@ static bool ParseAnimation(Animation *animation, std::string *err,
 }
 
 static bool ParseSampler(Sampler *sampler, std::string *err,
-                         const picojson::object &o) {
+                         const json &o) {
   ParseStringProperty(&sampler->name, err, o, "name", false);
 
   double minFilter =
@@ -2116,7 +2115,7 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
   return true;
 }
 
-static bool ParseSkin(Skin *skin, std::string *err, const picojson::object &o) {
+static bool ParseSkin(Skin *skin, std::string *err, const json &o) {
   ParseStringProperty(&skin->name, err, o, "name", false, "Skin");
 
   std::vector<double> joints;
@@ -2141,7 +2140,7 @@ static bool ParseSkin(Skin *skin, std::string *err, const picojson::object &o) {
 }
 
 static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
-                                   const picojson::object &o) {
+                                   const json &o) {
   double yfov = 0.0;
   if (!ParseNumberProperty(&yfov, err, o, "yfov", true, "OrthographicCamera")) {
     return false;
@@ -2174,7 +2173,7 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
 
 static bool ParseOrthographicCamera(OrthographicCamera *camera,
                                     std::string *err,
-                                    const picojson::object &o) {
+                                    const json &o) {
   double xmag = 0.0;
   if (!ParseNumberProperty(&xmag, err, o, "xmag", true, "OrthographicCamera")) {
     return false;
@@ -2209,7 +2208,7 @@ static bool ParseOrthographicCamera(OrthographicCamera *camera,
 }
 
 static bool ParseCamera(Camera *camera, std::string *err,
-                        const picojson::object &o) {
+                        const json &o) {
   if (!ParseStringProperty(&camera->type, err, o, "type", true, "Camera")) {
     return false;
   }
@@ -2224,8 +2223,8 @@ static bool ParseCamera(Camera *camera, std::string *err,
       return false;
     }
 
-    const picojson::value &v = o.find("orthographic")->second;
-    if (!v.is<picojson::object>()) {
+    const json::value &v = o.find("orthographic")->second;
+    if (!v.is<json>()) {
       if (err) {
         std::stringstream ss;
         ss << "\"orthographic\" is not a JSON object." << std::endl;
@@ -2235,7 +2234,7 @@ static bool ParseCamera(Camera *camera, std::string *err,
     }
 
     if (!ParseOrthographicCamera(&camera->orthographic, err,
-                                 v.get<picojson::object>())) {
+                                 v.get<json>())) {
       return false;
     }
   } else if (camera->type.compare("perspective") == 0) {
@@ -2248,8 +2247,8 @@ static bool ParseCamera(Camera *camera, std::string *err,
       return false;
     }
 
-    const picojson::value &v = o.find("perspective")->second;
-    if (!v.is<picojson::object>()) {
+    const json::value &v = o.find("perspective")->second;
+    if (!v.is<json>()) {
       if (err) {
         std::stringstream ss;
         ss << "\"perspective\" is not a JSON object." << std::endl;
@@ -2259,7 +2258,7 @@ static bool ParseCamera(Camera *camera, std::string *err,
     }
 
     if (!ParsePerspectiveCamera(&camera->perspective, err,
-                                v.get<picojson::object>())) {
+                                v.get<json>())) {
       return false;
     }
   } else {
@@ -2290,9 +2289,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // TODO(syoyo): Add feature not using exception handling.
-  picojson::value v;
+  json::value v;
   try {
-    std::string perr = picojson::parse(v, str, str + length);
+    std::string perr = json::parse(v, str, str + length);
 
     if (!perr.empty()) {
       if (err) {
@@ -2307,7 +2306,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  if (!v.is<picojson::object>()) {
+  if (!v.is<json>()) {
     // root is not an object.
     if (err) {
       (*err) = "Root element is not a JSON object\n";
@@ -2318,7 +2317,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   // scene is not mandatory.
   // FIXME Maybe a better way to handle it than removing the code
 
-  if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
+  if (v.contains("scenes") && v.get("scenes").is<json::array>()) {
     // OK
   } else if (check_sections & REQUIRE_SCENES) {
     if (err) {
@@ -2327,7 +2326,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  if (v.contains("nodes") && v.get("nodes").is<picojson::array>()) {
+  if (v.contains("nodes") && v.get("nodes").is<json::array>()) {
     // OK
   } else if (check_sections & REQUIRE_NODES) {
     if (err) {
@@ -2336,7 +2335,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  if (v.contains("accessors") && v.get("accessors").is<picojson::array>()) {
+  if (v.contains("accessors") && v.get("accessors").is<json::array>()) {
     // OK
   } else if (check_sections & REQUIRE_ACCESSORS) {
     if (err) {
@@ -2345,7 +2344,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  if (v.contains("buffers") && v.get("buffers").is<picojson::array>()) {
+  if (v.contains("buffers") && v.get("buffers").is<json::array>()) {
     // OK
   } else if (check_sections & REQUIRE_BUFFERS) {
     if (err) {
@@ -2354,7 +2353,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  if (v.contains("bufferViews") && v.get("bufferViews").is<picojson::array>()) {
+  if (v.contains("bufferViews") && v.get("bufferViews").is<json::array>()) {
     // OK
   } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
     if (err) {
@@ -2374,45 +2373,45 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   model->defaultScene = -1;
 
   // 0. Parse Asset
-  if (v.contains("asset") && v.get("asset").is<picojson::object>()) {
-    const picojson::object &root = v.get("asset").get<picojson::object>();
+  if (v.contains("asset") && v.get("asset").is<json>()) {
+    const json &root = v.get("asset").get<json>();
 
     ParseAsset(&model->asset, err, root);
   }
 
   // 0. Parse extensionUsed
   if (v.contains("extensionsUsed") &&
-      v.get("extensionsUsed").is<picojson::array>()) {
-    const picojson::array &root =
-        v.get("extensionsUsed").get<picojson::array>();
+      v.get("extensionsUsed").is<json::array>()) {
+    const json::array &root =
+        v.get("extensionsUsed").get<json::array>();
     for (unsigned int i = 0; i < root.size(); ++i) {
       model->extensionsUsed.push_back(root[i].get<std::string>());
     }
   }
   if (v.contains("extensionsRequired") &&
-      v.get("extensionsRequired").is<picojson::array>()) {
-    const picojson::array &root =
-        v.get("extensionsRequired").get<picojson::array>();
+      v.get("extensionsRequired").is<json::array>()) {
+    const json::array &root =
+        v.get("extensionsRequired").get<json::array>();
     for (unsigned int i = 0; i < root.size(); ++i) {
       model->extensionsRequired.push_back(root[i].get<std::string>());
     }
   }
 
   // 1. Parse Buffer
-  if (v.contains("buffers") && v.get("buffers").is<picojson::array>()) {
-    const picojson::array &root = v.get("buffers").get<picojson::array>();
+  if (v.contains("buffers") && v.get("buffers").is<json::array>()) {
+    const json::array &root = v.get("buffers").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`buffers' does not contain an JSON object.";
         }
         return false;
       }
       Buffer buffer;
-      if (!ParseBuffer(&buffer, err, it->get<picojson::object>(), base_dir,
+      if (!ParseBuffer(&buffer, err, it->get<json>(), base_dir,
                        is_binary_, bin_data_, bin_size_)) {
         return false;
       }
@@ -2422,20 +2421,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 2. Parse BufferView
-  if (v.contains("bufferViews") && v.get("bufferViews").is<picojson::array>()) {
-    const picojson::array &root = v.get("bufferViews").get<picojson::array>();
+  if (v.contains("bufferViews") && v.get("bufferViews").is<json::array>()) {
+    const json::array &root = v.get("bufferViews").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`bufferViews' does not contain an JSON object.";
         }
         return false;
       }
       BufferView bufferView;
-      if (!ParseBufferView(&bufferView, err, it->get<picojson::object>())) {
+      if (!ParseBufferView(&bufferView, err, it->get<json>())) {
         return false;
       }
 
@@ -2444,20 +2443,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 3. Parse Accessor
-  if (v.contains("accessors") && v.get("accessors").is<picojson::array>()) {
-    const picojson::array &root = v.get("accessors").get<picojson::array>();
+  if (v.contains("accessors") && v.get("accessors").is<json::array>()) {
+    const json::array &root = v.get("accessors").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`accessors' does not contain an JSON object.";
         }
         return false;
       }
       Accessor accessor;
-      if (!ParseAccessor(&accessor, err, it->get<picojson::object>())) {
+      if (!ParseAccessor(&accessor, err, it->get<json>())) {
         return false;
       }
 
@@ -2466,20 +2465,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 4. Parse Mesh
-  if (v.contains("meshes") && v.get("meshes").is<picojson::array>()) {
-    const picojson::array &root = v.get("meshes").get<picojson::array>();
+  if (v.contains("meshes") && v.get("meshes").is<json::array>()) {
+    const json::array &root = v.get("meshes").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`meshes' does not contain an JSON object.";
         }
         return false;
       }
       Mesh mesh;
-      if (!ParseMesh(&mesh, err, it->get<picojson::object>())) {
+      if (!ParseMesh(&mesh, err, it->get<json>())) {
         return false;
       }
 
@@ -2488,20 +2487,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 5. Parse Node
-  if (v.contains("nodes") && v.get("nodes").is<picojson::array>()) {
-    const picojson::array &root = v.get("nodes").get<picojson::array>();
+  if (v.contains("nodes") && v.get("nodes").is<json::array>()) {
+    const json::array &root = v.get("nodes").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`nodes' does not contain an JSON object.";
         }
         return false;
       }
       Node node;
-      if (!ParseNode(&node, err, it->get<picojson::object>())) {
+      if (!ParseNode(&node, err, it->get<json>())) {
         return false;
       }
 
@@ -2510,19 +2509,19 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 6. Parse scenes.
-  if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
-    const picojson::array &root = v.get("scenes").get<picojson::array>();
+  if (v.contains("scenes") && v.get("scenes").is<json::array>()) {
+    const json::array &root = v.get("scenes").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!(it->is<picojson::object>())) {
+      if (!(it->is<json>())) {
         if (err) {
           (*err) += "`scenes' does not contain an JSON object.";
         }
         return false;
       }
-      const picojson::object &o = it->get<picojson::object>();
+      const json &o = it->get<json>();
       std::vector<double> nodes;
       if (!ParseNumberArrayProperty(&nodes, err, o, "nodes", false)) {
         return false;
@@ -2548,18 +2547,18 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 8. Parse Material
-  if (v.contains("materials") && v.get("materials").is<picojson::array>()) {
-    const picojson::array &root = v.get("materials").get<picojson::array>();
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+  if (v.contains("materials") && v.get("materials").is<json::array>()) {
+    const json::array &root = v.get("materials").get<json::array>();
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`materials' does not contain an JSON object.";
         }
         return false;
       }
-      picojson::object jsonMaterial = it->get<picojson::object>();
+      json jsonMaterial = it->get<json>();
 
       Material material;
       ParseStringProperty(&material.name, err, jsonMaterial, "name", false);
@@ -2573,20 +2572,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 9. Parse Image
-  if (v.contains("images") && v.get("images").is<picojson::array>()) {
-    const picojson::array &root = v.get("images").get<picojson::array>();
+  if (v.contains("images") && v.get("images").is<json::array>()) {
+    const json::array &root = v.get("images").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`images' does not contain an JSON object.";
         }
         return false;
       }
       Image image;
-      if (!ParseImage(&image, err, it->get<picojson::object>(), base_dir,
+      if (!ParseImage(&image, err, it->get<json>(), base_dir,
                       is_binary_, bin_data_, bin_size_)) {
         return false;
       }
@@ -2620,20 +2619,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 10. Parse Texture
-  if (v.contains("textures") && v.get("textures").is<picojson::array>()) {
-    const picojson::array &root = v.get("textures").get<picojson::array>();
+  if (v.contains("textures") && v.get("textures").is<json::array>()) {
+    const json::array &root = v.get("textures").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`textures' does not contain an JSON object.";
         }
         return false;
       }
       Texture texture;
-      if (!ParseTexture(&texture, err, it->get<picojson::object>(), base_dir)) {
+      if (!ParseTexture(&texture, err, it->get<json>(), base_dir)) {
         return false;
       }
 
@@ -2642,20 +2641,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 11. Parse Animation
-  if (v.contains("animations") && v.get("animations").is<picojson::array>()) {
-    const picojson::array &root = v.get("animations").get<picojson::array>();
+  if (v.contains("animations") && v.get("animations").is<json::array>()) {
+    const json::array &root = v.get("animations").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`animations' does not contain an JSON object.";
         }
         return false;
       }
       Animation animation;
-      if (!ParseAnimation(&animation, err, it->get<picojson::object>())) {
+      if (!ParseAnimation(&animation, err, it->get<json>())) {
         return false;
       }
 
@@ -2664,20 +2663,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 12. Parse Skin
-  if (v.contains("skins") && v.get("skins").is<picojson::array>()) {
-    const picojson::array &root = v.get("skins").get<picojson::array>();
+  if (v.contains("skins") && v.get("skins").is<json::array>()) {
+    const json::array &root = v.get("skins").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`skins' does not contain an JSON object.";
         }
         return false;
       }
       Skin skin;
-      if (!ParseSkin(&skin, err, it->get<picojson::object>())) {
+      if (!ParseSkin(&skin, err, it->get<json>())) {
         return false;
       }
 
@@ -2686,20 +2685,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 13. Parse Sampler
-  if (v.contains("samplers") && v.get("samplers").is<picojson::array>()) {
-    const picojson::array &root = v.get("samplers").get<picojson::array>();
+  if (v.contains("samplers") && v.get("samplers").is<json::array>()) {
+    const json::array &root = v.get("samplers").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`samplers' does not contain an JSON object.";
         }
         return false;
       }
       Sampler sampler;
-      if (!ParseSampler(&sampler, err, it->get<picojson::object>())) {
+      if (!ParseSampler(&sampler, err, it->get<json>())) {
         return false;
       }
 
@@ -2708,20 +2707,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 14. Parse Camera
-  if (v.contains("cameras") && v.get("cameras").is<picojson::array>()) {
-    const picojson::array &root = v.get("cameras").get<picojson::array>();
+  if (v.contains("cameras") && v.get("cameras").is<json::array>()) {
+    const json::array &root = v.get("cameras").get<json::array>();
 
-    picojson::array::const_iterator it(root.begin());
-    picojson::array::const_iterator itEnd(root.end());
+    json::array::const_iterator it(root.begin());
+    json::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
-      if (!it->is<picojson::object>()) {
+      if (!it->is<json>()) {
         if (err) {
           (*err) += "`cameras' does not contain an JSON object.";
         }
         return false;
       }
       Camera camera;
-      if (!ParseCamera(&camera, err, it->get<picojson::object>())) {
+      if (!ParseCamera(&camera, err, it->get<json>())) {
         return false;
       }
 
@@ -2880,71 +2879,71 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 // GLTF Serialization
 ///////////////////////
 
-typedef std::pair<std::string, picojson::value> json_object_pair;
+typedef std::pair<std::string, json::value> json_object_pair;
 
 template <typename T>
 static void SerializeNumberProperty(const std::string &key, T number,
-                                    picojson::object &obj) {
+                                    json &obj) {
   obj.insert(
-      json_object_pair(key, picojson::value(static_cast<double>(number))));
+      json_object_pair(key, json::value(static_cast<double>(number))));
 }
 
 template <typename T>
 static void SerializeNumberArrayProperty(const std::string &key,
                                          const std::vector<T> &value,
-                                         picojson::object &obj) {
-  picojson::object o;
-  picojson::array vals;
+                                         json &obj) {
+  json o;
+  json::array vals;
 
   for (unsigned int i = 0; i < value.size(); ++i) {
-    vals.push_back(picojson::value(static_cast<double>(value[i])));
+    vals.push_back(json::value(static_cast<double>(value[i])));
   }
 
-  obj.insert(json_object_pair(key, picojson::value(vals)));
+  obj.insert(json_object_pair(key, json::value(vals)));
 }
 
 static void SerializeStringProperty(const std::string &key,
                                     const std::string &value,
-                                    picojson::object &obj) {
-  picojson::value strVal(value);
+                                    json &obj) {
+  json::value strVal(value);
   obj.insert(json_object_pair(key, strVal));
 }
 
 static void SerializeStringArrayProperty(const std::string &key,
                                          const std::vector<std::string> &value,
-                                         picojson::object &obj) {
-  picojson::object o;
-  picojson::array vals;
+                                         json &obj) {
+  json o;
+  json::array vals;
 
   for (unsigned int i = 0; i < value.size(); ++i) {
-    vals.push_back(picojson::value(value[i]));
+    vals.push_back(json::value(value[i]));
   }
 
-  obj.insert(json_object_pair(key, picojson::value(vals)));
+  obj.insert(json_object_pair(key, json::value(vals)));
 }
 
 static void SerializeValue(const std::string &key, const Value &value,
-                           picojson::object &obj) {
+                           json &obj) {
   if (value.IsArray()) {
-    picojson::array jsonValue;
+    json::array jsonValue;
     for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
       Value elementValue = value.Get(int(i));
       if (elementValue.IsString())
-        jsonValue.push_back(picojson::value(elementValue.Get<std::string>()));
+        jsonValue.push_back(json::value(elementValue.Get<std::string>()));
     }
-    obj.insert(json_object_pair(key, picojson::value(jsonValue)));
+    obj.insert(json_object_pair(key, json::value(jsonValue)));
   } else {
-    picojson::object jsonValue;
+    json jsonValue;
     std::vector<std::string> valueKeys;
     for (unsigned int i = 0; i < valueKeys.size(); ++i) {
       Value elementValue = value.Get(valueKeys[i]);
       if (elementValue.IsInt())
         jsonValue.insert(json_object_pair(
             valueKeys[i],
-            picojson::value(static_cast<double>(elementValue.Get<int>()))));
+            json::value(static_cast<double>(elementValue.Get<int>()))));
     }
 
-    obj.insert(json_object_pair(key, picojson::value(jsonValue)));
+    obj.insert(json_object_pair(key, json::value(jsonValue)));
   }
 }
 
@@ -2956,34 +2955,34 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
   output.close();
 }
 
-static void SerializeParameterMap(ParameterMap &param, picojson::object &o) {
+static void SerializeParameterMap(ParameterMap &param, json &o) {
   for (ParameterMap::iterator paramIt = param.begin(); paramIt != param.end();
        ++paramIt) {
     if (paramIt->second.number_array.size()) {
       SerializeNumberArrayProperty<double>(paramIt->first,
                                            paramIt->second.number_array, o);
     } else if (paramIt->second.json_double_value.size()) {
-      picojson::object json_double_value;
+      json json_double_value;
 
       for (std::map<std::string, double>::iterator it =
                paramIt->second.json_double_value.begin();
            it != paramIt->second.json_double_value.end(); ++it) {
         json_double_value.insert(
-            json_object_pair(it->first, picojson::value(it->second)));
+            json_object_pair(it.key(), json::value(it->second)));
       }
 
       o.insert(
-          json_object_pair(paramIt->first, picojson::value(json_double_value)));
+          json_object_pair(paramIt->first, json::value(json_double_value)));
     } else if (!paramIt->second.string_value.empty()) {
       SerializeStringProperty(paramIt->first, paramIt->second.string_value, o);
     } else {
       o.insert(json_object_pair(paramIt->first,
-                                picojson::value(paramIt->second.bool_value)));
+                                json::value(paramIt->second.bool_value)));
     }
   }
 }
 
-static void SerializeGltfAccessor(Accessor &accessor, picojson::object &o) {
+static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
 
   if (accessor.byteOffset != 0.0)
@@ -3022,45 +3021,45 @@ static void SerializeGltfAccessor(Accessor &accessor, picojson::object &o) {
 }
 
 static void SerializeGltfAnimationChannel(AnimationChannel &channel,
-                                          picojson::object &o) {
+                                          json &o) {
   SerializeNumberProperty("sampler", channel.sampler, o);
-  picojson::object target;
+  json target;
   SerializeNumberProperty("node", channel.target_node, target);
   SerializeStringProperty("path", channel.target_path, target);
 
-  o.insert(json_object_pair("target", picojson::value(target)));
+  o.insert(json_object_pair("target", json::value(target)));
 }
 
 static void SerializeGltfAnimationSampler(AnimationSampler &sampler,
-                                          picojson::object &o) {
+                                          json &o) {
   SerializeNumberProperty("input", sampler.input, o);
   SerializeNumberProperty("output", sampler.output, o);
   SerializeStringProperty("interpolation", sampler.interpolation, o);
 }
 
-static void SerializeGltfAnimation(Animation &animation, picojson::object &o) {
+static void SerializeGltfAnimation(Animation &animation, json &o) {
   SerializeStringProperty("name", animation.name, o);
-  picojson::array channels;
+  json::array channels;
   for (unsigned int i = 0; i < animation.channels.size(); ++i) {
-    picojson::object channel;
+    json channel;
     AnimationChannel gltfChannel = animation.channels[i];
     SerializeGltfAnimationChannel(gltfChannel, channel);
-    channels.push_back(picojson::value(channel));
+    channels.push_back(json::value(channel));
   }
-  o.insert(json_object_pair("channels", picojson::value(channels)));
+  o.insert(json_object_pair("channels", json::value(channels)));
 
-  picojson::array samplers;
+  json::array samplers;
   for (unsigned int i = 0; i < animation.samplers.size(); ++i) {
-    picojson::object sampler;
+    json sampler;
     AnimationSampler gltfSampler = animation.samplers[i];
     SerializeGltfAnimationSampler(gltfSampler, sampler);
-    samplers.push_back(picojson::value(sampler));
+    samplers.push_back(json::value(sampler));
   }
 
-  o.insert(json_object_pair("samplers", picojson::value(samplers)));
+  o.insert(json_object_pair("samplers", json::value(samplers)));
 }
 
-static void SerializeGltfAsset(Asset &asset, picojson::object &o) {
+static void SerializeGltfAsset(Asset &asset, json &o) {
   if (!asset.generator.empty()) {
     SerializeStringProperty("generator", asset.generator, o);
   }
@@ -3074,7 +3073,7 @@ static void SerializeGltfAsset(Asset &asset, picojson::object &o) {
   }
 }
 
-static void SerializeGltfBuffer(Buffer &buffer, picojson::object &o,
+static void SerializeGltfBuffer(Buffer &buffer, json &o,
                                 const std::string &binFilePath) {
   SerializeGltfBufferData(buffer.data, binFilePath);
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
@@ -3084,7 +3083,7 @@ static void SerializeGltfBuffer(Buffer &buffer, picojson::object &o,
 }
 
 static void SerializeGltfBufferView(BufferView &bufferView,
-                                    picojson::object &o) {
+                                    json &o) {
   SerializeNumberProperty("buffer", bufferView.buffer, o);
   SerializeNumberProperty<size_t>("byteLength", bufferView.byteLength, o);
   SerializeNumberProperty<size_t>("byteStride", bufferView.byteStride, o);
@@ -3097,7 +3096,7 @@ static void SerializeGltfBufferView(BufferView &bufferView,
 }
 
 // Only external textures are serialized for now
-static void SerializeGltfImage(Image &image, picojson::object &o) {
+static void SerializeGltfImage(Image &image, json &o) {
   SerializeStringProperty("uri", image.uri, o);
 
   if (image.name.size()) {
@@ -3105,24 +3104,24 @@ static void SerializeGltfImage(Image &image, picojson::object &o) {
   }
 }
 
-static void SerializeGltfMaterial(Material &material, picojson::object &o) {
+static void SerializeGltfMaterial(Material &material, json &o) {
   if (material.extPBRValues.size()) {
     // Serialize PBR specular/glossiness material
-    picojson::object values;
+    json values;
     SerializeParameterMap(material.extPBRValues, values);
 
-    picojson::object extension;
-    o.insert(json_object_pair("extensions", picojson::value(extension)));
+    json extension;
+    o.insert(json_object_pair("extensions", json::value(extension)));
   }
 
   if (material.values.size()) {
-    picojson::object pbrMetallicRoughness;
+    json pbrMetallicRoughness;
     SerializeParameterMap(material.values, pbrMetallicRoughness);
     o.insert(json_object_pair("pbrMetallicRoughness",
-                              picojson::value(pbrMetallicRoughness)));
+                              json::value(pbrMetallicRoughness)));
   }
 
-  picojson::object additionalValues;
+  json additionalValues;
   SerializeParameterMap(material.additionalValues, o);
 
   if (material.name.size()) {
@@ -3130,11 +3129,11 @@ static void SerializeGltfMaterial(Material &material, picojson::object &o) {
   }
 }
 
-static void SerializeGltfMesh(Mesh &mesh, picojson::object &o) {
-  picojson::array primitives;
+static void SerializeGltfMesh(Mesh &mesh, json &o) {
+  json::array primitives;
   for (unsigned int i = 0; i < mesh.primitives.size(); ++i) {
-    picojson::object primitive;
-    picojson::object attributes;
+    json primitive;
+    json attributes;
     Primitive gltfPrimitive = mesh.primitives[i];
     for (std::map<std::string, int>::iterator attrIt =
              gltfPrimitive.attributes.begin();
@@ -3143,16 +3142,16 @@ static void SerializeGltfMesh(Mesh &mesh, picojson::object &o) {
     }
 
     primitive.insert(
-        json_object_pair("attributes", picojson::value(attributes)));
+        json_object_pair("attributes", json::value(attributes)));
     SerializeNumberProperty<int>("indices", gltfPrimitive.indices, primitive);
     SerializeNumberProperty<int>("material", gltfPrimitive.material, primitive);
     SerializeNumberProperty<int>("mode", gltfPrimitive.mode, primitive);
 
     // Morph targets
     if (gltfPrimitive.targets.size()) {
-      picojson::array targets;
+      json::array targets;
       for (unsigned int k = 0; k < gltfPrimitive.targets.size(); ++k) {
-        picojson::object targetAttributes;
+        json targetAttributes;
         std::map<std::string, int> targetData = gltfPrimitive.targets[k];
         for (std::map<std::string, int>::iterator attrIt = targetData.begin();
              attrIt != targetData.end(); ++attrIt) {
@@ -3160,15 +3159,15 @@ static void SerializeGltfMesh(Mesh &mesh, picojson::object &o) {
                                        targetAttributes);
         }
 
-        targets.push_back(picojson::value(targetAttributes));
+        targets.push_back(json::value(targetAttributes));
       }
-      primitive.insert(json_object_pair("targets", picojson::value(targets)));
+      primitive.insert(json_object_pair("targets", json::value(targets)));
     }
 
-    primitives.push_back(picojson::value(primitive));
+    primitives.push_back(json::value(primitive));
   }
 
-  o.insert(json_object_pair("primitives", picojson::value(primitives)));
+  o.insert(json_object_pair("primitives", json::value(primitives)));
   if (mesh.weights.size()) {
     SerializeNumberArrayProperty<double>("weights", mesh.weights, o);
   }
@@ -3178,7 +3177,7 @@ static void SerializeGltfMesh(Mesh &mesh, picojson::object &o) {
   }
 }
 
-static void SerializeGltfNode(Node &node, picojson::object &o) {
+static void SerializeGltfNode(Node &node, json &o) {
   if (node.translation.size() > 0) {
     SerializeNumberArrayProperty<double>("translation", node.translation, o);
   }
@@ -3207,7 +3206,7 @@ static void SerializeGltfNode(Node &node, picojson::object &o) {
   SerializeNumberArrayProperty<int>("children", node.children, o);
 }
 
-static void SerializeGltfSampler(Sampler &sampler, picojson::object &o) {
+static void SerializeGltfSampler(Sampler &sampler, json &o) {
   SerializeNumberProperty("magFilter", sampler.magFilter, o);
   SerializeNumberProperty("minFilter", sampler.minFilter, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
@@ -3215,7 +3214,7 @@ static void SerializeGltfSampler(Sampler &sampler, picojson::object &o) {
 }
 
 static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
-                                            picojson::object &o) {
+                                            json &o) {
   SerializeNumberProperty("zfar", camera.zfar, o);
   SerializeNumberProperty("znear", camera.znear, o);
   SerializeNumberProperty("xmag", camera.xmag, o);
@@ -3223,7 +3222,7 @@ static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
 }
 
 static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
-                                           picojson::object &o) {
+                                           json &o) {
   SerializeNumberProperty("zfar", camera.zfar, o);
   SerializeNumberProperty("znear", camera.znear, o);
   if (camera.aspectRatio > 0) {
@@ -3235,26 +3234,26 @@ static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
   }
 }
 
-static void SerializeGltfCamera(const Camera &camera, picojson::object &o) {
+static void SerializeGltfCamera(const Camera &camera, json &o) {
   SerializeStringProperty("type", camera.type, o);
   if (!camera.name.empty()) {
     SerializeStringProperty("name", camera.type, o);
   }
 
   if (camera.type.compare("orthographic") == 0) {
-    picojson::object orthographic;
+    json orthographic;
     SerializeGltfOrthographicCamera(camera.orthographic, orthographic);
-    o.insert(json_object_pair("orthographic", picojson::value(orthographic)));
+    o.insert(json_object_pair("orthographic", json::value(orthographic)));
   } else if (camera.type.compare("perspective") == 0) {
-    picojson::object perspective;
+    json perspective;
     SerializeGltfPerspectiveCamera(camera.perspective, perspective);
-    o.insert(json_object_pair("perspective", picojson::value(perspective)));
+    o.insert(json_object_pair("perspective", json::value(perspective)));
   } else {
     // ???
   }
 }
 
-static void SerializeGltfScene(Scene &scene, picojson::object &o) {
+static void SerializeGltfScene(Scene &scene, json &o) {
   SerializeNumberArrayProperty<int>("nodes", scene.nodes, o);
 
   if (scene.name.size()) {
@@ -3262,7 +3261,7 @@ static void SerializeGltfScene(Scene &scene, picojson::object &o) {
   }
 }
 
-static void SerializeGltfSkin(Skin &skin, picojson::object &o) {
+static void SerializeGltfSkin(Skin &skin, json &o) {
   if (skin.inverseBindMatrices != -1)
     SerializeNumberProperty("inverseBindMatrices", skin.inverseBindMatrices, o);
 
@@ -3273,14 +3272,14 @@ static void SerializeGltfSkin(Skin &skin, picojson::object &o) {
   }
 }
 
-static void SerializeGltfTexture(Texture &texture, picojson::object &o) {
+static void SerializeGltfTexture(Texture &texture, json &o) {
   SerializeNumberProperty("sampler", texture.sampler, o);
   SerializeNumberProperty("source", texture.source, o);
 
   if (texture.extras.Size()) {
-    picojson::object extras;
+    json extras;
     SerializeValue("extras", texture.extras, o);
-    o.insert(json_object_pair("extras", picojson::value(extras)));
+    o.insert(json_object_pair("extras", json::value(extras)));
   }
 }
 
@@ -3294,34 +3293,34 @@ bool TinyGLTF::WriteGltfSceneToFile(
     Model *model,
     const std::string
         &filename /*, bool embedImages, bool embedBuffers, bool writeBinary*/) {
-  picojson::object output;
+  json output;
 
   // ACCESSORS
-  picojson::array accessors;
+  json::array accessors;
   for (unsigned int i = 0; i < model->accessors.size(); ++i) {
-    picojson::object accessor;
+    json accessor;
     SerializeGltfAccessor(model->accessors[i], accessor);
-    accessors.push_back(picojson::value(accessor));
+    accessors.push_back(json::value(accessor));
   }
-  output.insert(json_object_pair("accessors", picojson::value(accessors)));
+  output.insert(json_object_pair("accessors", json::value(accessors)));
 
   // ANIMATIONS
   if (model->animations.size()) {
-    picojson::array animations;
+    json::array animations;
     for (unsigned int i = 0; i < model->animations.size(); ++i) {
       if (model->animations[i].channels.size()) {
-        picojson::object animation;
+        json animation;
         SerializeGltfAnimation(model->animations[i], animation);
-        animations.push_back(picojson::value(animation));
+        animations.push_back(json::value(animation));
       }
     }
-    output.insert(json_object_pair("animations", picojson::value(animations)));
+    output.insert(json_object_pair("animations", json::value(animations)));
   }
 
   // ASSET
-  picojson::object asset;
+  json asset;
   SerializeGltfAsset(model->asset, asset);
-  output.insert(json_object_pair("asset", picojson::value(asset)));
+  output.insert(json_object_pair("asset", json::value(asset)));
 
   std::string binFilePath = filename;
   std::string ext = ".bin";
@@ -3334,22 +3333,22 @@ bool TinyGLTF::WriteGltfSceneToFile(
   }
 
   // BUFFERS (We expect only one buffer here)
-  picojson::array buffers;
+  json::array buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
-    picojson::object buffer;
+    json buffer;
     SerializeGltfBuffer(model->buffers[i], buffer, binFilePath);
-    buffers.push_back(picojson::value(buffer));
+    buffers.push_back(json::value(buffer));
   }
-  output.insert(json_object_pair("buffers", picojson::value(buffers)));
+  output.insert(json_object_pair("buffers", json::value(buffers)));
 
   // BUFFERVIEWS
-  picojson::array bufferViews;
+  json::array bufferViews;
   for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
-    picojson::object bufferView;
+    json bufferView;
     SerializeGltfBufferView(model->bufferViews[i], bufferView);
-    bufferViews.push_back(picojson::value(bufferView));
+    bufferViews.push_back(json::value(bufferView));
   }
-  output.insert(json_object_pair("bufferViews", picojson::value(bufferViews)));
+  output.insert(json_object_pair("bufferViews", json::value(bufferViews)));
 
   // Extensions used
   if (model->extensionsUsed.size()) {
@@ -3364,92 +3363,92 @@ bool TinyGLTF::WriteGltfSceneToFile(
   }
 
   // IMAGES
-  picojson::array images;
+  json::array images;
   for (unsigned int i = 0; i < model->images.size(); ++i) {
-    picojson::object image;
+    json image;
     SerializeGltfImage(model->images[i], image);
-    images.push_back(picojson::value(image));
+    images.push_back(json::value(image));
   }
-  output.insert(json_object_pair("images", picojson::value(images)));
+  output.insert(json_object_pair("images", json::value(images)));
 
   // MATERIALS
-  picojson::array materials;
+  json::array materials;
   for (unsigned int i = 0; i < model->materials.size(); ++i) {
-    picojson::object material;
+    json material;
     SerializeGltfMaterial(model->materials[i], material);
-    materials.push_back(picojson::value(material));
+    materials.push_back(json::value(material));
   }
-  output.insert(json_object_pair("materials", picojson::value(materials)));
+  output.insert(json_object_pair("materials", json::value(materials)));
 
   // MESHES
-  picojson::array meshes;
+  json::array meshes;
   for (unsigned int i = 0; i < model->meshes.size(); ++i) {
-    picojson::object mesh;
+    json mesh;
     SerializeGltfMesh(model->meshes[i], mesh);
-    meshes.push_back(picojson::value(mesh));
+    meshes.push_back(json::value(mesh));
   }
-  output.insert(json_object_pair("meshes", picojson::value(meshes)));
+  output.insert(json_object_pair("meshes", json::value(meshes)));
 
   // NODES
-  picojson::array nodes;
+  json::array nodes;
   for (unsigned int i = 0; i < model->nodes.size(); ++i) {
-    picojson::object node;
+    json node;
     SerializeGltfNode(model->nodes[i], node);
-    nodes.push_back(picojson::value(node));
+    nodes.push_back(json::value(node));
   }
-  output.insert(json_object_pair("nodes", picojson::value(nodes)));
+  output.insert(json_object_pair("nodes", json::value(nodes)));
 
   // SCENE
   SerializeNumberProperty<int>("scene", model->defaultScene, output);
 
   // SCENES
-  picojson::array scenes;
+  json::array scenes;
   for (unsigned int i = 0; i < model->scenes.size(); ++i) {
-    picojson::object currentScene;
+    json currentScene;
     SerializeGltfScene(model->scenes[i], currentScene);
-    scenes.push_back(picojson::value(currentScene));
+    scenes.push_back(json::value(currentScene));
   }
-  output.insert(json_object_pair("scenes", picojson::value(scenes)));
+  output.insert(json_object_pair("scenes", json::value(scenes)));
 
   // SKINS
   if (model->skins.size()) {
-    picojson::array skins;
+    json::array skins;
     for (unsigned int i = 0; i < model->skins.size(); ++i) {
-      picojson::object skin;
+      json skin;
       SerializeGltfSkin(model->skins[i], skin);
-      skins.push_back(picojson::value(picojson::value(skin)));
+      skins.push_back(json::value(json::value(skin)));
     }
-    output.insert(json_object_pair("skins", picojson::value(skins)));
+    output.insert(json_object_pair("skins", json::value(skins)));
   }
 
   // TEXTURES
-  picojson::array textures;
+  json::array textures;
   for (unsigned int i = 0; i < model->textures.size(); ++i) {
-    picojson::object texture;
+    json texture;
     SerializeGltfTexture(model->textures[i], texture);
-    textures.push_back(picojson::value(texture));
+    textures.push_back(json::value(texture));
   }
-  output.insert(json_object_pair("textures", picojson::value(textures)));
+  output.insert(json_object_pair("textures", json::value(textures)));
 
   // SAMPLERS
-  picojson::array samplers;
+  json::array samplers;
   for (unsigned int i = 0; i < model->samplers.size(); ++i) {
-    picojson::object sampler;
+    json sampler;
     SerializeGltfSampler(model->samplers[i], sampler);
-    samplers.push_back(picojson::value(sampler));
+    samplers.push_back(json::value(sampler));
   }
-  output.insert(json_object_pair("samplers", picojson::value(samplers)));
+  output.insert(json_object_pair("samplers", json::value(samplers)));
 
   // CAMERAS
-  picojson::array cameras;
+  json::array cameras;
   for (unsigned int i = 0; i < model->cameras.size(); ++i) {
-    picojson::object camera;
+    json camera;
     SerializeGltfCamera(model->cameras[i], camera);
-    cameras.push_back(picojson::value(camera));
+    cameras.push_back(json::value(camera));
   }
-  output.insert(json_object_pair("cameras", picojson::value(cameras)));
+  output.insert(json_object_pair("cameras", json::value(cameras)));
 
-  WriteGltfFile(filename, picojson::value(output).serialize());
+  WriteGltfFile(filename, json::value(output).serialize());
   return true;
 }
 
