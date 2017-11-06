@@ -505,6 +505,7 @@ class Node {
   std::vector<double> weights;  // The weights of the instantiated Morph Target
 
   Value extras;
+  ParameterMap extLightsValues;      // KHR_lights_cmn extension
 };
 
 typedef struct {
@@ -532,6 +533,12 @@ struct Scene {
   ParameterMap extras;
 };
 
+struct Light {
+  std::string name;
+  std::vector<double> color;
+  std::string type;
+};
+
 class Model {
  public:
   Model() {}
@@ -550,6 +557,7 @@ class Model {
   std::vector<Sampler> samplers;
   std::vector<Camera> cameras;
   std::vector<Scene> scenes;
+  std::vector<Light> lights;
 
   int defaultScene;
   std::vector<std::string> extensionsUsed;
@@ -1838,6 +1846,48 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
   return true;
 }
 
+static bool ParseParameterProperty(Parameter *param, std::string *err,
+                                   const picojson::object &o,
+                                   const std::string &prop, bool required) {
+  double num_val;
+
+  // A parameter value can either be a string or an array of either a boolean or
+  // a number. Booleans of any kind aren't supported here. Granted, it
+  // complicates the Parameter structure and breaks it semantically in the sense
+  // that the client probably works off the assumption that if the string is
+  // empty the vector is used, etc. Would a tagged union work?
+  if (ParseStringProperty(&param->string_value, err, o, prop, false)) {
+    // Found string property.
+    return true;
+  } else if (ParseNumberArrayProperty(&param->number_array, err, o, prop,
+                                      false)) {
+    // Found a number array.
+    return true;
+  } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
+    param->number_array.push_back(num_val);
+    return true;
+  } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
+                               false)) {
+    return true;
+  } else if (ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
+    return true;
+  } else {
+    if (required) {
+      if (err) {
+        (*err) += "parameter must be a string or number / number array.\n";
+      }
+    }
+    return false;
+  }
+}
+
+static bool ParseLight(Light *light, std::string *err, const picojson::object &o) {
+  ParseStringProperty(&light->name, err, o, "name", false);
+  ParseNumberArrayProperty(&light->color, err, o, "color", false);
+  ParseStringProperty(&light->type, err, o, "type", false);
+  return true;
+}
+
 static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
   ParseStringProperty(&node->name, err, o, "name", false);
 
@@ -1881,42 +1931,36 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
 
   ParseExtrasProperty(&(node->extras), o);
 
-  return true;
-}
+  picojson::object::const_iterator extensions_object = o.find("extensions");
+  if ((extensions_object != o.end()) &&
+      (extensions_object->second).is<picojson::object>()) {
+    const picojson::object &values_object =
+      (extensions_object->second).get<picojson::object>();
 
-static bool ParseParameterProperty(Parameter *param, std::string *err,
-                                   const picojson::object &o,
-                                   const std::string &prop, bool required) {
-  double num_val;
+    picojson::object::const_iterator it(values_object.begin());
+    picojson::object::const_iterator itEnd(values_object.end());
 
-  // A parameter value can either be a string or an array of either a boolean or
-  // a number. Booleans of any kind aren't supported here. Granted, it
-  // complicates the Parameter structure and breaks it semantically in the sense
-  // that the client probably works off the assumption that if the string is
-  // empty the vector is used, etc. Would a tagged union work?
-  if (ParseStringProperty(&param->string_value, err, o, prop, false)) {
-    // Found string property.
-    return true;
-  } else if (ParseNumberArrayProperty(&param->number_array, err, o, prop,
-                                      false)) {
-    // Found a number array.
-    return true;
-  } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
-    param->number_array.push_back(num_val);
-    return true;
-  } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
-                               false)) {
-    return true;
-  } else if (ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
-    return true;
-  } else {
-    if (required) {
-      if (err) {
-        (*err) += "parameter must be a string or number / number array.\n";
+    for (; it != itEnd; it++) {
+      if (it->first == "KHR_lights_cmn" &&
+         (it->second).is<picojson::object>()) {
+        const picojson::object &values_object =
+          (it->second).get<picojson::object>();
+
+        picojson::object::const_iterator itVal(values_object.begin());
+        picojson::object::const_iterator itValEnd(values_object.end());
+
+        for (; itVal != itValEnd; itVal++) {
+          Parameter param;
+          if (ParseParameterProperty(&param, err, values_object, itVal->first,
+                false)) {
+            node->extLightsValues[itVal->first] = param;
+          }
+        }
       }
     }
-    return false;
   }
+
+  return true;
 }
 
 static bool ParseMaterial(Material *material, std::string *err,
@@ -2722,6 +2766,35 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
       model->cameras.push_back(camera);
     }
   }
+
+  // 15. Parse Extensions
+  if (v.contains("extensions") && v.get("extensions").is<picojson::object>()) {
+    const picojson::object &root = v.get("extensions").get<picojson::object>();
+    picojson::object::const_iterator it(root.begin());
+    picojson::object::const_iterator itEnd(root.end());
+    for (; it != itEnd; ++it) {
+      // parse KHR_lights_cmn extension
+      if (it->first == "KHR_lights_cmn" && it->second.is<picojson::object>()) {
+        const picojson::object &object = it->second.get<picojson::object>();
+        picojson::object::const_iterator it(object.find("lights"));
+        picojson::object::const_iterator itEnd(object.end());
+        if (it == itEnd)
+          continue;
+
+        const picojson::array &lights = it->second.get<picojson::array>();
+        picojson::array::const_iterator arrayIt(lights.begin());
+        picojson::array::const_iterator arrayItEnd(lights.end());
+        for (; arrayIt != arrayItEnd; ++arrayIt) {
+          Light light;
+          if (!ParseLight(&light, err, arrayIt->get<picojson::object>())) {
+            return false;
+          }
+          model->lights.push_back(light);
+        }
+      }
+    }
+
+  }
   return true;
 }
 
@@ -3172,6 +3245,12 @@ static void SerializeGltfMesh(Mesh &mesh, picojson::object &o) {
   }
 }
 
+static void SerializeGltfLight(Light &light, picojson::object &o) {
+  SerializeStringProperty("name", light.name, o);
+  SerializeNumberArrayProperty("color", light.color, o);
+  SerializeStringProperty("type", light.type, o);
+}
+
 static void SerializeGltfNode(Node &node, picojson::object &o) {
   if (node.translation.size() > 0) {
     SerializeNumberArrayProperty<double>("translation", node.translation, o);
@@ -3196,6 +3275,15 @@ static void SerializeGltfNode(Node &node, picojson::object &o) {
   if (node.camera != -1) {
     SerializeNumberProperty<int>("camera", node.camera, o);
   }
+
+  if (node.extLightsValues.size()) {
+    picojson::object values;
+    SerializeParameterMap(node.extLightsValues, values);
+    picojson::object lightsExt;
+    lightsExt.insert(json_object_pair("KHR_lights_cmn", picojson::value(values)));
+    o.insert(json_object_pair("extensions", picojson::value(lightsExt)));
+  }
+
 
   SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
@@ -3442,6 +3530,15 @@ bool TinyGLTF::WriteGltfSceneToFile(
     cameras.push_back(picojson::value(camera));
   }
   output.insert(json_object_pair("cameras", picojson::value(cameras)));
+
+  // LIGHTS
+  picojson::array lights;
+  for (unsigned int i = 0; i < model->lights.size(); ++i) {
+    picojson::object light;
+    SerializeGltfLight(model->lights[i], light);
+    lights.push_back(picojson::value(light));
+  }
+  output.insert(json_object_pair("lights", picojson::value(lights)));
 
   WriteGltfFile(filename, picojson::value(output).serialize());
   return true;
