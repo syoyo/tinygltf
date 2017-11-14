@@ -695,6 +695,10 @@ class TinyGLTF {
 #endif
 #endif
 
+#if __APPLE__
+    #include "TargetConditionals.h"
+#endif
+
 namespace tinygltf {
 
 static void swap4(unsigned int *val) {
