@@ -231,10 +231,13 @@ inline value::value(double n) : type_(number_type), u_() {
   if (
 #ifdef _MSC_VER
       !_finite(n)
-#elif __cplusplus >= 201103L || !(defined(isnan) && defined(isinf))
+#elif __cplusplus >= 201103L
       std::isnan(n) || std::isinf(n)
-#else
+#elif defined(isnan) && defined(isinf)
       isnan(n) || isinf(n)
+#else
+      // ???. No nan&inf check
+      0
 #endif
           ) {
     throw std::overflow_error("");
