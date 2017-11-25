@@ -278,7 +278,9 @@ void json_validator::insert_schema(const json &input, const json_uri &id)
 			// check whether all schema-references are new
 			for (auto &sref : r.schema_refs) {
 				if (schema_refs_.find(sref.first) != schema_refs_.end())
-					throw std::invalid_argument("schema " + sref.first.to_string() + " already present in validator.");
+          // HACK(syoyo): Skip duplicated schema.
+          break;
+					//throw std::invalid_argument("schema " + sref.first.to_string() + " already present in validator.");
 			}
 			// no undefined references and no duplicated schema - store the schema
 			schema_store_.push_back(schema);

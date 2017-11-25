@@ -86,8 +86,11 @@ void json_uri::from_string(const std::string &uri)
 		auto path = url.substr(pos);
 		if (path[0] == '/') // if it starts with a / it is root-path
 			path_ = path;
-		else // otherwise it is a subfolder
-			path_.append(path);
+		else { // otherwise it is a subfolder
+      // HACK(syoyo): Force append '/' for glTF json schemas
+			path_ = path;
+			//path_.append(path);
+    }
 
 		pointer_ = json_pointer("");
 	}

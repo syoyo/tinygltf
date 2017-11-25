@@ -34,7 +34,8 @@ using nlohmann::json_schema_draft4::json_validator;
 
 static void usage(const char *name)
 {
-	std::cerr << "Usage: " << name << " <schema> < <document>\n";
+	std::cerr << "Usage: " << name << " <gltf file> <gltf schema dir>\n";
+	std::cerr << "  schema dir : $glTF/specification/2.0/schema\n";
 	exit(EXIT_FAILURE);
 }
 
@@ -45,6 +46,7 @@ static void usage(const char *name)
 	assert(r.undefined_refs.size() == 0);
 #endif
 
+#if 0
 static void loader(const json_uri &uri, json &schema)
 {
 	std::fstream lf("." + uri.path());
@@ -57,17 +59,17 @@ static void loader(const json_uri &uri, json &schema)
 		throw e;
 	}
 }
+#endif
 
-int main(int argc, char *argv[])
+bool validate(const std::string &schema_dir, const std::string &filename)
 {
-	if (argc != 2)
-		usage(argv[0]);
+  std::string gltf_schema = schema_dir + "/glTF.schema.json";
 
-	std::fstream f(argv[1]);
+	std::fstream f(gltf_schema);
 	if (!f.good()) {
-		std::cerr << "could not open " << argv[1] << " for reading\n";
-		usage(argv[0]);
-	}
+		std::cerr << "could not open " << gltf_schema << " for reading\n";
+    return false;
+  }
 
 	// 1) Read the schema for the document you want to validate
 	json schema;
@@ -75,11 +77,24 @@ int main(int argc, char *argv[])
 		f >> schema;
 	} catch (std::exception &e) {
 		std::cerr << e.what() << " at " << f.tellp() << " - while parsing the schema\n";
-		return EXIT_FAILURE;
+		return false;
 	}
 
 	// 2) create the validator and
-	json_validator validator(loader, [](const std::string &, const std::string &) {});
+	json_validator validator([&schema_dir](const json_uri &uri, json &schema) {
+    std::cout << "uri.url  : " << uri.url() << std::endl;
+    std::cout << "uri.path : " << uri.path() << std::endl;
+
+    std::fstream lf(schema_dir + "/" + uri.path());
+    if (!lf.good())
+      throw std::invalid_argument("could not open " + uri.url() + " tried with " + uri.path());
+
+    try {
+      lf >> schema;
+    } catch (std::exception &e) {
+      throw e;
+    }
+  }, [](const std::string &, const std::string &) {});
 
 	try {
 		// insert this schema as the root to the validator
@@ -93,16 +108,33 @@ int main(int argc, char *argv[])
 	// 3) do the actual validation of the document
 	json document;
 
+	std::fstream d(filename);
+	if (!d.good()) {
+		std::cerr << "could not open " << filename << " for reading\n";
+    return false;
+  }
+
 	try {
-		std::cin >> document;
+		d >> document;
 		validator.validate(document);
 	} catch (std::exception &e) {
 		std::cerr << "schema validation failed\n";
-		std::cerr << e.what() << " at offset: " << std::cin.tellg() << "\n";
-		return EXIT_FAILURE;
+		std::cerr << e.what() << " at offset: " << d.tellg() << "\n";
+		return false;
 	}
 
 	std::cerr << "document is valid\n";
 
-	return EXIT_SUCCESS;
+  return true;
+
+}
+
+int main(int argc, char *argv[])
+{
+	if (argc != 3)
+		usage(argv[0]);
+
+  bool ret = validate(argv[1], argv[2]);
+
+	return ret ? EXIT_SUCCESS : EXIT_FAILURE;
 }
