@@ -17,6 +17,7 @@ solution "TinyGLTFSolution"
       kind "ConsoleApp"
       language "C++"
       files { sources }
+      flags { "c++11" }
 
       configuration "Debug"
          defines { "DEBUG" } -- -DDEBUG
