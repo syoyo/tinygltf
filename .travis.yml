@@ -40,5 +40,5 @@ script:
   - export CC="${CC}-${COMPILER_VERSION}"
   - export CXX="${CXX}-${COMPILER_VERSION}"
   - ${CC} -v
-  - ${CXX} ${EXTRA_CXXFLAGS} -Wall -g -o loader_example loader_example.cc
+  - ${CXX} ${EXTRA_CXXFLAGS} -std=c++11 -Wall -g -o loader_example loader_example.cc
   - ./loader_example ./models/Cube/Cube.gltf
