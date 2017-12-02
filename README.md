@@ -14,7 +14,13 @@ Work in process(`devel` branch). Very near to release, but need more tests and e
 
 ## Features
 
-* Portable C++. C++-03 with STL dependency only.
+* Written in portable C++. C++-03 with STL dependency only.
+  * [x] macOS + clang(LLVM)
+  * [x] iOS + clang
+  * [x] Linux + gcc/clang
+  * [x] Windows + MinGW
+  * [x] Android + CrystaX(NDK drop-in replacement) GCC
+  * [x] Web using Emscripten(LLVM)
 * Moderate parsing time and memory consumption.
 * glTF specification v2.0.0
   * [x] ASCII glTF

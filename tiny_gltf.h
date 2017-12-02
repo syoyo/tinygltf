@@ -505,6 +505,7 @@ class Node {
   std::vector<double> weights;  // The weights of the instantiated Morph Target
 
   Value extras;
+  ParameterMap extLightsValues;      // KHR_lights_cmn extension
 };
 
 typedef struct {
@@ -532,6 +533,12 @@ struct Scene {
   ParameterMap extras;
 };
 
+struct Light {
+  std::string name;
+  std::vector<double> color;
+  std::string type;
+};
+
 class Model {
  public:
   Model() {}
@@ -550,6 +557,7 @@ class Model {
   std::vector<Sampler> samplers;
   std::vector<Camera> cameras;
   std::vector<Scene> scenes;
+  std::vector<Light> lights;
 
   int defaultScene;
   std::vector<std::string> extensionsUsed;
@@ -677,7 +685,7 @@ class TinyGLTF {
 #endif
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #elif !defined(__ANDROID__)
 #include <wordexp.h>
 #endif
@@ -691,6 +699,10 @@ class TinyGLTF {
 #endif
 
 using nlohmann::json;
+
+#if __APPLE__
+    #include "TargetConditionals.h"
+#endif
 
 namespace tinygltf {
 
@@ -1166,7 +1178,7 @@ static bool ParseBooleanProperty(bool *ret, std::string *err,
     return false;
   }
 
-  if (!it->second.is<bool>()) {
+  if (!it.value().is_boolean()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a bool type.\n";
@@ -1176,7 +1188,7 @@ static bool ParseBooleanProperty(bool *ret, std::string *err,
   }
 
   if (ret) {
-    (*ret) = it->second.get<bool>();
+    (*ret) = it.value().get<bool>();
   }
 
   return true;
@@ -1201,7 +1213,7 @@ static bool ParseNumberProperty(double *ret, std::string *err,
     return false;
   }
 
-  if (!it->second.is<double>()) {
+  if (!it.value().is_number()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a number type.\n";
@@ -1211,7 +1223,7 @@ static bool ParseNumberProperty(double *ret, std::string *err,
   }
 
   if (ret) {
-    (*ret) = it->second.get<double>();
+    (*ret) = it.value().get<double>();
   }
 
   return true;
@@ -1235,7 +1247,7 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
     return false;
   }
 
-  if (!it->second.is<json::array>()) {
+  if (!it.value().is_array()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not an array";
@@ -1249,9 +1261,8 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
   }
 
   ret->clear();
-  const json::array &arr = it->second.get<json::array>();
-  for (size_t i = 0; i < arr.size(); i++) {
-    if (!arr[i].is<double>()) {
+  for (json::const_iterator i = it.value().begin(); i != it.value().end(); i++) {
+    if (!i.value().is_number()) {
       if (required) {
         if (err) {
           (*err) += "'" + property + "' property is not a number.\n";
@@ -1263,7 +1274,7 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
       }
       return false;
     }
-    ret->push_back(arr[i].get<double>());
+    ret->push_back(i.value());
   }
 
   return true;
@@ -1288,7 +1299,7 @@ static bool ParseStringProperty(
     return false;
   }
 
-  if (!it->second.is<std::string>()) {
+  if (!it.value().is_string()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a string type.\n";
@@ -1298,7 +1309,7 @@ static bool ParseStringProperty(
   }
 
   if (ret) {
-    (*ret) = it->second.get<std::string>();
+    (*ret) = it.value();
   }
 
   return true;
@@ -1322,7 +1333,7 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   }
 
   // Make sure we are dealing with an object / dictionary.
-  if (!it->second.is<json>()) {
+  if (!it.value().is_object()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not an object.\n";
@@ -1332,13 +1343,13 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   }
 
   ret->clear();
-  const json &dict = it->second.get<json>();
+  const json &dict = it.value();
 
   json::const_iterator dictIt(dict.begin());
   json::const_iterator dictItEnd(dict.end());
 
   for (; dictIt != dictItEnd; ++dictIt) {
-    if (!dictIt->second.is<double>()) {
+    if (!dictIt.value().is_number()) {
       if (required) {
         if (err) {
           (*err) += "'" + property + "' value is not an int.\n";
@@ -1348,7 +1359,7 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
     }
 
     // Insert into the list.
-    (*ret)[dictIt->first] = static_cast<int>(dictIt->second.get<double>());
+    (*ret)[dictIt.key()] = static_cast<int>(dictIt.value());
   }
   return true;
 }
@@ -1366,7 +1377,7 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
     return false;
   }
 
-  if (!it->second.is<json>()) {
+  if (!it.value().is_object()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a JSON object.\n";
@@ -1376,13 +1387,13 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
   }
 
   ret->clear();
-  const json &obj = it->second.get<json>();
+  const json &obj = it.value();
   json::const_iterator it2(obj.begin());
   json::const_iterator itEnd(obj.end());
   for (; it2 != itEnd; it2++) {
-    if (it2->second.is<double>())
-      ret->insert(std::pair<std::string, double>(it2->first,
-                                                 it2->second.get<double>()));
+    if (it2.value().is_number())
+      ret->insert(std::pair<std::string, double>(it2.key(),
+                                                 it2.value()));
   }
 
   return true;
@@ -1538,8 +1549,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 
   json::const_iterator type = o.find("type");
   if (type != o.end()) {
-    if (type->second.is<std::string>()) {
-      const std::string &ty = (type->second).get<std::string>();
+    if (type.value().is_string()) {
+      const std::string &ty = type.value();
       if (ty.compare("arraybuffer") == 0) {
         // buffer.type = "arraybuffer";
       }
@@ -1773,19 +1784,17 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   // Look for morph targets
   json::const_iterator targetsObject = o.find("targets");
   if ((targetsObject != o.end()) &&
-      (targetsObject->second).is<json::array>()) {
-    const json::array &targetArray =
-        (targetsObject->second).get<json::array>();
-    for (size_t i = 0; i < targetArray.size(); i++) {
+      targetsObject.value().is_array()) {
+    for (json::const_iterator i = targetsObject.value().begin(); i != targetsObject.value().end(); i++) {
       std::map<std::string, int> targetAttribues;
 
-      const json &dict = targetArray[i].get<json>();
+      const json &dict = i.value();
       json::const_iterator dictIt(dict.begin());
       json::const_iterator dictItEnd(dict.end());
 
       for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt->first] =
-            static_cast<int>(dictIt->second.get<double>());
+        targetAttribues[dictIt.key()] =
+            static_cast<int>(dictIt.value());
       }
       primitive->targets.push_back(targetAttribues);
     }
@@ -1801,13 +1810,11 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const json &o) {
 
   mesh->primitives.clear();
   json::const_iterator primObject = o.find("primitives");
-  if ((primObject != o.end()) && (primObject->second).is<json::array>()) {
-    const json::array &primArray =
-        (primObject->second).get<json::array>();
-    for (size_t i = 0; i < primArray.size(); i++) {
+  if ((primObject != o.end()) && primObject.value().is_array()) {
+    for (json::const_iterator i = primObject.value().begin(); i != primObject.value().end(); i++) {
       Primitive primitive;
       if (ParsePrimitive(&primitive, err,
-                         primArray[i].get<json>())) {
+                         i.value())) {
         // Only add the primitive if the parsing succeeds.
         mesh->primitives.push_back(primitive);
       }
@@ -1817,19 +1824,17 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const json &o) {
   // Look for morph targets
   json::const_iterator targetsObject = o.find("targets");
   if ((targetsObject != o.end()) &&
-      (targetsObject->second).is<json::array>()) {
-    const json::array &targetArray =
-        (targetsObject->second).get<json::array>();
-    for (size_t i = 0; i < targetArray.size(); i++) {
+      targetsObject.value().is_array()) {
+    for (json::const_iterator i = targetsObject.value().begin(); i != targetsObject.value().end(); i++) {
       std::map<std::string, int> targetAttribues;
 
-      const json &dict = targetArray[i].get<json>();
+      const json &dict = i.value();
       json::const_iterator dictIt(dict.begin());
       json::const_iterator dictItEnd(dict.end());
 
       for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt->first] =
-            static_cast<int>(dictIt->second.get<double>());
+        targetAttribues[dictIt.key()] =
+            static_cast<int>(dictIt.value());
       }
       mesh->targets.push_back(targetAttribues);
     }
@@ -1839,52 +1844,6 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const json &o) {
   ParseNumberArrayProperty(&mesh->weights, err, o, "weights", false);
 
   ParseExtrasProperty(&(mesh->extras), o);
-
-  return true;
-}
-
-static bool ParseNode(Node *node, std::string *err, const json &o) {
-  ParseStringProperty(&node->name, err, o, "name", false);
-
-  double skin = -1.0;
-  ParseNumberProperty(&skin, err, o, "skin", false);
-  node->skin = static_cast<int>(skin);
-
-  // Matrix and T/R/S are exclusive
-  if (!ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false)) {
-    ParseNumberArrayProperty(&node->rotation, err, o, "rotation", false);
-    ParseNumberArrayProperty(&node->scale, err, o, "scale", false);
-    ParseNumberArrayProperty(&node->translation, err, o, "translation", false);
-  }
-
-  double camera = -1.0;
-  ParseNumberProperty(&camera, err, o, "camera", false);
-  node->camera = static_cast<int>(camera);
-
-  double mesh = -1.0;
-  ParseNumberProperty(&mesh, err, o, "mesh", false);
-  node->mesh = int(mesh);
-
-  node->children.clear();
-  json::const_iterator childrenObject = o.find("children");
-  if ((childrenObject != o.end()) &&
-      (childrenObject->second).is<json::array>()) {
-    const json::array &childrenArray =
-        (childrenObject->second).get<json::array>();
-    for (size_t i = 0; i < childrenArray.size(); i++) {
-      if (!childrenArray[i].is<double>()) {
-        if (err) {
-          (*err) += "Invalid `children` array.\n";
-        }
-        return false;
-      }
-      const int &childrenNode =
-          static_cast<int>(childrenArray[i].get<double>());
-      node->children.push_back(childrenNode);
-    }
-  }
-
-  ParseExtrasProperty(&(node->extras), o);
 
   return true;
 }
@@ -1924,6 +1883,86 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
   }
 }
 
+static bool ParseLight(Light *light, std::string *err, const json &o) {
+  ParseStringProperty(&light->name, err, o, "name", false);
+  ParseNumberArrayProperty(&light->color, err, o, "color", false);
+  ParseStringProperty(&light->type, err, o, "type", false);
+  return true;
+}
+
+static bool ParseNode(Node *node, std::string *err, const json &o) {
+  ParseStringProperty(&node->name, err, o, "name", false);
+
+  double skin = -1.0;
+  ParseNumberProperty(&skin, err, o, "skin", false);
+  node->skin = static_cast<int>(skin);
+
+  // Matrix and T/R/S are exclusive
+  if (!ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false)) {
+    ParseNumberArrayProperty(&node->rotation, err, o, "rotation", false);
+    ParseNumberArrayProperty(&node->scale, err, o, "scale", false);
+    ParseNumberArrayProperty(&node->translation, err, o, "translation", false);
+  }
+
+  double camera = -1.0;
+  ParseNumberProperty(&camera, err, o, "camera", false);
+  node->camera = static_cast<int>(camera);
+
+  double mesh = -1.0;
+  ParseNumberProperty(&mesh, err, o, "mesh", false);
+  node->mesh = int(mesh);
+
+  node->children.clear();
+  json::const_iterator childrenObject = o.find("children");
+  if ((childrenObject != o.end()) &&
+      childrenObject.value().is_array()) {
+    for (json::const_iterator i = childrenObject.value().begin(); i != childrenObject.value().end(); i++) {
+      if (!i.value().is_number()) {
+        if (err) {
+          (*err) += "Invalid `children` array.\n";
+        }
+        return false;
+      }
+      const int &childrenNode =
+          static_cast<int>(i.value());
+      node->children.push_back(childrenNode);
+    }
+  }
+
+  ParseExtrasProperty(&(node->extras), o);
+
+  json::const_iterator extensions_object = o.find("extensions");
+  if ((extensions_object != o.end()) &&
+      extensions_object.value().is_object()) {
+    const json &values_object =
+      extensions_object.value();
+
+    json::const_iterator it(values_object.begin());
+    json::const_iterator itEnd(values_object.end());
+
+    for (; it != itEnd; it++) {
+      if ((it.key().compare("KHR_lights_cmn") == 0) &&
+         it.value().is_object()) {
+        const json &values_object =
+          it.value();
+
+        json::const_iterator itVal(values_object.begin());
+        json::const_iterator itValEnd(values_object.end());
+
+        for (; itVal != itValEnd; itVal++) {
+          Parameter param;
+          if (ParseParameterProperty(&param, err, values_object, itVal.key(),
+                false)) {
+            node->extLightsValues[itVal.key()] = param;
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
 static bool ParseMaterial(Material *material, std::string *err,
                           const json &o) {
   material->values.clear();
@@ -1935,40 +1974,40 @@ static bool ParseMaterial(Material *material, std::string *err,
 
   for (; it != itEnd; it++) {
     if (it.key() == "pbrMetallicRoughness") {
-      if ((it->second).is<json>()) {
+      if (it.value().is_object()) {
         const json &values_object =
-            (it->second).get<json>();
+            it.value();
 
         json::const_iterator itVal(values_object.begin());
         json::const_iterator itValEnd(values_object.end());
 
         for (; itVal != itValEnd; itVal++) {
           Parameter param;
-          if (ParseParameterProperty(&param, err, values_object, itVal->first,
+          if (ParseParameterProperty(&param, err, values_object, itVal.key(),
                                      false)) {
-            material->values[itVal->first] = param;
+            material->values[itVal.key()] = param;
           }
         }
       }
     } else if (it.key() == "extensions") {
-      if ((it->second).is<json>()) {
+      if (it.value().is_object()) {
         const json &extension =
-            (it->second).get<json>();
+            it.value();
 
         json::const_iterator extIt = extension.begin();
-        if (!extIt->second.is<json>()) continue;
+        if (!extIt.value().is_object()) continue;
 
         const json &values_object =
-            (extIt->second).get<json>();
+            extIt.value();
 
         json::const_iterator itVal(values_object.begin());
         json::const_iterator itValEnd(values_object.end());
 
         for (; itVal != itValEnd; itVal++) {
           Parameter param;
-          if (ParseParameterProperty(&param, err, values_object, itVal->first,
+          if (ParseParameterProperty(&param, err, values_object, itVal.key(),
                                      false)) {
-            material->extPBRValues[itVal->first] = param;
+            material->extPBRValues[itVal.key()] = param;
           }
         }
       }
@@ -1997,9 +2036,9 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
   }
 
   json::const_iterator targetIt = o.find("target");
-  if ((targetIt != o.end()) && (targetIt->second).is<json>()) {
+  if ((targetIt != o.end()) && targetIt.value().is_object()) {
     const json &target_object =
-        (targetIt->second).get<json>();
+        targetIt.value();
 
     if (!ParseNumberProperty(&targetIndex, err, target_object, "node", true)) {
       if (err) {
@@ -2029,13 +2068,11 @@ static bool ParseAnimation(Animation *animation, std::string *err,
                            const json &o) {
   {
     json::const_iterator channelsIt = o.find("channels");
-    if ((channelsIt != o.end()) && (channelsIt->second).is<json::array>()) {
-      const json::array &channelArray =
-          (channelsIt->second).get<json::array>();
-      for (size_t i = 0; i < channelArray.size(); i++) {
+    if ((channelsIt != o.end()) && channelsIt.value().is_array()) {
+      for (json::const_iterator i = channelsIt.value().begin(); i != channelsIt.value().end(); i++) {
         AnimationChannel channel;
         if (ParseAnimationChannel(&channel, err,
-                                  channelArray[i].get<json>())) {
+                                  i.value())) {
           // Only add the channel if the parsing succeeds.
           animation->channels.push_back(channel);
         }
@@ -2045,12 +2082,12 @@ static bool ParseAnimation(Animation *animation, std::string *err,
 
   {
     json::const_iterator samplerIt = o.find("samplers");
-    if ((samplerIt != o.end()) && (samplerIt->second).is<json::array>()) {
-      const json::array &sampler_array =
-          (samplerIt->second).get<json::array>();
+    if ((samplerIt != o.end()) && samplerIt.value().is_array()) {
+      const json &sampler_array =
+          samplerIt.value();
 
-      json::array::const_iterator it = sampler_array.begin();
-      json::array::const_iterator itEnd = sampler_array.end();
+      json::const_iterator it = sampler_array.begin();
+      json::const_iterator itEnd = sampler_array.end();
 
       for (; it != itEnd; it++) {
         const json &s = it->get<json>();
@@ -2223,8 +2260,8 @@ static bool ParseCamera(Camera *camera, std::string *err,
       return false;
     }
 
-    const json::value &v = o.find("orthographic")->second;
-    if (!v.is<json>()) {
+    const json &v = o.find("orthographic").value();
+    if (!v.is_object()) {
       if (err) {
         std::stringstream ss;
         ss << "\"orthographic\" is not a JSON object." << std::endl;
@@ -2247,8 +2284,8 @@ static bool ParseCamera(Camera *camera, std::string *err,
       return false;
     }
 
-    const json::value &v = o.find("perspective")->second;
-    if (!v.is<json>()) {
+    const json &v = o.find("perspective").value();
+    if (!v.is_object()) {
       if (err) {
         std::stringstream ss;
         ss << "\"perspective\" is not a JSON object." << std::endl;
@@ -2289,16 +2326,10 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // TODO(syoyo): Add feature not using exception handling.
-  json::value v;
+  json v;
   try {
-    std::string perr = json::parse(v, str, str + length);
+    v = json::parse(str, str + length);
 
-    if (!perr.empty()) {
-      if (err) {
-        (*err) = "JSON parsing error: " + perr;
-      }
-      return false;
-    }
   } catch (std::exception e) {
     if (err) {
       (*err) = e.what();
@@ -2306,7 +2337,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  if (!v.is<json>()) {
+  if (!v.is_object()) {
     // root is not an object.
     if (err) {
       (*err) = "Root element is not a JSON object\n";
@@ -2317,49 +2348,64 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   // scene is not mandatory.
   // FIXME Maybe a better way to handle it than removing the code
 
-  if (v.contains("scenes") && v.get("scenes").is<json::array>()) {
-    // OK
-  } else if (check_sections & REQUIRE_SCENES) {
-    if (err) {
-      (*err) += "\"scenes\" object not found in .gltf\n";
+  {
+    json::const_iterator it = v.find("scenes"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      // OK
+    } else if (check_sections & REQUIRE_SCENES) {
+      if (err) {
+        (*err) += "\"scenes\" object not found in .gltf or not an array type\n";
+      }
+      return false;
     }
-    return false;
   }
 
-  if (v.contains("nodes") && v.get("nodes").is<json::array>()) {
-    // OK
-  } else if (check_sections & REQUIRE_NODES) {
-    if (err) {
-      (*err) += "\"nodes\" object not found in .gltf\n";
+  {
+    json::const_iterator it = v.find("nodes"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      // OK
+    } else if (check_sections & REQUIRE_NODES) {
+      if (err) {
+        (*err) += "\"nodes\" object not found in .gltf\n";
+      }
+      return false;
     }
-    return false;
   }
 
-  if (v.contains("accessors") && v.get("accessors").is<json::array>()) {
-    // OK
-  } else if (check_sections & REQUIRE_ACCESSORS) {
-    if (err) {
-      (*err) += "\"accessors\" object not found in .gltf\n";
+  {
+    json::const_iterator it = v.find("accessors"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      // OK
+    } else if (check_sections & REQUIRE_ACCESSORS) {
+      if (err) {
+        (*err) += "\"accessors\" object not found in .gltf\n";
+      }
+      return false;
     }
-    return false;
   }
 
-  if (v.contains("buffers") && v.get("buffers").is<json::array>()) {
-    // OK
-  } else if (check_sections & REQUIRE_BUFFERS) {
-    if (err) {
-      (*err) += "\"buffers\" object not found in .gltf\n";
+  {
+    json::const_iterator it = v.find("buffers"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      // OK
+    } else if (check_sections & REQUIRE_BUFFERS) {
+      if (err) {
+        (*err) += "\"buffers\" object not found in .gltf\n";
+      }
+      return false;
     }
-    return false;
   }
 
-  if (v.contains("bufferViews") && v.get("bufferViews").is<json::array>()) {
-    // OK
-  } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
-    if (err) {
-      (*err) += "\"bufferViews\" object not found in .gltf\n";
+  {
+    json::const_iterator it = v.find("bufferViews"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      // OK
+    } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
+      if (err) {
+        (*err) += "\"bufferViews\" object not found in .gltf\n";
+      }
+      return false;
     }
-    return false;
   }
 
   model->buffers.clear();
@@ -2372,361 +2418,449 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   model->extensionsRequired.clear();
   model->defaultScene = -1;
 
-  // 0. Parse Asset
-  if (v.contains("asset") && v.get("asset").is<json>()) {
-    const json &root = v.get("asset").get<json>();
+  // 1. Parse Asset
+  {
+    json::const_iterator it = v.find("asset"); 
+    if ((it != v.end()) && it.value().is_object()) {
+      const json &root = it.value();
 
-    ParseAsset(&model->asset, err, root);
-  }
-
-  // 0. Parse extensionUsed
-  if (v.contains("extensionsUsed") &&
-      v.get("extensionsUsed").is<json::array>()) {
-    const json::array &root =
-        v.get("extensionsUsed").get<json::array>();
-    for (unsigned int i = 0; i < root.size(); ++i) {
-      model->extensionsUsed.push_back(root[i].get<std::string>());
-    }
-  }
-  if (v.contains("extensionsRequired") &&
-      v.get("extensionsRequired").is<json::array>()) {
-    const json::array &root =
-        v.get("extensionsRequired").get<json::array>();
-    for (unsigned int i = 0; i < root.size(); ++i) {
-      model->extensionsRequired.push_back(root[i].get<std::string>());
+      ParseAsset(&model->asset, err, root);
     }
   }
 
-  // 1. Parse Buffer
-  if (v.contains("buffers") && v.get("buffers").is<json::array>()) {
-    const json::array &root = v.get("buffers").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`buffers' does not contain an JSON object.";
-        }
-        return false;
+  // 2. Parse extensionUsed
+  {
+    json::const_iterator it = v.find("extensionsUsed"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      const json &root = it.value();
+      for (unsigned int i = 0; i < root.size(); ++i) {
+        model->extensionsUsed.push_back(root[i].get<std::string>());
       }
-      Buffer buffer;
-      if (!ParseBuffer(&buffer, err, it->get<json>(), base_dir,
-                       is_binary_, bin_data_, bin_size_)) {
-        return false;
-      }
-
-      model->buffers.push_back(buffer);
     }
   }
 
-  // 2. Parse BufferView
-  if (v.contains("bufferViews") && v.get("bufferViews").is<json::array>()) {
-    const json::array &root = v.get("bufferViews").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`bufferViews' does not contain an JSON object.";
-        }
-        return false;
+  {
+    json::const_iterator it = v.find("extensionsRequired"); 
+    if ((it != v.end()) && it.value().is_array()) {
+      const json &root = it.value();
+      for (unsigned int i = 0; i < root.size(); ++i) {
+        model->extensionsRequired.push_back(root[i].get<std::string>());
       }
-      BufferView bufferView;
-      if (!ParseBufferView(&bufferView, err, it->get<json>())) {
-        return false;
-      }
-
-      model->bufferViews.push_back(bufferView);
     }
   }
 
-  // 3. Parse Accessor
-  if (v.contains("accessors") && v.get("accessors").is<json::array>()) {
-    const json::array &root = v.get("accessors").get<json::array>();
+  // 3. Parse Buffer
+  {
+    json::const_iterator rootIt = v.find("buffers"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
 
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`accessors' does not contain an JSON object.";
-        }
-        return false;
-      }
-      Accessor accessor;
-      if (!ParseAccessor(&accessor, err, it->get<json>())) {
-        return false;
-      }
-
-      model->accessors.push_back(accessor);
-    }
-  }
-
-  // 4. Parse Mesh
-  if (v.contains("meshes") && v.get("meshes").is<json::array>()) {
-    const json::array &root = v.get("meshes").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`meshes' does not contain an JSON object.";
-        }
-        return false;
-      }
-      Mesh mesh;
-      if (!ParseMesh(&mesh, err, it->get<json>())) {
-        return false;
-      }
-
-      model->meshes.push_back(mesh);
-    }
-  }
-
-  // 5. Parse Node
-  if (v.contains("nodes") && v.get("nodes").is<json::array>()) {
-    const json::array &root = v.get("nodes").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`nodes' does not contain an JSON object.";
-        }
-        return false;
-      }
-      Node node;
-      if (!ParseNode(&node, err, it->get<json>())) {
-        return false;
-      }
-
-      model->nodes.push_back(node);
-    }
-  }
-
-  // 6. Parse scenes.
-  if (v.contains("scenes") && v.get("scenes").is<json::array>()) {
-    const json::array &root = v.get("scenes").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!(it->is<json>())) {
-        if (err) {
-          (*err) += "`scenes' does not contain an JSON object.";
-        }
-        return false;
-      }
-      const json &o = it->get<json>();
-      std::vector<double> nodes;
-      if (!ParseNumberArrayProperty(&nodes, err, o, "nodes", false)) {
-        return false;
-      }
-
-      Scene scene;
-      ParseStringProperty(&scene.name, err, o, "name", false);
-      std::vector<int> nodesIds;
-      for (size_t i = 0; i < nodes.size(); i++) {
-        nodesIds.push_back(static_cast<int>(nodes[i]));
-      }
-      scene.nodes = nodesIds;
-
-      model->scenes.push_back(scene);
-    }
-  }
-
-  // 7. Parse default scenes.
-  if (v.contains("scene") && v.get("scene").is<double>()) {
-    const int defaultScene = int(v.get("scene").get<double>());
-
-    model->defaultScene = static_cast<int>(defaultScene);
-  }
-
-  // 8. Parse Material
-  if (v.contains("materials") && v.get("materials").is<json::array>()) {
-    const json::array &root = v.get("materials").get<json::array>();
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`materials' does not contain an JSON object.";
-        }
-        return false;
-      }
-      json jsonMaterial = it->get<json>();
-
-      Material material;
-      ParseStringProperty(&material.name, err, jsonMaterial, "name", false);
-
-      if (!ParseMaterial(&material, err, jsonMaterial)) {
-        return false;
-      }
-
-      model->materials.push_back(material);
-    }
-  }
-
-  // 9. Parse Image
-  if (v.contains("images") && v.get("images").is<json::array>()) {
-    const json::array &root = v.get("images").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`images' does not contain an JSON object.";
-        }
-        return false;
-      }
-      Image image;
-      if (!ParseImage(&image, err, it->get<json>(), base_dir,
-                      is_binary_, bin_data_, bin_size_)) {
-        return false;
-      }
-
-      if (image.bufferView != -1) {
-        // Load image from the buffer view.
-        if (size_t(image.bufferView) >= model->bufferViews.size()) {
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
           if (err) {
-            std::stringstream ss;
-            ss << "bufferView \"" << image.bufferView
-               << "\" not found in the scene." << std::endl;
-            (*err) += ss.str();
+            (*err) += "`buffers' does not contain an JSON object.";
           }
           return false;
         }
-
-        const BufferView &bufferView =
-            model->bufferViews[size_t(image.bufferView)];
-        const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
-
-        bool ret = LoadImageData(&image, err, image.width, image.height,
-                                 &buffer.data[bufferView.byteOffset],
-                                 static_cast<int>(bufferView.byteLength));
-        if (!ret) {
+        Buffer buffer;
+        if (!ParseBuffer(&buffer, err, it->get<json>(), base_dir,
+                         is_binary_, bin_data_, bin_size_)) {
           return false;
         }
-      }
 
-      model->images.push_back(image);
+        model->buffers.push_back(buffer);
+      }
     }
   }
+  
+  // 4. Parse BufferView
+  {
+    json::const_iterator rootIt = v.find("bufferViews"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
 
-  // 10. Parse Texture
-  if (v.contains("textures") && v.get("textures").is<json::array>()) {
-    const json::array &root = v.get("textures").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; it++) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`textures' does not contain an JSON object.";
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`bufferViews' does not contain an JSON object.";
+          }
+          return false;
         }
-        return false;
-      }
-      Texture texture;
-      if (!ParseTexture(&texture, err, it->get<json>(), base_dir)) {
-        return false;
-      }
-
-      model->textures.push_back(texture);
-    }
-  }
-
-  // 11. Parse Animation
-  if (v.contains("animations") && v.get("animations").is<json::array>()) {
-    const json::array &root = v.get("animations").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`animations' does not contain an JSON object.";
+        BufferView bufferView;
+        if (!ParseBufferView(&bufferView, err, it->get<json>())) {
+          return false;
         }
-        return false;
-      }
-      Animation animation;
-      if (!ParseAnimation(&animation, err, it->get<json>())) {
-        return false;
-      }
 
-      model->animations.push_back(animation);
+        model->bufferViews.push_back(bufferView);
+      }
     }
   }
 
-  // 12. Parse Skin
-  if (v.contains("skins") && v.get("skins").is<json::array>()) {
-    const json::array &root = v.get("skins").get<json::array>();
+  // 5. Parse Accessor
+  {
+    json::const_iterator rootIt = v.find("accessors"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
 
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`skins' does not contain an JSON object.";
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`accessors' does not contain an JSON object.";
+          }
+          return false;
         }
-        return false;
-      }
-      Skin skin;
-      if (!ParseSkin(&skin, err, it->get<json>())) {
-        return false;
-      }
-
-      model->skins.push_back(skin);
-    }
-  }
-
-  // 13. Parse Sampler
-  if (v.contains("samplers") && v.get("samplers").is<json::array>()) {
-    const json::array &root = v.get("samplers").get<json::array>();
-
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`samplers' does not contain an JSON object.";
+        Accessor accessor;
+        if (!ParseAccessor(&accessor, err, it->get<json>())) {
+          return false;
         }
-        return false;
-      }
-      Sampler sampler;
-      if (!ParseSampler(&sampler, err, it->get<json>())) {
-        return false;
-      }
 
-      model->samplers.push_back(sampler);
+        model->accessors.push_back(accessor);
+      }
     }
   }
 
-  // 14. Parse Camera
-  if (v.contains("cameras") && v.get("cameras").is<json::array>()) {
-    const json::array &root = v.get("cameras").get<json::array>();
+  // 6. Parse Mesh
+  {
+    json::const_iterator rootIt = v.find("meshes"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
 
-    json::array::const_iterator it(root.begin());
-    json::array::const_iterator itEnd(root.end());
-    for (; it != itEnd; ++it) {
-      if (!it->is<json>()) {
-        if (err) {
-          (*err) += "`cameras' does not contain an JSON object.";
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`meshes' does not contain an JSON object.";
+          }
+          return false;
         }
-        return false;
-      }
-      Camera camera;
-      if (!ParseCamera(&camera, err, it->get<json>())) {
-        return false;
-      }
+        Mesh mesh;
+        if (!ParseMesh(&mesh, err, it->get<json>())) {
+          return false;
+        }
 
-      model->cameras.push_back(camera);
+        model->meshes.push_back(mesh);
+      }
     }
   }
+
+  // 7. Parse Node
+  {
+    json::const_iterator rootIt = v.find("nodes"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`nodes' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Node node;
+        if (!ParseNode(&node, err, it->get<json>())) {
+          return false;
+        }
+
+        model->nodes.push_back(node);
+      }
+    }
+  }
+
+  // 8. Parse scenes.
+  {
+    json::const_iterator rootIt = v.find("scenes"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!(it.value().is_object())) {
+          if (err) {
+            (*err) += "`scenes' does not contain an JSON object.";
+          }
+          return false;
+        }
+        const json &o = it->get<json>();
+        std::vector<double> nodes;
+        if (!ParseNumberArrayProperty(&nodes, err, o, "nodes", false)) {
+          return false;
+        }
+
+        Scene scene;
+        ParseStringProperty(&scene.name, err, o, "name", false);
+        std::vector<int> nodesIds;
+        for (size_t i = 0; i < nodes.size(); i++) {
+          nodesIds.push_back(static_cast<int>(nodes[i]));
+        }
+        scene.nodes = nodesIds;
+
+        model->scenes.push_back(scene);
+      }
+    }
+  }
+
+  // 9. Parse default scenes.
+  {
+    json::const_iterator rootIt = v.find("scene"); 
+    if ((rootIt != v.end()) && rootIt.value().is_number_integer()) {
+      const int defaultScene = rootIt.value();
+
+      model->defaultScene = static_cast<int>(defaultScene);
+    }
+  }
+
+  // 10. Parse Material
+  {
+    json::const_iterator rootIt = v.find("materials"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`materials' does not contain an JSON object.";
+          }
+          return false;
+        }
+        json jsonMaterial = it->get<json>();
+
+        Material material;
+        ParseStringProperty(&material.name, err, jsonMaterial, "name", false);
+
+        if (!ParseMaterial(&material, err, jsonMaterial)) {
+          return false;
+        }
+
+        model->materials.push_back(material);
+      }
+    }
+  }
+
+  // 11. Parse Image
+  {
+    json::const_iterator rootIt = v.find("images"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`images' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Image image;
+        if (!ParseImage(&image, err, it.value(), base_dir,
+                        is_binary_, bin_data_, bin_size_)) {
+          return false;
+        }
+
+        if (image.bufferView != -1) {
+          // Load image from the buffer view.
+          if (size_t(image.bufferView) >= model->bufferViews.size()) {
+            if (err) {
+              std::stringstream ss;
+              ss << "bufferView \"" << image.bufferView
+                 << "\" not found in the scene." << std::endl;
+              (*err) += ss.str();
+            }
+            return false;
+          }
+
+          const BufferView &bufferView =
+              model->bufferViews[size_t(image.bufferView)];
+          const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
+
+          bool ret = LoadImageData(&image, err, image.width, image.height,
+                                   &buffer.data[bufferView.byteOffset],
+                                   static_cast<int>(bufferView.byteLength));
+          if (!ret) {
+            return false;
+          }
+        }
+
+        model->images.push_back(image);
+      }
+    }
+  }
+
+  // 12. Parse Texture
+  {
+    json::const_iterator rootIt = v.find("textures"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; it++) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`textures' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Texture texture;
+        if (!ParseTexture(&texture, err, it->get<json>(), base_dir)) {
+          return false;
+        }
+
+        model->textures.push_back(texture);
+      }
+    }
+  }
+
+  // 13. Parse Animation
+  {
+    json::const_iterator rootIt = v.find("animations"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; ++it) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`animations' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Animation animation;
+        if (!ParseAnimation(&animation, err, it->get<json>())) {
+          return false;
+        }
+
+        model->animations.push_back(animation);
+      }
+    }
+  }
+
+  // 14. Parse Skin
+  {
+    json::const_iterator rootIt = v.find("skins"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; ++it) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`skins' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Skin skin;
+        if (!ParseSkin(&skin, err, it->get<json>())) {
+          return false;
+        }
+
+        model->skins.push_back(skin);
+      }
+    }
+  }
+
+  // 15. Parse Sampler
+  {
+    json::const_iterator rootIt = v.find("samplers"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; ++it) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`samplers' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Sampler sampler;
+        if (!ParseSampler(&sampler, err, it->get<json>())) {
+          return false;
+        }
+
+        model->samplers.push_back(sampler);
+      }
+    }
+  }
+
+  // 16. Parse Camera
+  {
+    json::const_iterator rootIt = v.find("cameras"); 
+    if ((rootIt != v.end()) && rootIt.value().is_array()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; ++it) {
+        if (!it.value().is_object()) {
+          if (err) {
+            (*err) += "`cameras' does not contain an JSON object.";
+          }
+          return false;
+        }
+        Camera camera;
+        if (!ParseCamera(&camera, err, it->get<json>())) {
+          return false;
+        }
+
+        model->cameras.push_back(camera);
+      }
+    }
+  }
+
+  // 17. Parse Extensions
+  {
+    json::const_iterator rootIt = v.find("extensions"); 
+    if ((rootIt != v.end()) && rootIt.value().is_object()) {
+      const json &root = rootIt.value();
+
+      json::const_iterator it(root.begin());
+      json::const_iterator itEnd(root.end());
+      for (; it != itEnd; ++it) {
+        // parse KHR_lights_cmn extension
+        if ((it.key().compare("KHR_lights_cmn") == 0) && it.value().is_object()) {
+          const json &object = it.value();
+          json::const_iterator itLight(object.find("lights"));
+          json::const_iterator itLightEnd(object.end());
+          if (itLight == itLightEnd) {
+            continue;
+          }
+
+          if (!itLight.value().is_array()) {
+            continue;
+          }
+
+          const json &lights = itLight.value();
+          json::const_iterator arrayIt(lights.begin());
+          json::const_iterator arrayItEnd(lights.end());
+          for (; arrayIt != arrayItEnd; ++arrayIt) {
+            Light light;
+            if (!ParseLight(&light, err, arrayIt.value())) {
+              return false;
+            }
+            model->lights.push_back(light);
+          }
+        }
+      }
+    }
+  }
+
   return true;
 }
 
@@ -2879,13 +3013,14 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 // GLTF Serialization
 ///////////////////////
 
-typedef std::pair<std::string, json::value> json_object_pair;
+//typedef std::pair<std::string, json> json_object_pair;
 
 template <typename T>
 static void SerializeNumberProperty(const std::string &key, T number,
                                     json &obj) {
-  obj.insert(
-      json_object_pair(key, json::value(static_cast<double>(number))));
+  //obj.insert(
+  //    json_object_pair(key, json(static_cast<double>(number))));
+  obj[key] = static_cast<double>(number);
 }
 
 template <typename T>
@@ -2893,57 +3028,55 @@ static void SerializeNumberArrayProperty(const std::string &key,
                                          const std::vector<T> &value,
                                          json &obj) {
   json o;
-  json::array vals;
+  json vals;
 
   for (unsigned int i = 0; i < value.size(); ++i) {
-    vals.push_back(json::value(static_cast<double>(value[i])));
+    vals.push_back(static_cast<double>(value[i]));
   }
 
-  obj.insert(json_object_pair(key, json::value(vals)));
+  obj[key] = vals;
 }
 
 static void SerializeStringProperty(const std::string &key,
                                     const std::string &value,
                                     json &obj) {
-  json::value strVal(value);
-  obj.insert(json_object_pair(key, strVal));
+  obj[key] = value;
 }
 
 static void SerializeStringArrayProperty(const std::string &key,
                                          const std::vector<std::string> &value,
                                          json &obj) {
   json o;
-  json::array vals;
+  json vals;
 
   for (unsigned int i = 0; i < value.size(); ++i) {
-    vals.push_back(json::value(value[i]));
+    vals.push_back(value[i]);
   }
 
-  obj.insert(json_object_pair(key, json::value(vals)));
+  obj[key] = vals;
 }
 
 static void SerializeValue(const std::string &key, const Value &value,
                            json &obj) {
   if (value.IsArray()) {
-    json::array jsonValue;
+    json jsonValue;
     for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
       Value elementValue = value.Get(int(i));
       if (elementValue.IsString())
-        jsonValue.push_back(json::value(elementValue.Get<std::string>()));
+        jsonValue.push_back(elementValue.Get<std::string>());
     }
-    obj.insert(json_object_pair(key, json::value(jsonValue)));
+    obj[key] = jsonValue;
   } else {
     json jsonValue;
     std::vector<std::string> valueKeys;
     for (unsigned int i = 0; i < valueKeys.size(); ++i) {
       Value elementValue = value.Get(valueKeys[i]);
       if (elementValue.IsInt())
-        jsonValue.insert(json_object_pair(
-            valueKeys[i],
-            json::value(static_cast<double>(elementValue.Get<int>()))));
+        jsonValue[valueKeys[i]] = 
+            static_cast<double>(elementValue.Get<int>());
     }
 
-    obj.insert(json_object_pair(key, json::value(jsonValue)));
+    obj[key] = jsonValue;
   }
 }
 
@@ -2967,17 +3100,14 @@ static void SerializeParameterMap(ParameterMap &param, json &o) {
       for (std::map<std::string, double>::iterator it =
                paramIt->second.json_double_value.begin();
            it != paramIt->second.json_double_value.end(); ++it) {
-        json_double_value.insert(
-            json_object_pair(it.key(), json::value(it->second)));
+        json_double_value[it->first] = it->second;
       }
 
-      o.insert(
-          json_object_pair(paramIt->first, json::value(json_double_value)));
+      o[paramIt->first] = json_double_value;
     } else if (!paramIt->second.string_value.empty()) {
       SerializeStringProperty(paramIt->first, paramIt->second.string_value, o);
     } else {
-      o.insert(json_object_pair(paramIt->first,
-                                json::value(paramIt->second.bool_value)));
+      o[paramIt->first] = paramIt->second.bool_value;
     }
   }
 }
@@ -3027,7 +3157,7 @@ static void SerializeGltfAnimationChannel(AnimationChannel &channel,
   SerializeNumberProperty("node", channel.target_node, target);
   SerializeStringProperty("path", channel.target_path, target);
 
-  o.insert(json_object_pair("target", json::value(target)));
+  o["target"] = target;
 }
 
 static void SerializeGltfAnimationSampler(AnimationSampler &sampler,
@@ -3039,24 +3169,24 @@ static void SerializeGltfAnimationSampler(AnimationSampler &sampler,
 
 static void SerializeGltfAnimation(Animation &animation, json &o) {
   SerializeStringProperty("name", animation.name, o);
-  json::array channels;
+  json channels;
   for (unsigned int i = 0; i < animation.channels.size(); ++i) {
     json channel;
     AnimationChannel gltfChannel = animation.channels[i];
     SerializeGltfAnimationChannel(gltfChannel, channel);
-    channels.push_back(json::value(channel));
+    channels.push_back(channel);
   }
-  o.insert(json_object_pair("channels", json::value(channels)));
+  o["channels"] = channels;
 
-  json::array samplers;
+  json samplers;
   for (unsigned int i = 0; i < animation.samplers.size(); ++i) {
     json sampler;
     AnimationSampler gltfSampler = animation.samplers[i];
     SerializeGltfAnimationSampler(gltfSampler, sampler);
-    samplers.push_back(json::value(sampler));
+    samplers.push_back(sampler);
   }
 
-  o.insert(json_object_pair("samplers", json::value(samplers)));
+  o["samplers"] = samplers;
 }
 
 static void SerializeGltfAsset(Asset &asset, json &o) {
@@ -3111,14 +3241,13 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     SerializeParameterMap(material.extPBRValues, values);
 
     json extension;
-    o.insert(json_object_pair("extensions", json::value(extension)));
+    o["extensions"] = extension;
   }
 
   if (material.values.size()) {
     json pbrMetallicRoughness;
     SerializeParameterMap(material.values, pbrMetallicRoughness);
-    o.insert(json_object_pair("pbrMetallicRoughness",
-                              json::value(pbrMetallicRoughness)));
+    o["pbrMetallicRoughness"] = pbrMetallicRoughness;
   }
 
   json additionalValues;
@@ -3130,7 +3259,7 @@ static void SerializeGltfMaterial(Material &material, json &o) {
 }
 
 static void SerializeGltfMesh(Mesh &mesh, json &o) {
-  json::array primitives;
+  json primitives;
   for (unsigned int i = 0; i < mesh.primitives.size(); ++i) {
     json primitive;
     json attributes;
@@ -3141,15 +3270,14 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
       SerializeNumberProperty<int>(attrIt->first, attrIt->second, attributes);
     }
 
-    primitive.insert(
-        json_object_pair("attributes", json::value(attributes)));
+    primitive["attributes"] = attributes;
     SerializeNumberProperty<int>("indices", gltfPrimitive.indices, primitive);
     SerializeNumberProperty<int>("material", gltfPrimitive.material, primitive);
     SerializeNumberProperty<int>("mode", gltfPrimitive.mode, primitive);
 
     // Morph targets
     if (gltfPrimitive.targets.size()) {
-      json::array targets;
+      json targets;
       for (unsigned int k = 0; k < gltfPrimitive.targets.size(); ++k) {
         json targetAttributes;
         std::map<std::string, int> targetData = gltfPrimitive.targets[k];
@@ -3159,15 +3287,15 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
                                        targetAttributes);
         }
 
-        targets.push_back(json::value(targetAttributes));
+        targets.push_back(targetAttributes);
       }
-      primitive.insert(json_object_pair("targets", json::value(targets)));
+      primitive["targets"] = targets;
     }
 
-    primitives.push_back(json::value(primitive));
+    primitives.push_back(primitive);
   }
 
-  o.insert(json_object_pair("primitives", json::value(primitives)));
+  o["primitives"] = primitives;
   if (mesh.weights.size()) {
     SerializeNumberArrayProperty<double>("weights", mesh.weights, o);
   }
@@ -3175,6 +3303,12 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
   if (mesh.name.size()) {
     SerializeStringProperty("name", mesh.name, o);
   }
+}
+
+static void SerializeGltfLight(Light &light, json &o) {
+  SerializeStringProperty("name", light.name, o);
+  SerializeNumberArrayProperty("color", light.color, o);
+  SerializeStringProperty("type", light.type, o);
 }
 
 static void SerializeGltfNode(Node &node, json &o) {
@@ -3201,6 +3335,15 @@ static void SerializeGltfNode(Node &node, json &o) {
   if (node.camera != -1) {
     SerializeNumberProperty<int>("camera", node.camera, o);
   }
+
+  if (node.extLightsValues.size()) {
+    json values;
+    SerializeParameterMap(node.extLightsValues, values);
+    json lightsExt;
+    lightsExt["KHR_lights_cmn"] = values;
+    o["extensions"] = lightsExt;
+  }
+
 
   SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
@@ -3243,11 +3386,11 @@ static void SerializeGltfCamera(const Camera &camera, json &o) {
   if (camera.type.compare("orthographic") == 0) {
     json orthographic;
     SerializeGltfOrthographicCamera(camera.orthographic, orthographic);
-    o.insert(json_object_pair("orthographic", json::value(orthographic)));
+    o["orthographic"] = orthographic;
   } else if (camera.type.compare("perspective") == 0) {
     json perspective;
     SerializeGltfPerspectiveCamera(camera.perspective, perspective);
-    o.insert(json_object_pair("perspective", json::value(perspective)));
+    o["perspective"] = perspective;
   } else {
     // ???
   }
@@ -3279,7 +3422,7 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   if (texture.extras.Size()) {
     json extras;
     SerializeValue("extras", texture.extras, o);
-    o.insert(json_object_pair("extras", json::value(extras)));
+    o["extras"] = extras;
   }
 }
 
@@ -3296,31 +3439,31 @@ bool TinyGLTF::WriteGltfSceneToFile(
   json output;
 
   // ACCESSORS
-  json::array accessors;
+  json accessors;
   for (unsigned int i = 0; i < model->accessors.size(); ++i) {
     json accessor;
     SerializeGltfAccessor(model->accessors[i], accessor);
-    accessors.push_back(json::value(accessor));
+    accessors.push_back(accessor);
   }
-  output.insert(json_object_pair("accessors", json::value(accessors)));
+  output["accessors"] = accessors;
 
   // ANIMATIONS
   if (model->animations.size()) {
-    json::array animations;
+    json animations;
     for (unsigned int i = 0; i < model->animations.size(); ++i) {
       if (model->animations[i].channels.size()) {
         json animation;
         SerializeGltfAnimation(model->animations[i], animation);
-        animations.push_back(json::value(animation));
+        animations.push_back(animation);
       }
     }
-    output.insert(json_object_pair("animations", json::value(animations)));
+    output["animations"] = animations;
   }
 
   // ASSET
   json asset;
   SerializeGltfAsset(model->asset, asset);
-  output.insert(json_object_pair("asset", json::value(asset)));
+  output["asset"] = asset;
 
   std::string binFilePath = filename;
   std::string ext = ".bin";
@@ -3333,22 +3476,22 @@ bool TinyGLTF::WriteGltfSceneToFile(
   }
 
   // BUFFERS (We expect only one buffer here)
-  json::array buffers;
+  json buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
     SerializeGltfBuffer(model->buffers[i], buffer, binFilePath);
-    buffers.push_back(json::value(buffer));
+    buffers.push_back(buffer);
   }
-  output.insert(json_object_pair("buffers", json::value(buffers)));
+  output["buffers"] = buffers;
 
   // BUFFERVIEWS
-  json::array bufferViews;
+  json bufferViews;
   for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
     json bufferView;
     SerializeGltfBufferView(model->bufferViews[i], bufferView);
-    bufferViews.push_back(json::value(bufferView));
+    bufferViews.push_back(bufferView);
   }
-  output.insert(json_object_pair("bufferViews", json::value(bufferViews)));
+  output["bufferViews"] = bufferViews;
 
   // Extensions used
   if (model->extensionsUsed.size()) {
@@ -3363,92 +3506,101 @@ bool TinyGLTF::WriteGltfSceneToFile(
   }
 
   // IMAGES
-  json::array images;
+  json images;
   for (unsigned int i = 0; i < model->images.size(); ++i) {
     json image;
     SerializeGltfImage(model->images[i], image);
-    images.push_back(json::value(image));
+    images.push_back(image);
   }
-  output.insert(json_object_pair("images", json::value(images)));
+  output["images"] = images;
 
   // MATERIALS
-  json::array materials;
+  json materials;
   for (unsigned int i = 0; i < model->materials.size(); ++i) {
     json material;
     SerializeGltfMaterial(model->materials[i], material);
-    materials.push_back(json::value(material));
+    materials.push_back(material);
   }
-  output.insert(json_object_pair("materials", json::value(materials)));
+  output["materials"] = materials;
 
   // MESHES
-  json::array meshes;
+  json meshes;
   for (unsigned int i = 0; i < model->meshes.size(); ++i) {
     json mesh;
     SerializeGltfMesh(model->meshes[i], mesh);
-    meshes.push_back(json::value(mesh));
+    meshes.push_back(mesh);
   }
-  output.insert(json_object_pair("meshes", json::value(meshes)));
+  output["meshes"] = meshes;
 
   // NODES
-  json::array nodes;
+  json nodes;
   for (unsigned int i = 0; i < model->nodes.size(); ++i) {
     json node;
     SerializeGltfNode(model->nodes[i], node);
-    nodes.push_back(json::value(node));
+    nodes.push_back(node);
   }
-  output.insert(json_object_pair("nodes", json::value(nodes)));
+  output["nodes"] = nodes;
 
   // SCENE
   SerializeNumberProperty<int>("scene", model->defaultScene, output);
 
   // SCENES
-  json::array scenes;
+  json scenes;
   for (unsigned int i = 0; i < model->scenes.size(); ++i) {
     json currentScene;
     SerializeGltfScene(model->scenes[i], currentScene);
-    scenes.push_back(json::value(currentScene));
+    scenes.push_back(currentScene);
   }
-  output.insert(json_object_pair("scenes", json::value(scenes)));
+  output["scenes"] = scenes;
 
   // SKINS
   if (model->skins.size()) {
-    json::array skins;
+    json skins;
     for (unsigned int i = 0; i < model->skins.size(); ++i) {
       json skin;
       SerializeGltfSkin(model->skins[i], skin);
-      skins.push_back(json::value(json::value(skin)));
+      skins.push_back(skin);
     }
-    output.insert(json_object_pair("skins", json::value(skins)));
+    output["skins"] = skins;
   }
 
   // TEXTURES
-  json::array textures;
+  json textures;
   for (unsigned int i = 0; i < model->textures.size(); ++i) {
     json texture;
     SerializeGltfTexture(model->textures[i], texture);
-    textures.push_back(json::value(texture));
+    textures.push_back(texture);
   }
-  output.insert(json_object_pair("textures", json::value(textures)));
+  output["textures"] = textures;
 
   // SAMPLERS
-  json::array samplers;
+  json samplers;
   for (unsigned int i = 0; i < model->samplers.size(); ++i) {
     json sampler;
     SerializeGltfSampler(model->samplers[i], sampler);
-    samplers.push_back(json::value(sampler));
+    samplers.push_back(sampler);
   }
-  output.insert(json_object_pair("samplers", json::value(samplers)));
+  output["samplers"] = samplers;
 
   // CAMERAS
-  json::array cameras;
+  json cameras;
   for (unsigned int i = 0; i < model->cameras.size(); ++i) {
     json camera;
     SerializeGltfCamera(model->cameras[i], camera);
-    cameras.push_back(json::value(camera));
+    cameras.push_back(camera);
   }
-  output.insert(json_object_pair("cameras", json::value(cameras)));
+  output["cameras"] = cameras;
 
-  WriteGltfFile(filename, json::value(output).serialize());
+  // LIGHTS
+  json lights;
+  for (unsigned int i = 0; i < model->lights.size(); ++i) {
+    json light;
+    SerializeGltfLight(model->lights[i], light);
+    lights.push_back(light);
+  }
+  output["lights"] = lights;
+
+  WriteGltfFile(filename, output.dump());
   return true;
 }
 
