@@ -10,6 +10,7 @@ solution "glview"
       files { "glview.cc", "trackball.cc" }
       includedirs { "./" }
       includedirs { "../../" }
+      flags "c++11"
 
       configuration { "linux" }
          linkoptions { "`pkg-config --libs glfw3`" }
