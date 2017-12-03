@@ -1,6 +1,6 @@
 # Header only C++ tiny glTF library(loader/saver).
 
-`TinyGLTF` is a header only C++ glTF 2.0 https://github.com/KhronosGroup/glTF library.
+`TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 ## Status
 
@@ -14,7 +14,7 @@ Work in process(`devel` branch). Very near to release, but need more tests and e
 
 ## Features
 
-* Written in portable C++. C++-03 with STL dependency only.
+* Written in portable C++. C++-11 with STL dependency only.
   * [x] macOS + clang(LLVM)
   * [x] iOS + clang
   * [x] Linux + gcc/clang
@@ -40,11 +40,12 @@ Work in process(`devel` branch). Very near to release, but need more tests and e
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
+* [validator](examples/validator) : Simple glTF validator with JSON schema.
 
 ## TODOs
 
 * [ ] Write C++ code generator from json schema for robust parsing.
-* [ ] Serialization
+* [x] Serialization
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
@@ -56,14 +57,14 @@ TinyGLTF is licensed under MIT license.
 
 TinyGLTF uses the following third party libraries.
 
-* picojson.h : Copyright 2009-2010 Cybozu Labs, Inc. Copyright 2011-2014 Kazuho Oku
+* json.hpp : Copyright (c) 2013-2017 Niels Lohmann. MIT license.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
 * stb_image.h : v2.08 - public domain image loader - http://nothings.org/stb_image.h
 
 
 ## Build and example
 
-Copy `stb_image.h`, `picojson.h` and `tiny_gltf.h` to your project.
+Copy `stb_image.h`, `json.hpp` and `tiny_gltf.h` to your project.
 
 ### Loading glTF 2.0 model
 
