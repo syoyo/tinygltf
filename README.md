@@ -6,6 +6,9 @@
 
 Work in process(`devel` branch). Very near to release, but need more tests and examples.
 
+`TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
+If you are looking for old, C++03 version, please use `devel-picojson` branch.  
+
 ## Builds
 
 [![Build Status](https://travis-ci.org/syoyo/tinygltf.svg?branch=devel)](https://travis-ci.org/syoyo/tinygltf)
