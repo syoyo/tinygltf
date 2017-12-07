@@ -135,7 +135,7 @@ static std::string PrintParameterType(int ty) {
 #endif
 
 static std::string PrintWrapMode(int mode) {
-  if (mode == TINYGLTF_TEXTURE_WRAP_RPEAT) {
+  if (mode == TINYGLTF_TEXTURE_WRAP_REPEAT) {
     return "REPEAT";
   } else if (mode == TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE) {
     return "CLAMP_TO_EDGE";
