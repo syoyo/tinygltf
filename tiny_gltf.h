@@ -68,7 +68,7 @@ namespace tinygltf {
 #define TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR (9986)
 #define TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR (9987)
 
-#define TINYGLTF_TEXTURE_WRAP_RPEAT (10497)
+#define TINYGLTF_TEXTURE_WRAP_REPEAT (10497)
 #define TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE (33071)
 #define TINYGLTF_TEXTURE_WRAP_MIRRORED_REPEAT (33648)
 
@@ -341,8 +341,8 @@ struct Sampler {
   Value extras;
 
   Sampler()
-      : wrapS(TINYGLTF_TEXTURE_WRAP_RPEAT),
-        wrapT(TINYGLTF_TEXTURE_WRAP_RPEAT) {}
+      : wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
+        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
 };
 
 struct Image {
@@ -2135,8 +2135,8 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
   double minFilter =
       static_cast<double>(TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR);
   double magFilter = static_cast<double>(TINYGLTF_TEXTURE_FILTER_LINEAR);
-  double wrapS = static_cast<double>(TINYGLTF_TEXTURE_WRAP_RPEAT);
-  double wrapT = static_cast<double>(TINYGLTF_TEXTURE_WRAP_RPEAT);
+  double wrapS = static_cast<double>(TINYGLTF_TEXTURE_WRAP_REPEAT);
+  double wrapT = static_cast<double>(TINYGLTF_TEXTURE_WRAP_REPEAT);
   ParseNumberProperty(&minFilter, err, o, "minFilter", false);
   ParseNumberProperty(&magFilter, err, o, "magFilter", false);
   ParseNumberProperty(&wrapS, err, o, "wrapS", false);
