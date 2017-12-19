@@ -2,6 +2,9 @@
 
 Simple raytracing example with OpenGL preview
 
+## Status
+
+Not working yet. Still in work in progress.
 
 ## Build
 
