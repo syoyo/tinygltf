@@ -20,6 +20,7 @@ static std::string GetFilePathExtension(const std::string &FileName) {
 bool LoadGLTF(const std::string &filename, float scale, std::vector<Mesh<float> > *meshes, std::vector<Material> *materials, std::vector<Texture> *textures) 
 {
 
+  // TODO(syoyo): Implement
   // TODO(syoyo): Texture
   // TODO(syoyo): Material
 
@@ -45,7 +46,8 @@ bool LoadGLTF(const std::string &filename, float scale, std::vector<Mesh<float> 
     return false;
   }
 
-  return true;
+  std::cerr << "LoadGLTF() function is not yet implemented!" << std::endl;
+  return false;
 }
 
 } // namespace example
