@@ -45,7 +45,7 @@ bool LoadGLTF(const std::string &filename, float scale, std::vector<Mesh<float> 
     return false;
   }
 
-  return false;
+  return true;
 }
 
 } // namespace example
