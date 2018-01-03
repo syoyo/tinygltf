@@ -4,7 +4,9 @@ Simple OpenGL viewer for glTF geometry.
 
 * premake4 : Requires recent `premake4` for macosx and linux, `premake5` for windows.
 * GLEW
+  * Ubuntu 16.04: sudo apt install libglew-dev
 * glfw3
+  * Ubuntu 16.04: sudo apt install libglfw3-dev
 
 ### MacOSX and Linux
 

@@ -143,6 +143,52 @@ typedef enum {
   OBJECT_TYPE = 7
 } Type;
 
+static inline int GetComponentSizeInBytes(unsigned int componentType)
+{
+  if (componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
+    return 1;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+    return 1;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    return 2;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    return 2;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_INT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_DOUBLE) {
+    return 8;
+  } else {
+    // Unknown componenty type
+    return -1;
+  }
+}
+
+static inline int GetTypeSizeInBytes(unsigned int ty)
+{
+  if (ty == TINYGLTF_TYPE_SCALAR) {
+    return 1;
+  } else if (ty == TINYGLTF_TYPE_VEC2) {
+    return 2;
+  } else if (ty == TINYGLTF_TYPE_VEC3) {
+    return 3;
+  } else if (ty == TINYGLTF_TYPE_VEC4) {
+    return 4;
+  } else if (ty == TINYGLTF_TYPE_MAT2) {
+    return 4;
+  } else if (ty == TINYGLTF_TYPE_MAT3) {
+    return 9;
+  } else if (ty == TINYGLTF_TYPE_MAT4) {
+    return 16;
+  } else {
+    // Unknown componenty type
+    return -1;
+  }
+}
+
 #ifdef __clang__
 #pragma clang diagnostic push
 // Suppress warning for : static Value null_value
@@ -252,9 +298,9 @@ class Value {
   Array array_value_;
   Object object_value_;
   bool boolean_value_;
-  char pad[3];
+  char _pad[3];
 
-  int pad0;
+  int _pad0;
 };
 
 #ifdef __clang__
@@ -337,7 +383,7 @@ struct Sampler {
   int wrapT;      // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default
                   // "REPEAT"
   int wrapR;      // TinyGLTF extension
-  int pad0;
+  int _pad0;
   Value extras;
 
   Sampler()
@@ -350,7 +396,7 @@ struct Image {
   int width;
   int height;
   int component;
-  int pad0;
+  int _pad0;
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png"]
@@ -389,7 +435,7 @@ struct BufferView {
   size_t byteStride;  // minimum 4, maximum 252 (multiple of 4), default 0 =
                       // understood to be tightly packed
   int target;         // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
-  int pad0;
+  int _pad0;
   Value extras;
 
   BufferView() : byteOffset(0), byteStride(0) {}
@@ -410,6 +456,40 @@ struct Accessor {
   std::vector<double> maxValues;  // optional
 
   // TODO(syoyo): "sparse"
+
+  ///
+  /// Utility function to compute byteStride for a given bufferView object.
+  /// Returns -1 upon invalid glTF value or parameter configuration.
+  ///
+  int ByteStride(const BufferView &bufferViewObject) const {
+    if (bufferViewObject.byteStride == 0) {
+      // Assume data is tightly packed.
+      int componentSizeInBytes = GetComponentSizeInBytes(componentType);
+      if (componentSizeInBytes <= 0) {
+        return -1;
+      }
+
+      int typeSizeInBytes = GetTypeSizeInBytes(type);
+      if (typeSizeInBytes <= 0) {
+        return -1;
+      }
+
+      return componentSizeInBytes * typeSizeInBytes;
+    } else {
+      // Check if byteStride is a mulple of the size of the accessor's component type.
+      int componentSizeInBytes = GetComponentSizeInBytes(componentType);
+      if (componentSizeInBytes <= 0) {
+        return -1;
+      }
+
+      if ((bufferViewObject.byteStride % componentSizeInBytes) != 0) {
+        return -1;
+      }
+      return bufferViewObject.byteStride;
+    }
+
+    return 0;
+  }
 
   Accessor() { bufferView = -1; }
 };
@@ -582,7 +662,7 @@ enum SectionCheck {
 class TinyGLTF {
  public:
   TinyGLTF() : bin_data_(NULL), bin_size_(0), is_binary_(false) {
-    pad[0] = pad[1] = pad[2] = pad[3] = pad[4] = pad[5] = pad[6] = 0;
+    _pad[0] = _pad[1] = _pad[2] = _pad[3] = _pad[4] = _pad[5] = _pad[6] = 0;
   }
   ~TinyGLTF() {}
 
@@ -644,7 +724,7 @@ class TinyGLTF {
   const unsigned char *bin_data_;
   size_t bin_size_;
   bool is_binary_;
-  char pad[7];
+  char _pad[7];
 };
 
 }  // namespace tinygltf
