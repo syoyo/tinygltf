@@ -75,6 +75,7 @@ Copy `stb_image.h`, `json.hpp` and `tiny_gltf.h` to your project.
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+// #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
 using namespace tinygltf;
@@ -95,19 +96,42 @@ if (!ret) {
 }
 ```
 
+## Compile options
+
+* `TINYGLTF_NOEXCEPTION` : Disable C++ exception handling. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` to fully disable C++ exception codes.
+* `TINGLTF_
+
 ### Saving gltTF 2.0 model
 
 T.B.W.
 
 ## Running tests.
 
-### Setup
+### glTF parsing test
+
+#### Setup
 
 Python 2.6 or 2.7 required.
 Git clone https://github.com/KhronosGroup/glTF-Sample-Models to your local dir.
 
-### Run test
+#### Run parsing test
 
 After building `loader_example`, edit `test_runner.py`, then,
 
     $ python test_runner.py
+
+### Unit tests
+
+```
+$ cd tests
+$ make
+$ ./tester
+$ ./tester_noexcept
+```
+
+## Third party licenses
+
+* json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
+* stb_image : Public domain.
+* catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
+ *  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
