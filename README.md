@@ -98,8 +98,7 @@ if (!ret) {
 
 ## Compile options
 
-* `TINYGLTF_NOEXCEPTION` : Disable C++ exception handling. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` to fully disable C++ exception codes.
-* `TINGLTF_
+* `TINYGLTF_NOEXCEPTION` : Disable C++ exception in JSON parsing. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` and `TINYGLTF_NOEXCEPTION`  to fully remove C++ exception codes when compiling TinyGLTF.
 
 ### Saving gltTF 2.0 model
 
