@@ -2405,17 +2405,31 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  // TODO(syoyo): Add feature not using exception handling.
   json v;
+
+#if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && not defined(TINYGLTF_NOEXCEPTION)
   try {
     v = json::parse(str, str + length);
 
-  } catch (std::exception e) {
+  } catch (const std::exception &e) {
     if (err) {
       (*err) = e.what();
     }
     return false;
   }
+#else
+  {
+    v = json::parse(str, str + length, nullptr, /* exception */false);
+
+    if (!v.is_object()) {
+      // Assume parsing was failed.
+      if (err) {
+        (*err) = "Failed to parse JSON object\n";
+      }
+      return false;
+    }
+  }
+#endif
 
   if (!v.is_object()) {
     // root is not an object.
