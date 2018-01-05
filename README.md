@@ -133,4 +133,3 @@ $ ./tester_noexcept
 * json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
 * stb_image : Public domain.
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
- *  file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
