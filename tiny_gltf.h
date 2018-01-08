@@ -357,7 +357,7 @@ using ColorValue = std::array<double, 4>;
 
   ///Return the color of a material
   ///Returned value is only valid if the parameter represent a texture from a material
-  ColorValue Color() const {
+  ColorValue ColorFactor() const {
     return {
       { // this agregate intialize the std::array object, and uses C++11 RVO.
         number_array[0],
