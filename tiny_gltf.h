@@ -340,7 +340,7 @@ using ColorValue = std::array<double, 4>;
 
   ///Return the index of a texture if this Parameter is a texture map.
   ///Returned value is only valid if the parameter represent a texture from a material
-  int TextureIndex() {
+  int TextureIndex() const {
     const auto it = json_double_value.find("index");
     if (it != std::end(json_double_value))
     {
@@ -351,13 +351,13 @@ using ColorValue = std::array<double, 4>;
 
   ///Material factor, like the roughness or metalness of a material
   ///Returned value is only valid if the parameter represent a texture from a material
-  double Factor() {
+  double Factor() const {
     return number_array[0];
   }
 
   ///Return the color of a material
   ///Returned value is only valid if the parameter represent a texture from a material
-  ColorValue Color() {
+  ColorValue Color() const {
     return {
       { // this agregate intialize the std::array object, and uses C++11 RVO.
         number_array[0],
