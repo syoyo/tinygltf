@@ -42,6 +42,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <array>
 
 namespace tinygltf {
 
@@ -325,12 +326,48 @@ TINYGLTF_VALUE_GET(Value::Array, array_value_)
 TINYGLTF_VALUE_GET(Value::Object, object_value_)
 #undef TINYGLTF_VALUE_GET
 
-typedef struct {
+///Agregate object for representing a color
+using ColorValue = std::array<double, 4>;
+
+ struct Parameter {
   bool bool_value;
   std::string string_value;
   std::vector<double> number_array;
   std::map<std::string, double> json_double_value;
-} Parameter;
+
+  //context sensitive methods. depending the type of the Parameter you are accessing, these are either valid or not
+  //If this parameter represent a texture map in a material, will return the texture index
+
+  ///Return the index of a texture if this Parameter is a texture map.
+  ///Returned value is only valid if the parameter represent a texture from a material
+  int TextureIndex() {
+    const auto it = json_double_value.find("index");
+    if (it != std::end(json_double_value))
+    {
+      return int(it->second);
+    }
+    return -1;
+  }
+
+  ///Material factor, like the roughness or metalness of a material
+  ///Returned value is only valid if the parameter represent a texture from a material
+  double Factor() {
+    return number_array[0];
+  }
+
+  ///Return the color of a material
+  ///Returned value is only valid if the parameter represent a texture from a material
+  ColorValue Color() {
+    return {
+      { // this agregate intialize the std::array object, and uses C++11 RVO.
+        number_array[0],
+        number_array[1],
+        number_array[2],
+        (number_array.size() > 3 ? number_array[3] : 1.0)
+      }
+    };
+  }
+};
 
 typedef std::map<std::string, Parameter> ParameterMap;
 
