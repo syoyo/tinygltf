@@ -72,7 +72,7 @@ Copy `stb_image.h`, `json.hpp` and `tiny_gltf.h` to your project.
 
 ### Loading glTF 2.0 model
 
-```
+```c++
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -118,11 +118,13 @@ Git clone https://github.com/KhronosGroup/glTF-Sample-Models to your local dir.
 
 After building `loader_example`, edit `test_runner.py`, then,
 
-    $ python test_runner.py
+```bash
+$ python test_runner.py
+```
 
 ### Unit tests
 
-```
+```bash
 $ cd tests
 $ make
 $ ./tester
