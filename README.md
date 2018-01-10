@@ -22,6 +22,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [x] iOS + clang
   * [x] Linux + gcc/clang
   * [x] Windows + MinGW
+  * [x] Windows + Visual Studio 2015 or later.
   * [x] Android + CrystaX(NDK drop-in replacement) GCC
   * [x] Web using Emscripten(LLVM)
 * Moderate parsing time and memory consumption.
