@@ -522,7 +522,7 @@ struct Accessor {
       if ((bufferViewObject.byteStride % componentSizeInBytes) != 0) {
         return -1;
       }
-      return bufferViewObject.byteStride;
+      return static_cast<int>(bufferViewObject.byteStride);
     }
 
     return 0;
