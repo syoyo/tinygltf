@@ -37,11 +37,13 @@
 #ifndef TINY_GLTF_H_
 #define TINY_GLTF_H_
 
+#include <cstdint>
 #include <cassert>
 #include <cstring>
 #include <map>
 #include <string>
 #include <vector>
+#include <array>
 
 namespace tinygltf {
 
@@ -143,11 +145,58 @@ typedef enum {
   OBJECT_TYPE = 7
 } Type;
 
+static inline int32_t GetComponentSizeInBytes(uint32_t componentType)
+{
+  if (componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
+    return 1;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+    return 1;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    return 2;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    return 2;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_INT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_DOUBLE) {
+    return 8;
+  } else {
+    // Unknown componenty type
+    return -1;
+  }
+}
+
+static inline int32_t GetTypeSizeInBytes(uint32_t ty)
+{
+  if (ty == TINYGLTF_TYPE_SCALAR) {
+    return 1;
+  } else if (ty == TINYGLTF_TYPE_VEC2) {
+    return 2;
+  } else if (ty == TINYGLTF_TYPE_VEC3) {
+    return 3;
+  } else if (ty == TINYGLTF_TYPE_VEC4) {
+    return 4;
+  } else if (ty == TINYGLTF_TYPE_MAT2) {
+    return 4;
+  } else if (ty == TINYGLTF_TYPE_MAT3) {
+    return 9;
+  } else if (ty == TINYGLTF_TYPE_MAT4) {
+    return 16;
+  } else {
+    // Unknown componenty type
+    return -1;
+  }
+}
+
 #ifdef __clang__
 #pragma clang diagnostic push
 // Suppress warning for : static Value null_value
 // https://stackoverflow.com/questions/15708411/how-to-deal-with-global-constructor-warning-in-clang
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
+#pragma clang diagnostic ignored "-Wpadded"
 #endif
 
 // Simple class to represent JSON object
@@ -252,14 +301,12 @@ class Value {
   Array array_value_;
   Object object_value_;
   bool boolean_value_;
-  char pad[3];
-
-  int pad0;
 };
 
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
+
 
 #define TINYGLTF_VALUE_GET(ctype, var)            \
   template <>                                     \
@@ -279,12 +326,63 @@ TINYGLTF_VALUE_GET(Value::Array, array_value_)
 TINYGLTF_VALUE_GET(Value::Object, object_value_)
 #undef TINYGLTF_VALUE_GET
 
-typedef struct {
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++98-compat"
+#pragma clang diagnostic ignored "-Wpadded"
+#endif
+
+///Agregate object for representing a color
+using ColorValue = std::array<double, 4>;
+
+ struct Parameter {
   bool bool_value;
   std::string string_value;
   std::vector<double> number_array;
   std::map<std::string, double> json_double_value;
-} Parameter;
+
+  //context sensitive methods. depending the type of the Parameter you are accessing, these are either valid or not
+  //If this parameter represent a texture map in a material, will return the texture index
+
+  ///Return the index of a texture if this Parameter is a texture map.
+  ///Returned value is only valid if the parameter represent a texture from a material
+  int TextureIndex() const {
+    const auto it = json_double_value.find("index");
+    if (it != std::end(json_double_value))
+    {
+      return int(it->second);
+    }
+    return -1;
+  }
+
+  ///Material factor, like the roughness or metalness of a material
+  ///Returned value is only valid if the parameter represent a texture from a material
+  double Factor() const {
+    return number_array[0];
+  }
+
+  ///Return the color of a material
+  ///Returned value is only valid if the parameter represent a texture from a material
+  ColorValue ColorFactor() const {
+    return {
+      { // this agregate intialize the std::array object, and uses C++11 RVO.
+        number_array[0],
+        number_array[1],
+        number_array[2],
+        (number_array.size() > 3 ? number_array[3] : 1.0)
+      }
+    };
+  }
+};
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpadded"
+#endif
 
 typedef std::map<std::string, Parameter> ParameterMap;
 
@@ -337,7 +435,6 @@ struct Sampler {
   int wrapT;      // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default
                   // "REPEAT"
   int wrapR;      // TinyGLTF extension
-  int pad0;
   Value extras;
 
   Sampler()
@@ -350,7 +447,6 @@ struct Image {
   int width;
   int height;
   int component;
-  int pad0;
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png"]
@@ -389,7 +485,6 @@ struct BufferView {
   size_t byteStride;  // minimum 4, maximum 252 (multiple of 4), default 0 =
                       // understood to be tightly packed
   int target;         // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
-  int pad0;
   Value extras;
 
   BufferView() : byteOffset(0), byteStride(0) {}
@@ -410,6 +505,40 @@ struct Accessor {
   std::vector<double> maxValues;  // optional
 
   // TODO(syoyo): "sparse"
+
+  ///
+  /// Utility function to compute byteStride for a given bufferView object.
+  /// Returns -1 upon invalid glTF value or parameter configuration.
+  ///
+  int ByteStride(const BufferView &bufferViewObject) const {
+    if (bufferViewObject.byteStride == 0) {
+      // Assume data is tightly packed.
+      int componentSizeInBytes = GetComponentSizeInBytes(static_cast<uint32_t>(componentType));
+      if (componentSizeInBytes <= 0) {
+        return -1;
+      }
+
+      int typeSizeInBytes = GetTypeSizeInBytes(static_cast<uint32_t>(type));
+      if (typeSizeInBytes <= 0) {
+        return -1;
+      }
+
+      return componentSizeInBytes * typeSizeInBytes;
+    } else {
+      // Check if byteStride is a mulple of the size of the accessor's component type.
+      int componentSizeInBytes = GetComponentSizeInBytes(static_cast<uint32_t>(componentType));
+      if (componentSizeInBytes <= 0) {
+        return -1;
+      }
+
+      if ((bufferViewObject.byteStride % uint32_t(componentSizeInBytes)) != 0) {
+        return -1;
+      }
+      return static_cast<int>(bufferViewObject.byteStride);
+    }
+
+    return 0;
+  }
 
   Accessor() { bufferView = -1; }
 };
@@ -489,6 +618,23 @@ typedef struct {
 class Node {
  public:
   Node() : camera(-1), skin(-1), mesh(-1) {}
+
+  Node(const Node &rhs) {
+    camera = rhs.camera;
+
+    name = rhs.name;
+    skin = rhs.skin;
+    mesh = rhs.mesh;
+    children = rhs.children;
+    rotation = rhs.rotation;
+    scale = rhs.scale;
+    translation = rhs.translation;
+    matrix = rhs.matrix;
+    weights = rhs.weights;
+
+    extras = rhs.extras;
+    extLightsValues = rhs.extLightsValues;
+  }
 
   ~Node() {}
 
@@ -579,11 +725,22 @@ enum SectionCheck {
   REQUIRE_ALL = 0x3f
 };
 
+
 class TinyGLTF {
  public:
-  TinyGLTF() : bin_data_(NULL), bin_size_(0), is_binary_(false) {
-    pad[0] = pad[1] = pad[2] = pad[3] = pad[4] = pad[5] = pad[6] = 0;
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++98-compat"
+#endif
+
+  TinyGLTF() : bin_data_(nullptr), bin_size_(0), is_binary_(false) {
   }
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
   ~TinyGLTF() {}
 
   ///
@@ -644,8 +801,11 @@ class TinyGLTF {
   const unsigned char *bin_data_;
   size_t bin_size_;
   bool is_binary_;
-  char pad[7];
 };
+
+#ifdef __clang__
+#pragma clang diagnostic pop // -Wpadded
+#endif
 
 }  // namespace tinygltf
 
@@ -673,8 +833,16 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
 #pragma clang diagnostic ignored "-Wswitch-enum"
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
+#pragma clang diagnostic ignored "-Wweak-vtables"
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
 #if __has_warning("-Wcomma")
 #pragma clang diagnostic ignored "-Wcomma"
+#endif
+#if __has_warning("-Wzero-as-null-pointer-constant")
+#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
+#if __has_warning("-Wcast-qual")
+#pragma clang diagnostic ignored "-Wcast-qual"
 #endif
 #endif
 
@@ -700,8 +868,13 @@ class TinyGLTF {
 
 using nlohmann::json;
 
-#if __APPLE__
+#ifdef __APPLE__
     #include "TargetConditionals.h"
+#endif
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++98-compat"
 #endif
 
 namespace tinygltf {
@@ -1446,7 +1619,7 @@ static bool ParseImage(Image *image, std::string *err,
     if (!loaded) {
       // load data from (embedded) binary data
 
-      if ((bin_size == 0) || (bin_data == NULL)) {
+      if ((bin_size == 0) || (bin_data == nullptr)) {
         if (err) {
           (*err) += "Invalid binary data.\n";
         }
@@ -1529,7 +1702,7 @@ static bool ParseTexture(Texture *texture, std::string *err,
 static bool ParseBuffer(Buffer *buffer, std::string *err,
                         const json &o, const std::string &basedir,
                         bool is_binary = false,
-                        const unsigned char *bin_data = NULL,
+                        const unsigned char *bin_data = nullptr,
                         size_t bin_size = 0) {
   double byteLength;
   if (!ParseNumberProperty(&byteLength, err, o, "byteLength", true, "Buffer")) {
@@ -1567,7 +1740,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
     } else {
       // load data from (embedded) binary data
 
-      if ((bin_size == 0) || (bin_data == NULL)) {
+      if ((bin_size == 0) || (bin_data == nullptr)) {
         if (err) {
           (*err) += "Invalid binary data in `Buffer'.\n";
         }
@@ -1934,24 +2107,24 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
   json::const_iterator extensions_object = o.find("extensions");
   if ((extensions_object != o.end()) &&
       extensions_object.value().is_object()) {
-    const json &values_object =
+    const json &ext_values_object =
       extensions_object.value();
 
-    json::const_iterator it(values_object.begin());
-    json::const_iterator itEnd(values_object.end());
+    json::const_iterator it(ext_values_object.begin());
+    json::const_iterator itEnd(ext_values_object.end());
 
     for (; it != itEnd; it++) {
       if ((it.key().compare("KHR_lights_cmn") == 0) &&
          it.value().is_object()) {
-        const json &values_object =
+        const json &light_values_object =
           it.value();
 
-        json::const_iterator itVal(values_object.begin());
-        json::const_iterator itValEnd(values_object.end());
+        json::const_iterator itVal(light_values_object.begin());
+        json::const_iterator itValEnd(light_values_object.end());
 
         for (; itVal != itValEnd; itVal++) {
           Parameter param;
-          if (ParseParameterProperty(&param, err, values_object, itVal.key(),
+          if (ParseParameterProperty(&param, err, light_values_object, itVal.key(),
                 false)) {
             node->extLightsValues[itVal.key()] = param;
           }
@@ -2325,17 +2498,31 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     return false;
   }
 
-  // TODO(syoyo): Add feature not using exception handling.
   json v;
+
+#if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || defined(_CPPUNWIND)) && not defined(TINYGLTF_NOEXCEPTION)
   try {
     v = json::parse(str, str + length);
 
-  } catch (std::exception e) {
+  } catch (const std::exception &e) {
     if (err) {
       (*err) = e.what();
     }
     return false;
   }
+#else
+  {
+    v = json::parse(str, str + length, nullptr, /* exception */false);
+
+    if (!v.is_object()) {
+      // Assume parsing was failed.
+      if (err) {
+        (*err) = "Failed to parse JSON object\n";
+      }
+      return false;
+    }
+  }
+#endif
 
   if (!v.is_object()) {
     // root is not an object.
@@ -2869,7 +3056,7 @@ bool TinyGLTF::LoadASCIIFromString(Model *model, std::string *err,
                                    const std::string &base_dir,
                                    unsigned int check_sections) {
   is_binary_ = false;
-  bin_data_ = NULL;
+  bin_data_ = nullptr;
   bin_size_ = 0;
 
   return LoadFromString(model, err, str, length, base_dir, check_sections);
@@ -3605,5 +3792,9 @@ bool TinyGLTF::WriteGltfSceneToFile(
 }
 
 }  // namespace tinygltf
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 #endif  // TINYGLTF_IMPLEMENTATION

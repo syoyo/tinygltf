@@ -9,6 +9,22 @@ Experimental. W.I.P.
 ## Requirements
 
 * C++11 compiler
+* CMake
+
+## How to build
+
+```
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make
+```
+
+## How to use
+
+```
+$ gltf-validator /path/to/file.gltf /path/to/gltf-schema
+```
 
 ## Third party licenses
 

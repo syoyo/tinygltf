@@ -1,5 +1,8 @@
 version: 0.9.{build}
 
+image:
+  - Visual Studio 2015
+
 # scripts that runs after repo cloning.
 install:
   - vcsetup.bat
