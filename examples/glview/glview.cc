@@ -546,9 +546,12 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
           (it->first.compare("NORMAL") == 0) ||
           (it->first.compare("TEXCOORD_0") == 0)) {
         if (gGLProgramState.attribs[it->first] >= 0) {
+          // Compute byteStride from Accessor + BufferView combination.
+          int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+          assert(byteStride != -1);
           glVertexAttribPointer(gGLProgramState.attribs[it->first], size,
                                 accessor.componentType, accessor.normalized ? GL_TRUE : GL_FALSE,
-                                model.bufferViews[accessor.bufferView].byteStride,
+                                byteStride,
                                 BUFFER_OFFSET(accessor.byteOffset));
           CheckErrors("vertex attrib pointer");
           glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
