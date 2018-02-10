@@ -1176,7 +1176,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
     if (err) {
       (*err) += "Unknown image format.\n";
     }
-    return true;
+    return false;
   }
 
   if (w < 1 || h < 1) {
@@ -1184,7 +1184,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
     if (err) {
       (*err) += "Invalid image data.\n";
     }
-    return true;
+    return false;
   }
 
   if (req_width > 0) {
