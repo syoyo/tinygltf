@@ -449,7 +449,7 @@ struct Image {
   int component;
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
-  std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png"]
+  std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png", "image/bmp", "image/gif"]
   std::string uri;       // (reqiored if no mimeType)
   Value extras;
 
@@ -1224,13 +1224,23 @@ static bool IsDataURI(const std::string &in) {
     return true;
   }
 
+  header = "data:image/jpeg;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+  
   header = "data:image/png;base64,";
   if (in.find(header) == 0) {
     return true;
   }
+  
+  header = "data:image/bmp;base64,";
+  if(in.find(header) == 0) {
+    return true;
+  }
 
-  header = "data:image/jpeg;base64,";
-  if (in.find(header) == 0) {
+  header = "data:image/gif;base64,";
+  if(in.find(header) == 0) {
     return true;
   }
 
@@ -1260,6 +1270,20 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
 
   if (data.empty()) {
     header = "data:image/png;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size()));  // cut mime string.
+    }
+  }
+  
+  if (data.empty()) {
+    header = "data:image/bmp;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size()));  // cut mime string.
+    }
+  }
+
+  if (data.empty()) {
+    header = "data:image/gif;base64,";
     if (in.find(header) == 0) {
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
