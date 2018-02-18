@@ -1,5 +1,5 @@
 #include "obj-loader.h"
-#include "../../nanort.h"  // for float3
+#include "nanort.h"  // for float3
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
