@@ -9,6 +9,7 @@ newoption {
 }
 
 sources = {
+   "stbi-impl.cc",
    "main.cc",
    "render.cc",
    "render-config.cc",
