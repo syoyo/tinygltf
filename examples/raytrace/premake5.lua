@@ -13,6 +13,7 @@ sources = {
    "render.cc",
    "render-config.cc",
    "obj-loader.cc",
+   "gltf-loader.cc",
    "matrix.cc",
    "../common/trackball.cc",
    "../common/imgui/imgui.cpp",
