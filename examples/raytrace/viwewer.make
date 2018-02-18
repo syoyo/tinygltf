@@ -180,6 +180,7 @@ OBJECTS := \
 	$(OBJDIR)/imgui_draw.o \
 	$(OBJDIR)/imgui_impl_btgui.o \
 	$(OBJDIR)/trackball.o \
+	$(OBJDIR)/gltf-loader.o \
 	$(OBJDIR)/main.o \
 	$(OBJDIR)/matrix.o \
 	$(OBJDIR)/obj-loader.o \
@@ -285,6 +286,14 @@ else
 endif
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/trackball.o: ../common/trackball.cc
+	@echo $(notdir $<)
+ifeq (posix,$(SHELLTYPE))
+	$(SILENT) mkdir -p $(OBJDIR)
+else
+	$(SILENT) mkdir $(subst /,\\,$(OBJDIR))
+endif
+	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+$(OBJDIR)/gltf-loader.o: gltf-loader.cc
 	@echo $(notdir $<)
 ifeq (posix,$(SHELLTYPE))
 	$(SILENT) mkdir -p $(OBJDIR)
