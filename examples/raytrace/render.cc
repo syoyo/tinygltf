@@ -41,7 +41,7 @@ THE SOFTWARE.
 
 #include <iostream>
 
-#include "../../nanort.h"
+#include "nanort.h"
 #include "matrix.h"
 #include "material.h"
 #include "mesh.h"
