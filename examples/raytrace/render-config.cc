@@ -35,6 +35,12 @@ bool LoadRenderConfig(example::RenderConfig* config, const char* filename) {
     }
   }
 
+  if (o.find("gltf_filename") != o.end()) {
+    if (o["gltf_filename"].is<std::string>()) {
+      config->gltf_filename = o["gltf_filename"].get<std::string>();
+    }
+  }
+
   if (o.find("eson_filename") != o.end()) {
     if (o["eson_filename"].is<std::string>()) {
       config->eson_filename = o["eson_filename"].get<std::string>();
