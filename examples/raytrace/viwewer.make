@@ -186,6 +186,7 @@ OBJECTS := \
 	$(OBJDIR)/obj-loader.o \
 	$(OBJDIR)/render-config.o \
 	$(OBJDIR)/render.o \
+	$(OBJDIR)/stbi-impl.o \
 
 RESOURCES := \
 
@@ -334,6 +335,14 @@ else
 endif
 	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
 $(OBJDIR)/render.o: render.cc
+	@echo $(notdir $<)
+ifeq (posix,$(SHELLTYPE))
+	$(SILENT) mkdir -p $(OBJDIR)
+else
+	$(SILENT) mkdir $(subst /,\\,$(OBJDIR))
+endif
+	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -MF "$(@:%.o=%.d)" -c "$<"
+$(OBJDIR)/stbi-impl.o: stbi-impl.cc
 	@echo $(notdir $<)
 ifeq (posix,$(SHELLTYPE))
 	$(SILENT) mkdir -p $(OBJDIR)

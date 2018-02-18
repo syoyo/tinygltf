@@ -9,6 +9,10 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 
+#Files created by the CI scripts (downloading and installing premake)
+premake5
+premake5.tar.gz
+
 # Prerequisites
 *.d
 
