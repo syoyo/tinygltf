@@ -60,7 +60,6 @@ solution "NanoSGSolution"
       end
 
       if os.is("Windows") then
-         flags { "FatalCompileWarnings" }
          warnings "Extra" -- /W4
 
          defines { "NOMINMAX" }
