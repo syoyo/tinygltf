@@ -28,7 +28,6 @@
 #endif
 #endif
 
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #ifdef __clang__
