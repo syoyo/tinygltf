@@ -682,6 +682,12 @@ class Scene {
   /// Commit the scene. Must be called before tracing rays into the scene.
   ///
   bool Commit() {
+    // the scene should contains something
+    if (nodes_.size() == 0) {
+      std::cerr << "You are attempting to commit an empty scene!\n";
+      return false;
+    }
+
     // Update nodes.
     for (size_t i = 0; i < nodes_.size(); i++) {
       T ident[4][4];

@@ -736,33 +736,35 @@ int main(int argc, char **argv) {
     default_material.specular[1] = 0;
     default_material.specular[2] = 0;
 
-    bool ret = LoadObj(gRenderConfig.obj_filename, gRenderConfig.scene_scale,
-                       &meshes, &materials, &textures);
-    if (!ret) {
-      std::cerr << "Failed to load .obj [ " << gRenderConfig.obj_filename
-                << " ]" << std::endl;
-      return -1;
+    if (!gRenderConfig.obj_filename.empty()) {
+      bool ret = LoadObj(gRenderConfig.obj_filename, gRenderConfig.scene_scale,
+                         &meshes, &materials, &textures);
+      if (!ret) {
+        std::cerr << "Failed to load .obj [ " << gRenderConfig.obj_filename
+                  << " ]" << std::endl;
+        return -1;
+      }
+
+      gAsset.materials = materials;
+      gAsset.default_material = default_material;
+      gAsset.textures = textures;
+
+      for (size_t n = 0; n < meshes.size(); n++) {
+        size_t mesh_id = gAsset.meshes.size();
+        gAsset.meshes.push_back(meshes[mesh_id]);
+      }
+
+      for (size_t n = 0; n < gAsset.meshes.size(); n++) {
+        nanosg::Node<float, example::Mesh<float> > node(&gAsset.meshes[n]);
+        node.SetName(meshes[n].name);
+        node.SetLocalXform(
+            meshes[n].pivot_xform);  // Use mesh's pivot transform
+                                     // as node's local transform.
+        gNodes.push_back(node);
+
+        gScene.AddNode(node);
+      }
     }
-
-    gAsset.materials = materials;
-    gAsset.default_material = default_material;
-    gAsset.textures = textures;
-
-    for (size_t n = 0; n < meshes.size(); n++) {
-      size_t mesh_id = gAsset.meshes.size();
-      gAsset.meshes.push_back(meshes[mesh_id]);
-    }
-
-    for (size_t n = 0; n < gAsset.meshes.size(); n++) {
-      nanosg::Node<float, example::Mesh<float> > node(&gAsset.meshes[n]);
-      node.SetName(meshes[n].name);
-      node.SetLocalXform(meshes[n].pivot_xform);  // Use mesh's pivot transform
-                                                  // as node's local transform.
-      gNodes.push_back(node);
-
-      gScene.AddNode(node);
-    }
-
     if (!gScene.Commit()) {
       std::cerr << "Failed to commit the scene." << std::endl;
       return -1;
@@ -952,13 +954,15 @@ int main(int argc, char **argv) {
 
     // scene graph tree
     glm::mat4 node_matrix;
-    static int node_selected = 0;
+    static int node_selected_index = 0;
     {
       ImGui::Begin("Scene");
 
-      ImGui::ListBox("Node list", &node_selected, imgui_node_names.data(),
+      ImGui::ListBox("Node list", &node_selected_index, imgui_node_names.data(),
                      imgui_node_names.size(), 16);
-      node_matrix = glm::make_mat4(node_map[node_selected]->GetLocalXformPtr());
+
+      auto node_selected = node_map.at(node_selected_index);
+      node_matrix = glm::make_mat4(node_selected->GetLocalXformPtr());
 
       ImGui::End();
     }
@@ -1000,7 +1004,7 @@ int main(int argc, char **argv) {
 
       float mat[4][4];
       memcpy(mat, &node_matrix[0][0], sizeof(float) * 16);
-      node_map[node_selected]->SetLocalXform(mat);
+      node_map[node_selected_index]->SetLocalXform(mat);
 
       checkErrors("edit_transform");
 
