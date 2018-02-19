@@ -47,6 +47,48 @@ bool LoadGLTF(const std::string &filename, float scale,
   }
 
   std::cerr << "LoadGLTF() function is not yet implemented!" << std::endl;
+
+  std::cout << "loaded glTF file has:\n"
+            << model.accessors.size() << " accessors\n"
+            << model.animations.size() << " animations\n"
+            << model.buffers.size() << " buffers\n"
+            << model.bufferViews.size() << " bufferViews\n"
+            << model.materials.size() << " materials\n"
+            << model.meshes.size() << " meshes\n"
+            << model.nodes.size() << " nodes\n"
+            << model.textures.size() << " textures\n"
+            << model.images.size() << " images\n"
+            << model.skins.size() << " skins\n"
+            << model.samplers.size() << " samplers\n"
+            << model.cameras.size() << " cameras\n"
+            << model.scenes.size() << " scenes\n"
+            << model.lights.size() << " lights\n";
+
+  for (const auto &gltfMesh : model.meshes) {
+    std::cout << "Current mesh has " << gltfMesh.primitives.size()
+              << " primitives:\n";
+    for (const auto &meshPrimitive : gltfMesh.primitives) {
+      switch (meshPrimitive.mode) {
+        case TINYGLTF_MODE_TRIANGLES:  // this is the simpliest case to handle
+          std::cout << "Will load a plain old list of trianges\n";
+          break;
+
+        // Other trigangle based modes
+        case TINYGLTF_MODE_TRIANGLE_FAN:
+        case TINYGLTF_MODE_TRIANGLE_STRIP:
+        default:
+          std::cerr << "primitive mode not implemented";
+          break;
+
+        // These aren't triangles:
+        case TINYGLTF_MODE_POINTS:
+        case TINYGLTF_MODE_LINE:
+        case TINYGLTF_MODE_LINE_LOOP:
+          std::cerr << "primitive is not triangle based, ignoring";
+      }
+    }
+  }
+
   return false;
 }
 
