@@ -45,13 +45,19 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 * [glview](examples/glview) : Simple glTF geometry viewer.
 * [validator](examples/validator) : Simple glTF validator with JSON schema.
 
+## Projects using TinyGLTF
+
+* Physical based rendering with Vulkan using glTF 2.0 models https://github.com/SaschaWillems/Vulkan-glTF-PBR
+* Your projects here!(Plese send PR)
+
 ## TODOs
 
-* [ ] Write C++ code generator from json schema for robust parsing.
+* [ ] Write C++ code generator from jSON schema for robust parsing.
 * [x] Serialization
 * [ ] Compression/decompression(Open3DGC, etc)
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
+  * [ ] OpenEXR extension through TinyEXR.
 * [ ] Write tests for `animation` and `skin` 
 
 ## Licenses
