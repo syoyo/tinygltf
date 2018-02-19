@@ -3,7 +3,6 @@
 #include <iostream>
 
 #define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
 namespace example {
@@ -17,9 +16,10 @@ static std::string GetFilePathExtension(const std::string &FileName) {
 ///
 /// Loads glTF 2.0 mesh
 ///
-bool LoadGLTF(const std::string &filename, float scale, std::vector<Mesh<float> > *meshes, std::vector<Material> *materials, std::vector<Texture> *textures) 
-{
-
+bool LoadGLTF(const std::string &filename, float scale,
+              std::vector<Mesh<float> > *meshes,
+              std::vector<Material> *materials,
+              std::vector<Texture> *textures) {
   // TODO(syoyo): Implement
   // TODO(syoyo): Texture
   // TODO(syoyo): Material
@@ -50,4 +50,4 @@ bool LoadGLTF(const std::string &filename, float scale, std::vector<Mesh<float> 
   return false;
 }
 
-} // namespace example
+}  // namespace example
