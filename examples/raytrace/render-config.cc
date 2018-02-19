@@ -119,4 +119,4 @@ bool LoadRenderConfig(example::RenderConfig* config, const char* filename) {
 
   return true;
 }
-}
+}  // namespace example
