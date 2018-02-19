@@ -4,23 +4,23 @@ Simple, minimal and header-only scene graph library for NanoRT.
 
 NanoSG itself shoud be compiled with C++-03 compiler, but demo code uses C++11 features.
 
-![](images/nanosg-demo.png)
+![screenshot of the demo program](images/nanosg-demo.png)
 
-![](https://media.giphy.com/media/l3JDO29fMFndyObHW/giphy.gif)
+![Animation showing node manipulation](https://media.giphy.com/media/l3JDO29fMFndyObHW/giphy.gif)
 
 ## Build
 
 ### Linux or macOS
 
-```
-$ premake5 gmake
-$ make
+```bash
+premake5 gmake
+make
 ```
 
 ### Windows
 
-```
-$ premake5 vs2015
+```bash
+premake5 vs2015
 ```
 
 ## Data structure
@@ -46,7 +46,7 @@ Current example code assumes mesh is all composed of triangle meshes.
 
 Following method must be implemented for `Scene::Traversal`.
 
-```
+```cpp
 ///
 /// Get the geometric normal and the shading normal at `face_idx' th face.
 ///
@@ -74,19 +74,19 @@ API is still subject to change.
 
 ### Node
 
-```
+```cpp
 void Node::SetName(const std::string &name);
 ```
 
 Set (unique) name for the node.
 
-```
+```cpp
 void Node::AddChild(const type &child);
 ```
 
 Add node as child node.
 
-```
+```cpp
 void Node::SetLocalXform(const T xform[4][4]) {
 ```
 
@@ -94,20 +94,20 @@ Set local transformation matrix. Default is identity matrix.
 
 ### Scene
 
-```
+```cpp
 bool Scene::AddNode(const Node<T, M> &node);
 ```
 
 Add a node to the scene.
 
-```
+```cpp
 bool Scene::Commit() {
 ```
 
 Commit the scene. After adding nodes to the scene or changed transformation matrix, call this `Commit` before tracing rays.
 `Commit` triggers BVH build in each nodes and updates node's transformation matrix.
 
-```
+```cpp
 template<class H>
 bool Scene::Traverse(nanort::Ray<T> &ray, H *isect, const bool cull_back_face = false) const;
 ```
@@ -119,10 +119,10 @@ Returns `true` when there is an intersection and hit information is stored in `i
 
 * [ ] Compute pivot point of each node(mesh).
 
-## Third party libraries and its icenses.
+## Third party libraries and its icenses
 
 * picojson : BSD license.
-* bt3gui : zlib license. 
+* bt3gui : zlib license.
 * glew : BSD/MIT license.
 * tinyobjloader : MIT license.
 * glm : The Happy Bunny License (Modified MIT License). Copyright (c) 2005 - 2017 G-Truc Creation
