@@ -736,6 +736,9 @@ int main(int argc, char **argv) {
     default_material.specular[1] = 0;
     default_material.specular[2] = 0;
 
+    // Material pushed as first material on the list
+    materials.push_back(default_material);
+
     if (!gRenderConfig.obj_filename.empty()) {
       bool ret = LoadObj(gRenderConfig.obj_filename, gRenderConfig.scene_scale,
                          &meshes, &materials, &textures);
@@ -744,37 +747,38 @@ int main(int argc, char **argv) {
                   << " ]" << std::endl;
         return -1;
       }
-      if (!gRenderConfig.gltf_filename.empty()) {
-        std::cout << "Found gltf file : " << gRenderConfig.gltf_filename
-                  << "\n";
+    }
 
-        bool ret =
-            LoadGLTF(gRenderConfig.gltf_filename, gRenderConfig.scene_scale,
-                     &meshes, &materials, &textures);
-        if (!ret) {
-          // TODO handle error
-        }
+    if (!gRenderConfig.gltf_filename.empty()) {
+      std::cout << "Found gltf file : " << gRenderConfig.gltf_filename << "\n";
+
+      bool ret =
+          LoadGLTF(gRenderConfig.gltf_filename, gRenderConfig.scene_scale,
+                   &meshes, &materials, &textures);
+      if (!ret) {
+        std::cerr << "Failed to load glTF file [ "
+                  << gRenderConfig.gltf_filename << " ]" << std::endl;
+        return -1;
       }
+    }
 
-      gAsset.materials = materials;
-      gAsset.default_material = default_material;
-      gAsset.textures = textures;
+    gAsset.materials = materials;
+    gAsset.default_material = default_material;
+    gAsset.textures = textures;
 
-      for (size_t n = 0; n < meshes.size(); n++) {
-        size_t mesh_id = gAsset.meshes.size();
-        gAsset.meshes.push_back(meshes[mesh_id]);
-      }
+    for (size_t n = 0; n < meshes.size(); n++) {
+      size_t mesh_id = gAsset.meshes.size();
+      gAsset.meshes.push_back(meshes[mesh_id]);
+    }
 
-      for (size_t n = 0; n < gAsset.meshes.size(); n++) {
-        nanosg::Node<float, example::Mesh<float> > node(&gAsset.meshes[n]);
-        node.SetName(meshes[n].name);
-        node.SetLocalXform(
-            meshes[n].pivot_xform);  // Use mesh's pivot transform
-                                     // as node's local transform.
-        gNodes.push_back(node);
+    for (size_t n = 0; n < gAsset.meshes.size(); n++) {
+      nanosg::Node<float, example::Mesh<float> > node(&gAsset.meshes[n]);
+      node.SetName(meshes[n].name);
+      node.SetLocalXform(meshes[n].pivot_xform);  // Use mesh's pivot transform
+                                                  // as node's local transform.
+      gNodes.push_back(node);
 
-        gScene.AddNode(node);
-      }
+      gScene.AddNode(node);
     }
 
     if (!gScene.Commit()) {
