@@ -180,6 +180,9 @@ bool LoadGLTF(const std::string &filename, float scale,
               << " primitives:\n";
 
     Mesh<float> loadedMesh(sizeof(float) * 3);
+
+    v3f pMin, pMax;
+
     loadedMesh.name = gltfMesh.name;
     for (const auto &meshPrimitive : gltfMesh.primitives) {
       // get access to the indices
@@ -261,7 +264,12 @@ bool LoadGLTF(const std::string &filename, float scale,
 
             if (attribute.first == "POSITION") {
               std::cout << "found position attribute\n";
-
+              pMin.x = attribAccessor.minValues[0];
+              pMin.y = attribAccessor.minValues[1];
+              pMin.z = attribAccessor.minValues[2];
+              pMax.x = attribAccessor.maxValues[0];
+              pMax.y = attribAccessor.maxValues[1];
+              pMax.z = attribAccessor.maxValues[2];
               switch (attribAccessor.componentType) {
                 case TINYGLTF_COMPONENT_TYPE_FLOAT:
                   switch (attribAccessor.type) {
@@ -343,6 +351,42 @@ bool LoadGLTF(const std::string &filename, float scale,
     }
 
     // TODO compute pivot point
+
+    // bbox :
+    v3f bCenter;
+    bCenter.x = 0.5f * (pMax.x - pMin.x) + pMin.x;
+    bCenter.y = 0.5f * (pMax.y - pMin.y) + pMin.y;
+    bCenter.z = 0.5f * (pMax.z - pMin.z) + pMin.z;
+
+    for (size_t v = 0; v < loadedMesh.vertices.size() / 3; v++) {
+      loadedMesh.vertices[3 * v + 0] -= bCenter.x;
+      loadedMesh.vertices[3 * v + 1] -= bCenter.y;
+      loadedMesh.vertices[3 * v + 2] -= bCenter.z;
+    }
+
+    loadedMesh.pivot_xform[0][0] = 1.0f;
+    loadedMesh.pivot_xform[0][1] = 0.0f;
+    loadedMesh.pivot_xform[0][2] = 0.0f;
+    loadedMesh.pivot_xform[0][3] = 0.0f;
+
+    loadedMesh.pivot_xform[1][0] = 0.0f;
+    loadedMesh.pivot_xform[1][1] = 1.0f;
+    loadedMesh.pivot_xform[1][2] = 0.0f;
+    loadedMesh.pivot_xform[1][3] = 0.0f;
+
+    loadedMesh.pivot_xform[2][0] = 0.0f;
+    loadedMesh.pivot_xform[2][1] = 0.0f;
+    loadedMesh.pivot_xform[2][2] = 1.0f;
+    loadedMesh.pivot_xform[2][3] = 0.0f;
+
+    loadedMesh.pivot_xform[3][0] = bCenter.x;
+    loadedMesh.pivot_xform[3][1] = bCenter.y;
+    loadedMesh.pivot_xform[3][2] = bCenter.z;
+    loadedMesh.pivot_xform[3][3] = 1.0f;
+
+    for (size_t i{0}; i < loadedMesh.faces.size(); ++i)
+      loadedMesh.material_ids.push_back(materials->at(0).id);
+
     meshes->push_back(loadedMesh);
     ret = true;
   }
