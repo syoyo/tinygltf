@@ -27,6 +27,11 @@ struct arrayAdapter {
   /// Stride in bytes between two elements
   const size_t stride;
   /// Constructor.
+
+  /// Construct an array adapter.
+  /// \param ptr Pointer to the start of the data, with offset applied
+  /// \param count Number of elements in the array
+  /// \param byte_stride Stride betweens elements in the array
   arrayAdapter(const unsigned char *ptr, size_t count, size_t byte_stride = 1)
       : dataPtr(ptr), elemCount(count), stride(byte_stride) {}
 
@@ -233,6 +238,7 @@ bool LoadGLTF(const std::string &filename, float scale,
       if (indicesArrayPtr)
         for (size_t i(0); i < indicesArrayPtr->size(); ++i) {
           std::cout << indices[i] << " ";
+          loadedMesh.faces.push_back(indices[i]);
         }
 
       std::cout << '\n';
@@ -263,11 +269,14 @@ bool LoadGLTF(const std::string &filename, float scale,
                       /// 3D vector of float
                       v3fArray positions(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
-                      for (size_t i{0}; i < indices.size(); ++i) {
-                        const auto index(indices[i]);
-                        const auto v = positions[index];
+                      for (size_t i{0}; i < positions.size(); ++i) {
+                        const auto v = positions[i];
                         std::cout << '(' << v.x << ", " << v.y << ", " << v.z
                                   << ")\n";
+
+                        loadedMesh.vertices.push_back(v.x * scale);
+                        loadedMesh.vertices.push_back(v.y * scale);
+                        loadedMesh.vertices.push_back(v.z * scale);
                       }
                     } break;
                     default:
@@ -291,11 +300,14 @@ bool LoadGLTF(const std::string &filename, float scale,
                       std::cout << "normal vec3\n";
                       v3fArray normals(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
-                      for (size_t i{0}; i < indices.size(); ++i) {
-                        const auto index(indices[i]);
-                        const auto v = normals[index];
+                      for (size_t i{0}; i < normals.size(); ++i) {
+                        const auto v = normals[i];
                         std::cout << '(' << v.x << ", " << v.y << ", " << v.z
                                   << ")\n";
+
+                        loadedMesh.facevarying_normals.push_back(v.x);
+                        loadedMesh.facevarying_normals.push_back(v.y);
+                        loadedMesh.facevarying_normals.push_back(v.z);
                       }
                     } break;
                     case TINYGLTF_TYPE_VEC4:
@@ -329,9 +341,12 @@ bool LoadGLTF(const std::string &filename, float scale,
           std::cerr << "primitive is not triangle based, ignoring";
       }
     }
-  }
 
-  std::cerr << "LoadGLTF() function is not yet implemented!" << std::endl;
-  return false;
+    // TODO compute pivot point
+    meshes->push_back(loadedMesh);
+    ret = true;
+  }
+  // std::cerr << "LoadGLTF() function is not yet implemented!" << std::endl;
+  return ret;
 }
 }  // namespace example

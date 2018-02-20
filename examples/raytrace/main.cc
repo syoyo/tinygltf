@@ -744,6 +744,17 @@ int main(int argc, char **argv) {
                   << " ]" << std::endl;
         return -1;
       }
+      if (!gRenderConfig.gltf_filename.empty()) {
+        std::cout << "Found gltf file : " << gRenderConfig.gltf_filename
+                  << "\n";
+
+        bool ret =
+            LoadGLTF(gRenderConfig.gltf_filename, gRenderConfig.scene_scale,
+                     &meshes, &materials, &textures);
+        if (!ret) {
+          // TODO handle error
+        }
+      }
 
       gAsset.materials = materials;
       gAsset.default_material = default_material;
@@ -764,14 +775,6 @@ int main(int argc, char **argv) {
 
         gScene.AddNode(node);
       }
-    }
-
-    if (!gRenderConfig.gltf_filename.empty()) {
-      std::cout << "Found gltf file : " << gRenderConfig.gltf_filename << "\n";
-
-      bool ret =
-          LoadGLTF(gRenderConfig.gltf_filename, gRenderConfig.scene_scale,
-                   &meshes, &materials, &textures);
     }
 
     if (!gScene.Commit()) {
