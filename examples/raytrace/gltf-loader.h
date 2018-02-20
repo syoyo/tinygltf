@@ -26,7 +26,7 @@ struct arrayAdapter {
   /// \param ptr Pointer to the start of the data, with offset applied
   /// \param count Number of elements in the array
   /// \param byte_stride Stride betweens elements in the array
-  arrayAdapter(const unsigned char *ptr, size_t count, size_t byte_stride = 1)
+  arrayAdapter(const unsigned char *ptr, size_t count, size_t byte_stride)
       : dataPtr(ptr), elemCount(count), stride(byte_stride) {}
 
   /// Returns a *copy* of a single element. Can't be used to modify it.
@@ -117,6 +117,22 @@ struct v4fArray {
   v4fArray(const arrayAdapter<v4f> &a) : adapter(a) {}
 
   v4f operator[](size_t position) const { return adapter[position]; }
+  size_t size() const { return adapter.elemCount; }
+};
+
+struct v3dArray {
+  arrayAdapter<v3d> adapter;
+  v3dArray(const arrayAdapter<v3d> &a) : adapter(a) {}
+
+  v3d operator[](size_t position) const { return adapter[position]; }
+  size_t size() const { return adapter.elemCount; }
+};
+
+struct v4dArray {
+  arrayAdapter<v4d> adapter;
+  v4dArray(const arrayAdapter<v4d> &a) : adapter(a) {}
+
+  v4d operator[](size_t position) const { return adapter[position]; }
   size_t size() const { return adapter.elemCount; }
 };
 
