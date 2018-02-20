@@ -153,17 +153,20 @@ bool LoadGLTF(const std::string &filename, float scale,
 
             if (attribute.first == "POSITION") {
               std::cout << "found position attribute\n";
+
+              // get the position min/max for computing the boundingbox
               pMin.x = attribAccessor.minValues[0];
               pMin.y = attribAccessor.minValues[1];
               pMin.z = attribAccessor.minValues[2];
               pMax.x = attribAccessor.maxValues[0];
               pMax.y = attribAccessor.maxValues[1];
               pMax.z = attribAccessor.maxValues[2];
+
               switch (attribAccessor.componentType) {
                 case TINYGLTF_COMPONENT_TYPE_FLOAT:
                   switch (attribAccessor.type) {
                     case TINYGLTF_TYPE_VEC3: {
-                      /// 3D vector of float
+                      // 3D vector of float
                       v3fArray positions(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
                       for (size_t i{0}; i < positions.size(); ++i) {
@@ -180,7 +183,25 @@ bool LoadGLTF(const std::string &filename, float scale,
                       // TODO Handle error
                       break;
                   }
-                  break;
+                case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                  switch (attribAccessor.type) {
+                    case TINYGLTF_TYPE_VEC3: {
+                      v3dArray positions(
+                          arrayAdapter<v3d>(dataPtr, count, byte_stride));
+                      for (size_t i{0}; i < positions.size(); ++i) {
+                        const auto v = positions[i];
+                        std::cout << '(' << v.x << ", " << v.y << ", " << v.z
+                                  << ")\n";
+
+                        loadedMesh.vertices.push_back(v.x * scale);
+                        loadedMesh.vertices.push_back(v.y * scale);
+                        loadedMesh.vertices.push_back(v.z * scale);
+                      }
+                    } break;
+                    default:
+                      break;
+                  }
+                } break;
                 default:
                   // TODO handle error
                   break;
