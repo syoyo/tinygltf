@@ -264,7 +264,7 @@ bool LoadGLTF(const std::string &filename, float scale,
                       v3fArray positions(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
                       for (size_t i{0}; i < indices.size(); ++i) {
-                        const auto index{indices[i]};
+                        const auto index(indices[i]);
                         const auto v = positions[index];
                         std::cout << '(' << v.x << ", " << v.y << ", " << v.z
                                   << ")\n";
@@ -292,7 +292,7 @@ bool LoadGLTF(const std::string &filename, float scale,
                       v3fArray normals(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
                       for (size_t i{0}; i < indices.size(); ++i) {
-                        const auto index{indices[i]};
+                        const auto index(indices[i]);
                         const auto v = normals[index];
                         std::cout << '(' << v.x << ", " << v.y << ", " << v.z
                                   << ")\n";
