@@ -41,7 +41,7 @@ struct arrayAdapter {
 /// Interface of any adapted array that returns ingeger data
 struct intArrayBase {
   virtual ~intArrayBase() = default;
-  virtual int operator[](size_t) const = 0;
+  virtual unsigned int operator[](size_t) const = 0;
   virtual size_t size() const = 0;
 };
 
@@ -58,8 +58,8 @@ struct intArray : public intArrayBase {
   arrayAdapter<T> adapter;
 
   intArray(const arrayAdapter<T> &a) : adapter(a) {}
-  int operator[](size_t position) const override {
-    return static_cast<int>(adapter[position]);
+  unsigned int operator[](size_t position) const override {
+    return static_cast<unsigned int>(adapter[position]);
   }
 
   size_t size() const override { return adapter.elemCount; }
