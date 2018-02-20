@@ -283,6 +283,32 @@ bool LoadGLTF(const std::string &filename, float scale,
 
             if (attribute.first == "NORMAL") {
               std::cout << "found normal attribute\n";
+
+              switch (attribAccessor.componentType) {
+                case TINYGLTF_COMPONENT_TYPE_FLOAT:
+                  switch (attribAccessor.type) {
+                    case TINYGLTF_TYPE_VEC3: {
+                      std::cout << "normal vec3\n";
+                      v3fArray normals(
+                          arrayAdapter<v3f>(dataPtr, count, byte_stride));
+                      for (size_t i{0}; i < indices.size(); ++i) {
+                        const auto index{indices[i]};
+                        const auto v = normals[index];
+                        std::cout << '(' << v.x << ", " << v.y << ", " << v.z
+                                  << ")\n";
+                      }
+                    } break;
+                    case TINYGLTF_TYPE_VEC4:
+                      std::cout << "normal vec4";
+                      break;
+                    default:
+                      // TODO handle error
+                      break;
+                  }
+                default:
+                  // TODO handle error
+                  break;
+              }
             }
           }
         }
