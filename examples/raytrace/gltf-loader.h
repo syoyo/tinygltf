@@ -104,6 +104,14 @@ using v2d = v2<double>;
 using v3d = v3<double>;
 using v4d = v4<double>;
 
+struct v2fArray {
+  arrayAdapter<v2f> adapter;
+  v2fArray(const arrayAdapter<v2f> &a) : adapter(a) {}
+
+  v2f operator[](size_t position) const { return adapter[position]; }
+  size_t size() const { return adapter.elemCount; }
+};
+
 struct v3fArray {
   arrayAdapter<v3f> adapter;
   v3fArray(const arrayAdapter<v3f> &a) : adapter(a) {}
@@ -117,6 +125,14 @@ struct v4fArray {
   v4fArray(const arrayAdapter<v4f> &a) : adapter(a) {}
 
   v4f operator[](size_t position) const { return adapter[position]; }
+  size_t size() const { return adapter.elemCount; }
+};
+
+struct v2dArray {
+  arrayAdapter<v2d> adapter;
+  v2dArray(const arrayAdapter<v2d> &a) : adapter(a) {}
+
+  v2d operator[](size_t position) const { return adapter[position]; }
   size_t size() const { return adapter.elemCount; }
 };
 
