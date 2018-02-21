@@ -70,7 +70,7 @@ bool LoadGLTF(const std::string &filename, float scale,
 
     Mesh<float> loadedMesh(sizeof(float) * 3);
 
-    v3f pMin, pMax;
+    v3f pMin = {}, pMax = {};
 
     loadedMesh.name = gltfMesh.name;
     for (const auto &meshPrimitive : gltfMesh.primitives) {
@@ -80,12 +80,13 @@ bool LoadGLTF(const std::string &filename, float scale,
         auto &indicesAccessor = model.accessors[meshPrimitive.indices];
         auto &bufferView = model.bufferViews[indicesAccessor.bufferView];
         auto &buffer = model.buffers[bufferView.buffer];
-        unsigned char *dataAddress = buffer.data.data() +
-                                     bufferView.byteOffset +
-                                     indicesAccessor.byteOffset;
+        auto dataAddress = buffer.data.data() + bufferView.byteOffset +
+                           indicesAccessor.byteOffset;
         const auto byteStride = indicesAccessor.ByteStride(bufferView);
         const auto count = indicesAccessor.count;
 
+        // Allocate the index array in the pointer-to-base declared in the
+        // parent scope
         switch (indicesAccessor.componentType) {
           case TINYGLTF_COMPONENT_TYPE_BYTE:
             indicesArrayPtr =
@@ -125,12 +126,14 @@ bool LoadGLTF(const std::string &filename, float scale,
             break;
         }
       }
+
+      // Get access to the index array. Don't worry about underlying type
       const auto &indices = *indicesArrayPtr;
 
       if (indicesArrayPtr)
-        for (size_t i(0); i < indicesArrayPtr->size(); ++i) {
-          std::cout << indices[i] << " ";
+        for (size_t i(0); i < indices.size(); ++i) {
           loadedMesh.faces.push_back(indices[i]);
+          std::cout << indices[i] << " ";
         }
 
       std::cout << '\n';
