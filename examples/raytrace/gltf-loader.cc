@@ -243,6 +243,43 @@ bool LoadGLTF(const std::string &filename, float scale,
                   break;
               }
             }
+
+            if (attribute.first == "TEXCOORD_0") {
+              std::cout << "Found texture coordinates\n";
+
+              switch (attribAccessor.type) {
+                case TINYGLTF_TYPE_VEC2: {
+                  switch (attribAccessor.componentType) {
+                    case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+                      v2fArray uvs(
+                          arrayAdapter<v2f>(dataPtr, count, byte_stride));
+                      for (size_t i{0}; i < uvs.size(); ++i) {
+                        const auto v = uvs[i];
+                        std::cout << '(' << v.x << ", " << v.y << ")\n";
+
+                        loadedMesh.facevarying_uvs.push_back(v.x);
+                        loadedMesh.facevarying_uvs.push_back(v.y);
+                      }
+                    } break;
+                    case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                      v2dArray uvs(
+                          arrayAdapter<v2d>(dataPtr, count, byte_stride));
+                      for (size_t i{0}; i < uvs.size(); ++i) {
+                        const auto v = uvs[i];
+                        std::cout << '(' << v.x << ", " << v.y << ")\n";
+
+                        loadedMesh.facevarying_uvs.push_back(v.x);
+                        loadedMesh.facevarying_uvs.push_back(v.y);
+                      }
+                    } break;
+                    default:
+                      break;
+                  }
+                } break;
+                default:
+                  break;
+              }
+            }
           }
         }
 
