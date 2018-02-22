@@ -7,10 +7,10 @@ solution "glview"
 
       kind "ConsoleApp"
       language "C++"
+	  cppdialect "C++11"
       files { "glview.cc", "trackball.cc" }
       includedirs { "./" }
       includedirs { "../../" }
-      flags "c++11"
 
       configuration { "linux" }
          linkoptions { "`pkg-config --libs glfw3`" }
@@ -34,9 +34,10 @@ solution "glview"
 
       configuration "Debug"
          defines { "DEBUG" }
-         flags { "Symbols", "ExtraWarnings"}
+		 symbols "On"
+		 warnings "Extra"
 
       configuration "Release"
          defines { "NDEBUG" }
-         flags { "Optimize", "ExtraWarnings"}
-
+		 optimize "On"
+		 warnings "Extra"
