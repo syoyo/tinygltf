@@ -129,7 +129,7 @@ bool LoadGLTF(const std::string &filename, float scale,
 
       if (indicesArrayPtr)
         for (size_t i(0); i < indicesArrayPtr->size(); ++i) {
-          std::cout << indices[i] << " ";
+          // std::cout << indices[i] << " ";
           loadedMesh.faces.push_back(indices[i]);
         }
 
@@ -139,7 +139,7 @@ bool LoadGLTF(const std::string &filename, float scale,
         case TINYGLTF_MODE_TRIANGLES:  // this is the simpliest case to handle
 
         {
-          std::cout << "Will load a plain old list of trianges\n";
+          std::cout << "TRIANGLES\n";
 
           for (const auto &attribute : meshPrimitive.attributes) {
             const auto attribAccessor = model.accessors[attribute.second];
@@ -284,7 +284,11 @@ bool LoadGLTF(const std::string &filename, float scale,
 
         // Other trigangle based modes
         case TINYGLTF_MODE_TRIANGLE_FAN:
+          std::cout << "TRIANGLE_FAN\n";
+          break;
         case TINYGLTF_MODE_TRIANGLE_STRIP:
+          std::cout << "TRIANGLE_STRIP\n";
+          break;
         default:
           std::cerr << "primitive mode not implemented";
           break;
