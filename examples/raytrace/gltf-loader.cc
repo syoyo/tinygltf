@@ -70,7 +70,8 @@ bool LoadGLTF(const std::string &filename, float scale,
 
     Mesh<float> loadedMesh(sizeof(float) * 3);
 
-    v3f pMin, pMax;
+    // To store the min and max of the buffer
+    v3f pMin = {}, pMax = {};
 
     loadedMesh.name = gltfMesh.name;
     for (const auto &meshPrimitive : gltfMesh.primitives) {
@@ -80,12 +81,13 @@ bool LoadGLTF(const std::string &filename, float scale,
         auto &indicesAccessor = model.accessors[meshPrimitive.indices];
         auto &bufferView = model.bufferViews[indicesAccessor.bufferView];
         auto &buffer = model.buffers[bufferView.buffer];
-        unsigned char *dataAddress = buffer.data.data() +
-                                     bufferView.byteOffset +
-                                     indicesAccessor.byteOffset;
+        auto dataAddress = buffer.data.data() + bufferView.byteOffset +
+                           indicesAccessor.byteOffset;
         const auto byteStride = indicesAccessor.ByteStride(bufferView);
         const auto count = indicesAccessor.count;
 
+        // Allocate the index array in the pointer-to-base declared in the
+        // parent scope
         switch (indicesAccessor.componentType) {
           case TINYGLTF_COMPONENT_TYPE_BYTE:
             indicesArrayPtr =
