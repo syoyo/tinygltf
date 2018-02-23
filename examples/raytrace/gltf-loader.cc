@@ -129,13 +129,14 @@ bool LoadGLTF(const std::string &filename, float scale,
       }
       const auto &indices = *indicesArrayPtr;
 
-      if (indicesArrayPtr)
+      if (indicesArrayPtr) {
+        std::cout << "indices: ";
         for (size_t i(0); i < indicesArrayPtr->size(); ++i) {
-          // std::cout << indices[i] << " ";
+          std::cout << indices[i] << " ";
           loadedMesh.faces.push_back(indices[i]);
         }
-
-      std::cout << '\n';
+        std::cout << '\n';
+      }
 
       switch (meshPrimitive.mode) {
         case TINYGLTF_MODE_TRIANGLES:  // this is the simpliest case to handle
@@ -153,6 +154,9 @@ bool LoadGLTF(const std::string &filename, float scale,
             const auto byte_stride = attribAccessor.ByteStride(bufferView);
             const auto count = attribAccessor.count;
 
+            std::cout << "current attribute has count " << count
+                      << " and stride " << byte_stride << " bytes\n";
+
             if (attribute.first == "POSITION") {
               std::cout << "found position attribute\n";
 
@@ -166,15 +170,20 @@ bool LoadGLTF(const std::string &filename, float scale,
 
               switch (attribAccessor.componentType) {
                 case TINYGLTF_COMPONENT_TYPE_FLOAT:
+                  std::cout << "Type is FLOAT\n";
                   switch (attribAccessor.type) {
                     case TINYGLTF_TYPE_VEC3: {
                       // 3D vector of float
                       v3fArray positions(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
+
+                      std::cout << "positions's size : " << positions.size()
+                                << '\n';
+
                       for (size_t i{0}; i < positions.size(); ++i) {
                         const auto v = positions[i];
-                        std::cout << '(' << v.x << ", " << v.y << ", " << v.z
-                                  << ")\n";
+                        std::cout << "positions[" << i << "]: (" << v.x << ", "
+                                  << v.y << ", " << v.z << ")\n";
 
                         loadedMesh.vertices.push_back(v.x * scale);
                         loadedMesh.vertices.push_back(v.y * scale);
@@ -185,15 +194,17 @@ bool LoadGLTF(const std::string &filename, float scale,
                       // TODO Handle error
                       break;
                   }
+                  break;
                 case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                  std::cout << "Type is DOUBLE\n";
                   switch (attribAccessor.type) {
                     case TINYGLTF_TYPE_VEC3: {
                       v3dArray positions(
                           arrayAdapter<v3d>(dataPtr, count, byte_stride));
                       for (size_t i{0}; i < positions.size(); ++i) {
                         const auto v = positions[i];
-                        std::cout << '(' << v.x << ", " << v.y << ", " << v.z
-                                  << ")\n";
+                        std::cout << "positions[" << i << "]: (" << v.x << ", "
+                                  << v.y << ", " << v.z << ")\n";
 
                         loadedMesh.vertices.push_back(v.x * scale);
                         loadedMesh.vertices.push_back(v.y * scale);
@@ -280,9 +291,7 @@ bool LoadGLTF(const std::string &filename, float scale,
               }
             }
           }
-        }
-
-        break;
+        } break;
 
         // Other trigangle based modes
         case TINYGLTF_MODE_TRIANGLE_FAN:
@@ -302,8 +311,6 @@ bool LoadGLTF(const std::string &filename, float scale,
           std::cerr << "primitive is not triangle based, ignoring";
       }
     }
-
-    // TODO compute pivot point
 
     // bbox :
     v3f bCenter;

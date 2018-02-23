@@ -773,6 +773,14 @@ int main(int argc, char **argv) {
 
     for (size_t n = 0; n < gAsset.meshes.size(); n++) {
       nanosg::Node<float, example::Mesh<float> > node(&gAsset.meshes[n]);
+
+      // case where the name of a mesh isn't defined in the loaded file
+      if (gAsset.meshes[n].name.empty()) {
+        std::string generatedName = "unnamed_" + std::to_string(n);
+        gAsset.meshes[n].name = generatedName;
+        meshes[n].name = generatedName;
+      }
+
       node.SetName(meshes[n].name);
       node.SetLocalXform(meshes[n].pivot_xform);  // Use mesh's pivot transform
                                                   // as node's local transform.

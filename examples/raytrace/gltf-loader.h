@@ -20,7 +20,6 @@ struct arrayAdapter {
   const size_t elemCount;
   /// Stride in bytes between two elements
   const size_t stride;
-  /// Constructor.
 
   /// Construct an array adapter.
   /// \param ptr Pointer to the start of the data, with offset applied
