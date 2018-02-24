@@ -32,7 +32,10 @@ struct arrayAdapter {
   T operator[](size_t pos) const {
     if (pos >= elemCount)
       throw std::out_of_range(
-          "Tried to access beyond the last element of an array adapter");
+          "Tried to access beyond the last element of an array adapter with "
+          "count " +
+          std::to_string(elemCount) + " while getting elemnet number " +
+          std::to_string(pos));
     return *(reinterpret_cast<const T *>(dataPtr + pos * stride));
   }
 };

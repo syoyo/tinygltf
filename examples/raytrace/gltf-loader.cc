@@ -5,10 +5,7 @@
 #define TINYGLTF_IMPLEMENTATION
 #include <tiny_gltf.h>
 
-using std::out_of_range;
-
 namespace example {
-
 static std::string GetFilePathExtension(const std::string &FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
     return FileName.substr(FileName.find_last_of(".") + 1);
@@ -157,6 +154,7 @@ bool LoadGLTF(const std::string &filename, float scale,
             std::cout << "current attribute has count " << count
                       << " and stride " << byte_stride << " bytes\n";
 
+            std::cout << "attribute string is : " << attribute.first << '\n';
             if (attribute.first == "POSITION") {
               std::cout << "found position attribute\n";
 
@@ -231,14 +229,33 @@ bool LoadGLTF(const std::string &filename, float scale,
                       std::cout << "normal vec3\n";
                       v3fArray normals(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
-                      for (size_t i{0}; i < normals.size(); ++i) {
-                        const auto v = normals[i];
-                        std::cout << '(' << v.x << ", " << v.y << ", " << v.z
-                                  << ")\n";
 
-                        loadedMesh.facevarying_normals.push_back(v.x);
-                        loadedMesh.facevarying_normals.push_back(v.y);
-                        loadedMesh.facevarying_normals.push_back(v.z);
+                      // IMPORTANT: We need to reorder normals (and texture
+                      // coordinates into "facevarying" order) for each face
+                      for (size_t i{0}; i < indices.size() / 3; ++i) {
+                        // get the i'th triange's indexes
+                        auto f0 = indices[3 * i + 0];
+                        auto f1 = indices[3 * i + 1];
+                        auto f2 = indices[3 * i + 2];
+
+                        // get the 3 normal vectors for that face
+                        v3f n0, n1, n2;
+                        n0 = normals[f0];
+                        n1 = normals[f1];
+                        n2 = normals[f2];
+
+                        std::cout << "got the 3 normals!\n";
+
+                        // Put them in the array in the correct order
+                        loadedMesh.facevarying_normals.push_back(n0.x);
+                        loadedMesh.facevarying_normals.push_back(n0.y);
+                        loadedMesh.facevarying_normals.push_back(n0.z);
+                        loadedMesh.facevarying_normals.push_back(n1.x);
+                        loadedMesh.facevarying_normals.push_back(n1.y);
+                        loadedMesh.facevarying_normals.push_back(n2.z);
+                        loadedMesh.facevarying_normals.push_back(n2.x);
+                        loadedMesh.facevarying_normals.push_back(n2.y);
+                        loadedMesh.facevarying_normals.push_back(n2.z);
                       }
                     } break;
                     case TINYGLTF_TYPE_VEC4:
@@ -254,6 +271,7 @@ bool LoadGLTF(const std::string &filename, float scale,
               }
             }
 
+            // TODO (Ybalrid) : need to order the UVs into facevarying order
             if (attribute.first == "TEXCOORD_0") {
               std::cout << "Found texture coordinates\n";
 
@@ -265,7 +283,8 @@ bool LoadGLTF(const std::string &filename, float scale,
                           arrayAdapter<v2f>(dataPtr, count, byte_stride));
                       for (size_t i{0}; i < uvs.size(); ++i) {
                         const auto v = uvs[i];
-                        std::cout << '(' << v.x << ", " << v.y << ")\n";
+                        std::cout << "uvs[" << i << "] (" << v.x << ", " << v.y
+                                  << ")\n";
 
                         loadedMesh.facevarying_uvs.push_back(v.x);
                         loadedMesh.facevarying_uvs.push_back(v.y);
@@ -276,7 +295,8 @@ bool LoadGLTF(const std::string &filename, float scale,
                           arrayAdapter<v2d>(dataPtr, count, byte_stride));
                       for (size_t i{0}; i < uvs.size(); ++i) {
                         const auto v = uvs[i];
-                        std::cout << '(' << v.x << ", " << v.y << ")\n";
+                        std::cout << "uvs[" << i << "] (" << v.x << ", " << v.y
+                                  << ")\n";
 
                         loadedMesh.facevarying_uvs.push_back(v.x);
                         loadedMesh.facevarying_uvs.push_back(v.y);
@@ -350,7 +370,7 @@ bool LoadGLTF(const std::string &filename, float scale,
     meshes->push_back(loadedMesh);
     ret = true;
   }
-  // std::cerr << "LoadGLTF() function is not yet implemented!" << std::endl;
+
   return ret;
-}
+}  // namespace example
 }  // namespace example
