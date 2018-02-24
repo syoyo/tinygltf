@@ -72,6 +72,7 @@ bool LoadGLTF(const std::string &filename, float scale,
 
     loadedMesh.name = gltfMesh.name;
     for (const auto &meshPrimitive : gltfMesh.primitives) {
+      bool convertedToTriangleList = false;
       // get access to the indices
       std::unique_ptr<intArrayBase> indicesArrayPtr = nullptr;
       {
@@ -136,6 +137,40 @@ bool LoadGLTF(const std::string &filename, float scale,
       }
 
       switch (meshPrimitive.mode) {
+        // We re-arrange the indices so that it describe a simple list of
+        // triangles
+        case TINYGLTF_MODE_TRIANGLE_FAN:
+          if (!convertedToTriangleList) {
+            std::cout << "TRIANGLE_FAN\n";
+            // This only has to be done once per primitive
+            convertedToTriangleList = true;
+
+            // We steal the guts of the vector
+            auto triangleFan = std::move(loadedMesh.faces);
+            loadedMesh.faces.clear();
+
+            // Push back the indices that describe just one triangle one by one
+            for (size_t i{2}; i < triangleFan.size(); ++i) {
+              loadedMesh.faces.push_back(triangleFan[0]);
+              loadedMesh.faces.push_back(triangleFan[1]);
+              loadedMesh.faces.push_back(triangleFan[i]);
+            }
+          }
+        case TINYGLTF_MODE_TRIANGLE_STRIP:
+          if (!convertedToTriangleList) {
+            std::cout << "TRIANGLE_STRIP\n";
+            // This only has to be done once per primitive
+            convertedToTriangleList = true;
+
+            auto triangleStrip = std::move(loadedMesh.faces);
+            loadedMesh.faces.clear();
+
+            for (size_t i{2}; i < triangleStrip.size(); ++i) {
+              loadedMesh.faces.push_back(triangleStrip[i - 2]);
+              loadedMesh.faces.push_back(triangleStrip[i - 1]);
+              loadedMesh.faces.push_back(triangleStrip[i]);
+            }
+          }
         case TINYGLTF_MODE_TRIANGLES:  // this is the simpliest case to handle
 
         {
@@ -222,9 +257,10 @@ bool LoadGLTF(const std::string &filename, float scale,
 
               switch (attribAccessor.type) {
                 case TINYGLTF_TYPE_VEC3: {
+                  std::cout << "Normal is VEC3\n";
                   switch (attribAccessor.componentType) {
-                    case TINYGLTF_COMPONENT_TYPE_FLOAT:
-                      std::cout << "normal vec3\n";
+                    case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+                      std::cout << "Normal is FLOAT\n";
                       v3fArray normals(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
 
@@ -244,7 +280,40 @@ bool LoadGLTF(const std::string &filename, float scale,
                         n1 = normals[f1];
                         n2 = normals[f2];
 
-                        std::cout << "got the 3 normals!\n";
+                        // Put them in the array in the correct order
+                        loadedMesh.facevarying_normals.push_back(n0.x);
+                        loadedMesh.facevarying_normals.push_back(n0.y);
+                        loadedMesh.facevarying_normals.push_back(n0.z);
+
+                        loadedMesh.facevarying_normals.push_back(n1.x);
+                        loadedMesh.facevarying_normals.push_back(n1.y);
+                        loadedMesh.facevarying_normals.push_back(n2.z);
+
+                        loadedMesh.facevarying_normals.push_back(n2.x);
+                        loadedMesh.facevarying_normals.push_back(n2.y);
+                        loadedMesh.facevarying_normals.push_back(n2.z);
+                      }
+                    } break;
+                    case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                      std::cout << "Normal is DOUBLE\n";
+                      v3dArray normals(
+                          arrayAdapter<v3d>(dataPtr, count, byte_stride));
+
+                      // IMPORTANT: We need to reorder normals (and texture
+                      // coordinates into "facevarying" order) for each face
+
+                      // For each triangle :
+                      for (size_t i{0}; i < indices.size() / 3; ++i) {
+                        // get the i'th triange's indexes
+                        auto f0 = indices[3 * i + 0];
+                        auto f1 = indices[3 * i + 1];
+                        auto f2 = indices[3 * i + 2];
+
+                        // get the 3 normal vectors for that face
+                        v3d n0, n1, n2;
+                        n0 = normals[f0];
+                        n1 = normals[f1];
+                        n2 = normals[f2];
 
                         // Put them in the array in the correct order
                         loadedMesh.facevarying_normals.push_back(n0.x);
@@ -259,118 +328,113 @@ bool LoadGLTF(const std::string &filename, float scale,
                         loadedMesh.facevarying_normals.push_back(n2.y);
                         loadedMesh.facevarying_normals.push_back(n2.z);
                       }
-                  }
-                  break;
-                  default:
-                    // TODO handle error
-                    break;
-                }
-                case TINYGLTF_TYPE_VEC4:
-                  std::cout << "normal vec4";
-                  break;
-              }
-            }
-
-            // TODO (Ybalrid) : need to order the UVs into facevarying order
-            if (attribute.first == "TEXCOORD_0") {
-              std::cout << "Found texture coordinates\n";
-
-              switch (attribAccessor.type) {
-                case TINYGLTF_TYPE_VEC2: {
-                  switch (attribAccessor.componentType) {
-                    case TINYGLTF_COMPONENT_TYPE_FLOAT: {
-                      v2fArray uvs(
-                          arrayAdapter<v2f>(dataPtr, count, byte_stride));
-                      for (size_t i{0}; i < uvs.size(); ++i) {
-                        const auto v = uvs[i];
-                        std::cout << "uvs[" << i << "] (" << v.x << ", " << v.y
-                                  << ")\n";
-
-                        loadedMesh.facevarying_uvs.push_back(v.x);
-                        loadedMesh.facevarying_uvs.push_back(v.y);
-                      }
-                    } break;
-                    case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
-                      v2dArray uvs(
-                          arrayAdapter<v2d>(dataPtr, count, byte_stride));
-                      for (size_t i{0}; i < uvs.size(); ++i) {
-                        const auto v = uvs[i];
-                        std::cout << "uvs[" << i << "] (" << v.x << ", " << v.y
-                                  << ")\n";
-
-                        loadedMesh.facevarying_uvs.push_back(v.x);
-                        loadedMesh.facevarying_uvs.push_back(v.y);
-                      }
                     } break;
                     default:
-                      break;
+                      std::cerr << "Unhandeled componant type for normal\n";
                   }
                 } break;
                 default:
-                  break;
+                  std::cerr << "Unhandeled vector type for normal\n";
+              }
+
+              // TODO (Ybalrid) : need to order the UVs into facevarying order
+              if (attribute.first == "TEXCOORD_0") {
+                std::cout << "Found texture coordinates\n";
+
+                switch (attribAccessor.type) {
+                  case TINYGLTF_TYPE_VEC2: {
+                    std::cout << "TEXTCOORD is VEC2\n";
+                    switch (attribAccessor.componentType) {
+                      case TINYGLTF_COMPONENT_TYPE_FLOAT: {
+                        std::cout << "TEXTCOORD is FLOAT\n";
+                        v2fArray uvs(
+                            arrayAdapter<v2f>(dataPtr, count, byte_stride));
+                        for (size_t i{0}; i < uvs.size(); ++i) {
+                          const auto v = uvs[i];
+                          std::cout << "uvs[" << i << "] (" << v.x << ", "
+                                    << v.y << ")\n";
+
+                          loadedMesh.facevarying_uvs.push_back(v.x);
+                          loadedMesh.facevarying_uvs.push_back(v.y);
+                        }
+                      } break;
+                      case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                        std::cout << "TEXTCOORD is DOUBLE\n";
+                        v2dArray uvs(
+                            arrayAdapter<v2d>(dataPtr, count, byte_stride));
+                        for (size_t i{0}; i < uvs.size(); ++i) {
+                          const auto v = uvs[i];
+                          std::cout << "uvs[" << i << "] (" << v.x << ", "
+                                    << v.y << ")\n";
+
+                          loadedMesh.facevarying_uvs.push_back(v.x);
+                          loadedMesh.facevarying_uvs.push_back(v.y);
+                        }
+                      } break;
+                      default:
+                        std::cerr << "unrecognized vector type for UV";
+                    }
+                  } break;
+                  default:
+                    std::cerr << "unreconized componant type for UV";
+                }
               }
             }
           }
-        } break;
-
-        // Other trigangle based modes
-        case TINYGLTF_MODE_TRIANGLE_FAN:
-          std::cout << "TRIANGLE_FAN\n";
-          break;
-        case TINYGLTF_MODE_TRIANGLE_STRIP:
-          std::cout << "TRIANGLE_STRIP\n";
-          break;
-        default:
-          std::cerr << "primitive mode not implemented";
           break;
 
-        // These aren't triangles:
-        case TINYGLTF_MODE_POINTS:
-        case TINYGLTF_MODE_LINE:
-        case TINYGLTF_MODE_LINE_LOOP:
-          std::cerr << "primitive is not triangle based, ignoring";
+          default:
+            std::cerr << "primitive mode not implemented";
+            break;
+
+          // These aren't triangles:
+          case TINYGLTF_MODE_POINTS:
+          case TINYGLTF_MODE_LINE:
+          case TINYGLTF_MODE_LINE_LOOP:
+            std::cerr << "primitive is not triangle based, ignoring";
+        }
       }
+
+      // bbox :
+      v3f bCenter;
+      bCenter.x = 0.5f * (pMax.x - pMin.x) + pMin.x;
+      bCenter.y = 0.5f * (pMax.y - pMin.y) + pMin.y;
+      bCenter.z = 0.5f * (pMax.z - pMin.z) + pMin.z;
+
+      for (size_t v = 0; v < loadedMesh.vertices.size() / 3; v++) {
+        loadedMesh.vertices[3 * v + 0] -= bCenter.x;
+        loadedMesh.vertices[3 * v + 1] -= bCenter.y;
+        loadedMesh.vertices[3 * v + 2] -= bCenter.z;
+      }
+
+      loadedMesh.pivot_xform[0][0] = 1.0f;
+      loadedMesh.pivot_xform[0][1] = 0.0f;
+      loadedMesh.pivot_xform[0][2] = 0.0f;
+      loadedMesh.pivot_xform[0][3] = 0.0f;
+
+      loadedMesh.pivot_xform[1][0] = 0.0f;
+      loadedMesh.pivot_xform[1][1] = 1.0f;
+      loadedMesh.pivot_xform[1][2] = 0.0f;
+      loadedMesh.pivot_xform[1][3] = 0.0f;
+
+      loadedMesh.pivot_xform[2][0] = 0.0f;
+      loadedMesh.pivot_xform[2][1] = 0.0f;
+      loadedMesh.pivot_xform[2][2] = 1.0f;
+      loadedMesh.pivot_xform[2][3] = 0.0f;
+
+      loadedMesh.pivot_xform[3][0] = bCenter.x;
+      loadedMesh.pivot_xform[3][1] = bCenter.y;
+      loadedMesh.pivot_xform[3][2] = bCenter.z;
+      loadedMesh.pivot_xform[3][3] = 1.0f;
+
+      for (size_t i{0}; i < loadedMesh.faces.size(); ++i)
+        loadedMesh.material_ids.push_back(materials->at(0).id);
+
+      meshes->push_back(loadedMesh);
+      ret = true;
     }
 
-    // bbox :
-    v3f bCenter;
-    bCenter.x = 0.5f * (pMax.x - pMin.x) + pMin.x;
-    bCenter.y = 0.5f * (pMax.y - pMin.y) + pMin.y;
-    bCenter.z = 0.5f * (pMax.z - pMin.z) + pMin.z;
-
-    for (size_t v = 0; v < loadedMesh.vertices.size() / 3; v++) {
-      loadedMesh.vertices[3 * v + 0] -= bCenter.x;
-      loadedMesh.vertices[3 * v + 1] -= bCenter.y;
-      loadedMesh.vertices[3 * v + 2] -= bCenter.z;
-    }
-
-    loadedMesh.pivot_xform[0][0] = 1.0f;
-    loadedMesh.pivot_xform[0][1] = 0.0f;
-    loadedMesh.pivot_xform[0][2] = 0.0f;
-    loadedMesh.pivot_xform[0][3] = 0.0f;
-
-    loadedMesh.pivot_xform[1][0] = 0.0f;
-    loadedMesh.pivot_xform[1][1] = 1.0f;
-    loadedMesh.pivot_xform[1][2] = 0.0f;
-    loadedMesh.pivot_xform[1][3] = 0.0f;
-
-    loadedMesh.pivot_xform[2][0] = 0.0f;
-    loadedMesh.pivot_xform[2][1] = 0.0f;
-    loadedMesh.pivot_xform[2][2] = 1.0f;
-    loadedMesh.pivot_xform[2][3] = 0.0f;
-
-    loadedMesh.pivot_xform[3][0] = bCenter.x;
-    loadedMesh.pivot_xform[3][1] = bCenter.y;
-    loadedMesh.pivot_xform[3][2] = bCenter.z;
-    loadedMesh.pivot_xform[3][3] = 1.0f;
-
-    for (size_t i{0}; i < loadedMesh.faces.size(); ++i)
-      loadedMesh.material_ids.push_back(materials->at(0).id);
-
-    meshes->push_back(loadedMesh);
-    ret = true;
+    return ret;
   }
-
-  return ret;
-}  // namespace example
+}
 }  // namespace example
