@@ -166,11 +166,11 @@ bool LoadGLTF(const std::string &filename, float scale,
               pMax.y = attribAccessor.maxValues[1];
               pMax.z = attribAccessor.maxValues[2];
 
-              switch (attribAccessor.componentType) {
-                case TINYGLTF_COMPONENT_TYPE_FLOAT:
-                  std::cout << "Type is FLOAT\n";
-                  switch (attribAccessor.type) {
-                    case TINYGLTF_TYPE_VEC3: {
+              switch (attribAccessor.type) {
+                case TINYGLTF_TYPE_VEC3: {
+                  switch (attribAccessor.componentType) {
+                    case TINYGLTF_COMPONENT_TYPE_FLOAT:
+                      std::cout << "Type is FLOAT\n";
                       // 3D vector of float
                       v3fArray positions(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
@@ -187,51 +187,51 @@ bool LoadGLTF(const std::string &filename, float scale,
                         loadedMesh.vertices.push_back(v.y * scale);
                         loadedMesh.vertices.push_back(v.z * scale);
                       }
-                    } break;
-                    default:
-                      // TODO Handle error
-                      break;
                   }
                   break;
-                case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
-                  std::cout << "Type is DOUBLE\n";
-                  switch (attribAccessor.type) {
-                    case TINYGLTF_TYPE_VEC3: {
-                      v3dArray positions(
-                          arrayAdapter<v3d>(dataPtr, count, byte_stride));
-                      for (size_t i{0}; i < positions.size(); ++i) {
-                        const auto v = positions[i];
-                        std::cout << "positions[" << i << "]: (" << v.x << ", "
-                                  << v.y << ", " << v.z << ")\n";
+                  case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
+                    std::cout << "Type is DOUBLE\n";
+                    switch (attribAccessor.type) {
+                      case TINYGLTF_TYPE_VEC3: {
+                        v3dArray positions(
+                            arrayAdapter<v3d>(dataPtr, count, byte_stride));
+                        for (size_t i{0}; i < positions.size(); ++i) {
+                          const auto v = positions[i];
+                          std::cout << "positions[" << i << "]: (" << v.x
+                                    << ", " << v.y << ", " << v.z << ")\n";
 
-                        loadedMesh.vertices.push_back(v.x * scale);
-                        loadedMesh.vertices.push_back(v.y * scale);
-                        loadedMesh.vertices.push_back(v.z * scale);
-                      }
-                    } break;
+                          loadedMesh.vertices.push_back(v.x * scale);
+                          loadedMesh.vertices.push_back(v.y * scale);
+                          loadedMesh.vertices.push_back(v.z * scale);
+                        }
+                      } break;
+                      default:
+                        // TODO Handle error
+                        break;
+                    }
+                    break;
                     default:
                       break;
                   }
                 } break;
-                default:
-                  // TODO handle error
-                  break;
               }
             }
 
             if (attribute.first == "NORMAL") {
               std::cout << "found normal attribute\n";
 
-              switch (attribAccessor.componentType) {
-                case TINYGLTF_COMPONENT_TYPE_FLOAT:
-                  switch (attribAccessor.type) {
-                    case TINYGLTF_TYPE_VEC3: {
+              switch (attribAccessor.type) {
+                case TINYGLTF_TYPE_VEC3: {
+                  switch (attribAccessor.componentType) {
+                    case TINYGLTF_COMPONENT_TYPE_FLOAT:
                       std::cout << "normal vec3\n";
                       v3fArray normals(
                           arrayAdapter<v3f>(dataPtr, count, byte_stride));
 
                       // IMPORTANT: We need to reorder normals (and texture
                       // coordinates into "facevarying" order) for each face
+
+                      // For each triangle :
                       for (size_t i{0}; i < indices.size() / 3; ++i) {
                         // get the i'th triange's indexes
                         auto f0 = indices[3 * i + 0];
@@ -250,23 +250,23 @@ bool LoadGLTF(const std::string &filename, float scale,
                         loadedMesh.facevarying_normals.push_back(n0.x);
                         loadedMesh.facevarying_normals.push_back(n0.y);
                         loadedMesh.facevarying_normals.push_back(n0.z);
+
                         loadedMesh.facevarying_normals.push_back(n1.x);
                         loadedMesh.facevarying_normals.push_back(n1.y);
                         loadedMesh.facevarying_normals.push_back(n2.z);
+
                         loadedMesh.facevarying_normals.push_back(n2.x);
                         loadedMesh.facevarying_normals.push_back(n2.y);
                         loadedMesh.facevarying_normals.push_back(n2.z);
                       }
-                    } break;
-                    case TINYGLTF_TYPE_VEC4:
-                      std::cout << "normal vec4";
-                      break;
-                    default:
-                      // TODO handle error
-                      break;
                   }
-                default:
-                  // TODO handle error
+                  break;
+                  default:
+                    // TODO handle error
+                    break;
+                }
+                case TINYGLTF_TYPE_VEC4:
+                  std::cout << "normal vec4";
                   break;
               }
             }
