@@ -411,7 +411,7 @@ void resizeCallback(float width, float height) {
   gHeight = static_cast<int>(height);
 }
 
-inline float pesudoColor(float v, int ch) {
+inline float pseudoColor(float v, int ch) {
   if (ch == 0) {  // red
     if (v <= 0.5f)
       return 0.f;
@@ -476,7 +476,7 @@ void UpdateDisplayTextureGL(GLint tex_id, int width, int height) {
     for (size_t i = 0; i < buf.size(); i++) {
       float v = (gRenderLayer.depthRGBA[i] - d_min) / d_diff;
       if (gShowDepthPeseudoColor) {
-        buf[i] = pesudoColor(v, i % 4);
+        buf[i] = pseudoColor(v, i % 4);
       } else {
         buf[i] = v;
       }
@@ -935,7 +935,7 @@ int main(int argc, char **argv) {
       ImGui::InputFloat("show pos scale", &gShowPositionScale);
 
       ImGui::InputFloat2("show depth range", gShowDepthRange);
-      ImGui::Checkbox("show depth pesudo color", &gShowDepthPeseudoColor);
+      ImGui::Checkbox("show depth pseudo color", &gShowDepthPeseudoColor);
     }
 
     ImGui::End();
