@@ -337,7 +337,7 @@ bool LoadGLTF(const std::string &filename, float scale,
                   std::cerr << "Unhandeled vector type for normal\n";
               }
 
-              // TODO (Ybalrid) : need to order the UVs into facevarying order
+              // Face varying comment on the normals is also true for the UVs
               if (attribute.first == "TEXCOORD_0") {
                 std::cout << "Found texture coordinates\n";
 
@@ -349,26 +349,53 @@ bool LoadGLTF(const std::string &filename, float scale,
                         std::cout << "TEXTCOORD is FLOAT\n";
                         v2fArray uvs(
                             arrayAdapter<v2f>(dataPtr, count, byte_stride));
-                        for (size_t i{0}; i < uvs.size(); ++i) {
-                          const auto v = uvs[i];
-                          std::cout << "uvs[" << i << "] (" << v.x << ", "
-                                    << v.y << ")\n";
 
-                          loadedMesh.facevarying_uvs.push_back(v.x);
-                          loadedMesh.facevarying_uvs.push_back(v.y);
+                        for (size_t i{0}; i < indices.size() / 3; ++i) {
+                          // get the i'th triange's indexes
+                          auto f0 = indices[3 * i + 0];
+                          auto f1 = indices[3 * i + 1];
+                          auto f2 = indices[3 * i + 2];
+
+                          v2f uv0, uv1, uv2;
+                          uv0 = uvs[f0];
+                          uv1 = uvs[f1];
+                          uv2 = uvs[f2];
+
+                          loadedMesh.facevarying_uvs.push_back(uv0.x);
+                          loadedMesh.facevarying_uvs.push_back(uv0.y);
+
+                          loadedMesh.facevarying_uvs.push_back(uv1.x);
+                          loadedMesh.facevarying_uvs.push_back(uv1.y);
+
+                          loadedMesh.facevarying_uvs.push_back(uv2.x);
+                          loadedMesh.facevarying_uvs.push_back(uv2.y);
                         }
+
                       } break;
                       case TINYGLTF_COMPONENT_TYPE_DOUBLE: {
                         std::cout << "TEXTCOORD is DOUBLE\n";
                         v2dArray uvs(
                             arrayAdapter<v2d>(dataPtr, count, byte_stride));
-                        for (size_t i{0}; i < uvs.size(); ++i) {
-                          const auto v = uvs[i];
-                          std::cout << "uvs[" << i << "] (" << v.x << ", "
-                                    << v.y << ")\n";
 
-                          loadedMesh.facevarying_uvs.push_back(v.x);
-                          loadedMesh.facevarying_uvs.push_back(v.y);
+                        for (size_t i{0}; i < indices.size() / 3; ++i) {
+                          // get the i'th triange's indexes
+                          auto f0 = indices[3 * i + 0];
+                          auto f1 = indices[3 * i + 1];
+                          auto f2 = indices[3 * i + 2];
+
+                          v2d uv0, uv1, uv2;
+                          uv0 = uvs[f0];
+                          uv1 = uvs[f1];
+                          uv2 = uvs[f2];
+
+                          loadedMesh.facevarying_uvs.push_back(uv0.x);
+                          loadedMesh.facevarying_uvs.push_back(uv0.y);
+
+                          loadedMesh.facevarying_uvs.push_back(uv1.x);
+                          loadedMesh.facevarying_uvs.push_back(uv1.y);
+
+                          loadedMesh.facevarying_uvs.push_back(uv2.x);
+                          loadedMesh.facevarying_uvs.push_back(uv2.y);
                         }
                       } break;
                       default:
