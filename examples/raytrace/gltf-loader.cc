@@ -19,14 +19,13 @@ bool LoadGLTF(const std::string &filename, float scale,
               std::vector<Mesh<float> > *meshes,
               std::vector<Material> *materials,
               std::vector<Texture> *textures) {
-  // TODO(syoyo): Implement
   // TODO(syoyo): Texture
   // TODO(syoyo): Material
 
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
-  std::string ext = GetFilePathExtension(filename);
+  const std::string ext = GetFilePathExtension(filename);
 
   bool ret = false;
   if (ext.compare("glb") == 0) {
@@ -61,26 +60,32 @@ bool LoadGLTF(const std::string &filename, float scale,
             << model.scenes.size() << " scenes\n"
             << model.lights.size() << " lights\n";
 
+  // Iterate through all the meses in the glTF file
   for (const auto &gltfMesh : model.meshes) {
     std::cout << "Current mesh has " << gltfMesh.primitives.size()
               << " primitives:\n";
 
+    // Create a mesh object
     Mesh<float> loadedMesh(sizeof(float) * 3);
 
-    // To store the min and max of the buffer
+    // To store the min and max of the buffer (as 3D vector of floats)
     v3f pMin = {}, pMax = {};
 
+    // Store the name of the glTF mesh (if defined)
     loadedMesh.name = gltfMesh.name;
+
+    // For each primitive
     for (const auto &meshPrimitive : gltfMesh.primitives) {
+      // Boolean used to check if we have converted the vertex buffer format
       bool convertedToTriangleList = false;
-      // get access to the indices
+      // This permit to get a type agnostic way of reading the index buffer
       std::unique_ptr<intArrayBase> indicesArrayPtr = nullptr;
       {
-        auto &indicesAccessor = model.accessors[meshPrimitive.indices];
-        auto &bufferView = model.bufferViews[indicesAccessor.bufferView];
-        auto &buffer = model.buffers[bufferView.buffer];
-        auto dataAddress = buffer.data.data() + bufferView.byteOffset +
-                           indicesAccessor.byteOffset;
+        const auto &indicesAccessor = model.accessors[meshPrimitive.indices];
+        const auto &bufferView = model.bufferViews[indicesAccessor.bufferView];
+        const auto &buffer = model.buffers[bufferView.buffer];
+        const auto dataAddress = buffer.data.data() + bufferView.byteOffset +
+                                 indicesAccessor.byteOffset;
         const auto byteStride = indicesAccessor.ByteStride(bufferView);
         const auto count = indicesAccessor.count;
 
@@ -181,8 +186,8 @@ bool LoadGLTF(const std::string &filename, float scale,
             const auto &bufferView =
                 model.bufferViews[attribAccessor.bufferView];
             const auto &buffer = model.buffers[bufferView.buffer];
-            auto dataPtr = buffer.data.data() + bufferView.byteOffset +
-                           attribAccessor.byteOffset;
+            const auto dataPtr = buffer.data.data() + bufferView.byteOffset +
+                                 attribAccessor.byteOffset;
             const auto byte_stride = attribAccessor.ByteStride(bufferView);
             const auto count = attribAccessor.count;
 
@@ -356,11 +361,14 @@ bool LoadGLTF(const std::string &filename, float scale,
                           auto f1 = indices[3 * i + 1];
                           auto f2 = indices[3 * i + 2];
 
+                          // get the texture coordinates for each triangle's
+                          // vertices
                           v2f uv0, uv1, uv2;
                           uv0 = uvs[f0];
                           uv1 = uvs[f1];
                           uv2 = uvs[f2];
 
+                          // push them in order into the mesh data
                           loadedMesh.facevarying_uvs.push_back(uv0.x);
                           loadedMesh.facevarying_uvs.push_back(uv0.y);
 
@@ -454,6 +462,7 @@ bool LoadGLTF(const std::string &filename, float scale,
       loadedMesh.pivot_xform[3][2] = bCenter.z;
       loadedMesh.pivot_xform[3][3] = 1.0f;
 
+      // TODO handle materials
       for (size_t i{0}; i < loadedMesh.faces.size(); ++i)
         loadedMesh.material_ids.push_back(materials->at(0).id);
 
