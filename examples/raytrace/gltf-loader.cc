@@ -157,7 +157,7 @@ bool LoadGLTF(const std::string &filename, float scale,
             // Push back the indices that describe just one triangle one by one
             for (size_t i{2}; i < triangleFan.size(); ++i) {
               loadedMesh.faces.push_back(triangleFan[0]);
-              loadedMesh.faces.push_back(triangleFan[1]);
+              loadedMesh.faces.push_back(triangleFan[i - 1]);
               loadedMesh.faces.push_back(triangleFan[i]);
             }
           }
