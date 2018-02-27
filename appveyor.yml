@@ -13,3 +13,6 @@ configuration: Release
 build:
   parallel: true
   project: TinyGLTFSolution.sln
+
+after_build:
+  - examples.bat

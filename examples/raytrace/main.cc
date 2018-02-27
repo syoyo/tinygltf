@@ -55,10 +55,10 @@ THE SOFTWARE.
 #include <cstring>
 #include <iostream>
 #include <limits>
+#include <map>
+#include <sstream>
 #include <string>
 #include <vector>
-#include <sstream>
-#include <map>
 
 #include <atomic>  // C++11
 #include <chrono>  // C++11
@@ -72,22 +72,23 @@ THE SOFTWARE.
 
 #if defined(_MSC_VER)
 #pragma warning(push)
-#pragma warning(disable: 4201)
+#pragma warning(disable : 4201)
 #endif
 
-#include "glm/mat4x4.hpp"
-#include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "glm/mat4x4.hpp"
 
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif
 
+#include "gltf-loader.h"
 #include "nanosg.h"
+#include "obj-loader.h"
 #include "render-config.h"
 #include "render.h"
-#include "gltf-loader.h"
 #include "trackball.h"
 
 #ifdef WIN32
@@ -96,19 +97,17 @@ THE SOFTWARE.
 #endif
 #endif
 
-#define SHOW_BUFFER_COLOR (0)
-#define SHOW_BUFFER_NORMAL (1)
-#define SHOW_BUFFER_POSITION (2)
-#define SHOW_BUFFER_DEPTH (3)
-#define SHOW_BUFFER_TEXCOORD (4)
-#define SHOW_BUFFER_VARYCOORD (5)
-
-b3gDefaultOpenGLWindow* window = 0;
+b3gDefaultOpenGLWindow *window = 0;
 int gWidth = 512;
 int gHeight = 512;
 int gMousePosX = -1, gMousePosY = -1;
 bool gMouseLeftDown = false;
+
+// FIX issue when max passes is done - no modes is switched. pass must be set to
+// 0 when mode is changed
+int gShowBufferMode_prv = SHOW_BUFFER_COLOR;
 int gShowBufferMode = SHOW_BUFFER_COLOR;
+
 bool gTabPressed = false;
 bool gShiftPressed = false;
 float gShowPositionScale = 1.0f;
@@ -128,8 +127,7 @@ std::atomic<bool> gSceneDirty;
 example::RenderConfig gRenderConfig;
 std::mutex gMutex;
 
-struct RenderLayer
-{
+struct RenderLayer {
   std::vector<float> displayRGBA;  // Accumurated image.
   std::vector<float> rgba;
   std::vector<float> auxRGBA;        // Auxiliary buffer
@@ -143,14 +141,12 @@ struct RenderLayer
 
 RenderLayer gRenderLayer;
 
-struct Camera
-{
+struct Camera {
   glm::mat4 view;
   glm::mat4 projection;
 };
 
-struct ManipConfig
-{
+struct ManipConfig {
   glm::vec3 snapTranslation;
   glm::vec3 snapRotation;
   glm::vec3 snapScale;
@@ -201,9 +197,12 @@ void RenderThread() {
     // gRenderCancel may be set to true in main loop.
     // Render() will repeatedly check this flag inside the rendering loop.
 
-    bool ret =
-        example::Renderer::Render(&gRenderLayer.rgba.at(0), &gRenderLayer.auxRGBA.at(0), &gRenderLayer.sampleCounts.at(0),
-                         gCurrQuat, gScene, gAsset, gRenderConfig, gRenderCancel);
+    bool ret = example::Renderer::Render(
+        &gRenderLayer.rgba.at(0), &gRenderLayer.auxRGBA.at(0),
+        &gRenderLayer.sampleCounts.at(0), gCurrQuat, gScene, gAsset,
+        gRenderConfig, gRenderCancel,
+        gShowBufferMode  // added mode passing
+    );
 
     if (ret) {
       std::lock_guard<std::mutex> guard(gMutex);
@@ -219,16 +218,18 @@ void RenderThread() {
   }
 }
 
-void InitRender(example::RenderConfig* rc) {
+void InitRender(example::RenderConfig *rc) {
   rc->pass = 0;
 
   rc->max_passes = 128;
 
   gRenderLayer.sampleCounts.resize(rc->width * rc->height);
-  std::fill(gRenderLayer.sampleCounts.begin(), gRenderLayer.sampleCounts.end(), 0.0);
+  std::fill(gRenderLayer.sampleCounts.begin(), gRenderLayer.sampleCounts.end(),
+            0.0);
 
   gRenderLayer.displayRGBA.resize(rc->width * rc->height * 4);
-  std::fill(gRenderLayer.displayRGBA.begin(), gRenderLayer.displayRGBA.end(), 0.0);
+  std::fill(gRenderLayer.displayRGBA.begin(), gRenderLayer.displayRGBA.end(),
+            0.0);
 
   gRenderLayer.rgba.resize(rc->width * rc->height * 4);
   std::fill(gRenderLayer.rgba.begin(), gRenderLayer.rgba.end(), 0.0);
@@ -237,19 +238,23 @@ void InitRender(example::RenderConfig* rc) {
   std::fill(gRenderLayer.auxRGBA.begin(), gRenderLayer.auxRGBA.end(), 0.0);
 
   gRenderLayer.normalRGBA.resize(rc->width * rc->height * 4);
-  std::fill(gRenderLayer.normalRGBA.begin(), gRenderLayer.normalRGBA.end(), 0.0);
+  std::fill(gRenderLayer.normalRGBA.begin(), gRenderLayer.normalRGBA.end(),
+            0.0);
 
   gRenderLayer.positionRGBA.resize(rc->width * rc->height * 4);
-  std::fill(gRenderLayer.positionRGBA.begin(), gRenderLayer.positionRGBA.end(), 0.0);
+  std::fill(gRenderLayer.positionRGBA.begin(), gRenderLayer.positionRGBA.end(),
+            0.0);
 
   gRenderLayer.depthRGBA.resize(rc->width * rc->height * 4);
   std::fill(gRenderLayer.depthRGBA.begin(), gRenderLayer.depthRGBA.end(), 0.0);
 
   gRenderLayer.texCoordRGBA.resize(rc->width * rc->height * 4);
-  std::fill(gRenderLayer.texCoordRGBA.begin(), gRenderLayer.texCoordRGBA.end(), 0.0);
+  std::fill(gRenderLayer.texCoordRGBA.begin(), gRenderLayer.texCoordRGBA.end(),
+            0.0);
 
   gRenderLayer.varyCoordRGBA.resize(rc->width * rc->height * 4);
-  std::fill(gRenderLayer.varyCoordRGBA.begin(), gRenderLayer.varyCoordRGBA.end(), 0.0);
+  std::fill(gRenderLayer.varyCoordRGBA.begin(),
+            gRenderLayer.varyCoordRGBA.end(), 0.0);
 
   rc->normalImage = &gRenderLayer.normalRGBA.at(0);
   rc->positionImage = &gRenderLayer.positionRGBA.at(0);
@@ -268,19 +273,18 @@ void checkErrors(std::string desc) {
   }
 }
 
+static int CreateDisplayTextureGL(const float *data, int width, int height,
+                                  int components) {
+  GLuint id;
+  glGenTextures(1, &id);
 
-static int CreateDisplayTextureGL(const float *data, int width,
-                                   int height, int components) {
-  GLuint id;                       
-  glGenTextures(1, &id);           
-  
   GLint last_texture;
   glGetIntegerv(GL_TEXTURE_BINDING_2D, &last_texture);
-  
+
   glBindTexture(GL_TEXTURE_2D, id);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  
+
   GLenum format = GL_RGBA;
   if (components == 1) {
     format = GL_LUMINANCE;
@@ -290,15 +294,15 @@ static int CreateDisplayTextureGL(const float *data, int width,
     format = GL_RGB;
   } else if (components == 4) {
     format = GL_RGBA;
-  } else { 
-    assert(0); // "Invalid components"
-  } 
-  
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format,
-               GL_FLOAT, data);
-               
+  } else {
+    assert(0);  // "Invalid components"
+  }
+
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, format, GL_FLOAT,
+               data);
+
   glBindTexture(GL_TEXTURE_2D, last_texture);
-  
+
   return static_cast<int>(id);
 }
 
@@ -312,8 +316,10 @@ void keyboardCallback(int keycode, int state) {
     // reset.
     trackball(gCurrQuat, 0.0f, 0.0f, 0.0f, 0.0f);
     // clear buffer.
-    memset(gRenderLayer.rgba.data(), 0, sizeof(float) * gRenderConfig.width * gRenderConfig.height * 4);
-    memset(gRenderLayer.sampleCounts.data(), 0, sizeof(int) * gRenderConfig.width * gRenderConfig.height);
+    memset(gRenderLayer.rgba.data(), 0,
+           sizeof(float) * gRenderConfig.width * gRenderConfig.height * 4);
+    memset(gRenderLayer.sampleCounts.data(), 0,
+           sizeof(int) * gRenderConfig.width * gRenderConfig.height);
   } else if (keycode == 9) {
     gTabPressed = (state == 1);
   } else if (keycode == B3G_SHIFT) {
@@ -330,7 +336,6 @@ void keyboardCallback(int keycode, int state) {
 }
 
 void mouseMoveCallback(float x, float y) {
-
   if (gMouseLeftDown) {
     if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
     } else {
@@ -371,7 +376,7 @@ void mouseButtonCallback(int button, int state, float x, float y) {
   (void)y;
   ImGui_ImplBtGui_SetMouseButtonState(button, (state == 1));
 
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
     return;
   }
@@ -395,7 +400,7 @@ void mouseButtonCallback(int button, int state, float x, float y) {
 }
 
 void resizeCallback(float width, float height) {
-  //GLfloat h = (GLfloat)height / (GLfloat)width;
+  // GLfloat h = (GLfloat)height / (GLfloat)width;
   GLfloat xmax, znear, zfar;
 
   znear = 1.0f;
@@ -406,7 +411,7 @@ void resizeCallback(float width, float height) {
   gHeight = static_cast<int>(height);
 }
 
-inline float pesudoColor(float v, int ch) {
+inline float pseudoColor(float v, int ch) {
   if (ch == 0) {  // red
     if (v <= 0.5f)
       return 0.f;
@@ -471,7 +476,7 @@ void UpdateDisplayTextureGL(GLint tex_id, int width, int height) {
     for (size_t i = 0; i < buf.size(); i++) {
       float v = (gRenderLayer.depthRGBA[i] - d_min) / d_diff;
       if (gShowDepthPeseudoColor) {
-        buf[i] = pesudoColor(v, i % 4);
+        buf[i] = pseudoColor(v, i % 4);
       } else {
         buf[i] = v;
       }
@@ -491,31 +496,31 @@ void UpdateDisplayTextureGL(GLint tex_id, int width, int height) {
   disp.resize(width * height * 4);
   {
     for (size_t y = 0; y < height; y++) {
-      memcpy(&disp[4 * (y * width)], &buf[4 * ((height - y - 1) * width)], sizeof(float) * 4 * width);
+      memcpy(&disp[4 * (y * width)], &buf[4 * ((height - y - 1) * width)],
+             sizeof(float) * 4 * width);
     }
-  
   }
 
   glBindTexture(GL_TEXTURE_2D, tex_id);
-  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_FLOAT, disp.data());
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_FLOAT,
+                  disp.data());
   glBindTexture(GL_TEXTURE_2D, 0);
 
-  //glRasterPos2i(-1, -1);
-  //glDrawPixels(width, height, GL_RGBA, GL_FLOAT,
+  // glRasterPos2i(-1, -1);
+  // glDrawPixels(width, height, GL_RGBA, GL_FLOAT,
   //             static_cast<const GLvoid*>(&buf.at(0)));
 }
 
-void EditTransform(const ManipConfig &config, const Camera& camera, glm::mat4& matrix)
-{
+void EditTransform(const ManipConfig &config, const Camera &camera,
+                   glm::mat4 &matrix) {
   static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::ROTATE);
   static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
-  if (ImGui::IsKeyPressed(90))
-    mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-  if (ImGui::IsKeyPressed(69))
-    mCurrentGizmoOperation = ImGuizmo::ROTATE;
-  if (ImGui::IsKeyPressed(82)) // r Key
+  if (ImGui::IsKeyPressed(90)) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+  if (ImGui::IsKeyPressed(69)) mCurrentGizmoOperation = ImGuizmo::ROTATE;
+  if (ImGui::IsKeyPressed(82))  // r Key
     mCurrentGizmoOperation = ImGuizmo::SCALE;
-  if (ImGui::RadioButton("Translate", mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
+  if (ImGui::RadioButton("Translate",
+                         mCurrentGizmoOperation == ImGuizmo::TRANSLATE))
     mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
   ImGui::SameLine();
   if (ImGui::RadioButton("Rotate", mCurrentGizmoOperation == ImGuizmo::ROTATE))
@@ -524,14 +529,15 @@ void EditTransform(const ManipConfig &config, const Camera& camera, glm::mat4& m
   if (ImGui::RadioButton("Scale", mCurrentGizmoOperation == ImGuizmo::SCALE))
     mCurrentGizmoOperation = ImGuizmo::SCALE;
   float matrixTranslation[3], matrixRotation[3], matrixScale[3];
-  ImGuizmo::DecomposeMatrixToComponents(&matrix[0][0], matrixTranslation, matrixRotation, matrixScale);
+  ImGuizmo::DecomposeMatrixToComponents(&matrix[0][0], matrixTranslation,
+                                        matrixRotation, matrixScale);
   ImGui::InputFloat3("Tr", matrixTranslation, 3);
   ImGui::InputFloat3("Rt", matrixRotation, 3);
   ImGui::InputFloat3("Sc", matrixScale, 3);
-  ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation, matrixScale, &matrix[0][0]);
+  ImGuizmo::RecomposeMatrixFromComponents(matrixTranslation, matrixRotation,
+                                          matrixScale, &matrix[0][0]);
 
-  if (mCurrentGizmoOperation != ImGuizmo::SCALE)
-  {
+  if (mCurrentGizmoOperation != ImGuizmo::SCALE) {
     if (ImGui::RadioButton("Local", mCurrentGizmoMode == ImGuizmo::LOCAL))
       mCurrentGizmoMode = ImGuizmo::LOCAL;
     ImGui::SameLine();
@@ -539,33 +545,32 @@ void EditTransform(const ManipConfig &config, const Camera& camera, glm::mat4& m
       mCurrentGizmoMode = ImGuizmo::WORLD;
   }
   static bool useSnap(false);
-  if (ImGui::IsKeyPressed(83))
-    useSnap = !useSnap;
+  if (ImGui::IsKeyPressed(83)) useSnap = !useSnap;
   ImGui::Checkbox("", &useSnap);
   ImGui::SameLine();
   glm::vec3 snap;
-  switch (mCurrentGizmoOperation)
-  {
-  case ImGuizmo::TRANSLATE:
-    snap = config.snapTranslation;
-    ImGui::InputFloat3("Snap", &snap.x);
-    break;
-  case ImGuizmo::ROTATE:
-    snap = config.snapRotation;
-    ImGui::InputFloat("Angle Snap", &snap.x);
-    break;
-  case ImGuizmo::SCALE:
-    snap = config.snapScale;
-    ImGui::InputFloat("Scale Snap", &snap.x);
-    break;
+  switch (mCurrentGizmoOperation) {
+    case ImGuizmo::TRANSLATE:
+      snap = config.snapTranslation;
+      ImGui::InputFloat3("Snap", &snap.x);
+      break;
+    case ImGuizmo::ROTATE:
+      snap = config.snapRotation;
+      ImGui::InputFloat("Angle Snap", &snap.x);
+      break;
+    case ImGuizmo::SCALE:
+      snap = config.snapScale;
+      ImGui::InputFloat("Scale Snap", &snap.x);
+      break;
   }
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
-  ImGuizmo::Manipulate(&camera.view[0][0], &camera.projection[0][0], mCurrentGizmoOperation, mCurrentGizmoMode, &matrix[0][0], NULL, useSnap ? &snap.x : NULL);
+  ImGuizmo::Manipulate(&camera.view[0][0], &camera.projection[0][0],
+                       mCurrentGizmoOperation, mCurrentGizmoMode, &matrix[0][0],
+                       NULL, useSnap ? &snap.x : NULL);
 }
 
-void DrawMesh(const example::Mesh<float> *mesh)
-{
+void DrawMesh(const example::Mesh<float> *mesh) {
   // TODO(LTE): Use vertex array or use display list.
 
   glBegin(GL_TRIANGLES);
@@ -579,20 +584,17 @@ void DrawMesh(const example::Mesh<float> *mesh)
       glNormal3f(mesh->facevarying_normals[9 * i + 0],
                  mesh->facevarying_normals[9 * i + 1],
                  mesh->facevarying_normals[9 * i + 2]);
-      glVertex3f(mesh->vertices[3 * f0 + 0],
-                 mesh->vertices[3 * f0 + 1],
+      glVertex3f(mesh->vertices[3 * f0 + 0], mesh->vertices[3 * f0 + 1],
                  mesh->vertices[3 * f0 + 2]);
       glNormal3f(mesh->facevarying_normals[9 * i + 3],
                  mesh->facevarying_normals[9 * i + 4],
                  mesh->facevarying_normals[9 * i + 5]);
-      glVertex3f(mesh->vertices[3 * f1 + 0],
-                 mesh->vertices[3 * f1 + 1],
+      glVertex3f(mesh->vertices[3 * f1 + 0], mesh->vertices[3 * f1 + 1],
                  mesh->vertices[3 * f1 + 2]);
       glNormal3f(mesh->facevarying_normals[9 * i + 6],
                  mesh->facevarying_normals[9 * i + 7],
                  mesh->facevarying_normals[9 * i + 8]);
-      glVertex3f(mesh->vertices[3 * f2 + 0],
-                 mesh->vertices[3 * f2 + 1],
+      glVertex3f(mesh->vertices[3 * f2 + 0], mesh->vertices[3 * f2 + 1],
                  mesh->vertices[3 * f2 + 2]);
     }
 
@@ -602,23 +604,19 @@ void DrawMesh(const example::Mesh<float> *mesh)
       unsigned int f1 = mesh->faces[3 * i + 1];
       unsigned int f2 = mesh->faces[3 * i + 2];
 
-      glVertex3f(mesh->vertices[3 * f0 + 0],
-                 mesh->vertices[3 * f0 + 1],
+      glVertex3f(mesh->vertices[3 * f0 + 0], mesh->vertices[3 * f0 + 1],
                  mesh->vertices[3 * f0 + 2]);
-      glVertex3f(mesh->vertices[3 * f1 + 0],
-                 mesh->vertices[3 * f1 + 1],
+      glVertex3f(mesh->vertices[3 * f1 + 0], mesh->vertices[3 * f1 + 1],
                  mesh->vertices[3 * f1 + 2]);
-      glVertex3f(mesh->vertices[3 * f2 + 0],
-                 mesh->vertices[3 * f2 + 1],
+      glVertex3f(mesh->vertices[3 * f2 + 0], mesh->vertices[3 * f2 + 1],
                  mesh->vertices[3 * f2 + 2]);
     }
   }
 
-  glEnd(); 
+  glEnd();
 }
 
-void DrawNode(const nanosg::Node<float, example::Mesh<float> > &node)
-{
+void DrawNode(const nanosg::Node<float, example::Mesh<float> > &node) {
   glPushMatrix();
   glMultMatrixf(node.GetLocalXformPtr());
 
@@ -634,8 +632,8 @@ void DrawNode(const nanosg::Node<float, example::Mesh<float> > &node)
 }
 
 // Draw scene with OpenGL
-void DrawScene(const nanosg::Scene<float, example::Mesh<float> > &scene, const Camera &camera)
-{
+void DrawScene(const nanosg::Scene<float, example::Mesh<float> > &scene,
+               const Camera &camera) {
   glEnable(GL_DEPTH_TEST);
 
   glEnable(GL_LIGHTING);
@@ -649,11 +647,12 @@ void DrawScene(const nanosg::Scene<float, example::Mesh<float> > &scene, const C
   const float light_diffuse[4] = {0.5f, 0.5f, 0.5f, 1.0f};
 
   glLightfv(GL_LIGHT0, GL_POSITION, &light0_pos[0]);
-  glLightfv(GL_LIGHT0, GL_DIFFUSE,  &light_diffuse[0]);
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, &light_diffuse[0]);
   glLightfv(GL_LIGHT1, GL_POSITION, &light1_pos[0]);
-  glLightfv(GL_LIGHT1, GL_DIFFUSE,  &light_diffuse[0]);
+  glLightfv(GL_LIGHT1, GL_DIFFUSE, &light_diffuse[0]);
 
-  const std::vector<nanosg::Node<float, example::Mesh<float> > > &root_nodes = scene.GetNodes(); 
+  const std::vector<nanosg::Node<float, example::Mesh<float> > > &root_nodes =
+      scene.GetNodes();
 
   glMatrixMode(GL_PROJECTION);
   glPushMatrix();
@@ -675,15 +674,12 @@ void DrawScene(const nanosg::Scene<float, example::Mesh<float> > &scene, const C
   glDisable(GL_LIGHT1);
   glDisable(GL_LIGHTING);
   glDisable(GL_DEPTH_TEST);
-
 }
 
-void BuildSceneItems(
-  std::vector<std::string> *display_names,
-  std::vector<std::string> *names,
-  const nanosg::Node<float, example::Mesh<float> > &node,
-  int indent)
-{
+void BuildSceneItems(std::vector<std::string> *display_names,
+                     std::vector<std::string> *names,
+                     const nanosg::Node<float, example::Mesh<float> > &node,
+                     int indent) {
   if (node.GetName().empty()) {
     // Skip a node with empty name.
     return;
@@ -699,14 +695,16 @@ void BuildSceneItems(
 
   display_names->push_back(display_name);
   names->push_back(node.GetName());
-    
+
   for (size_t i = 0; i < node.GetChildren().size(); i++) {
     BuildSceneItems(display_names, names, node.GetChildren()[i], indent + 1);
   }
-
 }
 
-int main(int argc, char** argv) {
+// tigra: add default material
+example::Material default_material;
+
+int main(int argc, char **argv) {
   std::string config_filename = "config.json";
 
   if (argc > 1) {
@@ -729,13 +727,43 @@ int main(int argc, char** argv) {
     std::vector<example::Material> materials;
     std::vector<example::Texture> textures;
 
-    bool ret = LoadGLTF(gRenderConfig.gltf_filename, gRenderConfig.scene_scale, &meshes, &materials, &textures);
-    if (!ret) {
-      std::cerr << "Failed to load glTF [ " << gRenderConfig.gltf_filename << " ]" << std::endl;
-      return -1;
+    // tigra: set default material to 95% white diffuse
+    default_material.diffuse[0] = 0.95f;
+    default_material.diffuse[1] = 0.95f;
+    default_material.diffuse[2] = 0.95f;
+
+    default_material.specular[0] = 0;
+    default_material.specular[1] = 0;
+    default_material.specular[2] = 0;
+
+    // Material pushed as first material on the list
+    materials.push_back(default_material);
+
+    if (!gRenderConfig.obj_filename.empty()) {
+      bool ret = LoadObj(gRenderConfig.obj_filename, gRenderConfig.scene_scale,
+                         &meshes, &materials, &textures);
+      if (!ret) {
+        std::cerr << "Failed to load .obj [ " << gRenderConfig.obj_filename
+                  << " ]" << std::endl;
+        return -1;
+      }
+    }
+
+    if (!gRenderConfig.gltf_filename.empty()) {
+      std::cout << "Found gltf file : " << gRenderConfig.gltf_filename << "\n";
+
+      bool ret =
+          LoadGLTF(gRenderConfig.gltf_filename, gRenderConfig.scene_scale,
+                   &meshes, &materials, &textures);
+      if (!ret) {
+        std::cerr << "Failed to load glTF file [ "
+                  << gRenderConfig.gltf_filename << " ]" << std::endl;
+        return -1;
+      }
     }
 
     gAsset.materials = materials;
+    gAsset.default_material = default_material;
     gAsset.textures = textures;
 
     for (size_t n = 0; n < meshes.size(); n++) {
@@ -744,12 +772,20 @@ int main(int argc, char** argv) {
     }
 
     for (size_t n = 0; n < gAsset.meshes.size(); n++) {
-
       nanosg::Node<float, example::Mesh<float> > node(&gAsset.meshes[n]);
+
+      // case where the name of a mesh isn't defined in the loaded file
+      if (gAsset.meshes[n].name.empty()) {
+        std::string generatedName = "unnamed_" + std::to_string(n);
+        gAsset.meshes[n].name = generatedName;
+        meshes[n].name = generatedName;
+      }
+
       node.SetName(meshes[n].name);
-      node.SetLocalXform(meshes[n].pivot_xform); // Use mesh's pivot transform as node's local transform.
+      node.SetLocalXform(meshes[n].pivot_xform);  // Use mesh's pivot transform
+                                                  // as node's local transform.
       gNodes.push_back(node);
-     
+
       gScene.AddNode(node);
     }
 
@@ -761,11 +797,12 @@ int main(int argc, char** argv) {
     float bmin[3], bmax[3];
     gScene.GetBoundingBox(bmin, bmax);
     printf("  # of nodes               : %d\n", int(gNodes.size()));
-    printf("  Scene Bmin               : %f, %f, %f\n", bmin[0], bmin[1], bmin[2]);
-    printf("  Scene Bmax               : %f, %f, %f\n", bmax[0], bmax[1], bmax[2]);
-
+    printf("  Scene Bmin               : %f, %f, %f\n", bmin[0], bmin[1],
+           bmin[2]);
+    printf("  Scene Bmax               : %f, %f, %f\n", bmax[0], bmax[1],
+           bmax[2]);
   }
-  
+
   std::vector<const char *> imgui_node_names;
   std::vector<std::string> display_node_names;
   std::vector<std::string> node_names;
@@ -773,13 +810,14 @@ int main(int argc, char** argv) {
 
   {
     for (size_t i = 0; i < gScene.GetNodes().size(); i++) {
-      BuildSceneItems(&display_node_names, &node_names, gScene.GetNodes()[i], /* indent */0);
+      BuildSceneItems(&display_node_names, &node_names, gScene.GetNodes()[i],
+                      /* indent */ 0);
     }
 
     // List of strings for imgui.
     // Assume nodes in the scene does not change.
     for (size_t i = 0; i < display_node_names.size(); i++) {
-      //std::cout << "name : " << display_node_names[i] << std::endl;
+      // std::cout << "name : " << display_node_names[i] << std::endl;
       imgui_node_names.push_back(display_node_names[i].c_str());
     }
 
@@ -788,12 +826,12 @@ int main(int argc, char** argv) {
       nanosg::Node<float, example::Mesh<float> > *node;
 
       if (gScene.FindNode(node_names[i], &node)) {
-        //std::cout << "id : " << i << ", name : " << node_names[i] << std::endl;
+        // std::cout << "id : " << i << ", name : " << node_names[i] <<
+        // std::endl;
         node_map[i] = node;
       }
     }
   }
-
 
   window = new b3gDefaultOpenGLWindow;
   b3gWindowConstructionInfo ci;
@@ -836,9 +874,9 @@ int main(int argc, char** argv) {
 
   ImGui_ImplBtGui_Init(window);
 
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   io.Fonts->AddFontDefault();
-  //io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 15.0f);
+  // io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 15.0f);
 
   glm::mat4 projection(1.0f);
   glm::mat4 view(1.0f);
@@ -861,7 +899,7 @@ int main(int argc, char** argv) {
     ImGuizmo::BeginFrame();
     ImGuizmo::Enable(true);
 
-    //ImGuiIO &io = ImGui::GetIO();
+    // ImGuiIO &io = ImGui::GetIO();
     ImGuizmo::SetRect(0, 0, io.DisplaySize.x, io.DisplaySize.y);
 
     ImGui::Begin("UI");
@@ -897,7 +935,7 @@ int main(int argc, char** argv) {
       ImGui::InputFloat("show pos scale", &gShowPositionScale);
 
       ImGui::InputFloat2("show depth range", gShowDepthRange);
-      ImGui::Checkbox("show depth pesudo color", &gShowDepthPeseudoColor);
+      ImGui::Checkbox("show depth pseudo color", &gShowDepthPeseudoColor);
     }
 
     ImGui::End();
@@ -908,38 +946,47 @@ int main(int argc, char** argv) {
 
     checkErrors("clear");
 
+    // fix max passes issue
+    if (gShowBufferMode_prv != gShowBufferMode) {
+      gRenderConfig.pass = 0;
+      gShowBufferMode_prv = gShowBufferMode;
+    }
 
     // Render display window
     {
       static GLint gl_texid = -1;
       if (gl_texid < 0) {
-        gl_texid = CreateDisplayTextureGL(NULL, gRenderConfig.width, gRenderConfig.height, 4);
+        gl_texid = CreateDisplayTextureGL(NULL, gRenderConfig.width,
+                                          gRenderConfig.height, 4);
       }
 
       // Refresh texture until rendering finishes.
       if (gRenderConfig.pass < gRenderConfig.max_passes) {
         // FIXME(LTE): Do not update GL texture frequently.
-        UpdateDisplayTextureGL(gl_texid, gRenderConfig.width, gRenderConfig.height);
+        UpdateDisplayTextureGL(gl_texid, gRenderConfig.width,
+                               gRenderConfig.height);
       }
 
       ImGui::Begin("Render");
-      ImTextureID tex_id = reinterpret_cast<void *>(
-                    static_cast<intptr_t>(gl_texid));
+      ImTextureID tex_id =
+          reinterpret_cast<void *>(static_cast<intptr_t>(gl_texid));
       ImGui::Image(tex_id, ImVec2(256, 256), ImVec2(0, 0),
-                   ImVec2(1, 1));// Setup camera and draw imguizomo
+                   ImVec2(1, 1));  // Setup camera and draw imguizomo
 
       ImGui::End();
-  
     }
 
     // scene graph tree
     glm::mat4 node_matrix;
-    static int node_selected = 0;
+    static int node_selected_index = 0;
     {
       ImGui::Begin("Scene");
 
-      ImGui::ListBox("Node list", &node_selected, imgui_node_names.data(), imgui_node_names.size(), 16);
-      node_matrix = glm::make_mat4(node_map[node_selected]->GetLocalXformPtr());
+      ImGui::ListBox("Node list", &node_selected_index, imgui_node_names.data(),
+                     imgui_node_names.size(), 16);
+
+      auto node_selected = node_map.at(node_selected_index);
+      node_matrix = glm::make_mat4(node_selected->GetLocalXformPtr());
 
       ImGui::End();
     }
@@ -964,11 +1011,14 @@ int main(int argc, char** argv) {
       up[2] = gRenderConfig.up[2];
 
       // NOTE(LTE): w, then (x,y,z) for glm::quat.
-      glm::quat rot = glm::quat(gCurrQuat[3], gCurrQuat[0], gCurrQuat[1], gCurrQuat[2]);
+      glm::quat rot =
+          glm::quat(gCurrQuat[3], gCurrQuat[0], gCurrQuat[1], gCurrQuat[2]);
       glm::mat4 rm = glm::mat4_cast(rot);
 
       view = glm::lookAt(eye, lookat, up) * glm::inverse(glm::mat4_cast(rot));
-      projection = glm::perspective (45.0f, float(window->getWidth()) / float(window->getHeight()), 0.01f, 1000.0f);
+      projection = glm::perspective(
+          45.0f, float(window->getWidth()) / float(window->getHeight()), 0.01f,
+          1000.0f);
 
       camera.view = view;
       camera.projection = projection;
@@ -978,10 +1028,10 @@ int main(int argc, char** argv) {
 
       float mat[4][4];
       memcpy(mat, &node_matrix[0][0], sizeof(float) * 16);
-      node_map[node_selected]->SetLocalXform(mat);
+      node_map[node_selected_index]->SetLocalXform(mat);
 
       checkErrors("edit_transform");
- 
+
       ImGui::End();
     }
 
