@@ -470,7 +470,8 @@ bool LoadGLTF(const std::string &filename, float scale,
       ret = true;
     }
 
-    return ret;
   }
+
+  return ret;
 }
 }  // namespace example
