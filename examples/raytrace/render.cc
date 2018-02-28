@@ -443,7 +443,7 @@ bool Renderer::Render(float* rgba, float* aux_rgba, int* sample_counts,
             float specular_col[3];
 			
 			//tigra: material_id is ok
-			if(material_id>=0 && material_id<materials.size())
+			if(material_id<materials.size())
 			{
 				//printf("ok mat\n");
 				
