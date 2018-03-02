@@ -60,7 +60,7 @@ bool LoadGLTF(const std::string &filename, float scale,
             << model.scenes.size() << " scenes\n"
             << model.lights.size() << " lights\n";
 
-  // Iterate through all the meses in the glTF file
+  // Iterate through all the meshes in the glTF file
   for (const auto &gltfMesh : model.meshes) {
     std::cout << "Current mesh has " << gltfMesh.primitives.size()
               << " primitives:\n";
@@ -469,9 +469,23 @@ bool LoadGLTF(const std::string &filename, float scale,
       meshes->push_back(loadedMesh);
       ret = true;
     }
-
   }
 
+  // Iterate through all texture declaration in glTF file
+  for (const auto &gltfTexture : model.textures) {
+    std::cout << "Found texture!";
+    Texture loadedTexture;
+    const auto &image = model.images[gltfTexture.source];
+    loadedTexture.components = image.component;
+    loadedTexture.width = image.width;
+    loadedTexture.height = image.height;
+
+    const auto size =
+        image.component * image.width * image.height * sizeof(unsigned char);
+    loadedTexture.image = new unsigned char[size];
+    memcpy(loadedTexture.image, image.image.data(), size);
+    textures->push_back(loadedTexture);
+  }
   return ret;
 }
 }  // namespace example
