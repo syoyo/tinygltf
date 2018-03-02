@@ -53,6 +53,7 @@ THE SOFTWARE.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -338,6 +339,8 @@ void keyboardCallback(int keycode, int state) {
 void mouseMoveCallback(float x, float y) {
   if (gMouseLeftDown) {
     if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+      gSceneDirty = true;
+      // RequestRender();
     } else {
       float w = static_cast<float>(gRenderConfig.width);
       float h = static_cast<float>(gRenderConfig.height);
@@ -376,24 +379,27 @@ void mouseButtonCallback(int button, int state, float x, float y) {
   (void)y;
   ImGui_ImplBtGui_SetMouseButtonState(button, (state == 1));
 
+  if (button == 0 && !state)
+    gMouseLeftDown = false;  // prevent sticky trackball after using gizmo
+
   ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
-    return;
-  }
-
-  // left button
-  if (button == 0) {
-    if (state) {
-      gMouseLeftDown = true;
-      if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
-      } else {
-        trackball(gPrevQuat, 0.0f, 0.0f, 0.0f, 0.0f);
-      }
-    } else {
-      gMouseLeftDown = false;
-      if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+    if (button == 0 && !state) {
+      if (ImGuizmo::IsUsing()) {
         gSceneDirty = true;
         RequestRender();
+      }
+    }
+  } else {
+    // left button
+    if (button == 0) {
+      if (state) {
+        gMouseLeftDown = true;
+        if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+        } else {
+          trackball(gPrevQuat, 0.0f, 0.0f, 0.0f, 0.0f);
+        }
+      } else {
       }
     }
   }
@@ -762,9 +768,35 @@ int main(int argc, char **argv) {
       }
     }
 
+    if (textures.size() > 0) {
+      materials[0].diffuse_texid = 0;
+    }
+
     gAsset.materials = materials;
     gAsset.default_material = default_material;
     gAsset.textures = textures;
+
+#ifdef _DEBUG
+    // output raw data as RGB ASCII PPM file
+    if (textures.size() > 0) {
+      std::ofstream output(
+          "./"
+          "debug"
+          ".ppm");
+
+      if (output) {
+        output << "P3\n#sampleOutputDebug\n";
+        example::Texture &t = textures[0];
+        output << t.width << ' ' << t.height << "\n#imgSize\n255\n";
+        for (size_t i{0}; i < t.width * t.height * t.components;
+             i += t.components) {
+          for (size_t j{0}; j < 3; ++j)
+            output << size_t(t.image[i + j]) << '\n';
+        }
+      }
+    }
+
+#endif
 
     for (size_t n = 0; n < meshes.size(); n++) {
       size_t mesh_id = gAsset.meshes.size();
@@ -872,6 +904,7 @@ int main(int argc, char **argv) {
   window->setResizeCallback(resizeCallback);
   checkErrors("resize");
 
+  ImGui::CreateContext();
   ImGui_ImplBtGui_Init(window);
 
   ImGuiIO &io = ImGui::GetIO();
