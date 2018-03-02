@@ -340,7 +340,7 @@ void mouseMoveCallback(float x, float y) {
   if (gMouseLeftDown) {
     if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
       gSceneDirty = true;
-      RequestRender();
+      // RequestRender();
     } else {
       float w = static_cast<float>(gRenderConfig.width);
       float h = static_cast<float>(gRenderConfig.height);
@@ -360,8 +360,6 @@ void mouseMoveCallback(float x, float y) {
 
       } else {
         // Adjust y.
-        std::cout << "trackball in mouseMoveCallback\nmouseDown "
-                  << gMouseLeftDown << '\n';
         trackball(gPrevQuat, (2.f * gMousePosX - w) / (float)w,
                   (h - 2.f * (gMousePosY - y_offset)) / (float)h,
                   (2.f * x - w) / (float)w,
@@ -386,22 +384,22 @@ void mouseButtonCallback(int button, int state, float x, float y) {
 
   ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
-    std::cout << "muse or keyboard used by imgui\n";
-    return;
-  }
-
-  // left button
-  if (button == 0) {
-    if (state) {
-      gMouseLeftDown = true;
-      if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
-      } else {
-        trackball(gPrevQuat, 0.0f, 0.0f, 0.0f, 0.0f);
-      }
-    } else {
-      if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+    if (button == 0 && !state) {
+      if (ImGuizmo::IsUsing()) {
         gSceneDirty = true;
         RequestRender();
+      }
+    }
+  } else {
+    // left button
+    if (button == 0) {
+      if (state) {
+        gMouseLeftDown = true;
+        if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+        } else {
+          trackball(gPrevQuat, 0.0f, 0.0f, 0.0f, 0.0f);
+        }
+      } else {
       }
     }
   }
