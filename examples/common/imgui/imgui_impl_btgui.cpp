@@ -17,6 +17,7 @@
 #include "OpenGLWindow/X11OpenGLWindow.h"
 #endif
 
+#include <imgui_internal.h>
 #include <cstdio>
 
 #define IMGUI_B3G_CONTROL (300)
@@ -122,12 +123,12 @@ void ImGui_ImplBtGui_RenderDrawLists(ImDrawData* draw_data) {
              (GLsizei)last_viewport[3]);
 }
 
-static const char* ImGui_ImplBtGui_GetClipboardText() {
+static const char* ImGui_ImplBtGui_GetClipboardText(void* user_ctx) {
   // @todo
   return NULL;  // glfwGetClipboardString(g_Window);
 }
 
-static void ImGui_ImplBtGui_SetClipboardText(const char* text) {
+static void ImGui_ImplBtGui_SetClipboardText(void* user_ctx, const char* text) {
   // @todo
   return;
   // glfwSetClipboardString(g_Window, text);
@@ -259,7 +260,7 @@ bool ImGui_ImplBtGui_Init(b3gDefaultOpenGLWindow* window) {
   io.SetClipboardTextFn = ImGui_ImplBtGui_SetClipboardText;
   io.GetClipboardTextFn = ImGui_ImplBtGui_GetClipboardText;
 #ifdef _WIN32
-  //io.ImeWindowHandle = glfwGetWin32Window(g_Window);
+  // io.ImeWindowHandle = glfwGetWin32Window(g_Window);
 #endif
 
 #if 0
@@ -277,7 +278,7 @@ bool ImGui_ImplBtGui_Init(b3gDefaultOpenGLWindow* window) {
 
 void ImGui_ImplBtGui_Shutdown() {
   ImGui_ImplBtGui_InvalidateDeviceObjects();
-  ImGui::Shutdown();
+  ImGui::Shutdown(ImGui::GetCurrentContext());
 }
 
 void ImGui_ImplBtGui_NewFrame(int mouse_x, int mouse_y) {
