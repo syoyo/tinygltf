@@ -776,28 +776,6 @@ int main(int argc, char **argv) {
     gAsset.default_material = default_material;
     gAsset.textures = textures;
 
-#ifdef _DEBUG
-    // output raw data as RGB ASCII PPM file
-    if (textures.size() > 0) {
-      std::ofstream output(
-          "./"
-          "debug"
-          ".ppm");
-
-      if (output) {
-        output << "P3\n#sampleOutputDebug\n";
-        example::Texture &t = textures[0];
-        output << t.width << ' ' << t.height << "\n#imgSize\n255\n";
-        for (size_t i{0}; i < t.width * t.height * t.components;
-             i += t.components) {
-          for (size_t j{0}; j < 3; ++j)
-            output << size_t(t.image[i + j]) << '\n';
-        }
-      }
-    }
-
-#endif
-
     for (size_t n = 0; n < meshes.size(); n++) {
       size_t mesh_id = gAsset.meshes.size();
       gAsset.meshes.push_back(meshes[mesh_id]);
