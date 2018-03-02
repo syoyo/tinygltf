@@ -53,6 +53,7 @@ THE SOFTWARE.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -338,6 +339,8 @@ void keyboardCallback(int keycode, int state) {
 void mouseMoveCallback(float x, float y) {
   if (gMouseLeftDown) {
     if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
+      gSceneDirty = true;
+      RequestRender();
     } else {
       float w = static_cast<float>(gRenderConfig.width);
       float h = static_cast<float>(gRenderConfig.height);
@@ -357,6 +360,8 @@ void mouseMoveCallback(float x, float y) {
 
       } else {
         // Adjust y.
+        std::cout << "trackball in mouseMoveCallback\nmouseDown "
+                  << gMouseLeftDown << '\n';
         trackball(gPrevQuat, (2.f * gMousePosX - w) / (float)w,
                   (h - 2.f * (gMousePosY - y_offset)) / (float)h,
                   (2.f * x - w) / (float)w,
@@ -381,6 +386,7 @@ void mouseButtonCallback(int button, int state, float x, float y) {
 
   ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
+    std::cout << "muse or keyboard used by imgui\n";
     return;
   }
 
@@ -764,9 +770,35 @@ int main(int argc, char **argv) {
       }
     }
 
+    if (textures.size() > 0) {
+      materials[0].diffuse_texid = 0;
+    }
+
     gAsset.materials = materials;
     gAsset.default_material = default_material;
     gAsset.textures = textures;
+
+#ifdef _DEBUG
+    // output raw data as RGB ASCII PPM file
+    if (textures.size() > 0) {
+      std::ofstream output(
+          "./"
+          "debug"
+          ".ppm");
+
+      if (output) {
+        output << "P3\n#sampleOutputDebug\n";
+        example::Texture &t = textures[0];
+        output << t.width << ' ' << t.height << "\n#imgSize\n255\n";
+        for (size_t i{0}; i < t.width * t.height * t.components;
+             i += t.components) {
+          for (size_t j{0}; j < 3; ++j)
+            output << size_t(t.image[i + j]) << '\n';
+        }
+      }
+    }
+
+#endif
 
     for (size_t n = 0; n < meshes.size(); n++) {
       size_t mesh_id = gAsset.meshes.size();
