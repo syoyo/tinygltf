@@ -376,6 +376,9 @@ void mouseButtonCallback(int button, int state, float x, float y) {
   (void)y;
   ImGui_ImplBtGui_SetMouseButtonState(button, (state == 1));
 
+  if (button == 0 && !state)
+    gMouseLeftDown = false;  // prevent sticky trackball after using gizmo
+
   ImGuiIO &io = ImGui::GetIO();
   if (io.WantCaptureMouse || io.WantCaptureKeyboard) {
     return;
@@ -390,7 +393,6 @@ void mouseButtonCallback(int button, int state, float x, float y) {
         trackball(gPrevQuat, 0.0f, 0.0f, 0.0f, 0.0f);
       }
     } else {
-      gMouseLeftDown = false;
       if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) {
         gSceneDirty = true;
         RequestRender();
@@ -872,6 +874,7 @@ int main(int argc, char **argv) {
   window->setResizeCallback(resizeCallback);
   checkErrors("resize");
 
+  ImGui::CreateContext();
   ImGui_ImplBtGui_Init(window);
 
   ImGuiIO &io = ImGui::GetIO();
