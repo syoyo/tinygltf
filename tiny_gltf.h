@@ -3279,7 +3279,7 @@ static void SerializeValue(const std::string &key, const Value &value,
     obj[key] = jsonValue;
   } else {
     json jsonValue;
-    std::vector<std::string> valueKeys;
+    std::vector<std::string> valueKeys = value.Keys();
     for (unsigned int i = 0; i < valueKeys.size(); ++i) {
       Value elementValue = value.Get(valueKeys[i]);
       if (elementValue.IsInt())
