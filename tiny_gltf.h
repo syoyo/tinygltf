@@ -730,10 +730,12 @@ enum SectionCheck {
 ///
 typedef bool (*LoadImageDataFunction)(Image *, std::string *, int, int, const unsigned char *, int, void *);
 
+#ifndef TINYGLTF_NO_STB_IMAGE
 // Declaration of default image loader callback
 static bool LoadImageData(Image *image, std::string *err, int req_width,
                           int req_height, const unsigned char *bytes,
                           int size, void*);
+#endif
 
 class TinyGLTF {
  public:
@@ -869,7 +871,11 @@ class TinyGLTF {
 #endif
 
 #include "./json.hpp"
+
+#ifndef TINYGLTF_NO_STB_IMAGE
 #include "./stb_image.h"
+#endif
+
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
@@ -1186,6 +1192,7 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
     load_image_user_data_ = user_data;
 }
 
+#ifndef TINYGLTF_NO_STB_IMAGE
 static bool LoadImageData(Image *image, std::string *err, int req_width,
                           int req_height, const unsigned char *bytes,
                           int size, void*) {
@@ -1242,6 +1249,7 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
 
   return true;
 }
+#endif
 
 static bool IsDataURI(const std::string &in) {
   std::string header = "data:application/octet-stream;base64,";
