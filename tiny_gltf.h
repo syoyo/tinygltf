@@ -450,7 +450,7 @@ struct Image {
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png", "image/bmp", "image/gif"]
-  std::string uri;       // (reqiored if no mimeType)
+  std::string uri;       // (required if no mimeType)
   Value extras;
 
   Image() { bufferView = -1; }
