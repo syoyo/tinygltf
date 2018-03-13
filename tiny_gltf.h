@@ -725,6 +725,15 @@ enum SectionCheck {
   REQUIRE_ALL = 0x3f
 };
 
+///
+/// LoadImageDataFunction type. Signature for custom image loading callbacks.
+///
+typedef bool (*LoadImageDataFunction)(Image *, std::string *, int, int, const unsigned char *, int, void *);
+
+// Declaration of default image loader callback
+static bool LoadImageData(Image *image, std::string *err, int req_width,
+                          int req_height, const unsigned char *bytes,
+                          int size, void*);
 
 class TinyGLTF {
  public:
@@ -788,6 +797,11 @@ class TinyGLTF {
       const std::string &
           filename /*, bool embedImages, bool embedBuffers, bool writeBinary*/);
 
+  ///
+  /// Set callback to use for loading image data
+  ///
+  void SetImageLoader(LoadImageDataFunction LoadImageData, void *user_data);
+
  private:
   ///
   /// Loads glTF asset from string(memory).
@@ -801,6 +815,14 @@ class TinyGLTF {
   const unsigned char *bin_data_;
   size_t bin_size_;
   bool is_binary_;
+
+  LoadImageDataFunction LoadImageData =
+#ifndef TINYGLTF_NO_STB_IMAGE
+      &tinygltf::LoadImageData;
+#else
+      nullptr;
+#endif
+  void *load_image_user_data_ = nullptr;
 };
 
 #ifdef __clang__
@@ -1159,9 +1181,14 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   return true;
 }
 
+void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
+    LoadImageData = func;
+    load_image_user_data_ = user_data;
+}
+
 static bool LoadImageData(Image *image, std::string *err, int req_width,
                           int req_height, const unsigned char *bytes,
-                          int size) {
+                          int size, void*) {
   int w, h, comp;
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
@@ -1609,7 +1636,8 @@ static bool ParseAsset(Asset *asset, std::string *err,
 static bool ParseImage(Image *image, std::string *err,
                        const json &o, const std::string &basedir,
                        bool is_binary, const unsigned char *bin_data,
-                       size_t bin_size) {
+                       size_t bin_size, LoadImageDataFunction* LoadImageData = nullptr,
+                       void *user_data = nullptr) {
   // A glTF image must either reference a bufferView or an image uri
   double bufferView = -1;
   bool isEmbedded =
@@ -1701,8 +1729,14 @@ static bool ParseImage(Image *image, std::string *err,
     }
   }
 
-  return LoadImageData(image, err, 0, 0, &img.at(0),
-                       static_cast<int>(img.size()));
+  if (*LoadImageData == nullptr) {
+    if (err) {
+      (*err) += "No LoadImageData callback specified.\n";
+    }
+    return false;
+  }
+  return (*LoadImageData)(image, err, 0, 0, &img.at(0),
+                       static_cast<int>(img.size()), user_data);
 }
 
 static bool ParseTexture(Texture *texture, std::string *err,
@@ -2875,7 +2909,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
         }
         Image image;
         if (!ParseImage(&image, err, it.value(), base_dir,
-                        is_binary_, bin_data_, bin_size_)) {
+                        is_binary_, bin_data_, bin_size_, &this->LoadImageData, load_image_user_data_)) {
           return false;
         }
 
@@ -2895,9 +2929,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
               model->bufferViews[size_t(image.bufferView)];
           const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
 
+          if (*LoadImageData == nullptr) {
+            if (err) {
+              (*err) += "No LoadImageData callback specified.\n";
+            }
+            return false;
+          }
           bool ret = LoadImageData(&image, err, image.width, image.height,
                                    &buffer.data[bufferView.byteOffset],
-                                   static_cast<int>(bufferView.byteLength));
+                                   static_cast<int>(bufferView.byteLength), load_image_user_data_);
           if (!ret) {
             return false;
           }
