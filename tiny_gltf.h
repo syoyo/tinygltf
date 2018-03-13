@@ -1228,12 +1228,12 @@ static bool IsDataURI(const std::string &in) {
   if (in.find(header) == 0) {
     return true;
   }
-  
+
   header = "data:image/png;base64,";
   if (in.find(header) == 0) {
     return true;
   }
-  
+
   header = "data:image/bmp;base64,";
   if(in.find(header) == 0) {
     return true;
@@ -1274,7 +1274,7 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
   }
-  
+
   if (data.empty()) {
     header = "data:image/bmp;base64,";
     if (in.find(header) == 0) {
@@ -2560,7 +2560,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   // FIXME Maybe a better way to handle it than removing the code
 
   {
-    json::const_iterator it = v.find("scenes"); 
+    json::const_iterator it = v.find("scenes");
     if ((it != v.end()) && it.value().is_array()) {
       // OK
     } else if (check_sections & REQUIRE_SCENES) {
@@ -2572,7 +2572,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   {
-    json::const_iterator it = v.find("nodes"); 
+    json::const_iterator it = v.find("nodes");
     if ((it != v.end()) && it.value().is_array()) {
       // OK
     } else if (check_sections & REQUIRE_NODES) {
@@ -2584,7 +2584,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   {
-    json::const_iterator it = v.find("accessors"); 
+    json::const_iterator it = v.find("accessors");
     if ((it != v.end()) && it.value().is_array()) {
       // OK
     } else if (check_sections & REQUIRE_ACCESSORS) {
@@ -2596,7 +2596,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   {
-    json::const_iterator it = v.find("buffers"); 
+    json::const_iterator it = v.find("buffers");
     if ((it != v.end()) && it.value().is_array()) {
       // OK
     } else if (check_sections & REQUIRE_BUFFERS) {
@@ -2608,7 +2608,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   {
-    json::const_iterator it = v.find("bufferViews"); 
+    json::const_iterator it = v.find("bufferViews");
     if ((it != v.end()) && it.value().is_array()) {
       // OK
     } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
@@ -2631,7 +2631,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 1. Parse Asset
   {
-    json::const_iterator it = v.find("asset"); 
+    json::const_iterator it = v.find("asset");
     if ((it != v.end()) && it.value().is_object()) {
       const json &root = it.value();
 
@@ -2641,7 +2641,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 2. Parse extensionUsed
   {
-    json::const_iterator it = v.find("extensionsUsed"); 
+    json::const_iterator it = v.find("extensionsUsed");
     if ((it != v.end()) && it.value().is_array()) {
       const json &root = it.value();
       for (unsigned int i = 0; i < root.size(); ++i) {
@@ -2651,7 +2651,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   {
-    json::const_iterator it = v.find("extensionsRequired"); 
+    json::const_iterator it = v.find("extensionsRequired");
     if ((it != v.end()) && it.value().is_array()) {
       const json &root = it.value();
       for (unsigned int i = 0; i < root.size(); ++i) {
@@ -2662,7 +2662,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 3. Parse Buffer
   {
-    json::const_iterator rootIt = v.find("buffers"); 
+    json::const_iterator rootIt = v.find("buffers");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2685,10 +2685,10 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
       }
     }
   }
-  
+
   // 4. Parse BufferView
   {
-    json::const_iterator rootIt = v.find("bufferViews"); 
+    json::const_iterator rootIt = v.find("bufferViews");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2713,7 +2713,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 5. Parse Accessor
   {
-    json::const_iterator rootIt = v.find("accessors"); 
+    json::const_iterator rootIt = v.find("accessors");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2738,7 +2738,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 6. Parse Mesh
   {
-    json::const_iterator rootIt = v.find("meshes"); 
+    json::const_iterator rootIt = v.find("meshes");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2763,7 +2763,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 7. Parse Node
   {
-    json::const_iterator rootIt = v.find("nodes"); 
+    json::const_iterator rootIt = v.find("nodes");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2788,7 +2788,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 8. Parse scenes.
   {
-    json::const_iterator rootIt = v.find("scenes"); 
+    json::const_iterator rootIt = v.find("scenes");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2823,7 +2823,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 9. Parse default scenes.
   {
-    json::const_iterator rootIt = v.find("scene"); 
+    json::const_iterator rootIt = v.find("scene");
     if ((rootIt != v.end()) && rootIt.value().is_number_integer()) {
       const int defaultScene = rootIt.value();
 
@@ -2833,7 +2833,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 10. Parse Material
   {
-    json::const_iterator rootIt = v.find("materials"); 
+    json::const_iterator rootIt = v.find("materials");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2862,7 +2862,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 11. Parse Image
   {
-    json::const_iterator rootIt = v.find("images"); 
+    json::const_iterator rootIt = v.find("images");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2912,7 +2912,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 12. Parse Texture
   {
-    json::const_iterator rootIt = v.find("textures"); 
+    json::const_iterator rootIt = v.find("textures");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2937,7 +2937,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 13. Parse Animation
   {
-    json::const_iterator rootIt = v.find("animations"); 
+    json::const_iterator rootIt = v.find("animations");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2962,7 +2962,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 14. Parse Skin
   {
-    json::const_iterator rootIt = v.find("skins"); 
+    json::const_iterator rootIt = v.find("skins");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -2987,7 +2987,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 15. Parse Sampler
   {
-    json::const_iterator rootIt = v.find("samplers"); 
+    json::const_iterator rootIt = v.find("samplers");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -3012,7 +3012,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 16. Parse Camera
   {
-    json::const_iterator rootIt = v.find("cameras"); 
+    json::const_iterator rootIt = v.find("cameras");
     if ((rootIt != v.end()) && rootIt.value().is_array()) {
       const json &root = rootIt.value();
 
@@ -3037,7 +3037,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
 
   // 17. Parse Extensions
   {
-    json::const_iterator rootIt = v.find("extensions"); 
+    json::const_iterator rootIt = v.find("extensions");
     if ((rootIt != v.end()) && rootIt.value().is_object()) {
       const json &root = rootIt.value();
 
@@ -3283,7 +3283,7 @@ static void SerializeValue(const std::string &key, const Value &value,
     for (unsigned int i = 0; i < valueKeys.size(); ++i) {
       Value elementValue = value.Get(valueKeys[i]);
       if (elementValue.IsInt())
-        jsonValue[valueKeys[i]] = 
+        jsonValue[valueKeys[i]] =
             static_cast<double>(elementValue.Get<int>());
     }
 
