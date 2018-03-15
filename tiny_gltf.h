@@ -1282,6 +1282,11 @@ static bool IsDataURI(const std::string &in) {
     return true;
   }
 
+  header = "data:application/gltf-buffer;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+
   return false;
 }
 
@@ -1324,6 +1329,13 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
 
   if (data.empty()) {
     header = "data:text/plain;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size()));
+    }
+  }
+
+  if (data.empty()) {
+    header = "data:application/gltf-buffer;base64,";
     if (in.find(header) == 0) {
       data = base64_decode(in.substr(header.size()));
     }
@@ -1774,11 +1786,11 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
   }
 
   // In glTF 2.0, uri is not mandatory anymore
-  std::string uri;
-  ParseStringProperty(&uri, err, o, "uri", false, "Buffer");
+  buffer->uri.clear();
+  ParseStringProperty(&buffer->uri, err, o, "uri", false, "Buffer");
 
   // having an empty uri for a non embedded image should not be valid
-  if (!is_binary && uri.empty()) {
+  if (!is_binary && buffer->uri.empty()) {
     if (err) {
       (*err) += "'uri' is missing from non binary glTF file buffer.\n";
     }
@@ -1798,9 +1810,9 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
   if (is_binary) {
     // Still binary glTF accepts external dataURI. First try external resources.
 
-    if (!uri.empty()) {
+    if (!buffer->uri.empty()) {
       // External .bin file.
-      LoadExternalFile(&buffer->data, err, uri, basedir, bytes, true);
+      LoadExternalFile(&buffer->data, err, buffer->uri, basedir, bytes, true);
     } else {
       // load data from (embedded) binary data
 
@@ -1828,16 +1840,16 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
     }
 
   } else {
-    if (IsDataURI(uri)) {
-      if (!DecodeDataURI(&buffer->data, uri, bytes, true)) {
+    if (IsDataURI(buffer->uri)) {
+      if (!DecodeDataURI(&buffer->data, buffer->uri, bytes, true)) {
         if (err) {
-          (*err) += "Failed to decode 'uri' : " + uri + " in Buffer\n";
+          (*err) += "Failed to decode 'uri' : " + buffer->uri + " in Buffer\n";
         }
         return false;
       }
     } else {
       // Assume external .bin file.
-      if (!LoadExternalFile(&buffer->data, err, uri, basedir, bytes, true)) {
+      if (!LoadExternalFile(&buffer->data, err, buffer->uri, basedir, bytes, true)) {
         return false;
       }
     }
