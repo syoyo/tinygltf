@@ -3207,7 +3207,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   memcpy(&model_format, bytes + 16, 4);
   swap4(&model_format);
 
-  if ((20 + model_length > size) || (model_length < 1) || // specification allows a GLB file with no bin buffer
+  if ((20 + model_length >= size) || (model_length < 1) ||
       (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
