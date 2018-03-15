@@ -385,6 +385,7 @@ using ColorValue = std::array<double, 4>;
 #endif
 
 typedef std::map<std::string, Parameter> ParameterMap;
+typedef std::map<std::string, ParameterMap> ExtensionMap;
 
 struct AnimationChannel {
   int sampler;              // required
@@ -472,8 +473,8 @@ struct Material {
 
   ParameterMap values;            // PBR metal/roughness workflow
   ParameterMap additionalValues;  // normal/occlusion/emissive values
-  ParameterMap extCommonValues;   // KHR_common_material extension
-  ParameterMap extPBRValues;
+
+  ExtensionMap extensions;
   Value extras;
 };
 
@@ -556,7 +557,7 @@ struct PerspectiveCamera {
         ,
         znear(0.0f) {}
 
-  ParameterMap extensions;
+  ExtensionMap extensions;
   Value extras;
 };
 
@@ -568,7 +569,7 @@ struct OrthographicCamera {
 
   OrthographicCamera() : xmag(0.0f), ymag(0.0f), zfar(0.0f), znear(0.0f) {}
 
-  ParameterMap extensions;
+  ExtensionMap extensions;
   Value extras;
 };
 
@@ -581,7 +582,7 @@ struct Camera {
 
   Camera() {}
 
-  ParameterMap extensions;
+  ExtensionMap extensions;
   Value extras;
 };
 
@@ -611,7 +612,7 @@ typedef struct {
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
   std::vector<std::map<std::string, int> > targets;
-  ParameterMap extensions;
+  ExtensionMap extensions;
   Value extras;
 } Mesh;
 
@@ -632,8 +633,8 @@ class Node {
     matrix = rhs.matrix;
     weights = rhs.weights;
 
+    extensions = rhs.extensions;
     extras = rhs.extras;
-    extLightsValues = rhs.extLightsValues;
   }
 
   ~Node() {}
@@ -649,9 +650,9 @@ class Node {
   std::vector<double> translation;  // length must be 0 or 3
   std::vector<double> matrix;       // length must be 0 or 16
   std::vector<double> weights;  // The weights of the instantiated Morph Target
-
+  
+  ExtensionMap extensions;
   Value extras;
-  ParameterMap extLightsValues;      // KHR_lights_cmn extension
 };
 
 typedef struct {
@@ -667,7 +668,7 @@ typedef struct {
   std::string generator;
   std::string minVersion;
   std::string copyright;
-  ParameterMap extensions;
+  ExtensionMap extensions;
   Value extras;
 } Asset;
 
@@ -675,8 +676,8 @@ struct Scene {
   std::string name;
   std::vector<int> nodes;
 
-  ParameterMap extensions;
-  ParameterMap extras;
+  ExtensionMap extensions;
+  Value extras;
 };
 
 struct Light {
@@ -704,6 +705,7 @@ class Model {
   std::vector<Camera> cameras;
   std::vector<Scene> scenes;
   std::vector<Light> lights;
+  ExtensionMap extensions;
 
   int defaultScene;
   std::vector<std::string> extensionsUsed;
@@ -1629,11 +1631,82 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
   return true;
 }
 
+static bool ParseParameterProperty(Parameter *param, std::string *err,
+                                   const json &o,
+                                   const std::string &prop, bool required) {
+  double num_val;
+
+  // A parameter value can either be a string or an array of either a boolean or
+  // a number. Booleans of any kind aren't supported here. Granted, it
+  // complicates the Parameter structure and breaks it semantically in the sense
+  // that the client probably works off the assumption that if the string is
+  // empty the vector is used, etc. Would a tagged union work?
+  if (ParseStringProperty(&param->string_value, err, o, prop, false)) {
+    // Found string property.
+    return true;
+  } else if (ParseNumberArrayProperty(&param->number_array, err, o, prop,
+                                      false)) {
+    // Found a number array.
+    return true;
+  } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
+    param->number_array.push_back(num_val);
+    return true;
+  } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
+                               false)) {
+    return true;
+  } else if (ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
+    return true;
+  } else {
+    if (required) {
+      if (err) {
+        (*err) += "parameter must be a string or number / number array.\n";
+      }
+    }
+    return false;
+  }
+}
+
+static bool ParseExtensionsProperty(ExtensionMap *ret, std::string* err, const json &o)
+{
+  json::const_iterator it = o.find("extensions");
+  if (it == o.end()) {
+    return false;
+  }
+  if (!it.value().is_object()) {
+    return false;
+  }
+  ExtensionMap extensions;
+  json::const_iterator extIt = it.value().begin();
+  for(; extIt != it.value().end(); extIt++)
+  {
+    if (!extIt.value().is_object()) continue;
+    
+    const json &values_object = extIt.value();
+    json::const_iterator itVal(values_object.begin());
+    json::const_iterator itValEnd(values_object.end());
+     
+    ParameterMap extValues;
+    for (; itVal != itValEnd; itVal++) {
+      Parameter param;
+      if (ParseParameterProperty(&param, err, values_object, itVal.key(), false)) {
+          extValues[itVal.key()] = param;
+      }
+    }
+  	extensions[extIt.key()] = extValues;
+  }
+  if(ret) {
+    (*ret) = extensions;
+  }
+  return true;
+}
+
 static bool ParseAsset(Asset *asset, std::string *err,
                        const json &o) {
   ParseStringProperty(&asset->version, err, o, "version", true, "Asset");
   ParseStringProperty(&asset->generator, err, o, "generator", false, "Asset");
   ParseStringProperty(&asset->minVersion, err, o, "minVersion", false, "Asset");
+
+  ParseExtensionsProperty(&asset->extensions, err, o);
 
   // Unity exporter version is added as extra here
   ParseExtrasProperty(&(asset->extras), o);
@@ -2080,44 +2153,10 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const json &o) {
   // Should probably check if has targets and if dimensions fit
   ParseNumberArrayProperty(&mesh->weights, err, o, "weights", false);
 
+  ParseExtensionsProperty(&mesh->extensions, err, o);
   ParseExtrasProperty(&(mesh->extras), o);
 
   return true;
-}
-
-static bool ParseParameterProperty(Parameter *param, std::string *err,
-                                   const json &o,
-                                   const std::string &prop, bool required) {
-  double num_val;
-
-  // A parameter value can either be a string or an array of either a boolean or
-  // a number. Booleans of any kind aren't supported here. Granted, it
-  // complicates the Parameter structure and breaks it semantically in the sense
-  // that the client probably works off the assumption that if the string is
-  // empty the vector is used, etc. Would a tagged union work?
-  if (ParseStringProperty(&param->string_value, err, o, prop, false)) {
-    // Found string property.
-    return true;
-  } else if (ParseNumberArrayProperty(&param->number_array, err, o, prop,
-                                      false)) {
-    // Found a number array.
-    return true;
-  } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
-    param->number_array.push_back(num_val);
-    return true;
-  } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
-                               false)) {
-    return true;
-  } else if (ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
-    return true;
-  } else {
-    if (required) {
-      if (err) {
-        (*err) += "parameter must be a string or number / number array.\n";
-      }
-    }
-    return false;
-  }
 }
 
 static bool ParseLight(Light *light, std::string *err, const json &o) {
@@ -2166,36 +2205,8 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
     }
   }
 
+  ParseExtensionsProperty(&node->extensions, err, o);
   ParseExtrasProperty(&(node->extras), o);
-
-  json::const_iterator extensions_object = o.find("extensions");
-  if ((extensions_object != o.end()) &&
-      extensions_object.value().is_object()) {
-    const json &ext_values_object =
-      extensions_object.value();
-
-    json::const_iterator it(ext_values_object.begin());
-    json::const_iterator itEnd(ext_values_object.end());
-
-    for (; it != itEnd; it++) {
-      if ((it.key().compare("KHR_lights_cmn") == 0) &&
-         it.value().is_object()) {
-        const json &light_values_object =
-          it.value();
-
-        json::const_iterator itVal(light_values_object.begin());
-        json::const_iterator itValEnd(light_values_object.end());
-
-        for (; itVal != itValEnd; itVal++) {
-          Parameter param;
-          if (ParseParameterProperty(&param, err, light_values_object, itVal.key(),
-                false)) {
-            node->extLightsValues[itVal.key()] = param;
-          }
-        }
-      }
-    }
-  }
 
   return true;
 }
@@ -2203,7 +2214,7 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
 static bool ParseMaterial(Material *material, std::string *err,
                           const json &o) {
   material->values.clear();
-  material->extPBRValues.clear();
+  material->extensions.clear();
   material->additionalValues.clear();
 
   json::const_iterator it(o.begin());
@@ -2226,28 +2237,6 @@ static bool ParseMaterial(Material *material, std::string *err,
           }
         }
       }
-    } else if (it.key() == "extensions") {
-      if (it.value().is_object()) {
-        const json &extension =
-            it.value();
-
-        json::const_iterator extIt = extension.begin();
-        if (!extIt.value().is_object()) continue;
-
-        const json &values_object =
-            extIt.value();
-
-        json::const_iterator itVal(values_object.begin());
-        json::const_iterator itValEnd(values_object.end());
-
-        for (; itVal != itValEnd; itVal++) {
-          Parameter param;
-          if (ParseParameterProperty(&param, err, values_object, itVal.key(),
-                                     false)) {
-            material->extPBRValues[itVal.key()] = param;
-          }
-        }
-      }
     } else {
       Parameter param;
       if (ParseParameterProperty(&param, err, o, it.key(), false)) {
@@ -2256,6 +2245,7 @@ static bool ParseMaterial(Material *material, std::string *err,
     }
   }
 
+  ParseExtensionsProperty(&material->extensions, err, o);
   ParseExtrasProperty(&(material->extras), o);
 
   return true;
@@ -2438,6 +2428,7 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
   camera->yfov = float(yfov);
   camera->znear = float(znear);
 
+  ParseExtensionsProperty(&camera->extensions, err, o);
   ParseExtrasProperty(&(camera->extras), o);
 
   // TODO(syoyo): Validate parameter values.
@@ -2469,6 +2460,7 @@ static bool ParseOrthographicCamera(OrthographicCamera *camera,
     return false;
   }
 
+  ParseExtensionsProperty(&camera->extensions, err, o);
   ParseExtrasProperty(&(camera->extras), o);
 
   camera->xmag = float(xmag);
@@ -2547,6 +2539,7 @@ static bool ParseCamera(Camera *camera, std::string *err,
 
   ParseStringProperty(&camera->name, err, o, "name", false);
 
+  ParseExtensionsProperty(&camera->extensions, err, o);
   ParseExtrasProperty(&(camera->extras), o);
 
   return true;
@@ -2667,6 +2660,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   model->nodes.clear();
   model->extensionsUsed.clear();
   model->extensionsRequired.clear();
+  model->extensions.clear();
   model->defaultScene = -1;
 
   // 1. Parse Asset
@@ -2855,6 +2849,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
           nodesIds.push_back(static_cast<int>(nodes[i]));
         }
         scene.nodes = nodesIds;
+
+        ParseExtensionsProperty(&scene.extensions, err, o);
+        ParseExtrasProperty(&scene.extras, o);
 
         model->scenes.push_back(scene);
       }
@@ -3082,6 +3079,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   }
 
   // 17. Parse Extensions
+  ParseExtensionsProperty(&model->extensions, err, v);
+
+  // 18. Specific extension implementations
   {
     json::const_iterator rootIt = v.find("extensions");
     if ((rootIt != v.end()) && rootIt.value().is_object()) {
@@ -3207,7 +3207,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   memcpy(&model_format, bytes + 16, 4);
   swap4(&model_format);
 
-  if ((20 + model_length >= size) || (model_length < 1) ||
+  if ((20 + model_length > size) || (model_length < 1) || // specification allows a GLB file with no bin buffer
       (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
@@ -3369,6 +3369,20 @@ static void SerializeParameterMap(ParameterMap &param, json &o) {
   }
 }
 
+static void SerializeExtensionMap(ExtensionMap &extensions, json &o)
+{
+  if(!extensions.size())
+    return;
+
+  json extMap;
+  for(ExtensionMap::iterator extIt = extensions.begin(); extIt != extensions.end(); ++extIt) {
+    json extension_values;
+	SerializeParameterMap(extIt->second, extension_values);
+	extMap[extIt->first] = extension_values;
+  }
+  o["extensions"] = extMap;
+}
+
 static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
 
@@ -3458,6 +3472,8 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
   if (asset.extras.Keys().size()) {
     SerializeValue("extras", asset.extras, o);
   }
+  
+  SerializeExtensionMap(asset.extensions, o);
 }
 
 static void SerializeGltfBuffer(Buffer &buffer, json &o,
@@ -3492,14 +3508,7 @@ static void SerializeGltfImage(Image &image, json &o) {
 }
 
 static void SerializeGltfMaterial(Material &material, json &o) {
-  if (material.extPBRValues.size()) {
-    // Serialize PBR specular/glossiness material
-    json values;
-    SerializeParameterMap(material.extPBRValues, values);
-
-    json extension;
-    o["extensions"] = extension;
-  }
+  SerializeExtensionMap(material.extensions, o);
 
   if (material.values.size()) {
     json pbrMetallicRoughness;
@@ -3593,14 +3602,7 @@ static void SerializeGltfNode(Node &node, json &o) {
     SerializeNumberProperty<int>("camera", node.camera, o);
   }
 
-  if (node.extLightsValues.size()) {
-    json values;
-    SerializeParameterMap(node.extLightsValues, values);
-    json lightsExt;
-    lightsExt["KHR_lights_cmn"] = values;
-    o["extensions"] = lightsExt;
-  }
-
+  SerializeExtensionMap(node.extensions, o);
 
   SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
@@ -3659,6 +3661,10 @@ static void SerializeGltfScene(Scene &scene, json &o) {
   if (scene.name.size()) {
     SerializeStringProperty("name", scene.name, o);
   }
+  if (scene.extras.Keys().size()) {
+    SerializeValue("extras", scene.extras, o);
+  }
+  SerializeExtensionMap(scene.extensions, o);
 }
 
 static void SerializeGltfSkin(Skin &skin, json &o) {
@@ -3847,6 +3853,9 @@ bool TinyGLTF::WriteGltfSceneToFile(
     cameras.push_back(camera);
   }
   output["cameras"] = cameras;
+
+  // EXTENSIONS
+  SerializeExtensionMap(model->extensions, output);
 
   // LIGHTS
   json lights;
