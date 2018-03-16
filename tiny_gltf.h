@@ -3208,7 +3208,10 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   memcpy(&model_format, bytes + 16, 4);
   swap4(&model_format);
 
-  if ((20 + model_length >= size) || (model_length < 1) ||
+  // In case the Bin buffer is not present, the size is exactly 20 + size of
+  // JSON contents,
+  // so use "greater than" operator.
+  if ((20 + model_length > size) || (model_length < 1) ||
       (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
@@ -3739,7 +3742,8 @@ bool TinyGLTF::WriteGltfSceneToFile(
   json buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
-    SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath, binFilename);
+    SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath,
+                        binFilename);
     buffers.push_back(buffer);
   }
   output["buffers"] = buffers;
