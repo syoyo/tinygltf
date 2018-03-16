@@ -2862,7 +2862,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
   // 9. Parse default scenes.
   {
     json::const_iterator rootIt = v.find("scene");
-    if ((rootIt != v.end()) && rootIt.value().is_number_integer()) {
+    if ((rootIt != v.end()) && rootIt.value().is_number()) {
       const int defaultScene = rootIt.value();
 
       model->defaultScene = static_cast<int>(defaultScene);
