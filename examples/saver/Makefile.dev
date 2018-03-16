@@ -1,0 +1,2 @@
+all:
+	clang++ -std=c++11 -I../../ -g -O1 -o saver main.cc
