@@ -1684,6 +1684,7 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 
 static bool ParseExtensionsProperty(ExtensionMap *ret, std::string* err, const json &o)
 {
+  // TODO: Fully parse extension properties.
   json::const_iterator it = o.find("extensions");
   if (it == o.end()) {
     return false;
@@ -1704,7 +1705,7 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string* err, const j
     ParameterMap extValues;
     for (; itVal != itValEnd; itVal++) {
       Parameter param;
-      if (ParseParameterProperty(&param, err, values_object, itVal.key(), false)) {
+      if (ParseParameterProperty(&param, err, itVal.value(), itVal.key(), false)) {
           extValues[itVal.key()] = param;
       }
     }
@@ -3870,14 +3871,26 @@ bool TinyGLTF::WriteGltfSceneToFile(
   // EXTENSIONS
   SerializeExtensionMap(model->extensions, output);
 
-  // LIGHTS
+  // LIGHTS as KHR_lights_cmn
   json lights;
   for (unsigned int i = 0; i < model->lights.size(); ++i) {
     json light;
     SerializeGltfLight(model->lights[i], light);
     lights.push_back(light);
   }
-  output["lights"] = lights;
+  if (model->lights.size() > 0) {
+    json khr_lights_cmn;
+    khr_lights_cmn["lights"] = lights;
+    json ext_j;
+
+    if (output.find("extensions") != output.end()) {
+      ext_j = output["extensions"];
+    }
+
+    ext_j["KHR_lights_cmn"] = khr_lights_cmn;
+
+    output["extensions"] = ext_j;
+  }  
 
   WriteGltfFile(filename, output.dump());
   return true;
