@@ -1759,7 +1759,12 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
     if (IsDataURI(uri)) {
       loaded = DecodeDataURI(&img, uri, 0, false);
     } else {
-      // Assume external .bin file.
+      // Assume external file
+      // Keep texture path (for textures that cannot be decoded)
+      image->uri = uri;
+#ifdef TINYGLTF_NO_EXTERNAL_IMAGE
+      return true;
+#endif
       loaded = LoadExternalFile(&img, err, uri, basedir, 0, false);
     }
 
@@ -1807,10 +1812,11 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
       }
     } else {
       // Assume external file
-
       // Keep texture path (for textures that cannot be decoded)
       image->uri = uri;
-
+#ifdef TINYGLTF_NO_EXTERNAL_IMAGE
+      return true;
+#endif
       if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
         if (err) {
           (*err) += "Failed to load external 'uri' for image parameter\n";
