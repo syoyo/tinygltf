@@ -4,6 +4,8 @@
 #include <iostream>
 #include <string>
 
+#include "texture_dumper.h"
+
 namespace gltfutil {
 
 enum class ui_mode { cli, interactive };
@@ -45,6 +47,9 @@ struct configuration {
   std::string input_path, output_dir;
   ui_mode mode;
   cli_action action = cli_action::not_set;
+  texture_dumper::texture_output_format requested_format =
+      texture_dumper::texture_output_format::not_specified;
+
   bool has_output_dir;
   bool is_valid() {
     // TODO impl check

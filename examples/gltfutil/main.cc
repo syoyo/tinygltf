@@ -16,10 +16,12 @@ int usage(int ret = 0) {
   using std::cout;
   cout << "gltfutil: tool for manipulating gltf files\n"
        << " usage information:\n\n"
-       << "\t gltfutil (-d|-h) [path to .gltf/glb] (-o [path to output "
-          "directory])\n\n"
+       << "\t gltfutil (-d|-h|) (-f [png|bmp|tga]) [path to .gltf/glb] (-o "
+          "[path to output directory])\n\n"
        //<< "\t\t -i: start in interactive mode\n"
        << "\t\t -d: dump enclosed content (image assets)\n"
+       << "\t\t -f: file format for image output"
+       << "\t\t -o: ouptput directory path"
        << "\t\t -h: print this help\n";
   return ret;
 }
@@ -48,6 +50,11 @@ int parse_args(int argc, char** argv) {
         case 'o':
           i++;
           config.output_dir = argv[i];
+          break;
+        case 'f':
+          i++;
+          config.requested_format =
+              texture_dumper::get_fromat_from_string(argv[i]);
           break;
         default:
           return arg_error();
@@ -85,12 +92,19 @@ int parse_args(int argc, char** argv) {
       switch (config.action) {
         case cli_action::help:
           return usage();
+          break;
+
         case cli_action::dump: {
           texture_dumper dumper(model);
+          if (config.requested_format !=
+              texture_dumper::texture_output_format::not_specified)
+            dumper.set_output_format(config.requested_format);
+
           if (config.output_dir.empty())
             dumper.dump_to_folder();
           else
             dumper.dump_to_folder(config.output_dir);
+
         } break;
         default:
           return arg_error();
