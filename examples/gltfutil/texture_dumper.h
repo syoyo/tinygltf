@@ -7,7 +7,7 @@
 namespace gltfutil {
 class texture_dumper {
  public:
-  enum class texture_output_format { png, bmp, tga };
+  enum class texture_output_format { png, bmp, tga, not_specified };
 
  private:
   const tinygltf::Model& model;
