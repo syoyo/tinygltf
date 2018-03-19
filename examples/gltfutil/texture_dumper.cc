@@ -3,6 +3,8 @@
 #include "stb_image_write.h"
 #include "texture_dumper.h"
 
+#include <tiny_gltf.h>
+
 using namespace gltfutil;
 using namespace tinygltf;
 using std::cout;
@@ -15,7 +17,8 @@ texture_dumper::texture_dumper(const Model& input)
 void texture_dumper::dump_to_folder(const std::string& path) {
   cout << "dumping to folder " << path << '\n';
   cout << "model file has " << model.textures.size() << " textures.\n";
-  size_t index;
+  size_t index = 0;
+
   for (const auto& texture : model.textures) {
     index++;
     const auto& image = model.images[texture.source];
@@ -23,6 +26,7 @@ void texture_dumper::dump_to_folder(const std::string& path) {
     cout << "image size is: " << image.width << 'x' << image.height << '\n';
     cout << "pixel channel count :" << image.component << '\n';
     std::string name = image.name.empty() ? std::to_string(index) : image.name;
+
     switch (configured_format) {
       case texture_output_format::png:
         name = path + "/" + name + ".png";
@@ -44,4 +48,20 @@ void texture_dumper::dump_to_folder(const std::string& path) {
         break;
     }
   }
+}
+
+void texture_dumper::set_output_format(texture_output_format format) {
+  configured_format = format;
+}
+
+texture_dumper::texture_output_format texture_dumper::get_fromat_from_string(
+    const std::string& str) {
+  std::string type = str;
+  std::transform(str.begin(), str.end(), type.begin(), ::tolower);
+
+  if (type == "png") return texture_output_format::png;
+  if (type == "bmp") return texture_output_format::bmp;
+  if (type == "tga") return texture_output_format::tga;
+
+  return texture_output_format::not_specified;
 }
