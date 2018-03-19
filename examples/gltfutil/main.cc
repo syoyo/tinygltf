@@ -12,16 +12,16 @@
 #include "stb_image_write.h"
 
 namespace gltfutil {
-int usage() {
+int usage(int ret = 0) {
   using std::cout;
   cout << "gltfutil: tool for manipulating gltf files\n"
        << " usage information:\n\n"
-       << "\t gltfutil (-i|-d|-h) [path to .gltf/glb] (-o [path to output "
+       << "\t gltfutil (-d|-h) [path to .gltf/glb] (-o [path to output "
           "directory])\n\n"
-       << "\t\t -i: start in interactive mode\n"
+       //<< "\t\t -i: start in interactive mode\n"
        << "\t\t -d: dump enclosed content (image assets)\n"
        << "\t\t -h: print this help\n";
-  return 0;
+  return ret;
 }
 
 int arg_error() {
@@ -36,8 +36,8 @@ int parse_args(int argc, char** argv) {
     char* arg = argv[i];
     if (arg[0] == '-') switch (arg[1]) {
         case 'h':
-          config.mode = ui_mode::cli;
-          config.action = cli_action::help;
+          return usage(0);
+          break;
         case 'd':
           config.mode = ui_mode::cli;
           config.action = cli_action::dump;
@@ -46,7 +46,8 @@ int parse_args(int argc, char** argv) {
           config.mode = ui_mode::interactive;
           break;
         case 'o':
-          // TODO impl
+          i++;
+          config.output_dir = argv[i];
           break;
         default:
           return arg_error();
