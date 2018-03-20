@@ -732,9 +732,9 @@ typedef bool (*LoadImageDataFunction)(Image *, std::string *, int, int,
 
 #ifndef TINYGLTF_NO_STB_IMAGE
 // Declaration of default image loader callback
-static bool LoadImageData(Image *image, std::string *err, int req_width,
-                          int req_height, const unsigned char *bytes, int size,
-                          void *);
+bool LoadImageData(Image *image, std::string *err, int req_width,
+                   int req_height, const unsigned char *bytes, int size,
+                   void *);
 #endif
 
 class TinyGLTF {
@@ -1197,9 +1197,9 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
 }
 
 #ifndef TINYGLTF_NO_STB_IMAGE
-static bool LoadImageData(Image *image, std::string *err, int req_width,
-                          int req_height, const unsigned char *bytes, int size,
-                          void *) {
+bool LoadImageData(Image *image, std::string *err, int req_width,
+                   int req_height, const unsigned char *bytes, int size,
+                   void *) {
   int w, h, comp;
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
