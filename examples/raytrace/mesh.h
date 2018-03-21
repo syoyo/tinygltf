@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace example {
 
@@ -69,9 +70,13 @@ inline void calculate_normal(T Nn[3], const T v0[3], const T v1[3], const T v2[3
 template<typename T>
 class Mesh {
  public:
+	explicit Mesh(const size_t vertex_stride) :
+		stride(vertex_stride) {
+	}
+
   std::string name;
 
-  std::vector<T> vertices;               /// [xyz] * num_vertices
+  std::vector<T> vertices;               /// stride * num_vertices
   std::vector<T> facevarying_normals;    /// [xyz] * 3(triangle) * num_faces
   std::vector<T> facevarying_tangents;   /// [xyz] * 3(triangle) * num_faces
   std::vector<T> facevarying_binormals;  /// [xyz] * 3(triangle) * num_faces
@@ -82,6 +87,7 @@ class Mesh {
   std::vector<unsigned int> material_ids;  /// index x num_faces
 
   T pivot_xform[4][4];
+	size_t stride;													 /// stride for vertex data.
 
   // --- Required methods in Scene::Traversal. ---
 

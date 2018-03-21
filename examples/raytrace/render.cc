@@ -200,6 +200,7 @@ void BuildCameraFrame(float3* origin, float3* corner, float3* u, float3* v,
   }
 }
 
+#if 0 // TODO(LTE): Not used method. Delete.
 nanort::Ray<float> GenerateRay(const float3& origin, const float3& corner,
                                const float3& du, const float3& dv, float u,
                                float v) {
@@ -217,9 +218,12 @@ nanort::Ray<float> GenerateRay(const float3& origin, const float3& corner,
   ray.org[1] = origin[1];
   ray.org[2] = origin[2];
   ray.dir[0] = dir[0];
+  ray.dir[1] = dir[1];
+  ray.dir[2] = dir[2];
 
   return ray;
 }
+#endif
 
 void FetchTexture(const Texture &texture, float u, float v, float* col) {
   int tx = u * texture.width;
@@ -235,10 +239,15 @@ bool Renderer::Render(float* rgba, float* aux_rgba, int* sample_counts,
                       const nanosg::Scene<float, example::Mesh<float>> &scene,
                       const example::Asset &asset,
                       const RenderConfig& config,
-                      std::atomic<bool>& cancelFlag) {
+                      std::atomic<bool>& cancelFlag,
+                      int &_showBufferMode
+                      ) {
   //if (!gAccel.IsValid()) {
   //  return false;
   //}
+  
+  
+  
 
   int width = config.width;
   int height = config.height;
@@ -300,6 +309,19 @@ bool Renderer::Render(float* rgba, float* aux_rgba, int* sample_counts,
           float u1 = pcg32_random(&rng);
 
           float3 dir;
+        
+        //for modes not a "color"
+		    if(_showBufferMode != SHOW_BUFFER_COLOR)
+		    {
+          //only one pass
+			    if(config.pass > 0)
+				    continue;
+				  
+          //to the center of pixel
+			      u0 = 0.5f;
+			      u1 = 0.5f;
+		      }
+      
           dir = corner + (float(x) + u0) * u +
                 (float(config.height - y - 1) + u1) * v;
           dir = vnormalize(dir);
@@ -320,6 +342,9 @@ bool Renderer::Render(float* rgba, float* aux_rgba, int* sample_counts,
             const std::vector<Material> &materials = asset.materials;
             const std::vector<Texture> &textures = asset.textures;
             const Mesh<float> &mesh = asset.meshes[isect.node_id];
+			
+			//tigra: add default material
+			const Material &default_material = asset.default_material;
 
             float3 p;
             p[0] =
@@ -410,26 +435,49 @@ bool Renderer::Render(float* rgba, float* aux_rgba, int* sample_counts,
             // Fetch texture
             unsigned int material_id =
                 mesh.material_ids[isect.prim_id];
+				
+			//printf("material_id=%d materials=%lld\n", material_id, materials.size());
 
             float diffuse_col[3];
-            int diffuse_texid = materials[material_id].diffuse_texid;
-            if (diffuse_texid >= 0) {
-              FetchTexture(textures[diffuse_texid], UV[0], UV[1], diffuse_col);
-            } else {
-              diffuse_col[0] = materials[material_id].diffuse[0];
-              diffuse_col[1] = materials[material_id].diffuse[1];
-              diffuse_col[2] = materials[material_id].diffuse[2];
-            }
 
             float specular_col[3];
-            int specular_texid = materials[material_id].specular_texid;
-            if (specular_texid >= 0) {
-              FetchTexture(textures[specular_texid], UV[0], UV[1], specular_col);
-            } else {
-              specular_col[0] = materials[material_id].specular[0];
-              specular_col[1] = materials[material_id].specular[1];
-              specular_col[2] = materials[material_id].specular[2];
-            }
+			
+			//tigra: material_id is ok
+			if(material_id<materials.size())
+			{
+				//printf("ok mat\n");
+				
+				int diffuse_texid = materials[material_id].diffuse_texid;
+				if (diffuse_texid >= 0) {
+				  FetchTexture(textures[diffuse_texid], UV[0], UV[1], diffuse_col);
+				} else {
+				  diffuse_col[0] = materials[material_id].diffuse[0];
+				  diffuse_col[1] = materials[material_id].diffuse[1];
+				  diffuse_col[2] = materials[material_id].diffuse[2];
+				}
+				
+				int specular_texid = materials[material_id].specular_texid;
+				if (specular_texid >= 0) {
+				  FetchTexture(textures[specular_texid], UV[0], UV[1], specular_col);
+				} else {
+				  specular_col[0] = materials[material_id].specular[0];
+				  specular_col[1] = materials[material_id].specular[1];
+				  specular_col[2] = materials[material_id].specular[2];
+				}
+			}
+			else
+				//tigra: wrong material_id, use default_material
+				{
+					
+				//printf("default_material\n");
+				
+					diffuse_col[0] = default_material.diffuse[0];
+					diffuse_col[1] = default_material.diffuse[1];
+					diffuse_col[2] = default_material.diffuse[2];
+					specular_col[0] = default_material.specular[0];
+					specular_col[1] = default_material.specular[1];
+					specular_col[2] = default_material.specular[2];
+				}
 
             // Simple shading
             float NdotV = fabsf(vdot(N, dir));

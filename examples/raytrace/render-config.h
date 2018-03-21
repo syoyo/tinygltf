@@ -28,7 +28,9 @@ typedef struct {
   float *varycoordImage;
 
   // Scene input info
+  std::string obj_filename;
   std::string gltf_filename;
+  std::string eson_filename;
   float scene_scale;
 
 } RenderConfig;

@@ -9,6 +9,28 @@ install_manifest.txt
 compile_commands.json
 CTestTestfile.cmake
 
+#Files created by the CI scripts (downloading and installing premake)
+premake5
+premake5.tar.gz
+
+#built examples
+/examples/raytrace/bin/
+
+#visual studio files
+*.sln
+*.vcxproj*
+.vs
+
+#binary directories
+bin/
+obj/
+
+#runtime gui config
+imgui.ini
+
+#visual stuido code
+.vscode
+
 # Prerequisites
 *.d
 
