@@ -3,9 +3,14 @@
 
 #include <cstdlib>
 
-namespace example {
+#ifdef __clang__
+#pragma clang diagnostic push
+#if __has_warning("-Wzero-as-null-pointer-constant")
+#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
+#endif
 
-// TODO(syoyo): Support PBR material.
+namespace example {
 
 struct Material {
   // float ambient[3];
@@ -53,6 +58,7 @@ struct Texture {
   int width;
   int height;
   int components;
+  int _pad_;
   unsigned char* image;
 
   Texture() {

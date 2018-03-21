@@ -1,12 +1,19 @@
 newoption {
+   trigger = "with-gtk3nfd",
+   description = "Build with native file dialog support(GTK3 required. Linux only)"
+}
+
+newoption {
    trigger = "asan",
    description = "Enable Address Sanitizer(gcc5+ ang clang only)"
 }
 
 sources = {
+   "stbi-impl.cc",
    "main.cc",
    "render.cc",
    "render-config.cc",
+   "obj-loader.cc",
    "gltf-loader.cc",
    "matrix.cc",
    "../common/trackball.cc",
@@ -16,7 +23,7 @@ sources = {
    "../common/imgui/ImGuizmo.cpp",
    }
 
-solution "RaytraceSolution"
+solution "NanoSGSolution"
    configurations { "Release", "Debug" }
 
    if os.is("Windows") then
@@ -53,7 +60,6 @@ solution "RaytraceSolution"
       end
 
       if os.is("Windows") then
-         flags { "FatalCompileWarnings" }
          warnings "Extra" -- /W4
 
          defines { "NOMINMAX" }

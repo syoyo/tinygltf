@@ -29,9 +29,21 @@ bool LoadRenderConfig(example::RenderConfig* config, const char* filename) {
 
   picojson::object o = v.get<picojson::object>();
 
+  if (o.find("obj_filename") != o.end()) {
+    if (o["obj_filename"].is<std::string>()) {
+      config->obj_filename = o["obj_filename"].get<std::string>();
+    }
+  }
+
   if (o.find("gltf_filename") != o.end()) {
     if (o["gltf_filename"].is<std::string>()) {
       config->gltf_filename = o["gltf_filename"].get<std::string>();
+    }
+  }
+
+  if (o.find("eson_filename") != o.end()) {
+    if (o["eson_filename"].is<std::string>()) {
+      config->eson_filename = o["eson_filename"].get<std::string>();
     }
   }
 
@@ -107,4 +119,4 @@ bool LoadRenderConfig(example::RenderConfig* config, const char* filename) {
 
   return true;
 }
-}
+}  // namespace example
