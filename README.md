@@ -50,6 +50,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 ## Projects using TinyGLTF
 
 * Physical based rendering with Vulkan using glTF 2.0 models https://github.com/SaschaWillems/Vulkan-glTF-PBR
+* GLTF loader plugin for OGRE 2.1. Support for PBR materials via HLMS/PBS https://github.com/Ybalrid/Ogre_glTF
 * Your projects here!(Plese send PR)
 
 ## TODOs
