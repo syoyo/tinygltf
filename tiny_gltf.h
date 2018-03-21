@@ -1689,7 +1689,7 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
   if (hasBufferView) {
     if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true)) {
       if (err) {
-        (*err) += "Invalid `bufferView` definition for Image.\n";
+        (*err) += "Failed to parse `bufferView` for Image.\n";
       }
       return false;
     }
@@ -1718,7 +1718,7 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
   if (hasURI) {
     if (!ParseStringProperty(&uri, &tmp_err, o, "uri", true)) {
       if (err) {
-        (*err) += "`bufferView` or `uri` required for Image.\n";
+        (*err) += "Failed to parse `uri` for Image.\n";
       }
       return false;
     }
