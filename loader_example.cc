@@ -210,6 +210,17 @@ static std::string PrintParameterValue(const tinygltf::Parameter &param) {
   }
 }
 
+static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
+  std::stringstream ss;
+
+  ss << pmap.size() << std::endl;
+  for (auto &kv : pmap) {
+    ss << kv.first << " : " << PrintParameterValue(kv.second) << std::endl;
+  }
+
+  return ss.str();
+}
+
 static std::string PrintValue(const std::string &name,
                               const tinygltf::Value &value, const int indent) {
   std::stringstream ss;
@@ -287,6 +298,14 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
             << PrintValue("extras", primitive.extras, indent + 1) << std::endl;
 }
 
+static void DumpExtensions(const tinygltf::ExtensionMap &extension, const int indent)
+{
+  for (auto &e : extension) {
+    std::cout << Indent(indent) << e.first << std::endl;
+    std::cout << Indent(indent+1) << PrintParameterMap(e.second);
+  }  
+}
+
 static void Dump(const tinygltf::Model &model) {
   std::cout << "=== Dump glTF ===" << std::endl;
   std::cout << "asset.copyright          : " << model.asset.copyright
@@ -307,6 +326,7 @@ static void Dump(const tinygltf::Model &model) {
     for (size_t i = 0; i < model.scenes.size(); i++) {
       std::cout << Indent(1) << "scene[" << i
                 << "] name  : " << model.scenes[i].name << std::endl;
+      DumpExtensions(model.scenes[i].extensions, 1);
     }
   }
 
@@ -529,6 +549,12 @@ static void Dump(const tinygltf::Model &model) {
                   << std::endl;
       }
     }
+  }
+  
+  // toplevel extensions
+  {
+    std::cout << "extensions(items=" << model.extensions.size() << ")" << std::endl;
+    DumpExtensions(model.extensions, 1);
   }
 }
 
