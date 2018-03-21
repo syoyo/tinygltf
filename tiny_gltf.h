@@ -1671,7 +1671,7 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
   if (hasBufferView && hasURI) {
     // Should not both defined.
     if (err) {
-      (*err) += "One of `bufferView` or `uri` should be defined, but both are defined for Image.\n";
+      (*err) += "Only one of `bufferView` or `uri` should be defined, but both are defined for Image.\n";
     }
     return false;
   }
@@ -1685,8 +1685,8 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
 
   ParseStringProperty(&image->name, err, o, "name", false);
 
-  double bufferView = -1;
   if (hasBufferView) {
+    double bufferView = -1;
     if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true)) {
       if (err) {
         (*err) += "Failed to parse `bufferView` for Image.\n";
@@ -1713,48 +1713,46 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
     return true;
   }
 
+  // Parse URI & Load image data.
+
   std::string uri;
   std::string tmp_err;
-  if (hasURI) {
-    if (!ParseStringProperty(&uri, &tmp_err, o, "uri", true)) {
-      if (err) {
-        (*err) += "Failed to parse `uri` for Image.\n";
-      }
-      return false;
+  if (!ParseStringProperty(&uri, &tmp_err, o, "uri", true)) {
+    if (err) {
+      (*err) += "Failed to parse `uri` for Image.\n";
     }
+    return false;
   }
 
   std::vector<unsigned char> img;
 
-  if (hasURI) {
-    if (IsDataURI(uri)) {
-      if (!DecodeDataURI(&img, uri, 0, false)) {
-        if (err) {
-          (*err) += "Failed to decode 'uri' for image parameter.\n";
-        }
-        return false;
+  if (IsDataURI(uri)) {
+    if (!DecodeDataURI(&img, uri, 0, false)) {
+      if (err) {
+        (*err) += "Failed to decode 'uri' for image parameter.\n";
       }
-    } else {
-      // Assume external file
-      // Keep texture path (for textures that cannot be decoded)
-      image->uri = uri;
+      return false;
+    }
+  } else {
+    // Assume external file
+    // Keep texture path (for textures that cannot be decoded)
+    image->uri = uri;
 #ifdef TINYGLTF_NO_EXTERNAL_IMAGE
-      return true;
+    return true;
 #endif
-      if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
-        if (err) {
-          (*err) += "Failed to load external 'uri' for image parameter\n";
-        }
-        // If the image cannot be loaded, keep uri as image->uri.
-        return true;
+    if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
+      if (err) {
+        (*err) += "Failed to load external 'uri' for image parameter\n";
       }
+      // If the image cannot be loaded, keep uri as image->uri.
+      return true;
+    }
 
-      if (img.empty()) {
-        if (err) {
-          (*err) += "Image is empty.\n";
-        }
-        return false;
+    if (img.empty()) {
+      if (err) {
+        (*err) += "Image is empty.\n";
       }
+      return false;
     }
   }
 
