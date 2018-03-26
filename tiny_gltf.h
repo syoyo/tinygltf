@@ -734,9 +734,9 @@ typedef bool (*LoadImageDataFunction)(Image *, std::string *, int, int,
 
 #ifndef TINYGLTF_NO_STB_IMAGE
 // Declaration of default image loader callback
-static bool LoadImageData(Image *image, std::string *err, int req_width,
-                          int req_height, const unsigned char *bytes, int size,
-                          void *);
+bool LoadImageData(Image *image, std::string *err, int req_width,
+                   int req_height, const unsigned char *bytes, int size,
+                   void *);
 #endif
 
 class TinyGLTF {
@@ -1199,9 +1199,9 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
 }
 
 #ifndef TINYGLTF_NO_STB_IMAGE
-static bool LoadImageData(Image *image, std::string *err, int req_width,
-                          int req_height, const unsigned char *bytes, int size,
-                          void *) {
+bool LoadImageData(Image *image, std::string *err, int req_width,
+                   int req_height, const unsigned char *bytes, int size,
+                   void *) {
   int w, h, comp;
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
@@ -1736,100 +1736,97 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
                        LoadImageDataFunction *LoadImageData = nullptr,
                        void *user_data = nullptr) {
   // A glTF image must either reference a bufferView or an image uri
-  double bufferView = -1;
-  bool isEmbedded =
-      ParseNumberProperty(&bufferView, err, o, "bufferView", false);
 
-  std::string uri;
-  std::string tmp_err;
-  if (!ParseStringProperty(&uri, &tmp_err, o, "uri", false) && !isEmbedded) {
+  // schema says oneOf [`bufferView`, `uri`]
+  // TODO(syoyo): Check the type of each parameters.
+  bool hasBufferView = (o.find("bufferView") != o.end());
+  bool hasURI = (o.find("uri") != o.end());
+
+  if (hasBufferView && hasURI) {
+    // Should not both defined.
     if (err) {
-      (*err) += "`bufferView` or `uri` required for Image.\n";
+      (*err) += "Only one of `bufferView` or `uri` should be defined, but both are defined for Image.\n";
+    }
+    return false;
+  }
+
+  if (!hasBufferView && !hasURI) {
+    if (err) {
+      (*err) += "Neither required `bufferView` nor `uri` defined for Image.\n";
     }
     return false;
   }
 
   ParseStringProperty(&image->name, err, o, "name", false);
 
+  if (hasBufferView) {
+    double bufferView = -1;
+    if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true)) {
+      if (err) {
+        (*err) += "Failed to parse `bufferView` for Image.\n";
+      }
+      return false;
+    }
+
+    std::string mime_type;
+    ParseStringProperty(&mime_type, err, o, "mimeType", false);
+
+    double width = 0.0;
+    ParseNumberProperty(&width, err, o, "width", false);
+
+    double height = 0.0;
+    ParseNumberProperty(&height, err, o, "height", false);
+
+    // Just only save some information here. Loading actual image data from
+    // bufferView is done after this `ParseImage` function.
+    image->bufferView = static_cast<int>(bufferView);
+    image->mimeType = mime_type;
+    image->width = static_cast<int>(width);
+    image->height = static_cast<int>(height);
+
+    return true;
+  }
+
+  // Parse URI & Load image data.
+
+  std::string uri;
+  std::string tmp_err;
+  if (!ParseStringProperty(&uri, &tmp_err, o, "uri", true)) {
+    if (err) {
+      (*err) += "Failed to parse `uri` for Image.\n";
+    }
+    return false;
+  }
+
   std::vector<unsigned char> img;
 
-  if (is_binary) {
-    // Still binary glTF accepts external dataURI. First try external resources.
-    bool loaded = false;
-    if (IsDataURI(uri)) {
-      loaded = DecodeDataURI(&img, uri, 0, false);
-    } else {
-      // Assume external file
-      // Keep texture path (for textures that cannot be decoded)
-      image->uri = uri;
-#ifdef TINYGLTF_NO_EXTERNAL_IMAGE
-      return true;
-#endif
-      loaded = LoadExternalFile(&img, err, uri, basedir, 0, false);
-    }
-
-    if (!loaded) {
-      // load data from (embedded) binary data
-
-      if ((bin_size == 0) || (bin_data == nullptr)) {
-        if (err) {
-          (*err) += "Invalid binary data.\n";
-        }
-        return false;
+  if (IsDataURI(uri)) {
+    if (!DecodeDataURI(&img, uri, 0, false)) {
+      if (err) {
+        (*err) += "Failed to decode 'uri' for image parameter.\n";
       }
-
-      double buffer_view = -1.0;
-      if (!ParseNumberProperty(&buffer_view, err, o, "bufferView", true,
-                               "Image")) {
-        return false;
-      }
-
-      std::string mime_type;
-      ParseStringProperty(&mime_type, err, o, "mimeType", false);
-
-      double width = 0.0;
-      ParseNumberProperty(&width, err, o, "width", false);
-
-      double height = 0.0;
-      ParseNumberProperty(&height, err, o, "height", false);
-
-      // Just only save some information here. Loading actual image data from
-      // bufferView is done in other place.
-      image->bufferView = static_cast<int>(buffer_view);
-      image->mimeType = mime_type;
-      image->width = static_cast<int>(width);
-      image->height = static_cast<int>(height);
-
-      return true;
+      return false;
     }
   } else {
-    if (IsDataURI(uri)) {
-      if (!DecodeDataURI(&img, uri, 0, false)) {
-        if (err) {
-          (*err) += "Failed to decode 'uri' for image parameter.\n";
-        }
-        return false;
-      }
-    } else {
-      // Assume external file
-      // Keep texture path (for textures that cannot be decoded)
-      image->uri = uri;
+    // Assume external file
+    // Keep texture path (for textures that cannot be decoded)
+    image->uri = uri;
 #ifdef TINYGLTF_NO_EXTERNAL_IMAGE
-      return true;
+    return true;
 #endif
-      if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
-        if (err) {
-          (*err) += "Failed to load external 'uri' for image parameter\n";
-        }
-        // If the image cannot be loaded, keep uri as image->uri.
-        return true;
+    if (!LoadExternalFile(&img, err, uri, basedir, 0, false)) {
+      if (err) {
+        (*err) += "Failed to load external 'uri' for image parameter\n";
       }
-      if (img.empty()) {
-        if (err) {
-          (*err) += "Image is empty.\n";
-        }
-        return false;
+      // If the image cannot be loaded, keep uri as image->uri.
+      return true;
+    }
+
+    if (img.empty()) {
+      if (err) {
+        (*err) += "Image is empty.\n";
       }
+      return false;
     }
   }
 
