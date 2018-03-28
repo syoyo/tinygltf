@@ -3298,8 +3298,9 @@ static void SerializeNumberArrayProperty(const std::string &key,
   for (unsigned int i = 0; i < value.size(); ++i) {
     vals.push_back(static_cast<double>(value[i]));
   }
-
-  obj[key] = vals;
+  if (!vals.is_null()) {
+    obj[key] = vals;
+  }
 }
 
 static void SerializeStringProperty(const std::string &key,
@@ -3477,10 +3478,20 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o,
 static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
   SerializeNumberProperty("buffer", bufferView.buffer, o);
   SerializeNumberProperty<size_t>("byteLength", bufferView.byteLength, o);
-  SerializeNumberProperty<size_t>("byteStride", bufferView.byteStride, o);
-  SerializeNumberProperty<size_t>("byteOffset", bufferView.byteOffset, o);
-  SerializeNumberProperty("target", bufferView.target, o);
 
+  // byteStride is optional, minimum allowed is 4
+  if (bufferView.byteStride >= 4) {
+    SerializeNumberProperty<size_t>("byteStride", bufferView.byteStride, o);
+  }
+  // byteOffset is optional, default is 0
+  if (bufferView.byteOffset > 0) {
+    SerializeNumberProperty<size_t>("byteOffset", bufferView.byteOffset, o);
+  }
+  // Target is optional, check if it contains a valid value
+  if (bufferView.target == TINYGLTF_TARGET_ARRAY_BUFFER ||
+      bufferView.target == TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER) {
+    SerializeNumberProperty("target", bufferView.target, o);
+  }
   if (bufferView.name.size()) {
     SerializeStringProperty("name", bufferView.name, o);
   }
@@ -3532,8 +3543,15 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
     }
 
     primitive["attributes"] = attributes;
-    SerializeNumberProperty<int>("indices", gltfPrimitive.indices, primitive);
-    SerializeNumberProperty<int>("material", gltfPrimitive.material, primitive);
+
+    // Indicies is optional
+    if (gltfPrimitive.indices > -1) {
+      SerializeNumberProperty<int>("indices", gltfPrimitive.indices, primitive);
+    }
+    // Material is optional
+    if (gltfPrimitive.material > -1) {
+      SerializeNumberProperty<int>("material", gltfPrimitive.material, primitive);
+    }
     SerializeNumberProperty<int>("mode", gltfPrimitive.mode, primitive);
 
     // Morph targets
@@ -3773,52 +3791,64 @@ bool TinyGLTF::WriteGltfSceneToFile(
   }
 
   // IMAGES
-  json images;
-  for (unsigned int i = 0; i < model->images.size(); ++i) {
-    json image;
-    SerializeGltfImage(model->images[i], image);
-    images.push_back(image);
+  if (model->images.size()) {
+    json images;
+    for (unsigned int i = 0; i < model->images.size(); ++i) {
+      json image;
+      SerializeGltfImage(model->images[i], image);
+      images.push_back(image);
+    }
+    output["images"] = images;
   }
-  output["images"] = images;
 
   // MATERIALS
-  json materials;
-  for (unsigned int i = 0; i < model->materials.size(); ++i) {
-    json material;
-    SerializeGltfMaterial(model->materials[i], material);
-    materials.push_back(material);
+  if (model->materials.size()) {
+    json materials;
+    for (unsigned int i = 0; i < model->materials.size(); ++i) {
+      json material;
+      SerializeGltfMaterial(model->materials[i], material);
+      materials.push_back(material);
+    }
+    output["materials"] = materials;
   }
-  output["materials"] = materials;
 
   // MESHES
-  json meshes;
-  for (unsigned int i = 0; i < model->meshes.size(); ++i) {
-    json mesh;
-    SerializeGltfMesh(model->meshes[i], mesh);
-    meshes.push_back(mesh);
+  if (model->meshes.size()) {
+    json meshes;
+    for (unsigned int i = 0; i < model->meshes.size(); ++i) {
+      json mesh;
+      SerializeGltfMesh(model->meshes[i], mesh);
+      meshes.push_back(mesh);
+    }
+    output["meshes"] = meshes;
   }
-  output["meshes"] = meshes;
 
   // NODES
-  json nodes;
-  for (unsigned int i = 0; i < model->nodes.size(); ++i) {
-    json node;
-    SerializeGltfNode(model->nodes[i], node);
-    nodes.push_back(node);
+  if (model->nodes.size()) {
+    json nodes;
+    for (unsigned int i = 0; i < model->nodes.size(); ++i) {
+      json node;
+      SerializeGltfNode(model->nodes[i], node);
+      nodes.push_back(node);
+    }
+    output["nodes"] = nodes;
   }
-  output["nodes"] = nodes;
 
   // SCENE
-  SerializeNumberProperty<int>("scene", model->defaultScene, output);
+  if (model->defaultScene > -1) {
+    SerializeNumberProperty<int>("scene", model->defaultScene, output);
+  }
 
   // SCENES
-  json scenes;
-  for (unsigned int i = 0; i < model->scenes.size(); ++i) {
-    json currentScene;
-    SerializeGltfScene(model->scenes[i], currentScene);
-    scenes.push_back(currentScene);
+  if (model->scenes.size()) {
+    json scenes;
+    for (unsigned int i = 0; i < model->scenes.size(); ++i) {
+      json currentScene;
+      SerializeGltfScene(model->scenes[i], currentScene);
+      scenes.push_back(currentScene);
+    }
+    output["scenes"] = scenes;
   }
-  output["scenes"] = scenes;
 
   // SKINS
   if (model->skins.size()) {
@@ -3832,40 +3862,48 @@ bool TinyGLTF::WriteGltfSceneToFile(
   }
 
   // TEXTURES
-  json textures;
-  for (unsigned int i = 0; i < model->textures.size(); ++i) {
-    json texture;
-    SerializeGltfTexture(model->textures[i], texture);
-    textures.push_back(texture);
+  if (model->textures.size()) {
+    json textures;
+    for (unsigned int i = 0; i < model->textures.size(); ++i) {
+      json texture;
+      SerializeGltfTexture(model->textures[i], texture);
+      textures.push_back(texture);
+    }
+    output["textures"] = textures;
   }
-  output["textures"] = textures;
 
   // SAMPLERS
-  json samplers;
-  for (unsigned int i = 0; i < model->samplers.size(); ++i) {
-    json sampler;
-    SerializeGltfSampler(model->samplers[i], sampler);
-    samplers.push_back(sampler);
+  if (model->samplers.size()) {
+    json samplers;
+    for (unsigned int i = 0; i < model->samplers.size(); ++i) {
+      json sampler;
+      SerializeGltfSampler(model->samplers[i], sampler);
+      samplers.push_back(sampler);
+    }
+    output["samplers"] = samplers;
   }
-  output["samplers"] = samplers;
 
   // CAMERAS
-  json cameras;
-  for (unsigned int i = 0; i < model->cameras.size(); ++i) {
-    json camera;
-    SerializeGltfCamera(model->cameras[i], camera);
-    cameras.push_back(camera);
+  if (model->cameras.size()) {
+    json cameras;
+    for (unsigned int i = 0; i < model->cameras.size(); ++i) {
+      json camera;
+      SerializeGltfCamera(model->cameras[i], camera);
+      cameras.push_back(camera);
+    }
+    output["cameras"] = cameras;
   }
-  output["cameras"] = cameras;
 
   // LIGHTS
-  json lights;
-  for (unsigned int i = 0; i < model->lights.size(); ++i) {
-    json light;
-    SerializeGltfLight(model->lights[i], light);
-    lights.push_back(light);
+  if (model->lights.size()) {
+    json lights;
+    for (unsigned int i = 0; i < model->lights.size(); ++i) {
+      json light;
+      SerializeGltfLight(model->lights[i], light);
+      lights.push_back(light);
+    }
+    output["lights"] = lights;
   }
-  output["lights"] = lights;
 
   WriteGltfFile(filename, output.dump());
   return true;
