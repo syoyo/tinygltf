@@ -51,7 +51,8 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 * Physical based rendering with Vulkan using glTF 2.0 models https://github.com/SaschaWillems/Vulkan-glTF-PBR
 * GLTF loader plugin for OGRE 2.1. Support for PBR materials via HLMS/PBS https://github.com/Ybalrid/Ogre_glTF
-* Your projects here!(Plese send PR)
+* [TinyGltfImporter](http://doc.magnum.graphics/magnum/classMagnum_1_1Trade_1_1TinyGltfImporter.html) plugin for [Magnum](https://github.com/mosra/magnum), a lightweight and modular C++11/C++14 graphics middleware for games and data visualization.
+* Your projects here! (Please send PR)
 
 ## TODOs
 
