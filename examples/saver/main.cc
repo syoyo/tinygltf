@@ -17,6 +17,7 @@ int main(int argc, char *argv[])
   std::string err;
   std::string input_filename(argv[1]);
   std::string output_filename(argv[2]);
+  std::string embedded_filename = output_filename.substr(0, output_filename.size() - 5) + "-Embedded.gltf";
 
   // assume ascii glTF.
   bool ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
@@ -27,6 +28,9 @@ int main(int argc, char *argv[])
     return EXIT_FAILURE;
   }
   loader.WriteGltfSceneToFile(&model, output_filename);
+
+  // embed buffers
+  loader.WriteGltfSceneToFile(&model, embedded_filename, true);
 
   return EXIT_SUCCESS;
 
