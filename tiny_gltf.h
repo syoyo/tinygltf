@@ -794,8 +794,8 @@ class TinyGLTF {
   ///
   bool WriteGltfSceneToFile(
       Model *model,
-      const std::string &
-          filename /*, bool embedImages, bool embedBuffers, bool writeBinary*/);
+      const std::string &filename,
+      bool embedBuffers /*, bool embedImages, bool writeBinary*/);
 
   ///
   /// Set callback to use for loading image data
@@ -1033,7 +1033,7 @@ std::string GetBaseFilename(const std::string &filepath) {
   return filepath.substr(filepath.find_last_of("/\\") + 1);
 }
 
-// std::string base64_encode(unsigned char const* , unsigned int len);
+std::string base64_encode(unsigned char const* , unsigned int len);
 std::string base64_decode(std::string const &s);
 
 /*
@@ -1077,6 +1077,48 @@ static const std::string base64_chars =
 
 static inline bool is_base64(unsigned char c) {
   return (isalnum(c) || (c == '+') || (c == '/'));
+}
+
+std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len) {
+  std::string ret;
+  int i = 0;
+  int j = 0;
+  unsigned char char_array_3[3];
+  unsigned char char_array_4[4];
+
+  while (in_len--) {
+    char_array_3[i++] = *(bytes_to_encode++);
+    if (i == 3) {
+      char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+      char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+      char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+      char_array_4[3] = char_array_3[2] & 0x3f;
+
+      for(i = 0; (i <4) ; i++)
+        ret += base64_chars[char_array_4[i]];
+      i = 0;
+    }
+  }
+
+  if (i)
+  {
+    for(j = i; j < 3; j++)
+      char_array_3[j] = '\0';
+
+    char_array_4[0] = ( char_array_3[0] & 0xfc) >> 2;
+    char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+    char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+
+    for (j = 0; (j < i + 1); j++)
+      ret += base64_chars[char_array_4[j]];
+
+    while((i++ < 3))
+      ret += '=';
+
+  }
+
+  return ret;
+
 }
 
 std::string base64_decode(std::string const &encoded_string) {
@@ -3344,6 +3386,13 @@ static void SerializeValue(const std::string &key, const Value &value,
   }
 }
 
+static void SerializeGltfBufferData(const std::vector<unsigned char> &data, 
+                                    json &o) {
+  std::string header = "data:application/octet-stream;base64,";
+  std::string encodedData = base64_encode(&data[0], (unsigned int) data.size());
+  SerializeStringProperty("uri", header + encodedData, o);
+}
+
 static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     const std::string &binFilename) {
   std::ofstream output(binFilename.c_str(), std::ofstream::binary);
@@ -3463,6 +3512,13 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
   if (asset.extras.Keys().size()) {
     SerializeValue("extras", asset.extras, o);
   }
+}
+
+static void SerializeGltfBuffer(Buffer &buffer, json &o) {
+  SerializeNumberProperty("byteLength", buffer.data.size(), o);
+  SerializeGltfBufferData(buffer.data, o);
+
+  if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
 }
 
 static void SerializeGltfBuffer(Buffer &buffer, json &o,
@@ -3712,8 +3768,8 @@ static void WriteGltfFile(const std::string &output,
 
 bool TinyGLTF::WriteGltfSceneToFile(
     Model *model,
-    const std::string
-        &filename /*, bool embedImages, bool embedBuffers, bool writeBinary*/) {
+    const std::string &filename,
+    bool embedBuffers = false /*, bool embedImages, bool writeBinary*/) {
   json output;
 
   // ACCESSORS
@@ -3763,8 +3819,13 @@ bool TinyGLTF::WriteGltfSceneToFile(
   json buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
-    SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath,
-                        binFilename);
+    if (embedBuffers) {
+      SerializeGltfBuffer(model->buffers[i], buffer);  
+    }
+    else {
+      SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath,
+                          binFilename);
+    }
     buffers.push_back(buffer);
   }
   output["buffers"] = buffers;
