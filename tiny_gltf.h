@@ -793,8 +793,7 @@ class TinyGLTF {
   /// Write glTF to file.
   ///
   bool WriteGltfSceneToFile(
-      Model *model,
-      const std::string &filename,
+      Model *model, const std::string &filename,
       bool embedBuffers /*, bool embedImages, bool writeBinary*/);
 
   ///
@@ -1029,11 +1028,11 @@ static std::string GetBaseDir(const std::string &filepath) {
 }
 
 // https://stackoverflow.com/questions/8520560/get-a-file-name-from-a-path
-std::string GetBaseFilename(const std::string &filepath) {
+static std::string GetBaseFilename(const std::string &filepath) {
   return filepath.substr(filepath.find_last_of("/\\") + 1);
 }
 
-std::string base64_encode(unsigned char const* , unsigned int len);
+std::string base64_encode(unsigned char const *, unsigned int len);
 std::string base64_decode(std::string const &s);
 
 /*
@@ -1079,7 +1078,8 @@ static inline bool is_base64(unsigned char c) {
   return (isalnum(c) || (c == '+') || (c == '/'));
 }
 
-std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_len) {
+std::string base64_encode(unsigned char const *bytes_to_encode,
+                          unsigned int in_len) {
   std::string ret;
   int i = 0;
   int j = 0;
@@ -1090,35 +1090,32 @@ std::string base64_encode(unsigned char const* bytes_to_encode, unsigned int in_
     char_array_3[i++] = *(bytes_to_encode++);
     if (i == 3) {
       char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
-      char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-      char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+      char_array_4[1] =
+          ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+      char_array_4[2] =
+          ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
       char_array_4[3] = char_array_3[2] & 0x3f;
 
-      for(i = 0; (i <4) ; i++)
-        ret += base64_chars[char_array_4[i]];
+      for (i = 0; (i < 4); i++) ret += base64_chars[char_array_4[i]];
       i = 0;
     }
   }
 
-  if (i)
-  {
-    for(j = i; j < 3; j++)
-      char_array_3[j] = '\0';
+  if (i) {
+    for (j = i; j < 3; j++) char_array_3[j] = '\0';
 
-    char_array_4[0] = ( char_array_3[0] & 0xfc) >> 2;
-    char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
-    char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+    char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+    char_array_4[1] =
+        ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+    char_array_4[2] =
+        ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
 
-    for (j = 0; (j < i + 1); j++)
-      ret += base64_chars[char_array_4[j]];
+    for (j = 0; (j < i + 1); j++) ret += base64_chars[char_array_4[j]];
 
-    while((i++ < 3))
-      ret += '=';
-
+    while ((i++ < 3)) ret += '=';
   }
 
   return ret;
-
 }
 
 std::string base64_decode(std::string const &encoded_string) {
@@ -1699,8 +1696,7 @@ static bool ParseAsset(Asset *asset, std::string *err, const json &o) {
 }
 
 static bool ParseImage(Image *image, std::string *err, const json &o,
-                       const std::string &basedir, bool is_binary,
-                       const unsigned char *bin_data, size_t bin_size,
+                       const std::string &basedir,
                        LoadImageDataFunction *LoadImageData = nullptr,
                        void *user_data = nullptr) {
   // A glTF image must either reference a bufferView or an image uri
@@ -1713,7 +1709,9 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
   if (hasBufferView && hasURI) {
     // Should not both defined.
     if (err) {
-      (*err) += "Only one of `bufferView` or `uri` should be defined, but both are defined for Image.\n";
+      (*err) +=
+          "Only one of `bufferView` or `uri` should be defined, but both are "
+          "defined for Image.\n";
     }
     return false;
   }
@@ -2959,8 +2957,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
           return false;
         }
         Image image;
-        if (!ParseImage(&image, err, it.value(), base_dir, is_binary_,
-                        bin_data_, bin_size_, &this->LoadImageData,
+        if (!ParseImage(&image, err, it.value(), base_dir, &this->LoadImageData,
                         load_image_user_data_)) {
           return false;
         }
@@ -3386,10 +3383,11 @@ static void SerializeValue(const std::string &key, const Value &value,
   }
 }
 
-static void SerializeGltfBufferData(const std::vector<unsigned char> &data, 
+static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     json &o) {
   std::string header = "data:application/octet-stream;base64,";
-  std::string encodedData = base64_encode(&data[0], (unsigned int) data.size());
+  std::string encodedData =
+      base64_encode(&data[0], static_cast<unsigned int>(data.size()));
   SerializeStringProperty("uri", header + encodedData, o);
 }
 
@@ -3606,7 +3604,8 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
     }
     // Material is optional
     if (gltfPrimitive.material > -1) {
-      SerializeNumberProperty<int>("material", gltfPrimitive.material, primitive);
+      SerializeNumberProperty<int>("material", gltfPrimitive.material,
+                                   primitive);
     }
     SerializeNumberProperty<int>("mode", gltfPrimitive.mode, primitive);
 
@@ -3767,8 +3766,7 @@ static void WriteGltfFile(const std::string &output,
 }
 
 bool TinyGLTF::WriteGltfSceneToFile(
-    Model *model,
-    const std::string &filename,
+    Model *model, const std::string &filename,
     bool embedBuffers = false /*, bool embedImages, bool writeBinary*/) {
   json output;
 
@@ -3820,9 +3818,8 @@ bool TinyGLTF::WriteGltfSceneToFile(
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
     if (embedBuffers) {
-      SerializeGltfBuffer(model->buffers[i], buffer);  
-    }
-    else {
+      SerializeGltfBuffer(model->buffers[i], buffer);
+    } else {
       SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath,
                           binFilename);
     }
