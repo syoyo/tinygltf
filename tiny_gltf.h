@@ -730,11 +730,23 @@ enum SectionCheck {
 typedef bool (*LoadImageDataFunction)(Image *, std::string *, int, int,
                                       const unsigned char *, int, void *);
 
+///
+/// WriteImageDataFunction type. Signature for custom image writing callbacks.
+///
+typedef bool (*WriteImageDataFunction)(const std::string *, const std::string *,
+                                       Image *, bool, void *);
+
 #ifndef TINYGLTF_NO_STB_IMAGE
 // Declaration of default image loader callback
 bool LoadImageData(Image *image, std::string *err, int req_width,
                    int req_height, const unsigned char *bytes, int size,
                    void *);
+#endif
+
+#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+// Declaration of default image writer callback
+bool WriteImageData(const std::string *basepath, const std::string *filename,
+                    Image *image, bool embedImages, void *);
 #endif
 
 class TinyGLTF {
@@ -792,14 +804,19 @@ class TinyGLTF {
   ///
   /// Write glTF to file.
   ///
-  bool WriteGltfSceneToFile(
-      Model *model, const std::string &filename,
-      bool embedBuffers /*, bool embedImages, bool writeBinary*/);
+  bool WriteGltfSceneToFile(Model *model, const std::string &filename,
+                            bool embedImages,
+                            bool embedBuffers /*, bool writeBinary*/);
 
   ///
   /// Set callback to use for loading image data
   ///
   void SetImageLoader(LoadImageDataFunction LoadImageData, void *user_data);
+
+  ///
+  /// Set callback to use for writing image data
+  ///
+  void SetImageWriter(WriteImageDataFunction WriteImageData, void *user_data);
 
  private:
   ///
@@ -822,6 +839,14 @@ class TinyGLTF {
       nullptr;
 #endif
   void *load_image_user_data_ = nullptr;
+
+  WriteImageDataFunction WriteImageData =
+#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+      &tinygltf::WriteImageData;
+#else
+      nullptr;
+#endif
+  void *write_image_user_data_ = nullptr;
 };
 
 #ifdef __clang__
@@ -871,6 +896,10 @@ class TinyGLTF {
 
 #ifndef TINYGLTF_NO_STB_IMAGE
 #include "./stb_image.h"
+#endif
+
+#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+#include "./stb_image_write.h"
 #endif
 
 #ifdef __clang__
@@ -1014,12 +1043,11 @@ static std::string FindFile(const std::vector<std::string> &paths,
   return std::string();
 }
 
-// std::string GetFilePathExtension(const std::string& FileName)
-//{
-//    if(FileName.find_last_of(".") != std::string::npos)
-//        return FileName.substr(FileName.find_last_of(".")+1);
-//    return "";
-//}
+std::string GetFilePathExtension(const std::string &FileName) {
+  if (FileName.find_last_of(".") != std::string::npos)
+    return FileName.substr(FileName.find_last_of(".") + 1);
+  return "";
+}
 
 static std::string GetBaseDir(const std::string &filepath) {
   if (filepath.find_last_of("/\\") != std::string::npos)
@@ -1294,6 +1322,121 @@ bool LoadImageData(Image *image, std::string *err, int req_width,
 }
 #endif
 
+void TinyGLTF::SetImageWriter(WriteImageDataFunction func, void *user_data) {
+  WriteImageData = func;
+  write_image_user_data_ = user_data;
+}
+
+#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+static void WriteToMemory_stbi(void *context, void *data, int size) {
+  std::vector<unsigned char> *buffer =
+      reinterpret_cast<std::vector<unsigned char> *>(context);
+
+  unsigned char *pData = reinterpret_cast<unsigned char *>(data);
+
+  buffer->insert(buffer->end(), pData, pData + size);
+}
+
+bool WriteImageData(const std::string *basepath, const std::string *filename,
+                    Image *image, bool embedImages, void *) {
+  const std::string ext = GetFilePathExtension(*filename);
+
+  if (embedImages) {
+    // Write image to memory and embed in output
+    std::string header;
+    std::vector<unsigned char> data;
+
+    if (ext == "png") {
+      stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
+                             image->height, image->component, &image->image[0],
+                             0);
+      header = "data:image/png;base64,";
+    } else if (ext == "jpg") {
+      stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
+                             image->height, image->component, &image->image[0],
+                             100);
+      header = "data:image/jpeg;base64,";
+    } else if (ext == "bmp") {
+      stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
+                             image->height, image->component, &image->image[0]);
+      header = "data:image/bmp;base64,";
+    }
+
+    if (data.size()) {
+      image->uri =
+          header +
+          base64_encode(&data[0], static_cast<unsigned int>(data.size()));
+    } else {
+      // Throw error?
+    }
+  } else {
+    // Write image to disc
+
+    const std::string imagefilepath = JoinPath(*basepath, *filename);
+    if (ext == "png") {
+      stbi_write_png(imagefilepath.c_str(), image->width, image->height,
+                     image->component, &image->image[0], 0);
+    } else if (ext == "jpg") {
+      // TODO (Bowald): Give user the option to set output quality?
+      const int quality = 100;
+      stbi_write_jpg(imagefilepath.c_str(), image->width, image->height,
+                     image->component, &image->image[0], quality);
+    } else if (ext == "bmp") {
+      stbi_write_bmp(imagefilepath.c_str(), image->width, image->height,
+                     image->component, &image->image[0]);
+    } else {
+      // Throw error? Cant output requested format.
+    }
+    image->uri = *filename;
+  }
+
+  return true;
+}
+#endif
+
+static std::string MimeToExt(const std::string &mimeType) {
+  if (mimeType == "image/jpeg") {
+    return "jpg";
+  } else if (mimeType == "image/png") {
+    return "png";
+  } else if (mimeType == "image/bmp") {
+    return "bmp";
+  } else if (mimeType == "image/gif") {
+    return "gif";
+  }
+
+  return "";
+}
+
+void UpdateImageObject(Image &image, std::string &baseDir, int index,
+                       bool embedImages,
+                       WriteImageDataFunction *WriteImageData = nullptr,
+                       void *user_data = nullptr) {
+  std::string filename;
+  std::string ext;
+
+  // If image have uri. Use it it as a filename
+  if (image.uri.size()) {
+    filename = GetBaseFilename(image.uri);
+    ext = GetFilePathExtension(filename);
+
+  } else if (image.name.size()) {
+    ext = MimeToExt(image.mimeType);
+    // Otherwise use name as filename
+    filename = image.name + "." + ext;
+  } else {
+    ext = MimeToExt(image.mimeType);
+    // Fallback to index of image as filename
+    filename = std::to_string(index) + "." + ext;
+  }
+
+  // If callback is set, modify image data object
+  if (*WriteImageData != nullptr) {
+    std::string uri;
+    (*WriteImageData)(&baseDir, &filename, &image, embedImages, user_data);
+  }
+}
+
 static bool IsDataURI(const std::string &in) {
   std::string header = "data:application/octet-stream;base64,";
   if (in.find(header) == 0) {
@@ -1334,8 +1477,8 @@ static bool IsDataURI(const std::string &in) {
 }
 
 static bool DecodeDataURI(std::vector<unsigned char> *out,
-                          const std::string &in, size_t reqBytes,
-                          bool checkSize) {
+                          std::string &mime_type, const std::string &in,
+                          size_t reqBytes, bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
   std::string data;
   if (in.find(header) == 0) {
@@ -1345,6 +1488,7 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   if (data.empty()) {
     header = "data:image/jpeg;base64,";
     if (in.find(header) == 0) {
+      mime_type = "image/jpeg";
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
   }
@@ -1352,6 +1496,7 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   if (data.empty()) {
     header = "data:image/png;base64,";
     if (in.find(header) == 0) {
+      mime_type = "image/png";
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
   }
@@ -1359,6 +1504,7 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   if (data.empty()) {
     header = "data:image/bmp;base64,";
     if (in.find(header) == 0) {
+      mime_type = "image/bmp";
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
   }
@@ -1366,6 +1512,7 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   if (data.empty()) {
     header = "data:image/gif;base64,";
     if (in.find(header) == 0) {
+      mime_type = "image/gif";
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
   }
@@ -1373,6 +1520,7 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   if (data.empty()) {
     header = "data:text/plain;base64,";
     if (in.find(header) == 0) {
+      mime_type = "text/plain";
       data = base64_decode(in.substr(header.size()));
     }
   }
@@ -1767,7 +1915,7 @@ static bool ParseImage(Image *image, std::string *err, const json &o,
   std::vector<unsigned char> img;
 
   if (IsDataURI(uri)) {
-    if (!DecodeDataURI(&img, uri, 0, false)) {
+    if (!DecodeDataURI(&img, image->mimeType, uri, 0, false)) {
       if (err) {
         (*err) += "Failed to decode 'uri' for image parameter.\n";
       }
@@ -1886,7 +2034,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
 
   } else {
     if (IsDataURI(buffer->uri)) {
-      if (!DecodeDataURI(&buffer->data, buffer->uri, bytes, true)) {
+      if (!DecodeDataURI(&buffer->data, std::string(), buffer->uri, bytes,
+                         true)) {
         if (err) {
           (*err) += "Failed to decode 'uri' : " + buffer->uri + " in Buffer\n";
         }
@@ -3551,7 +3700,6 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
   }
 }
 
-// Only external textures are serialized for now
 static void SerializeGltfImage(Image &image, json &o) {
   SerializeStringProperty("uri", image.uri, o);
 
@@ -3749,7 +3897,9 @@ static void SerializeGltfSkin(Skin &skin, json &o) {
 }
 
 static void SerializeGltfTexture(Texture &texture, json &o) {
-  SerializeNumberProperty("sampler", texture.sampler, o);
+  if (texture.sampler > 0) {
+    SerializeNumberProperty("sampler", texture.sampler, o);
+  }
   SerializeNumberProperty("source", texture.source, o);
 
   if (texture.extras.Size()) {
@@ -3765,9 +3915,10 @@ static void WriteGltfFile(const std::string &output,
   gltfFile << content << std::endl;
 }
 
-bool TinyGLTF::WriteGltfSceneToFile(
-    Model *model, const std::string &filename,
-    bool embedBuffers = false /*, bool embedImages, bool writeBinary*/) {
+bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
+                                    bool embedImages = false,
+                                    bool embedBuffers = false
+                                    /*, bool writeBinary*/) {
   json output;
 
   // ACCESSORS
@@ -3806,12 +3957,12 @@ bool TinyGLTF::WriteGltfSceneToFile(
   } else {
     binFilename = binFilename + ".bin";
   }
-  std::string binSaveFilePath = GetBaseDir(filename);
-  if (binSaveFilePath.empty()) {
-    binSaveFilePath = "./";
+  std::string baseDir = GetBaseDir(filename);
+  if (baseDir.empty()) {
+    baseDir = "./";
   }
 
-  binSaveFilePath = JoinPath(binSaveFilePath, binFilename);
+  std::string binSaveFilePath = JoinPath(baseDir, binFilename);
 
   // BUFFERS (We expect only one buffer here)
   json buffers;
@@ -3853,6 +4004,9 @@ bool TinyGLTF::WriteGltfSceneToFile(
     json images;
     for (unsigned int i = 0; i < model->images.size(); ++i) {
       json image;
+
+      UpdateImageObject(model->images[i], baseDir, i, embedImages,
+                        &this->WriteImageData, &this->write_image_user_data_);
       SerializeGltfImage(model->images[i], image);
       images.push_back(image);
     }
