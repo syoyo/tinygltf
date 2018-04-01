@@ -73,11 +73,12 @@ TinyGLTF uses the following third party libraries.
 * json.hpp : Copyright (c) 2013-2017 Niels Lohmann. MIT license.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
 * stb_image.h : v2.08 - public domain image loader - http://nothings.org/stb_image.h
+* stb_image_write.h : v1.09 - public domain image writer - http://nothings.org/stb_image_write.h
 
 
 ## Build and example
 
-Copy `stb_image.h`, `json.hpp` and `tiny_gltf.h` to your project.
+Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your project.
 
 ### Loading glTF 2.0 model
 
@@ -110,10 +111,17 @@ if (!ret) {
 
 * `TINYGLTF_NOEXCEPTION` : Disable C++ exception in JSON parsing. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` and `TINYGLTF_NOEXCEPTION`  to fully remove C++ exception codes when compiling TinyGLTF.
 * `TINYGLTF_NO_STB_IMAGE` : Do not load images with stb_image. Instead use `TinyGLTF::SetImageLoader(LoadimageDataFunction LoadImageData, void *user_data)` to set a callback for loading images.
+* `TINYGLTF_NO_STB_IMAGE_WRITE` : Do not write images with stb_image_write. Instead use `TinyGLTF::SetImageWriter(WriteimageDataFunction WriteImageData, void *user_data)` to set a callback for writing images.
 
 ### Saving gltTF 2.0 model
-
-T.B.W.
+* [ ] Buffers.
+  * [x] To file
+  * [x] Embedded
+  * [ ] Draco compressed?
+* [x] Images
+  * [x] To file
+  * [x] Embedded
+* [ ] Binary(.glb)
 
 ## Running tests.
 
