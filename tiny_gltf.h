@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (c) 2015 - 2017 Syoyo Fujita, Aurélien Chatelain and many
+// Copyright (c) 2015 - 2018 Syoyo Fujita, Aurélien Chatelain and many
 // contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -876,6 +876,7 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
 #pragma clang diagnostic ignored "-Wpadded"
 #pragma clang diagnostic ignored "-Wc++98-compat"
+#pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
 #pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
 #pragma clang diagnostic ignored "-Wswitch-enum"
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
@@ -889,6 +890,18 @@ class TinyGLTF {
 #endif
 #if __has_warning("-Wcast-qual")
 #pragma clang diagnostic ignored "-Wcast-qual"
+#endif
+#if __has_warning("-Wmissing-variable-declarations")
+#pragma clang diagnostic ignored "-Wmissing-variable-declarations"
+#endif
+#if __has_warning("-Wmissing-prototypes")
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#endif
+#if __has_warning("-Wcast-align")
+#pragma clang diagnostic ignored "-Wcast-align"
+#endif
+#if __has_warning("-Wnewline-eof")
+#pragma clang diagnostic ignored "-Wnewline-eof"
 #endif
 #endif
 
@@ -1043,7 +1056,7 @@ static std::string FindFile(const std::vector<std::string> &paths,
   return std::string();
 }
 
-std::string GetFilePathExtension(const std::string &FileName) {
+static std::string GetFilePathExtension(const std::string &FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
     return FileName.substr(FileName.find_last_of(".") + 1);
   return "";
@@ -1408,7 +1421,7 @@ static std::string MimeToExt(const std::string &mimeType) {
   return "";
 }
 
-void UpdateImageObject(Image &image, std::string &baseDir, int index,
+static void UpdateImageObject(Image &image, std::string &baseDir, int index,
                        bool embedImages,
                        WriteImageDataFunction *WriteImageData = nullptr,
                        void *user_data = nullptr) {
@@ -4005,7 +4018,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     for (unsigned int i = 0; i < model->images.size(); ++i) {
       json image;
 
-      UpdateImageObject(model->images[i], baseDir, i, embedImages,
+      UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
                         &this->WriteImageData, &this->write_image_user_data_);
       SerializeGltfImage(model->images[i], image);
       images.push_back(image);
