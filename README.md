@@ -72,8 +72,8 @@ TinyGLTF uses the following third party libraries.
 
 * json.hpp : Copyright (c) 2013-2017 Niels Lohmann. MIT license.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
-* stb_image.h : v2.08 - public domain image loader - http://nothings.org/stb_image.h
-* stb_image_write.h : v1.09 - public domain image writer - http://nothings.org/stb_image_write.h
+* stb_image.h : v2.08 - public domain image loader - [Github link](https://github.com/nothings/stb/blob/master/stb_image.h)
+* stb_image_write.h : v1.09 - public domain image writer - [Github link](https://github.com/nothings/stb/blob/master/stb_image_write.h)
 
 
 ## Build and example
@@ -86,6 +86,7 @@ Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your pr
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
