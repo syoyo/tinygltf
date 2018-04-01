@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>  // c++11
 #define TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_NO_STB_IMAGE_WRITE
 #include <tiny_gltf.h>
 
 namespace example {

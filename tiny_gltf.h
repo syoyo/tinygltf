@@ -2034,8 +2034,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
 
   } else {
     if (IsDataURI(buffer->uri)) {
-      if (!DecodeDataURI(&buffer->data, std::string(), buffer->uri, bytes,
-                         true)) {
+      std::string mime_type;
+      if (!DecodeDataURI(&buffer->data, mime_type, buffer->uri, bytes, true)) {
         if (err) {
           (*err) += "Failed to decode 'uri' : " + buffer->uri + " in Buffer\n";
         }
