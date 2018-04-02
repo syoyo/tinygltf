@@ -3910,7 +3910,7 @@ static void SerializeGltfSkin(Skin &skin, json &o) {
 }
 
 static void SerializeGltfTexture(Texture &texture, json &o) {
-  if (texture.sampler > 0) {
+  if (texture.sampler > -1) {
     SerializeNumberProperty("sampler", texture.sampler, o);
   }
   SerializeNumberProperty("source", texture.source, o);
