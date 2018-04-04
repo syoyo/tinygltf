@@ -51,7 +51,8 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 * Physical based rendering with Vulkan using glTF 2.0 models https://github.com/SaschaWillems/Vulkan-glTF-PBR
 * GLTF loader plugin for OGRE 2.1. Support for PBR materials via HLMS/PBS https://github.com/Ybalrid/Ogre_glTF
-* Your projects here!(Plese send PR)
+* [TinyGltfImporter](http://doc.magnum.graphics/magnum/classMagnum_1_1Trade_1_1TinyGltfImporter.html) plugin for [Magnum](https://github.com/mosra/magnum), a lightweight and modular C++11/C++14 graphics middleware for games and data visualization.
+* Your projects here! (Please send PR)
 
 ## TODOs
 
@@ -71,12 +72,13 @@ TinyGLTF uses the following third party libraries.
 
 * json.hpp : Copyright (c) 2013-2017 Niels Lohmann. MIT license.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
-* stb_image.h : v2.08 - public domain image loader - http://nothings.org/stb_image.h
+* stb_image.h : v2.08 - public domain image loader - [Github link](https://github.com/nothings/stb/blob/master/stb_image.h)
+* stb_image_write.h : v1.09 - public domain image writer - [Github link](https://github.com/nothings/stb/blob/master/stb_image_write.h)
 
 
 ## Build and example
 
-Copy `stb_image.h`, `json.hpp` and `tiny_gltf.h` to your project.
+Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your project.
 
 ### Loading glTF 2.0 model
 
@@ -84,6 +86,7 @@ Copy `stb_image.h`, `json.hpp` and `tiny_gltf.h` to your project.
 // Define these only in *one* .cc file.
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
@@ -109,10 +112,17 @@ if (!ret) {
 
 * `TINYGLTF_NOEXCEPTION` : Disable C++ exception in JSON parsing. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` and `TINYGLTF_NOEXCEPTION`  to fully remove C++ exception codes when compiling TinyGLTF.
 * `TINYGLTF_NO_STB_IMAGE` : Do not load images with stb_image. Instead use `TinyGLTF::SetImageLoader(LoadimageDataFunction LoadImageData, void *user_data)` to set a callback for loading images.
+* `TINYGLTF_NO_STB_IMAGE_WRITE` : Do not write images with stb_image_write. Instead use `TinyGLTF::SetImageWriter(WriteimageDataFunction WriteImageData, void *user_data)` to set a callback for writing images.
 
 ### Saving gltTF 2.0 model
-
-T.B.W.
+* [ ] Buffers.
+  * [x] To file
+  * [x] Embedded
+  * [ ] Draco compressed?
+* [x] Images
+  * [x] To file
+  * [x] Embedded
+* [ ] Binary(.glb)
 
 ## Running tests.
 
