@@ -380,7 +380,7 @@ struct Parameter {
 #endif
 
 typedef std::map<std::string, Parameter> ParameterMap;
-typedef std::map<std::string, ParameterMap> ExtensionMap;
+typedef std::map<std::string, Value> ExtensionMap;
 
 struct AnimationChannel {
   int sampler;              // required
@@ -457,6 +457,7 @@ struct Texture {
   int sampler;
   int source;  // Required (not specified in the spec ?)
   Value extras;
+  ExtensionMap extensions;
 
   Texture() : sampler(-1), source(-1) {}
 };
@@ -1363,32 +1364,59 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   return true;
 }
 
-static void ParseObjectProperty(Value *ret, const json &o) {
-  tinygltf::Value::Object vo;
-  json::const_iterator it(o.begin());
-  json::const_iterator itEnd(o.end());
-
-  for (; it != itEnd; it++) {
-    json v = it.value();
-
-    if (v.is_boolean()) {
-      vo[it.key()] = tinygltf::Value(v.get<bool>());
-    } else if (v.is_number()) {
-      vo[it.key()] = tinygltf::Value(v.get<double>());
-    } else if (v.is_number_integer()) {
-      vo[it.key()] =
-          tinygltf::Value(static_cast<int>(v.get<int64_t>()));  // truncate
-    } else if (v.is_string()) {
-      vo[it.key()] = tinygltf::Value(v.get<std::string>());
-    } else if (v.is_object()) {
-      tinygltf::Value child_value;
-      ParseObjectProperty(&child_value, v);
-      vo[it.key()] = child_value;
+static bool ParseJsonAsValue(Value* ret, const json &o)
+{
+  Value val{};
+  switch (o.type())
+  {
+    case json::value_t::object:
+    {
+      Value::Object value_object;
+      for (auto it = o.begin(); it != o.end(); it++) {
+        Value entry;
+        ParseJsonAsValue(&entry, it.value());
+        if (entry.Type() != NULL_TYPE)
+      	  value_object[it.key()] = entry;
+      }
+      if (value_object.size() > 0)
+        val = Value(value_object);
     }
-    // TODO(syoyo) binary, array
+    break;
+    case json::value_t::array:
+    {
+      Value::Array value_array;
+      for (auto it = o.begin(); it != o.end(); it++) {
+        Value entry;
+        ParseJsonAsValue(&entry, it.value());
+        if (entry.Type() != NULL_TYPE)
+      	  value_array.push_back(entry);
+      }
+      if (value_array.size() > 0)
+        val = Value(value_array);
+    }
+    break;
+    case json::value_t::string:
+      val = Value(o.get<std::string>());
+      break;
+    case json::value_t::boolean:
+      val = Value(o.get<bool>());
+      break;
+    case json::value_t::number_integer:
+    case json::value_t::number_unsigned:
+      val = Value(static_cast<int>(o.get<int64_t>()));
+      break;
+    case json::value_t::number_float:
+      val = Value(o.get<double>());
+      break;
+    case json::value_t::null:
+    case json::value_t::discarded:
+    default:
+      break;
   }
-
-  (*ret) = tinygltf::Value(vo);
+  if (ret)
+    *ret = val;
+  
+  return val.Type() != NULL_TYPE;
 }
 
 static bool ParseExtrasProperty(Value *ret, const json &o) {
@@ -1397,14 +1425,7 @@ static bool ParseExtrasProperty(Value *ret, const json &o) {
     return false;
   }
 
-  // FIXME(syoyo) Currently we only support `object` type for extras property.
-  if (!it.value().is_object()) {
-    return false;
-  }
-
-  ParseObjectProperty(ret, it.value());
-
-  return true;
+  return ParseJsonAsValue(ret, it.value());
 }
 
 static bool ParseBooleanProperty(bool *ret, std::string *err, const json &o,
@@ -1684,7 +1705,6 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 
 static bool ParseExtensionsProperty(ExtensionMap *ret, std::string* err, const json &o)
 {
-  // TODO: Fully parse extension properties.
   json::const_iterator it = o.find("extensions");
   if (it == o.end()) {
     return false;
@@ -1694,22 +1714,10 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string* err, const j
   }
   ExtensionMap extensions;
   json::const_iterator extIt = it.value().begin();
-  for(; extIt != it.value().end(); extIt++)
-  {
-    if (!extIt.value().is_object()) continue;
-    
-    const json &values_object = extIt.value();
-    json::const_iterator itVal(values_object.begin());
-    json::const_iterator itValEnd(values_object.end());
-     
-    ParameterMap extValues;
-    for (; itVal != itValEnd; itVal++) {
-      Parameter param;
-      if (ParseParameterProperty(&param, err, itVal.value(), itVal.key(), false)) {
-          extValues[itVal.key()] = param;
-      }
-    }
-  	extensions[extIt.key()] = extValues;
+  for(; extIt != it.value().end(); extIt++) {
+    if (!extIt.value().is_object())
+      continue;
+    ParseJsonAsValue(&extensions[extIt.key()], extIt.value());
   }
   if(ret) {
     (*ret) = extensions;
@@ -1851,6 +1859,9 @@ static bool ParseTexture(Texture *texture, std::string *err, const json &o,
 
   texture->sampler = static_cast<int>(sampler);
   texture->source = static_cast<int>(source);
+  
+  ParseExtensionsProperty(&texture->extensions, err, o);
+  ParseExtrasProperty(&texture->extras, o);
 
   return true;
 }
@@ -2250,7 +2261,9 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
           }
         }
       }
-    } else {
+	} else if (it.key() == "extensions" || it.key() == "extras") {
+      // done later, skip, otherwise poorly parsed contents will be saved in the parametermap and serialized again later
+	} else {
       Parameter param;
       if (ParseParameterProperty(&param, err, o, it.key(), false)) {
         material->additionalValues[it.key()] = param;
@@ -3327,27 +3340,62 @@ static void SerializeStringArrayProperty(const std::string &key,
   obj[key] = vals;
 }
 
+static bool ValueToJson(const Value& value, json *ret)
+{
+  json obj;
+  switch (value.Type())
+  {
+    case NUMBER_TYPE:
+      obj = json(value.Get<double>());
+	  break;
+    case INT_TYPE:
+      obj = json(value.Get<int>());
+	  break;
+    case BOOL_TYPE:
+      obj = json(value.Get<bool>());
+	  break;
+    case STRING_TYPE:
+      obj = json(value.Get<std::string>());
+	  break;
+    case ARRAY_TYPE:
+	{
+      for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
+        Value elementValue = value.Get(int(i));
+		json elementJson;
+		if(ValueToJson(value.Get(int(i)), &elementJson))
+          obj.push_back(elementJson);
+      }
+	  break;
+	}
+    case BINARY_TYPE:
+      //TODO 
+      //obj = json(value.Get<std::vector<unsigned char>>());
+      return false;
+      break;
+    case OBJECT_TYPE:
+	{
+      Value::Object objMap = value.Get<Value::Object>();
+      for (auto& it : objMap) {
+        json elementJson;
+		if (ValueToJson(it.second, &elementJson))
+          obj[it.first] = elementJson;
+      }
+	  break;
+	}
+	case NULL_TYPE:
+	default:
+	  return false;
+  }
+  if (ret)
+	  *ret = obj;
+  return true;
+}
+
 static void SerializeValue(const std::string &key, const Value &value,
                            json &obj) {
-  if (value.IsArray()) {
-    json jsonValue;
-    for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
-      Value elementValue = value.Get(int(i));
-      if (elementValue.IsString())
-        jsonValue.push_back(elementValue.Get<std::string>());
-    }
-    obj[key] = jsonValue;
-  } else {
-    json jsonValue;
-    std::vector<std::string> valueKeys = value.Keys();
-    for (unsigned int i = 0; i < valueKeys.size(); ++i) {
-      Value elementValue = value.Get(valueKeys[i]);
-      if (elementValue.IsInt())
-        jsonValue[valueKeys[i]] = static_cast<double>(elementValue.Get<int>());
-    }
-
-    obj[key] = jsonValue;
-  }
+  json ret;
+  if (ValueToJson(value, &ret))
+    obj[key] = ret;
 }
 
 static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
@@ -3390,8 +3438,7 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o)
   json extMap;
   for(ExtensionMap::iterator extIt = extensions.begin(); extIt != extensions.end(); ++extIt) {
     json extension_values;
-	SerializeParameterMap(extIt->second, extension_values);
-	extMap[extIt->first] = extension_values;
+	SerializeValue(extIt->first, extIt->second, extMap);
   }
   o["extensions"] = extMap;
 }
@@ -3519,6 +3566,9 @@ static void SerializeGltfImage(Image &image, json &o) {
 }
 
 static void SerializeGltfMaterial(Material &material, json &o) {
+
+  if (material.extras.Size())
+    SerializeValue("extras", material.extras, o);
   SerializeExtensionMap(material.extensions, o);
 
   if (material.values.size()) {
@@ -3527,7 +3577,6 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     o["pbrMetallicRoughness"] = pbrMetallicRoughness;
   }
 
-  json additionalValues;
   SerializeParameterMap(material.additionalValues, o);
 
   if (material.name.size()) {
@@ -3695,7 +3744,6 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   if (texture.extras.Size()) {
     json extras;
     SerializeValue("extras", texture.extras, o);
-    o["extras"] = extras;
   }
 }
 
