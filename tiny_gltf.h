@@ -3745,6 +3745,7 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
     json extras;
     SerializeValue("extras", texture.extras, o);
   }
+  SerializeExtensionMap(texture.extensions, o);
 }
 
 static void WriteGltfFile(const std::string &output,
