@@ -1,5 +1,6 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
 #include <cstdio>
@@ -210,6 +211,7 @@ static std::string PrintParameterValue(const tinygltf::Parameter &param) {
   }
 }
 
+#if 0
 static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
   std::stringstream ss;
 
@@ -220,6 +222,7 @@ static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
 
   return ss.str();
 }
+#endif
 
 static std::string PrintValue(const std::string &name,
                               const tinygltf::Value &value, const int indent) {
@@ -300,9 +303,10 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
 
 static void DumpExtensions(const tinygltf::ExtensionMap &extension, const int indent)
 {
+  // TODO(syoyo): Print extensions
   for (auto &e : extension) {
     std::cout << Indent(indent) << e.first << std::endl;
-    std::cout << Indent(indent+1) << PrintParameterMap(e.second);
+    //std::cout << Indent(indent+1) << PrintParameterMap(e.second);
   }  
 }
 
