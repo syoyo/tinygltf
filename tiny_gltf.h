@@ -4185,13 +4185,13 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   SerializeExtensionMap(model->extensions, output);
 
   // LIGHTS as KHR_lights_cmn
-  json lights;
-  for (unsigned int i = 0; i < model->lights.size(); ++i) {
-    json light;
-    SerializeGltfLight(model->lights[i], light);
-    lights.push_back(light);
-  }
-  if (model->lights.size() > 0) {
+  if (model->lights.size()) {
+    json lights;
+    for (unsigned int i = 0; i < model->lights.size(); ++i) {
+      json light;
+      SerializeGltfLight(model->lights[i], light);
+      lights.push_back(light);
+    }
     json khr_lights_cmn;
     khr_lights_cmn["lights"] = lights;
     json ext_j;

@@ -225,7 +225,7 @@ static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
 #endif
 
 static std::string PrintValue(const std::string &name,
-                              const tinygltf::Value &value, const int indent) {
+                              const tinygltf::Value &value, const int indent, const bool tag = true) {
   std::stringstream ss;
 
   if (value.IsObject()) {
@@ -233,19 +233,45 @@ static std::string PrintValue(const std::string &name,
     tinygltf::Value::Object::const_iterator it(o.begin());
     tinygltf::Value::Object::const_iterator itEnd(o.end());
     for (; it != itEnd; it++) {
-      ss << PrintValue(name, it->second, indent + 1);
+      ss << PrintValue(it->first, it->second, indent + 1) << std::endl;
     }
   } else if (value.IsString()) {
-    ss << Indent(indent) << name << " : " << value.Get<std::string>()
-       << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<std::string>();
+    } else {
+      ss << " " << value.Get<std::string>() << " ";
+    }
   } else if (value.IsBool()) {
-    ss << Indent(indent) << name << " : " << value.Get<bool>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<bool>();
+    } else {
+      ss << " " << value.Get<bool>() << " ";
+    }
   } else if (value.IsNumber()) {
-    ss << Indent(indent) << name << " : " << value.Get<double>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<double>();
+    } else {
+      ss << " " << value.Get<double>() << " ";
+    }
   } else if (value.IsInt()) {
-    ss << Indent(indent) << name << " : " << value.Get<int>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<int>();
+    } else {
+      ss << " " << value.Get<int>() << " ";
+    }
+  } else if (value.IsArray()) {
+    ss << Indent(indent) << name << " [ ";
+    for (size_t i = 0; i < value.Size(); i++) {
+      ss << PrintValue("", value.Get(i), indent + 1, /* tag */false);
+      if (i != (value.ArrayLen()-1)) {
+        ss << ", ";
+      }
+
+    }
+    ss << Indent(indent) << "] ";
   }
-  // @todo { binary, array }
+
+  // @todo { binary }
 
   return ss.str();
 }
@@ -303,10 +329,10 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
 
 static void DumpExtensions(const tinygltf::ExtensionMap &extension, const int indent)
 {
-  // TODO(syoyo): Print extensions
+  // TODO(syoyo): pritty print Value
   for (auto &e : extension) {
     std::cout << Indent(indent) << e.first << std::endl;
-    //std::cout << Indent(indent+1) << PrintParameterMap(e.second);
+    std::cout << PrintValue("extensions", e.second, indent+1) << std::endl;
   }  
 }
 
@@ -368,7 +394,7 @@ static void Dump(const tinygltf::Model &model) {
         std::cout << Indent(2) << "min          : [";
         for (size_t k = 0; k < accessor.minValues.size(); k++) {
           std::cout << accessor.minValues[k]
-                    << ((i != accessor.minValues.size() - 1) ? ", " : "");
+                    << ((k != accessor.minValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
       }
@@ -376,7 +402,7 @@ static void Dump(const tinygltf::Model &model) {
         std::cout << Indent(2) << "max          : [";
         for (size_t k = 0; k < accessor.maxValues.size(); k++) {
           std::cout << accessor.maxValues[k]
-                    << ((i != accessor.maxValues.size() - 1) ? ", " : "");
+                    << ((k != accessor.maxValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
       }
