@@ -3487,7 +3487,16 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 // GLTF Serialization
 ///////////////////////
 
-// typedef std::pair<std::string, json> json_object_pair;
+static bool isIdentityMatrix(const std::vector<double> &matrix) {
+  if (matrix.size() != 16) return false;
+
+  return matrix[0] == 1.0 && matrix[1] == 0.0 && matrix[2] == 0.0 &&
+         matrix[3] == 0.0 && matrix[4] == 0.0 && matrix[5] == 1.0 &&
+         matrix[6] == 0.0 && matrix[7] == 0.0 && matrix[8] == 0.0 &&
+         matrix[9] == 0.0 && matrix[10] == 1.0 && matrix[11] == 0.0 &&
+         matrix[12] == 0.0 && matrix[13] == 0.0 && matrix[14] == 0.0 &&
+         matrix[15] == 1.0;
+}
 
 template <typename T>
 static void SerializeNumberProperty(const std::string &key, T number,
@@ -3568,7 +3577,10 @@ static bool ValueToJson(const Value &value, json *ret) {
       }
       break;
     }
-    case NULL_TYPE:
+    case NULL_TYPE: {
+      obj = json::object({});
+      break;
+    }
     default:
       return false;
   }
@@ -3601,7 +3613,9 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
 static void SerializeParameterMap(ParameterMap &param, json &o) {
   for (ParameterMap::iterator paramIt = param.begin(); paramIt != param.end();
        ++paramIt) {
-    if (paramIt->second.number_array.size()) {
+    if (paramIt->second.number_array.size() == 1) {
+      SerializeNumberProperty(paramIt->first, paramIt->second.Factor(), o);
+    } else if (paramIt->second.number_array.size() > 1) {
       SerializeNumberArrayProperty<double>(paramIt->first,
                                            paramIt->second.number_array, o);
     } else if (paramIt->second.json_double_value.size()) {
@@ -3773,8 +3787,13 @@ static void SerializeGltfImage(Image &image, json &o) {
 }
 
 static void SerializeGltfMaterial(Material &material, json &o) {
-  if (material.extras.Size()) SerializeValue("extras", material.extras, o);
-  SerializeExtensionMap(material.extensions, o);
+  if (material.extras.Size()) {
+    SerializeValue("extras", material.extras, o);
+  }
+
+  if (material.extensions.size()) {
+    SerializeExtensionMap(material.extensions, o);
+  }
 
   if (material.values.size()) {
     json pbrMetallicRoughness;
@@ -3860,7 +3879,7 @@ static void SerializeGltfNode(Node &node, json &o) {
   if (node.scale.size() > 0) {
     SerializeNumberArrayProperty<double>("scale", node.scale, o);
   }
-  if (node.matrix.size() > 0) {
+  if (node.matrix.size() > 0 && !isIdentityMatrix(node.matrix)) {
     SerializeNumberArrayProperty<double>("matrix", node.matrix, o);
   }
   if (node.mesh != -1) {
