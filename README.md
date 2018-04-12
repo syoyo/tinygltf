@@ -22,7 +22,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [x] iOS + clang
   * [x] Linux + gcc/clang
   * [x] Windows + MinGW
-  * [x] Windows + Visual Studio 2015 or later.
+  * [x] Windows + Visual Studio 2015 Update 3 or later.
     * Visual Studio 2013 is not supported since they have limited C++11 support and failed to compile `json.hpp`.
   * [x] Android + CrystaX(NDK drop-in replacement) GCC
   * [x] Web using Emscripten(LLVM)
