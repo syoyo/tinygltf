@@ -262,7 +262,7 @@ static std::string PrintValue(const std::string &name,
   } else if (value.IsArray()) {
     ss << Indent(indent) << name << " [ ";
     for (size_t i = 0; i < value.Size(); i++) {
-      ss << PrintValue("", value.Get(i), indent + 1, /* tag */false);
+      ss << PrintValue("", value.Get(int(i)), indent + 1, /* tag */false);
       if (i != (value.ArrayLen()-1)) {
         ss << ", ";
       }
