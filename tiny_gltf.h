@@ -1610,7 +1610,7 @@ static bool ParseJsonAsValue(Value* ret, const json &o)
       break;
     case json::value_t::null:
     case json::value_t::discarded:
-    default:
+    //default:
       break;
   }
   if (ret)
@@ -1905,6 +1905,8 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 
 static bool ParseExtensionsProperty(ExtensionMap *ret, std::string* err, const json &o)
 {
+  (void)err;
+
   json::const_iterator it = o.find("extensions");
   if (it == o.end()) {
     return false;
