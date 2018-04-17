@@ -401,12 +401,12 @@ struct AnimationSampler {
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
 };
 
-typedef struct {
+struct Animation {
   std::string name;
   std::vector<AnimationChannel> channels;
   std::vector<AnimationSampler> samplers;
   Value extras;
-} Animation;
+};
 
 struct Skin {
   std::string name;
@@ -607,14 +607,14 @@ struct Primitive {
   }
 };
 
-typedef struct {
+struct Mesh {
   std::string name;
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
   std::vector<std::map<std::string, int> > targets;
   ExtensionMap extensions;
   Value extras;
-} Mesh;
+};
 
 class Node {
  public:
@@ -655,22 +655,22 @@ class Node {
   Value extras;
 };
 
-typedef struct {
+struct Buffer {
   std::string name;
   std::vector<unsigned char> data;
   std::string
       uri;  // considered as required here but not in the spec (need to clarify)
   Value extras;
-} Buffer;
+};
 
-typedef struct {
+struct Asset {
   std::string version;  // required
   std::string generator;
   std::string minVersion;
   std::string copyright;
   ExtensionMap extensions;
   Value extras;
-} Asset;
+};
 
 struct Scene {
   std::string name;
