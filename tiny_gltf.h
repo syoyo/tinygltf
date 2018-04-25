@@ -42,7 +42,6 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -335,10 +334,11 @@ using ColorValue = std::array<double, 4>;
 
 struct Parameter {
   bool bool_value;
+  bool has_number_value = false;
   std::string string_value;
   std::vector<double> number_array;
   std::map<std::string, double> json_double_value;
-  std::optional<double> number_value;
+  double number_value;
   // context sensitive methods. depending the type of the Parameter you are
   // accessing, these are either valid or not
   // If this parameter represent a texture map in a material, will return the
@@ -358,7 +358,7 @@ struct Parameter {
   /// Material factor, like the roughness or metalness of a material
   /// Returned value is only valid if the parameter represent a texture from a
   /// material
-  double Factor() const { return *number_value; }
+  double Factor() const { return number_value; }
 
   /// Return the color of a material
   /// Returned value is only valid if the parameter represent a texture from a
@@ -1861,8 +1861,6 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
 static bool ParseParameterProperty(Parameter *param, std::string *err,
                                    const json &o, const std::string &prop,
                                    bool required) {
-  double num_val;
-
   // A parameter value can either be a string or an array of either a boolean or
   // a number. Booleans of any kind aren't supported here. Granted, it
   // complicates the Parameter structure and breaks it semantically in the sense
@@ -1875,9 +1873,8 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
                                       false)) {
     // Found a number array.
     return true;
-  } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
-    param->number_value = num_val;
-    return true;
+  } else if (ParseNumberProperty(&param->number_value, err, o, prop, false)) {
+    return param->has_number_value = true;
   } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
                                false)) {
     return true;
@@ -3622,8 +3619,8 @@ static void SerializeParameterMap(ParameterMap &param, json &o) {
       o[paramIt->first] = json_double_value;
     } else if (!paramIt->second.string_value.empty()) {
       SerializeStringProperty(paramIt->first, paramIt->second.string_value, o);
-    } else if (paramIt->second.number_value) {
-      o[paramIt->first] = *paramIt->second.number_value;
+    } else if (paramIt->second.has_number_value) {
+      o[paramIt->first] = paramIt->second.number_value;
     } else {
       o[paramIt->first] = paramIt->second.bool_value;
     }
