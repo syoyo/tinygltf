@@ -3880,7 +3880,7 @@ static void SerializeGltfNode(Node &node, json &o) {
     SerializeNumberProperty<int>("camera", node.camera, o);
   }
 
-  if (node.extras.Type() != NULL_TYPE)
+  if (node.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", node.extras, o);
   }
 
