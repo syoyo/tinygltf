@@ -1010,6 +1010,14 @@ static bool IsDataURI(const std::string &in) {
     return true;
   }
 
+  // NOTE(syoyo) `gltf-buffer` is still in draft as of Jun 4, 2018,
+  // but some glTF sample model uses `gltf-buffer` so we deal with it.
+  // https://github.com/KhronosGroup/glTF/pull/1180
+  header = "data:application/gltf-buffer;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+
   header = "data:image/png;base64,";
   if (in.find(header) == 0) {
     return true;
@@ -1035,6 +1043,13 @@ static bool DecodeDataURI(std::vector<unsigned char> *out,
   std::string data;
   if (in.find(header) == 0) {
     data = base64_decode(in.substr(header.size()));  // cut mime string.
+  }
+
+  if (data.empty()) {
+    header = "data:application/gltf-buffer;base64,";
+    if (in.find(header) == 0) {
+      data = base64_decode(in.substr(header.size()));  // cut mime string.
+    }
   }
 
   if (data.empty()) {
@@ -1662,11 +1677,11 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
   accessor->minValues.clear();
   accessor->maxValues.clear();
-  if(!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", true, "Accessor")) {
+  if(!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", false, "Accessor")) {
     return false;
   }
 
-  if(!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", true, "Accessor")) {
+  if(!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", false, "Accessor")) {
     return false;
   }
 
