@@ -398,6 +398,7 @@ struct AnimationSampler {
   int output;                 // required
   std::string interpolation;  // in ["LINEAR", "STEP", "CATMULLROMSPLINE",
                               // "CUBICSPLINE"], default "LINEAR"
+  Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
 };
@@ -2559,6 +2560,7 @@ static bool ParseAnimation(Animation *animation, std::string *err,
         }
         sampler.input = static_cast<int>(inputIndex);
         sampler.output = static_cast<int>(outputIndex);
+        ParseExtrasProperty(&(sampler.extras), s);
         animation->samplers.push_back(sampler);
       }
     }
@@ -3675,6 +3677,10 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   }
 
   SerializeStringProperty("type", type, o);
+
+  if (accessor.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", accessor.extras, o);
+  }
 }
 
 static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
@@ -3684,12 +3690,20 @@ static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
   SerializeStringProperty("path", channel.target_path, target);
 
   o["target"] = target;
+
+  if (channel.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", channel.extras, o);
+  }
 }
 
 static void SerializeGltfAnimationSampler(AnimationSampler &sampler, json &o) {
   SerializeNumberProperty("input", sampler.input, o);
   SerializeNumberProperty("output", sampler.output, o);
   SerializeStringProperty("interpolation", sampler.interpolation, o);
+
+  if (sampler.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", sampler.extras, o);
+  }
 }
 
 static void SerializeGltfAnimation(Animation &animation, json &o) {
@@ -3712,6 +3726,10 @@ static void SerializeGltfAnimation(Animation &animation, json &o) {
   }
 
   o["samplers"] = samplers;
+
+  if (animation.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", animation.extras, o);
+  }
 }
 
 static void SerializeGltfAsset(Asset &asset, json &o) {
@@ -3735,6 +3753,10 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o) {
   SerializeGltfBufferData(buffer.data, o);
 
   if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
+
+  if (buffer.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", buffer.extras, o);
+  }
 }
 
 static void SerializeGltfBuffer(Buffer &buffer, json &o,
@@ -3745,6 +3767,10 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o,
   SerializeStringProperty("uri", binBaseFilename, o);
 
   if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
+
+  if (buffer.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", buffer.extras, o);
+  }
 }
 
 static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
@@ -3767,6 +3793,10 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
   if (bufferView.name.size()) {
     SerializeStringProperty("name", bufferView.name, o);
   }
+
+  if (bufferView.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", bufferView.extras, o);
+  }
 }
 
 static void SerializeGltfImage(Image &image, json &o) {
@@ -3774,6 +3804,10 @@ static void SerializeGltfImage(Image &image, json &o) {
 
   if (image.name.size()) {
     SerializeStringProperty("name", image.name, o);
+  }
+
+  if (image.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", image.extras, o);
   }
 }
 
@@ -3791,6 +3825,10 @@ static void SerializeGltfMaterial(Material &material, json &o) {
 
   if (material.name.size()) {
     SerializeStringProperty("name", material.name, o);
+  }
+
+  if (material.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", material.extras, o);
   }
 }
 
@@ -3836,6 +3874,10 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
       primitive["targets"] = targets;
     }
 
+    if (gltfPrimitive.extras.Type() != NULL_TYPE) {
+      SerializeValue("extras", gltfPrimitive.extras, primitive);
+    }
+
     primitives.push_back(primitive);
   }
 
@@ -3846,6 +3888,10 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
 
   if (mesh.name.size()) {
     SerializeStringProperty("name", mesh.name, o);
+  }
+
+  if (mesh.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", mesh.extras, o);
   }
 }
 
@@ -3894,6 +3940,10 @@ static void SerializeGltfSampler(Sampler &sampler, json &o) {
   SerializeNumberProperty("minFilter", sampler.minFilter, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
+
+  if (sampler.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", sampler.extras, o);
+  }
 }
 
 static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
@@ -3902,6 +3952,10 @@ static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
   SerializeNumberProperty("znear", camera.znear, o);
   SerializeNumberProperty("xmag", camera.xmag, o);
   SerializeNumberProperty("ymag", camera.ymag, o);
+
+  if (camera.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", camera.extras, o);
+  }
 }
 
 static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
@@ -3914,6 +3968,10 @@ static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
 
   if (camera.yfov > 0) {
     SerializeNumberProperty("yfov", camera.yfov, o);
+  }
+
+  if (camera.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", camera.extras, o);
   }
 }
 
@@ -3942,7 +4000,7 @@ static void SerializeGltfScene(Scene &scene, json &o) {
   if (scene.name.size()) {
     SerializeStringProperty("name", scene.name, o);
   }
-  if (scene.extras.Keys().size()) {
+  if (scene.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", scene.extras, o);
   }
   SerializeExtensionMap(scene.extensions, o);
@@ -3965,8 +4023,7 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   }
   SerializeNumberProperty("source", texture.source, o);
 
-  if (texture.extras.Size()) {
-    json extras;
+  if (texture.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", texture.extras, o);
   }
   SerializeExtensionMap(texture.extensions, o);
@@ -4191,6 +4248,11 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     ext_j["KHR_lights_cmn"] = khr_lights_cmn;
 
     output["extensions"] = ext_j;
+  }
+
+  // EXTRAS
+  if (model->extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", model->extras, output);
   }
 
   WriteGltfFile(filename, output.dump());
