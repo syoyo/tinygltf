@@ -4,7 +4,8 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (c) 2015 - 2017 Syoyo Fujita, Aurélien Chatelain and many contributors.
+// Copyright (c) 2015 - 2017 Syoyo Fujita, Aurélien Chatelain and many
+// contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -286,29 +287,22 @@ typedef struct {
 typedef std::map<std::string, Parameter> ParameterMap;
 
 struct AnimationChannel {
-  int sampler; // required
-  int target_node; // required (index of the node to target)
-  std::string target_path; // required in ["translation", "rotation", "scale", "weights"]
+  int sampler;              // required
+  int target_node;          // required (index of the node to target)
+  std::string target_path;  // required in ["translation", "rotation", "scale",
+                            // "weights"]
   Value extras;
 
-  AnimationChannel()
-    : sampler(-1)
-    , target_node(-1)
-  {
-  }
+  AnimationChannel() : sampler(-1), target_node(-1) {}
 };
 
 struct AnimationSampler {
-  int input; // required
-  int output; // required
-  std::string interpolation; // in ["LINEAR", "STEP", "CATMULLROMSPLINE", "CUBICSPLINE"], default "LINEAR"
+  int input;                  // required
+  int output;                 // required
+  std::string interpolation;  // in ["LINEAR", "STEP", "CATMULLROMSPLINE",
+                              // "CUBICSPLINE"], default "LINEAR"
 
-  AnimationSampler()
-    : input(-1)
-    , output(-1)
-    , interpolation("LINEAR")
-  {
-  }
+  AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
 };
 
 typedef struct {
@@ -320,61 +314,53 @@ typedef struct {
 
 struct Skin {
   std::string name;
-  int inverseBindMatrices; // required here but not in the spec
-  int skeleton; // The index of the node used as a skeleton root
-  std::vector<int> joints; // Indices of skeleton nodes
+  int inverseBindMatrices;  // required here but not in the spec
+  int skeleton;             // The index of the node used as a skeleton root
+  std::vector<int> joints;  // Indices of skeleton nodes
 
-  Skin()
-  {
-    inverseBindMatrices = -1;
-  }
+  Skin() { inverseBindMatrices = -1; }
 };
 
 struct Sampler {
   std::string name;
-  int minFilter; // ["NEAREST", "LINEAR", "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_NEAREST", "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_LINEAR"]
-  int magFilter; // ["NEAREST", "LINEAR"]
-  int wrapS; // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default "REPEAT"
-  int wrapT; // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default "REPEAT"
-  int wrapR;  // TinyGLTF extension
+  int minFilter;  // ["NEAREST", "LINEAR", "NEAREST_MIPMAP_LINEAR",
+                  // "LINEAR_MIPMAP_NEAREST", "NEAREST_MIPMAP_LINEAR",
+                  // "LINEAR_MIPMAP_LINEAR"]
+  int magFilter;  // ["NEAREST", "LINEAR"]
+  int wrapS;      // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default
+                  // "REPEAT"
+  int wrapT;      // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default
+                  // "REPEAT"
+  int wrapR;      // TinyGLTF extension
   int pad0;
   Value extras;
 
   Sampler()
-    : wrapS(TINYGLTF_TEXTURE_WRAP_RPEAT)
-    , wrapT(TINYGLTF_TEXTURE_WRAP_RPEAT)
-  {
-  }
+      : wrapS(TINYGLTF_TEXTURE_WRAP_RPEAT),
+        wrapT(TINYGLTF_TEXTURE_WRAP_RPEAT) {}
 };
 
-struct Image{
+struct Image {
   std::string name;
   int width;
   int height;
   int component;
   int pad0;
   std::vector<unsigned char> image;
-  int bufferView;  // (required if no uri)
-  std::string mimeType;    // (required if no uri) ["image/jpeg", "image/png"]
-  std::string uri; // (reqiored if no mimeType)
+  int bufferView;        // (required if no uri)
+  std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png"]
+  std::string uri;       // (reqiored if no mimeType)
   Value extras;
 
-  Image()
-  {
-    bufferView = -1;
-  }
+  Image() { bufferView = -1; }
 };
 
 struct Texture {
   int sampler;
-  int source;   // Required (not specified in the spec ?)
+  int source;  // Required (not specified in the spec ?)
   Value extras;
 
-  Texture()
-    : sampler(-1)
-    , source(-1)
-  {
-  }
+  Texture() : sampler(-1), source(-1) {}
 };
 
 // Each extension should be stored in a ParameterMap.
@@ -383,47 +369,41 @@ struct Texture {
 struct Material {
   std::string name;
 
-  ParameterMap values; // PBR metal/roughness workflow
-  ParameterMap additionalValues; // normal/occlusion/emissive values
-  ParameterMap extCommonValues; // KHR_common_material extension
+  ParameterMap values;            // PBR metal/roughness workflow
+  ParameterMap additionalValues;  // normal/occlusion/emissive values
+  ParameterMap extCommonValues;   // KHR_common_material extension
   ParameterMap extPBRValues;
   Value extras;
 };
 
-struct BufferView{
+struct BufferView {
   std::string name;
-  int buffer;  // Required
-  size_t byteOffset;   // minimum 0, default 0
-  size_t byteLength;   // required, minimum 1
+  int buffer;         // Required
+  size_t byteOffset;  // minimum 0, default 0
+  size_t byteLength;  // required, minimum 1
   size_t byteStride;  // minimum 4, maximum 252 (multiple of 4)
-  int target; // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
+  int target;         // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
   int pad0;
   Value extras;
 
-  BufferView()
-    : byteOffset(0)
-    , byteStride(4)
-  {}  
-
+  BufferView() : byteOffset(0), byteStride(4) {}
 };
 
 struct Accessor {
-  int bufferView; // optional in spec but required here since sparse accessor are not supported
+  int bufferView;  // optional in spec but required here since sparse accessor
+                   // are not supported
   std::string name;
   size_t byteOffset;
   size_t byteStride;
   int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
-  size_t count; // required
-  int type;  // (required) One of TINYGLTF_TYPE_***   ..
+  size_t count;       // required
+  int type;           // (required) One of TINYGLTF_TYPE_***   ..
   Value extras;
 
   std::vector<double> minValues;  // required
   std::vector<double> maxValues;  // required
 
-  Accessor()
-  {
-    bufferView = -1;
-  }
+  Accessor() { bufferView = -1; }
 };
 
 class Camera {
@@ -435,16 +415,16 @@ class Camera {
   bool isOrthographic;  // false = perspective.
 
   // Orthographic properties
-  float xMag; // required
-  float yMag; // required
-  float zFar; // required
-  float zNear; //required
+  float xMag;   // required
+  float yMag;   // required
+  float zFar;   // required
+  float zNear;  // required
 
   // Perspective properties
   float aspectRatio;
-  float yfov; // required
+  float yfov;  // required
   float zfar;
-  float znear; // required
+  float znear;  // required
 
   ParameterMap extensions;
   Value extras;
@@ -456,16 +436,17 @@ struct Primitive {
                                           // is the index of the accessor
                                           // containing an attribute.
   int material;  // The index of the material to apply to this primitive
-                      // when rendering.
+                 // when rendering.
   int indices;   // The index of the accessor that contains the indices.
   int mode;      // one of TINYGLTF_MODE_***
-  std::vector<std::map<std::string, int> > targets; // array of morph targets,
-                //where each target is a dict with attribues in ["POSITION, "NORMAL", "TANGENT"] pointing
+  std::vector<std::map<std::string, int> >
+      targets;  // array of morph targets,
+                // where each target is a dict with attribues in ["POSITION,
+                // "NORMAL", "TANGENT"] pointing
                 // to their corresponding accessors
   Value extras;
 
-  Primitive()
-  {
+  Primitive() {
     material = -1;
     indices = -1;
   }
@@ -474,19 +455,15 @@ struct Primitive {
 typedef struct {
   std::string name;
   std::vector<Primitive> primitives;
-  std::vector<double> weights; // weights to be applied to the Morph Targets
-  std::vector<std::map<std::string, int> >targets;
+  std::vector<double> weights;  // weights to be applied to the Morph Targets
+  std::vector<std::map<std::string, int> > targets;
   ParameterMap extensions;
   Value extras;
 } Mesh;
 
 class Node {
  public:
-  Node()
-    : skin(-1)
-    , mesh(-1)
-  {
-  }
+  Node() : skin(-1), mesh(-1) {}
 
   ~Node() {}
 
@@ -500,7 +477,7 @@ class Node {
   std::vector<double> scale;        // length must be 0 or 3
   std::vector<double> translation;  // length must be 0 or 3
   std::vector<double> matrix;       // length must be 0 or 16
-  std::vector<double> weights; // The weights of the instantiated Morph Target
+  std::vector<double> weights;  // The weights of the instantiated Morph Target
 
   Value extras;
 };
@@ -508,12 +485,13 @@ class Node {
 typedef struct {
   std::string name;
   std::vector<unsigned char> data;
-  std::string uri; // considered as required here but not in the spec (need to clarify)
+  std::string
+      uri;  // considered as required here but not in the spec (need to clarify)
   Value extras;
 } Buffer;
 
 typedef struct {
-  std::string version; // required
+  std::string version;  // required
   std::string generator;
   std::string minVersion;
   std::string copyright;
@@ -733,8 +711,9 @@ static std::string ExpandFilePath(const std::string &filepath) {
   }
 
   // char** w;
-  // wrap filepath by quotes to avoid splitting file path when the path contains spaces(more precisely, $IFS environment variables).
-  std::string quoted_filepath = "\"" + filepath + "\""; 
+  // wrap filepath by quotes to avoid splitting file path when the path contains
+  // spaces(more precisely, $IFS environment variables).
+  std::string quoted_filepath = "\"" + filepath + "\"";
   int ret = wordexp(quoted_filepath.c_str(), &p, 0);
   if (ret) {
     // err
@@ -921,6 +900,9 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   size_t sz = static_cast<size_t>(f.tellg());
   if (int(sz) < 0) {
     // Looks reading directory, not a file.
+    if (err) {
+      (*err) += "Looks like filepath is a directory : \"" + filepath + "\"\n";
+    }
     return false;
   }
   std::vector<unsigned char> buf(sz);
@@ -955,8 +937,10 @@ static bool LoadImageData(Image *image, std::string *err, int req_width,
   int w, h, comp;
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
-  //FIXME we should only enter this function if the image is embedded. If image->uri references
-  // an image file, it should be left as it is. Image loading should not be mandatory (to support other formats)
+  // FIXME we should only enter this function if the image is embedded. If
+  // image->uri references
+  // an image file, it should be left as it is. Image loading should not be
+  // mandatory (to support other formats)
   unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, 0);
   if (!data) {
     if (err) {
@@ -1164,7 +1148,9 @@ static bool ParseBooleanProperty(bool *ret, std::string *err,
 
 static bool ParseNumberProperty(double *ret, std::string *err,
                                 const picojson::object &o,
-                                const std::string &property, const bool required, const std::string &parent_node = "") {
+                                const std::string &property,
+                                const bool required,
+                                const std::string &parent_node = "") {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
     if (required) {
@@ -1197,8 +1183,7 @@ static bool ParseNumberProperty(double *ret, std::string *err,
 
 static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
                                      const picojson::object &o,
-                                     const std::string &property,
-                                     bool required,
+                                     const std::string &property, bool required,
                                      const std::string &parent_node = "") {
   picojson::object::const_iterator it = o.find(property);
   if (it == o.end()) {
@@ -1328,23 +1313,20 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   return true;
 }
 
-static bool ParseJSONProperty(std::map<std::string, double> *ret, std::string *err,
-                              const picojson::object &o,
-                              const std::string &property,
-                              bool required)
-{
+static bool ParseJSONProperty(std::map<std::string, double> *ret,
+                              std::string *err, const picojson::object &o,
+                              const std::string &property, bool required) {
   picojson::object::const_iterator it = o.find(property);
-  if(it == o.end())
-  {
+  if (it == o.end()) {
     if (required) {
-      if(err) {
+      if (err) {
         (*err) += "'" + property + "' property is missing. \n'";
       }
     }
     return false;
   }
 
-  if(!it->second.is<picojson::object>()) {
+  if (!it->second.is<picojson::object>()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a JSON object.\n";
@@ -1358,8 +1340,9 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret, std::string *e
   picojson::object::const_iterator it2(obj.begin());
   picojson::object::const_iterator itEnd(obj.end());
   for (; it2 != itEnd; it2++) {
-    if(it2->second.is<double>())
-      ret->insert(std::pair<std::string, double>(it2->first, it2->second.get<double>()));
+    if (it2->second.is<double>())
+      ret->insert(std::pair<std::string, double>(it2->first,
+                                                 it2->second.get<double>()));
   }
 
   return true;
@@ -1383,7 +1366,8 @@ static bool ParseImage(Image *image, std::string *err,
                        size_t bin_size) {
   // A glTF image must either reference a bufferView or an image uri
   double bufferView = -1;
-  bool isEmbedded = ParseNumberProperty(&bufferView, err, o, "bufferView", true);
+  bool isEmbedded =
+      ParseNumberProperty(&bufferView, err, o, "bufferView", true);
   isEmbedded = isEmbedded && static_cast<int>(bufferView) != -1;
 
   std::string uri;
@@ -1508,11 +1492,10 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
   ParseStringProperty(&uri, err, o, "uri", false, "Buffer");
 
   // having an empty uri for a non embedded image should not be valid
-  if(!is_binary && uri.empty())
-  {
-      if (err) {
-        (*err) += "'uri' is missing from non binary glTF file buffer.\n";
-      }
+  if (!is_binary && uri.empty()) {
+    if (err) {
+      (*err) += "'uri' is missing from non binary glTF file buffer.\n";
+    }
   }
 
   picojson::object::const_iterator type = o.find("type");
@@ -1529,13 +1512,10 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
   if (is_binary) {
     // Still binary glTF accepts external dataURI. First try external resources.
 
-    if(!uri.empty())
-    {
+    if (!uri.empty()) {
       // External .bin file.
       LoadExternalFile(&buffer->data, err, uri, basedir, bytes, true);
-    }
-    else
-    {
+    } else {
       // load data from (embedded) binary data
 
       if ((bin_size == 0) || (bin_data == NULL)) {
@@ -1558,8 +1538,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err,
 
       // Read buffer data
       buffer->data.resize(static_cast<size_t>(byteLength));
-      memcpy(&(buffer->data.at(0)), bin_data,
-             static_cast<size_t>(byteLength));
+      memcpy(&(buffer->data.at(0)), bin_data, static_cast<size_t>(byteLength));
     }
 
   } else {
@@ -1594,7 +1573,8 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
   ParseNumberProperty(&byteOffset, err, o, "byteOffset", false);
 
   double byteLength = 1.0;
-  if(!ParseNumberProperty(&byteLength, err, o, "byteLength", true, "BufferView")) {
+  if (!ParseNumberProperty(&byteLength, err, o, "byteLength", true,
+                           "BufferView")) {
     return false;
   }
 
@@ -1625,7 +1605,8 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
 static bool ParseAccessor(Accessor *accessor, std::string *err,
                           const picojson::object &o) {
   double bufferView = -1.0;
-  if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true, "Accessor")) {
+  if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true,
+                           "Accessor")) {
     return false;
   }
 
@@ -1633,7 +1614,8 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
   ParseNumberProperty(&byteOffset, err, o, "byteOffset", false, "Accessor");
 
   double componentType = 0.0;
-  if (!ParseNumberProperty(&componentType, err, o, "componentType", true, "Accessor")) {
+  if (!ParseNumberProperty(&componentType, err, o, "componentType", true,
+                           "Accessor")) {
     return false;
   }
 
@@ -1677,13 +1659,11 @@ static bool ParseAccessor(Accessor *accessor, std::string *err,
 
   accessor->minValues.clear();
   accessor->maxValues.clear();
-  if(!ParseNumberArrayProperty(&accessor->minValues, err, o, "min", false, "Accessor")) {
-    return false;
-  }
+  ParseNumberArrayProperty(&accessor->minValues, err, o, "min", false,
+                                "Accessor");
 
-  if(!ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", false, "Accessor")) {
-    return false;
-  }
+  ParseNumberArrayProperty(&accessor->maxValues, err, o, "max", false,
+                                "Accessor");
 
   accessor->count = static_cast<size_t>(count);
   accessor->bufferView = static_cast<int>(bufferView);
@@ -1721,7 +1701,7 @@ static bool ParsePrimitive(Primitive *primitive, std::string *err,
   ParseNumberProperty(&mode, err, o, "mode", false);
 
   int primMode = static_cast<int>(mode);
-  primitive->mode = primMode; // Why only triangled were supported ?
+  primitive->mode = primMode;  // Why only triangled were supported ?
 
   double indices = -1.0;
   ParseNumberProperty(&indices, err, o, "indices", false);
@@ -1756,7 +1736,8 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
 
   // Look for morph targets
   picojson::object::const_iterator targetsObject = o.find("targets");
-  if ((targetsObject != o.end()) && (targetsObject->second).is<picojson::array>()) {
+  if ((targetsObject != o.end()) &&
+      (targetsObject->second).is<picojson::array>()) {
     const picojson::array &targetArray =
         (targetsObject->second).get<picojson::array>();
     for (size_t i = 0; i < targetArray.size(); i++) {
@@ -1767,7 +1748,8 @@ static bool ParseMesh(Mesh *mesh, std::string *err, const picojson::object &o) {
       picojson::object::const_iterator dictItEnd(dict.end());
 
       for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt->first] = static_cast<int>(dictIt->second.get<double>());
+        targetAttribues[dictIt->first] =
+            static_cast<int>(dictIt->second.get<double>());
       }
       mesh->targets.push_back(targetAttribues);
     }
@@ -1789,8 +1771,7 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
   node->skin = static_cast<int>(skin);
 
   // Matrix and T/R/S are exclusive
-  if(!ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false)) {
-
+  if (!ParseNumberArrayProperty(&node->matrix, err, o, "matrix", false)) {
     ParseNumberArrayProperty(&node->rotation, err, o, "rotation", false);
     ParseNumberArrayProperty(&node->scale, err, o, "scale", false);
     ParseNumberArrayProperty(&node->translation, err, o, "translation", false);
@@ -1817,7 +1798,8 @@ static bool ParseNode(Node *node, std::string *err, const picojson::object &o) {
         }
         return false;
       }
-      const int &childrenNode = static_cast<int>(childrenArray[i].get<double>());
+      const int &childrenNode =
+          static_cast<int>(childrenArray[i].get<double>());
       node->children.push_back(childrenNode);
     }
   }
@@ -1847,9 +1829,10 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
   } else if (ParseNumberProperty(&num_val, err, o, prop, false)) {
     param->number_array.push_back(num_val);
     return true;
-  } else if(ParseJSONProperty(&param->json_double_value, err, o, prop, false)) {
+  } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
+                               false)) {
     return true;
-  } else if(ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
+  } else if (ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
     return true;
   } else {
     if (required) {
@@ -1862,8 +1845,7 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 }
 
 static bool ParseMaterial(Material *material, std::string *err,
-                             const picojson::object &o) {
-
+                          const picojson::object &o) {
   material->values.clear();
   material->extPBRValues.clear();
   material->additionalValues.clear();
@@ -1872,8 +1854,7 @@ static bool ParseMaterial(Material *material, std::string *err,
   picojson::object::const_iterator itEnd(o.end());
 
   for (; it != itEnd; it++) {
-    if(it->first == "pbrMetallicRoughness")
-    {
+    if (it->first == "pbrMetallicRoughness") {
       if ((it->second).is<picojson::object>()) {
         const picojson::object &values_object =
             (it->second).get<picojson::object>();
@@ -1889,40 +1870,35 @@ static bool ParseMaterial(Material *material, std::string *err,
           }
         }
       }
-    }
-    else if(it->first == "extensions")
-    {
+    } else if (it->first == "extensions") {
       if ((it->second).is<picojson::object>()) {
-      const picojson::object &extension = (it->second).get<picojson::object>();
+        const picojson::object &extension =
+            (it->second).get<picojson::object>();
 
-      picojson::object::const_iterator extIt = extension.begin();
-      if(!extIt->second.is<picojson::object>())
-        continue;
+        picojson::object::const_iterator extIt = extension.begin();
+        if (!extIt->second.is<picojson::object>()) continue;
 
-      const picojson::object &values_object =
-          (extIt->second).get<picojson::object>();
+        const picojson::object &values_object =
+            (extIt->second).get<picojson::object>();
 
-      picojson::object::const_iterator itVal(values_object.begin());
-      picojson::object::const_iterator itValEnd(values_object.end());
+        picojson::object::const_iterator itVal(values_object.begin());
+        picojson::object::const_iterator itValEnd(values_object.end());
 
-      for (; itVal != itValEnd; itVal++) {
-        Parameter param;
-        if (ParseParameterProperty(&param, err, values_object, itVal->first,
-                                   false)) {
-          material->extPBRValues[itVal->first] = param;
+        for (; itVal != itValEnd; itVal++) {
+          Parameter param;
+          if (ParseParameterProperty(&param, err, values_object, itVal->first,
+                                     false)) {
+            material->extPBRValues[itVal->first] = param;
           }
         }
       }
-    }
-    else
-    {
-        Parameter param;
-        if (ParseParameterProperty(&param, err, o, it->first,
-                                   false)) {
-          material->additionalValues[it->first] = param;
-        }
+    } else {
+      Parameter param;
+      if (ParseParameterProperty(&param, err, o, it->first, false)) {
+        material->additionalValues[it->first] = param;
       }
     }
+  }
 
   ParseExtrasProperty(&(material->extras), o);
 
@@ -1945,8 +1921,7 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
     const picojson::object &target_object =
         (targetIt->second).get<picojson::object>();
 
-    if (!ParseNumberProperty(&targetIndex, err, target_object, "node",
-                             true)) {
+    if (!ParseNumberProperty(&targetIndex, err, target_object, "node", true)) {
       if (err) {
         (*err) += "`id` field is missing in animation.channels.target\n";
       }
@@ -2060,9 +2035,7 @@ static bool ParseSampler(Sampler *sampler, std::string *err,
   return true;
 }
 
-static bool ParseSkin(Skin *skin, std::string *err,
-                          const picojson::object &o) {
-
+static bool ParseSkin(Skin *skin, std::string *err, const picojson::object &o) {
   ParseStringProperty(&skin->name, err, o, "name", false, "Skin");
 
   std::vector<double> joints;
@@ -2098,9 +2071,9 @@ bool TinyGLTFLoader::LoadFromString(Model *model, std::string *err,
   }
 
   // scene is not mandatory.
-  //FIXME Maybe a better way to handle it than removing the code
+  // FIXME Maybe a better way to handle it than removing the code
 
-if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
+  if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_SCENES) {
     if (err) {
@@ -2136,8 +2109,7 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     return false;
   }
 
-  if (v.contains("bufferViews") &&
-      v.get("bufferViews").is<picojson::array>()) {
+  if (v.contains("bufferViews") && v.get("bufferViews").is<picojson::array>()) {
     // OK
   } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
     if (err) {
@@ -2162,10 +2134,11 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
   }
 
   // 0. Parse extensionUsed
-  if (v.contains("extensionsUsed") && v.get("extensionsUsed").is<picojson::array>()) {
-    const picojson::array &root = v.get("extensionsUsed").get<picojson::array>();
-    for(unsigned int i=0; i< root.size(); ++i)
-    {
+  if (v.contains("extensionsUsed") &&
+      v.get("extensionsUsed").is<picojson::array>()) {
+    const picojson::array &root =
+        v.get("extensionsUsed").get<picojson::array>();
+    for (unsigned int i = 0; i < root.size(); ++i) {
       model->extensionsUsed.push_back(root[i].get<std::string>());
     }
   }
@@ -2178,8 +2151,8 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Buffer buffer;
-      if (!ParseBuffer(&buffer, err, it->get<picojson::object>(),
-                       base_dir, is_binary_, bin_data_, bin_size_)) {
+      if (!ParseBuffer(&buffer, err, it->get<picojson::object>(), base_dir,
+                       is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
@@ -2187,17 +2160,16 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     }
   }
 
+
   // 2. Parse BufferView
-  if (v.contains("bufferViews") &&
-      v.get("bufferViews").is<picojson::array>()) {
+  if (v.contains("bufferViews") && v.get("bufferViews").is<picojson::array>()) {
     const picojson::array &root = v.get("bufferViews").get<picojson::array>();
 
     picojson::array::const_iterator it(root.begin());
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       BufferView bufferView;
-      if (!ParseBufferView(&bufferView, err,
-                           it->get<picojson::object>())) {
+      if (!ParseBufferView(&bufferView, err, it->get<picojson::object>())) {
         return false;
       }
 
@@ -2213,8 +2185,7 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Accessor accessor;
-      if (!ParseAccessor(&accessor, err,
-                         it->get<picojson::object>())) {
+      if (!ParseAccessor(&accessor, err, it->get<picojson::object>())) {
         return false;
       }
 
@@ -2316,8 +2287,8 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Image image;
-      if (!ParseImage(&image, err, it->get<picojson::object>(),
-                      base_dir, is_binary_, bin_data_, bin_size_)) {
+      if (!ParseImage(&image, err, it->get<picojson::object>(), base_dir,
+                      is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
@@ -2333,7 +2304,8 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
           return false;
         }
 
-        const BufferView &bufferView = model->bufferViews[size_t(image.bufferView)];
+        const BufferView &bufferView =
+            model->bufferViews[size_t(image.bufferView)];
         const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
 
         bool ret = LoadImageData(&image, err, image.width, image.height,
@@ -2356,8 +2328,7 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; it++) {
       Texture texture;
-      if (!ParseTexture(&texture, err, it->get<picojson::object>(),
-                        base_dir)) {
+      if (!ParseTexture(&texture, err, it->get<picojson::object>(), base_dir)) {
         return false;
       }
 
@@ -2373,8 +2344,7 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
       Animation animation;
-      if (!ParseAnimation(&animation, err,
-                          it->get<picojson::object>())) {
+      if (!ParseAnimation(&animation, err, it->get<picojson::object>())) {
         return false;
       }
 
@@ -2390,8 +2360,7 @@ if (v.contains("scenes") && v.get("scenes").is<picojson::array>()) {
     picojson::array::const_iterator itEnd(root.end());
     for (; it != itEnd; ++it) {
       Skin skin;
-      if (!ParseSkin(&skin, err,
-                          it->get<picojson::object>())) {
+      if (!ParseSkin(&skin, err, it->get<picojson::object>())) {
         return false;
       }
 
@@ -2516,7 +2485,8 @@ bool TinyGLTFLoader::LoadBinaryFromMemory(Model *model, std::string *err,
                          model_length);
 
   is_binary_ = true;
-  bin_data_ = bytes + 20 + model_length + 8; // 4 bytes (buffer_length) + 4 bytes(buffer_format)
+  bin_data_ = bytes + 20 + model_length +
+              8;  // 4 bytes (buffer_length) + 4 bytes(buffer_format)
   bin_size_ =
       length - (20 + model_length);  // extract header + JSON scene data.
 
