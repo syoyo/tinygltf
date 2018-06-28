@@ -3334,6 +3334,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, const char *str,
     }
   }
 
+  // 19. Parse Extras
+  ParseExtrasProperty(&model->extras, v);
+
   return true;
 }
 
