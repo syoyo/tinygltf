@@ -793,7 +793,7 @@ struct FsCallbacks
     ReadWholeFileFunction ReadWholeFile;
     WriteWholeFileFunction WriteWholeFile;
 
-    void* user_data = nullptr; // An argument that is passed to all fs callbacks
+    void* user_data; // An argument that is passed to all fs callbacks
 };
 
 #ifndef TINYGLTF_NO_FS
