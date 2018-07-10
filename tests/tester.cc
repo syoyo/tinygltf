@@ -1,5 +1,6 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
 #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
@@ -23,4 +24,19 @@ TEST_CASE("parse-error", "[parse]") {
   REQUIRE(false == ret);
 
 }
+
+TEST_CASE("datauri-in-glb", "[issue-79]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+
+  bool ret = ctx.LoadBinaryFromFile(&model, &err, "../models/box01.glb");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+    
+  REQUIRE(true == ret);
+}
+
 

@@ -28,7 +28,7 @@ def run(filename):
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         (stdout, stderr) = p.communicate()
     except:
-        print "Failed to execute: ", cmd
+        print("Failed to execute: ", cmd)
         raise
 
     if p.returncode != 0:

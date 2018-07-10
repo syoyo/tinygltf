@@ -2260,11 +2260,21 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
 
   size_t bytes = static_cast<size_t>(byteLength);
   if (is_binary) {
-    // Still binary glTF accepts external dataURI. First try external resources.
-
+    // Still binary glTF accepts external dataURI. 
     if (!buffer->uri.empty()) {
-      // External .bin file.
-      LoadExternalFile(&buffer->data, err, buffer->uri, basedir, bytes, true, fs);
+      // First try embedded data URI.
+      if (IsDataURI(buffer->uri)) {
+        std::string mime_type;
+        if (!DecodeDataURI(&buffer->data, mime_type, buffer->uri, bytes, true)) {
+            if (err) {
+                (*err) += "Failed to decode 'uri' : " + buffer->uri + " in Buffer\n";
+            }
+            return false;
+        }
+      } else { 
+        // External .bin file.
+        LoadExternalFile(&buffer->data, err, buffer->uri, basedir, bytes, true, fs);
+      }
     } else {
       // load data from (embedded) binary data
 
