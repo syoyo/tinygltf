@@ -1486,7 +1486,7 @@ std::string ExpandFilePath(const std::string &filepath, void *) {
 #else
 
 #if defined(TARGET_OS_IPHONE) || defined(TARGET_IPHONE_SIMULATOR) || \
-    defined(__ANDROID__)
+    defined(__ANDROID__) || defined(__EMSCRIPTEN__)
   // no expansion
   std::string s = filepath;
 #else
