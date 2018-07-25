@@ -456,6 +456,8 @@ struct Image {
 };
 
 struct Texture {
+  std::string name;
+
   int sampler;
   int source;  // Required (not specified in the spec ?)
   Value extras;
@@ -2223,6 +2225,8 @@ static bool ParseTexture(Texture *texture, std::string *err, const json &o,
 
   ParseExtensionsProperty(&texture->extensions, err, o);
   ParseExtrasProperty(&texture->extras, o);
+
+  ParseStringProperty(&texture->name, err, o, "name", false);
 
   return true;
 }
