@@ -26,15 +26,20 @@ bool LoadGLTF(const std::string &filename, float scale,
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
+  std::string warn;
   const std::string ext = GetFilePathExtension(filename);
 
   bool ret = false;
   if (ext.compare("glb") == 0) {
     // assume binary glTF.
-    ret = loader.LoadBinaryFromFile(&model, &err, filename.c_str());
+    ret = loader.LoadBinaryFromFile(&model, &err, &warn, filename.c_str());
   } else {
     // assume ascii glTF.
-    ret = loader.LoadASCIIFromFile(&model, &err, filename.c_str());
+    ret = loader.LoadASCIIFromFile(&model, &err, &warn, filename.c_str());
+  }
+
+  if (!warn.empty()) {
+    std::cout << "glTF parse warning: " << warn << std::endl;
   }
 
   if (!err.empty()) {

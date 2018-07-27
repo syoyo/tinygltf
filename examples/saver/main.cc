@@ -25,13 +25,17 @@ int main(int argc, char *argv[]) {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
+  std::string warn;
   std::string input_filename(argv[1]);
   std::string output_filename(argv[2]);
   std::string embedded_filename =
       output_filename.substr(0, output_filename.size() - 5) + "-Embedded.gltf";
 
   // assume ascii glTF.
-  bool ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
+  bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+  if (!warn.empty()) {
+    std::cout << "warn : " << warn << std::endl;
+  }
   if (!ret) {
     if (!err.empty()) {
       std::cerr << err << std::endl;

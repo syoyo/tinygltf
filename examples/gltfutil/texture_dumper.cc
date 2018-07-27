@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 
 #include "stb_image_write.h"
 #include "texture_dumper.h"

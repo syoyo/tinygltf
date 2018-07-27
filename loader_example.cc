@@ -597,6 +597,7 @@ int main(int argc, char **argv) {
   tinygltf::Model model;
   tinygltf::TinyGLTF gltf_ctx;
   std::string err;
+  std::string warn; 
   std::string input_filename(argv[1]);
   std::string ext = GetFilePathExtension(input_filename);
 
@@ -604,12 +605,17 @@ int main(int argc, char **argv) {
   if (ext.compare("glb") == 0) {
     std::cout << "Reading binary glTF" << std::endl;
     // assume binary glTF.
-    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, input_filename.c_str());
+    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
   } else {
     std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
-    ret = gltf_ctx.LoadASCIIFromFile(&model, &err, input_filename.c_str());
+    ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
   }
+
+  if (!warn.empty()) {
+    printf("Warn: %s\n", warn.c_str());
+  }
+
 
   if (!err.empty()) {
     printf("Err: %s\n", err.c_str());
