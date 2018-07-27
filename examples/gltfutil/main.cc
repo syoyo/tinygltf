@@ -69,13 +69,14 @@ int parse_args(int argc, char** argv) {
     tinygltf::TinyGLTF loader;
     tinygltf::Model model;
     std::string error;
+    std::string warning;
     bool state;
     switch (detectType(config.input_path)) {
       case FileType::Ascii:
-        state = loader.LoadASCIIFromFile(&model, &error, config.input_path);
+        state = loader.LoadASCIIFromFile(&model, &error, &warning, config.input_path);
         break;
       case FileType::Binary:
-        state = loader.LoadBinaryFromFile(&model, &error, config.input_path);
+        state = loader.LoadBinaryFromFile(&model, &error, &warning, config.input_path);
         break;
       case FileType::Unknown:
       default:

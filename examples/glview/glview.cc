@@ -16,6 +16,7 @@
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
@@ -732,16 +733,21 @@ int main(int argc, char **argv) {
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
   std::string err;
+  std::string warn;
   std::string input_filename(argv[1]);
   std::string ext = GetFilePathExtension(input_filename);
 
   bool ret = false;
   if (ext.compare("glb") == 0) {
     // assume binary glTF.
-    ret = loader.LoadBinaryFromFile(&model, &err, input_filename.c_str());
+    ret = loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
   } else {
     // assume ascii glTF.
-    ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
+    ret = loader.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+  }
+
+  if (!warn.empty()) {
+    printf("Warn: %s\n", warn.c_str());
   }
 
   if (!err.empty()) {
