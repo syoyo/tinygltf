@@ -298,7 +298,7 @@ bool LoadGLTF(const std::string &filename, float scale,
 
                         loadedMesh.facevarying_normals.push_back(n1.x);
                         loadedMesh.facevarying_normals.push_back(n1.y);
-                        loadedMesh.facevarying_normals.push_back(n2.z);
+                        loadedMesh.facevarying_normals.push_back(n1.z);
 
                         loadedMesh.facevarying_normals.push_back(n2.x);
                         loadedMesh.facevarying_normals.push_back(n2.y);
@@ -333,7 +333,7 @@ bool LoadGLTF(const std::string &filename, float scale,
 
                         loadedMesh.facevarying_normals.push_back(n1.x);
                         loadedMesh.facevarying_normals.push_back(n1.y);
-                        loadedMesh.facevarying_normals.push_back(n2.z);
+                        loadedMesh.facevarying_normals.push_back(n1.z);
 
                         loadedMesh.facevarying_normals.push_back(n2.x);
                         loadedMesh.facevarying_normals.push_back(n2.y);
