@@ -2260,8 +2260,10 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
         }
       } else {
         // External .bin file.
-        LoadExternalFile(&buffer->data, err, /* warn */ nullptr, buffer->uri,
-                         basedir, bytes, true, fs);
+        if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr, buffer->uri,
+                              basedir, bytes, true, fs)) {
+          return false;
+        }
       }
     } else {
       // load data from (embedded) binary data
