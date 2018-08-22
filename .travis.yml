@@ -30,17 +30,18 @@ matrix:
     env: COMPILER_VERSION=4.9 BUILD_TYPE=Release EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *1
     compiler: clang
-    env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug CFLAGS="-O0 --coverage" CXXFLAGS="-O0
-      --coverage" REPORT_COVERAGE=1
+    env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
 before_install:
-- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew upgrade; fi
-- if [ -n "$REPORT_COVERAGE" ]; then pip install --user cpp-coveralls; fi
+  - ./.travis-before-install.sh
 
 
 script:
   - export CC="${CC}-${COMPILER_VERSION}"
   - export CXX="${CXX}-${COMPILER_VERSION}"
   - ${CC} -v
-  - ${CXX} ${EXTRA_CXXFLAGS} -Wall -g -o loader_example loader_example.cc
-  - ./loader_example box.gltf
+  - ${CXX} ${EXTRA_CXXFLAGS} -std=c++11 -Wall -g -o loader_example loader_example.cc
+  - ./loader_example ./models/Cube/Cube.gltf
+  - cd examples/raytrace
+  - ../../premake5 gmake
+  - make

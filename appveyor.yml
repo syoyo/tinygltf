@@ -1,5 +1,8 @@
 version: 0.9.{build}
 
+image:
+  - Visual Studio 2015
+
 # scripts that runs after repo cloning.
 install:
   - vcsetup.bat
@@ -9,4 +12,7 @@ configuration: Release
 
 build:
   parallel: true
-  project: TinyGLTFLoaderSolution.sln
+  project: TinyGLTFSolution.sln
+
+after_build:
+  - examples.bat

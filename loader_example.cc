@@ -1,6 +1,7 @@
-#define TINYGLTF_LOADER_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#include "tiny_gltf_loader.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "tiny_gltf.h"
 
 #include <cstdio>
 #include <fstream>
@@ -135,7 +136,7 @@ static std::string PrintParameterType(int ty) {
 #endif
 
 static std::string PrintWrapMode(int mode) {
-  if (mode == TINYGLTF_TEXTURE_WRAP_RPEAT) {
+  if (mode == TINYGLTF_TEXTURE_WRAP_REPEAT) {
     return "REPEAT";
   } else if (mode == TINYGLTF_TEXTURE_WRAP_CLAMP_TO_EDGE) {
     return "CLAMP_TO_EDGE";
@@ -210,26 +211,67 @@ static std::string PrintParameterValue(const tinygltf::Parameter &param) {
   }
 }
 
-static std::string PrintValue(const std::string& name, const tinygltf::Value &value, const int indent) {
+#if 0
+static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
+  std::stringstream ss;
+
+  ss << pmap.size() << std::endl;
+  for (auto &kv : pmap) {
+    ss << kv.first << " : " << PrintParameterValue(kv.second) << std::endl;
+  }
+
+  return ss.str();
+}
+#endif
+
+static std::string PrintValue(const std::string &name,
+                              const tinygltf::Value &value, const int indent, const bool tag = true) {
   std::stringstream ss;
 
   if (value.IsObject()) {
-    const tinygltf::Value::Object& o = value.Get<tinygltf::Value::Object>();
+    const tinygltf::Value::Object &o = value.Get<tinygltf::Value::Object>();
     tinygltf::Value::Object::const_iterator it(o.begin());
     tinygltf::Value::Object::const_iterator itEnd(o.end());
     for (; it != itEnd; it++) {
-      ss << PrintValue(name, it->second, indent + 1);
+      ss << PrintValue(it->first, it->second, indent + 1) << std::endl;
     }
   } else if (value.IsString()) {
-    ss << Indent(indent) << name << " : " << value.Get<std::string>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<std::string>();
+    } else {
+      ss << " " << value.Get<std::string>() << " ";
+    }
   } else if (value.IsBool()) {
-    ss << Indent(indent) << name << " : " << value.Get<bool>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<bool>();
+    } else {
+      ss << " " << value.Get<bool>() << " ";
+    }
   } else if (value.IsNumber()) {
-    ss << Indent(indent) << name << " : " << value.Get<double>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<double>();
+    } else {
+      ss << " " << value.Get<double>() << " ";
+    }
   } else if (value.IsInt()) {
-    ss << Indent(indent) << name << " : " << value.Get<int>() << std::endl;
+    if (tag) {
+      ss << Indent(indent) << name << " : " << value.Get<int>();
+    } else {
+      ss << " " << value.Get<int>() << " ";
+    }
+  } else if (value.IsArray()) {
+    ss << Indent(indent) << name << " [ ";
+    for (size_t i = 0; i < value.Size(); i++) {
+      ss << PrintValue("", value.Get(int(i)), indent + 1, /* tag */false);
+      if (i != (value.ArrayLen()-1)) {
+        ss << ", ";
+      }
+
+    }
+    ss << Indent(indent) << "] ";
   }
-  // @todo { binary, array }
+
+  // @todo { binary }
 
   return ss.str();
 }
@@ -262,8 +304,7 @@ static void DumpNode(const tinygltf::Node &node, int indent) {
             << "children    : " << PrintIntArray(node.children) << std::endl;
 }
 
-static void DumpStringIntMap(const std::map<std::string, int> &m,
-                          int indent) {
+static void DumpStringIntMap(const std::map<std::string, int> &m, int indent) {
   std::map<std::string, int>::const_iterator it(m.begin());
   std::map<std::string, int>::const_iterator itEnd(m.end());
   for (; it != itEnd; it++) {
@@ -282,9 +323,17 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
             << std::endl;
   DumpStringIntMap(primitive.attributes, indent + 1);
 
-  std::cout << Indent(indent)
-            << "extras :" << std::endl
-            << PrintValue("extras", primitive.extras, indent+1) << std::endl;
+  std::cout << Indent(indent) << "extras :" << std::endl
+            << PrintValue("extras", primitive.extras, indent + 1) << std::endl;
+}
+
+static void DumpExtensions(const tinygltf::ExtensionMap &extension, const int indent)
+{
+  // TODO(syoyo): pritty print Value
+  for (auto &e : extension) {
+    std::cout << Indent(indent) << e.first << std::endl;
+    std::cout << PrintValue("extensions", e.second, indent+1) << std::endl;
+  }  
 }
 
 static void Dump(const tinygltf::Model &model) {
@@ -305,14 +354,17 @@ static void Dump(const tinygltf::Model &model) {
   {
     std::cout << "scenes(items=" << model.scenes.size() << ")" << std::endl;
     for (size_t i = 0; i < model.scenes.size(); i++) {
-      std::cout << Indent(1) << "scene[" << i << "] name  : " << model.scenes[i].name << std::endl;
+      std::cout << Indent(1) << "scene[" << i
+                << "] name  : " << model.scenes[i].name << std::endl;
+      DumpExtensions(model.scenes[i].extensions, 1);
     }
   }
 
   {
     std::cout << "meshes(item=" << model.meshes.size() << ")" << std::endl;
     for (size_t i = 0; i < model.meshes.size(); i++) {
-      std::cout << Indent(1) << "name     : " << model.meshes[i].name << std::endl;
+      std::cout << Indent(1) << "name     : " << model.meshes[i].name
+                << std::endl;
       std::cout << Indent(1)
                 << "primitives(items=" << model.meshes[i].primitives.size()
                 << "): " << std::endl;
@@ -331,8 +383,6 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
       std::cout << Indent(2) << "byteOffset   : " << accessor.byteOffset
                 << std::endl;
-      std::cout << Indent(2) << "byteStride   : " << accessor.byteStride
-                << std::endl;
       std::cout << Indent(2) << "componentType: "
                 << PrintComponentType(accessor.componentType) << "("
                 << accessor.componentType << ")" << std::endl;
@@ -344,7 +394,7 @@ static void Dump(const tinygltf::Model &model) {
         std::cout << Indent(2) << "min          : [";
         for (size_t k = 0; k < accessor.minValues.size(); k++) {
           std::cout << accessor.minValues[k]
-                    << ((i != accessor.minValues.size() - 1) ? ", " : "");
+                    << ((k != accessor.minValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
       }
@@ -352,7 +402,7 @@ static void Dump(const tinygltf::Model &model) {
         std::cout << Indent(2) << "max          : [";
         for (size_t k = 0; k < accessor.maxValues.size(); k++) {
           std::cout << accessor.maxValues[k]
-                    << ((i != accessor.maxValues.size() - 1) ? ", " : "");
+                    << ((k != accessor.maxValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
       }
@@ -364,7 +414,8 @@ static void Dump(const tinygltf::Model &model) {
               << std::endl;
     for (size_t i = 0; i < model.animations.size(); i++) {
       const tinygltf::Animation &animation = model.animations[i];
-      std::cout << Indent(1) << "name         : " << animation.name << std::endl;
+      std::cout << Indent(1) << "name         : " << animation.name
+                << std::endl;
 
       std::cout << Indent(1) << "channels : [ " << std::endl;
       for (size_t j = 0; i < animation.channels.size(); i++) {
@@ -387,13 +438,11 @@ static void Dump(const tinygltf::Model &model) {
         const tinygltf::AnimationSampler &sampler = animation.samplers[j];
         std::cout << Indent(2) << "input         : " << sampler.input
                   << std::endl;
-        std::cout << Indent(2)
-                  << "interpolation : " << sampler.interpolation
+        std::cout << Indent(2) << "interpolation : " << sampler.interpolation
                   << std::endl;
         std::cout << Indent(2) << "output        : " << sampler.output
                   << std::endl;
       }
-
     }
   }
 
@@ -402,12 +451,15 @@ static void Dump(const tinygltf::Model &model) {
               << std::endl;
     for (size_t i = 0; i < model.bufferViews.size(); i++) {
       const tinygltf::BufferView &bufferView = model.bufferViews[i];
-      std::cout << Indent(1) << "name         : " << bufferView.name << std::endl;
+      std::cout << Indent(1) << "name         : " << bufferView.name
+                << std::endl;
       std::cout << Indent(2) << "buffer       : " << bufferView.buffer
                 << std::endl;
       std::cout << Indent(2) << "byteLength   : " << bufferView.byteLength
                 << std::endl;
       std::cout << Indent(2) << "byteOffset   : " << bufferView.byteOffset
+                << std::endl;
+      std::cout << Indent(2) << "byteStride   : " << bufferView.byteStride
                 << std::endl;
       std::cout << Indent(2)
                 << "target       : " << PrintTarget(bufferView.target)
@@ -431,8 +483,8 @@ static void Dump(const tinygltf::Model &model) {
     for (size_t i = 0; i < model.materials.size(); i++) {
       const tinygltf::Material &material = model.materials[i];
       std::cout << Indent(1) << "name         : " << material.name << std::endl;
-      std::cout << Indent(1) << "values(items=" << material.values.size()
-                << ")" << std::endl;
+      std::cout << Indent(1) << "values(items=" << material.values.size() << ")"
+                << std::endl;
 
       tinygltf::ParameterMap::const_iterator p(material.values.begin());
       tinygltf::ParameterMap::const_iterator pEnd(material.values.end());
@@ -460,10 +512,8 @@ static void Dump(const tinygltf::Model &model) {
       std::cout << Indent(1) << "name         : " << image.name << std::endl;
 
       std::cout << Indent(2) << "width     : " << image.width << std::endl;
-      std::cout << Indent(2) << "height    : " << image.height
-                << std::endl;
-      std::cout << Indent(2) << "component : " << image.component
-                << std::endl;
+      std::cout << Indent(2) << "height    : " << image.height << std::endl;
+      std::cout << Indent(2) << "component : " << image.component << std::endl;
     }
   }
 
@@ -498,6 +548,44 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
     }
   }
+
+  {
+    std::cout << "cameras(items=" << model.cameras.size() << ")" << std::endl;
+
+    for (size_t i = 0; i < model.cameras.size(); i++) {
+      const tinygltf::Camera &camera = model.cameras[i];
+      std::cout << Indent(1) << "name (id)    : " << camera.name << std::endl;
+      std::cout << Indent(1) << "type         : " << camera.type << std::endl;
+
+      if (camera.type.compare("perspective") == 0) {
+        std::cout << Indent(2)
+                  << "aspectRatio   : " << camera.perspective.aspectRatio
+                  << std::endl;
+        std::cout << Indent(2) << "yfov          : " << camera.perspective.yfov
+                  << std::endl;
+        std::cout << Indent(2) << "zfar          : " << camera.perspective.zfar
+                  << std::endl;
+        std::cout << Indent(2) << "znear         : " << camera.perspective.znear
+                  << std::endl;
+      } else if (camera.type.compare("orthographic") == 0) {
+        std::cout << Indent(2) << "xmag          : " << camera.orthographic.xmag
+                  << std::endl;
+        std::cout << Indent(2) << "ymag          : " << camera.orthographic.ymag
+                  << std::endl;
+        std::cout << Indent(2) << "zfar          : " << camera.orthographic.zfar
+                  << std::endl;
+        std::cout << Indent(2)
+                  << "znear         : " << camera.orthographic.znear
+                  << std::endl;
+      }
+    }
+  }
+  
+  // toplevel extensions
+  {
+    std::cout << "extensions(items=" << model.extensions.size() << ")" << std::endl;
+    DumpExtensions(model.extensions, 1);
+  }
 }
 
 int main(int argc, char **argv) {
@@ -507,8 +595,9 @@ int main(int argc, char **argv) {
   }
 
   tinygltf::Model model;
-  tinygltf::TinyGLTFLoader loader;
+  tinygltf::TinyGLTF gltf_ctx;
   std::string err;
+  std::string warn; 
   std::string input_filename(argv[1]);
   std::string ext = GetFilePathExtension(input_filename);
 
@@ -516,12 +605,17 @@ int main(int argc, char **argv) {
   if (ext.compare("glb") == 0) {
     std::cout << "Reading binary glTF" << std::endl;
     // assume binary glTF.
-    ret = loader.LoadBinaryFromFile(&model, &err, input_filename.c_str());
+    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
   } else {
     std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
-    ret = loader.LoadASCIIFromFile(&model, &err, input_filename.c_str());
+    ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
   }
+
+  if (!warn.empty()) {
+    printf("Warn: %s\n", warn.c_str());
+  }
+
 
   if (!err.empty()) {
     printf("Err: %s\n", err.c_str());
