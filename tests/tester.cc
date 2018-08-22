@@ -18,8 +18,9 @@ TEST_CASE("parse-error", "[parse]") {
   tinygltf::Model model;
   tinygltf::TinyGLTF ctx;
   std::string err;
+  std::string warn;
 
-  bool ret = ctx.LoadASCIIFromString(&model, &err, "bora", strlen("bora"), /* basedir*/ "");
+  bool ret = ctx.LoadASCIIFromString(&model, &err, &warn, "bora", strlen("bora"), /* basedir*/ "");
 
   REQUIRE(false == ret);
 
@@ -30,8 +31,9 @@ TEST_CASE("datauri-in-glb", "[issue-79]") {
   tinygltf::Model model;
   tinygltf::TinyGLTF ctx;
   std::string err;
+  std::string warn;
 
-  bool ret = ctx.LoadBinaryFromFile(&model, &err, "../models/box01.glb");
+  bool ret = ctx.LoadBinaryFromFile(&model, &err, &warn, "../models/box01.glb");
   if (!err.empty()) {
     std::cerr << err << std::endl;
   }
