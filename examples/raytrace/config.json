@@ -1,0 +1,23 @@
+{
+  "commented_out_obj_filename": "cornellbox_suzanne.obj",
+  "gltf_filename": "../../models/Cube/Cube.gltf",
+  "scene_scale": 1.0,
+  "width": 512,
+  "height": 512,
+  "eye": [
+    0,
+    2.5,
+    15
+  ],
+  "up": [
+    0,
+    1,
+    0
+  ],
+  "look_at": [
+    0,
+    0,
+    0
+  ],
+  "dummy": 0
+}

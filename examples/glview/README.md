@@ -2,9 +2,11 @@ Simple OpenGL viewer for glTF geometry.
 
 ## Requirements
 
-* premake4 : Requires recent `premake4` for macosx and linux, `premake5` for windows.
+* premake5 : Requires recent `premake5`(alpha12 or later) for macosx and linux. `premake5` for windows is included in `$tinygltf/tools/window` directory.
 * GLEW
+  * Ubuntu 16.04: sudo apt install libglew-dev
 * glfw3
+  * Ubuntu 16.04: sudo apt install libglfw3-dev
 
 ### MacOSX and Linux
 
@@ -17,7 +19,7 @@ Simple OpenGL viewer for glTF geometry.
 
 ### Windows(not tested well)
 
-Edit glew and glfw path in `premake4.lua`, then
+Edit glew and glfw path in `premake5.lua`, then
 
     > premake5.exe vs2013
 
@@ -27,7 +29,6 @@ When running .exe, glew and glfw dll must exist in the working directory.
 
 ## TODO
 
-* [x] Texture
-  * [ ] Various texture format.
-* [ ] Shader
+* [ ] PBR Material
+  * [ ] PBR Texture.
 * [ ] Animation

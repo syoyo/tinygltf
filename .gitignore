@@ -1,0 +1,70 @@
+# CMake
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+#Files created by the CI scripts (downloading and installing premake)
+premake5
+premake5.tar.gz
+
+#built examples
+/examples/raytrace/bin/
+
+#visual studio files
+*.sln
+*.vcxproj*
+.vs
+
+#binary directories
+bin/
+obj/
+
+#runtime gui config
+imgui.ini
+
+#visual stuido code
+.vscode
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+loader_example
+tests/tester
+tests/tester_noexcept
+
