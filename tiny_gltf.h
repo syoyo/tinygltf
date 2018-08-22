@@ -189,6 +189,11 @@ static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
   }
 }
 
+bool IsDataURI(const std::string &in);
+bool DecodeDataURI(std::vector<unsigned char> *out,
+	std::string &mime_type, const std::string &in,
+	size_t reqBytes, bool checkSize);
+
 #ifdef __clang__
 #pragma clang diagnostic push
 // Suppress warning for : static Value null_value
@@ -1608,7 +1613,7 @@ static void UpdateImageObject(Image &image, std::string &baseDir, int index,
   }
 }
 
-static bool IsDataURI(const std::string &in) {
+bool IsDataURI(const std::string &in) {
   std::string header = "data:application/octet-stream;base64,";
   if (in.find(header) == 0) {
     return true;
@@ -1647,7 +1652,7 @@ static bool IsDataURI(const std::string &in) {
   return false;
 }
 
-static bool DecodeDataURI(std::vector<unsigned char> *out,
+bool DecodeDataURI(std::vector<unsigned char> *out,
                           std::string &mime_type, const std::string &in,
                           size_t reqBytes, bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
