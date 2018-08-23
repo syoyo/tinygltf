@@ -1314,14 +1314,19 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
                    int size, void *) {
   (void)warn;
 
-  int w, h, comp;
+  int w, h, comp, req_comp;
+  
+  // force 32-bit textures for common Vulkan compatibility. It appears that
+  // some GPU drivers do not support 24-bit images for Vulkan
+  req_comp = 4;
+  
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
   // FIXME we should only enter this function if the image is embedded. If
   // image->uri references
   // an image file, it should be left as it is. Image loading should not be
   // mandatory (to support other formats)
-  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, 0);
+  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
     // NOTE: you can use `warn` instead of `err`
     if (err) {
@@ -1360,9 +1365,9 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
 
   image->width = w;
   image->height = h;
-  image->component = comp;
-  image->image.resize(static_cast<size_t>(w * h * comp));
-  std::copy(data, data + w * h * comp, image->image.begin());
+  image->component = req_comp;
+  image->image.resize(static_cast<size_t>(w * h * req_comp));
+  std::copy(data, data + w * h * req_comp, image->image.begin());
 
   free(data);
 
