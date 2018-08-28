@@ -1385,18 +1385,24 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   std::vector<unsigned char> data;
 
   if (ext == "png") {
-    stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
+    if (!stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
                            image->height, image->component, &image->image[0],
-                           0);
+                           0)) {
+      return false;
+    }
     header = "data:image/png;base64,";
   } else if (ext == "jpg") {
-    stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
+    if (!stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
                            image->height, image->component, &image->image[0],
-                           100);
+                           100)) {
+      return false;
+    }
     header = "data:image/jpeg;base64,";
   } else if (ext == "bmp") {
-    stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
-                           image->height, image->component, &image->image[0]);
+    if (!stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
+                           image->height, image->component, &image->image[0])) {
+      return false;
+    }
     header = "data:image/bmp;base64,";
   } else if (!embedImages) {
     // Error: can't output requested format to file
@@ -1421,6 +1427,7 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
       if (!fs->WriteWholeFile(&writeError, imagefilepath, data,
                               fs->user_data)) {
         // Could not write image file to disc; Throw error ?
+        return false;
       }
     } else {
       // Throw error?
