@@ -7,15 +7,15 @@ matrix:
         sources:
         - george-edison55-precise-backports
         - ubuntu-toolchain-r-test
-        - llvm-toolchain-precise-3.7
+        - llvm-toolchain-trusty-3.9
         packages:
         - g++-4.9
-        - clang-3.7
+        - clang-3.9
     compiler: clang
-    env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug
+    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug
   - addons: *1
     compiler: clang
-    env: COMPILER_VERSION=3.7 BUILD_TYPE=Release
+    env: COMPILER_VERSION=3.9 BUILD_TYPE=Release
   - addons: &2
       apt:
         sources:
@@ -30,7 +30,7 @@ matrix:
     env: COMPILER_VERSION=4.9 BUILD_TYPE=Release EXTRA_CXXFLAGS="-fsanitize=address"
   - addons: *1
     compiler: clang
-    env: COMPILER_VERSION=3.7 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
+    env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
 
 before_install:
   - ./.travis-before-install.sh
