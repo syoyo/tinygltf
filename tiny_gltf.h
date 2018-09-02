@@ -456,6 +456,7 @@ struct Image {
                          // "image/bmp", "image/gif"]
   std::string uri;       // (required if no mimeType)
   Value extras;
+  ExtensionMap extensions;
 
   Image() { bufferView = -1; }
 };
@@ -2126,6 +2127,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
   }
 
   ParseStringProperty(&image->name, err, o, "name", false);
+  ParseExtensionsProperty(&image->extensions, err, o);
 
   if (hasBufferView) {
     double bufferView = -1;
@@ -4014,6 +4016,8 @@ static void SerializeGltfImage(Image &image, json &o) {
   if (image.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", image.extras, o);
   }
+
+  SerializeExtensionMap(image.extensions, o);
 }
 
 static void SerializeGltfMaterial(Material &material, json &o) {

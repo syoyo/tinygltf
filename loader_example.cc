@@ -1,3 +1,6 @@
+//
+// TODO(syoyo): Print extensions and extras for each glTF object.
+//
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -514,6 +517,7 @@ static void Dump(const tinygltf::Model &model) {
       std::cout << Indent(2) << "width     : " << image.width << std::endl;
       std::cout << Indent(2) << "height    : " << image.height << std::endl;
       std::cout << Indent(2) << "component : " << image.component << std::endl;
+      DumpExtensions(image.extensions, 1);
     }
   }
 
@@ -525,6 +529,7 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
       std::cout << Indent(1) << "source         : " << texture.source
                 << std::endl;
+      DumpExtensions(texture.extensions, 1);
     }
   }
 
