@@ -458,7 +458,14 @@ struct Image {
   Value extras;
   ExtensionMap extensions;
 
-  Image() { bufferView = -1; }
+  // When this flag is true, data is stored to `image` in as-is format(e.g. jpeg compressed for "image/jpeg" mime)
+  // This feature is good if you use custom image loader function.
+  // (e.g. delayed decoding of images for faster glTF parsing)
+  // Default parser for Image does not provide as-is loading feature at the moment.
+  // (You can manipulate this by providing your own LoadImageData function)
+  bool as_is;            
+
+  Image() : as_is(false) { bufferView = -1; }
 };
 
 struct Texture {
