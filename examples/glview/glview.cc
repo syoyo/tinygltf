@@ -19,7 +19,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
+//#define BUFFER_OFFSET(i) ((char *)NULL + (i))
+#define BUFFER_OFFSET(i) (reinterpret_cast<void *>(i))
 
 #define CheckGLErrors(desc)                                                   \
   {                                                                           \
@@ -677,7 +678,7 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   glPopMatrix();
 }
 
-static void DrawModel(tinygltf::Model &model) {
+static void DrawModel(tinygltf::Model &model, size_t scene_idx) {
 #if 0
   std::map<std::string, tinygltf::Mesh>::const_iterator it(scene.meshes.begin());
   std::map<std::string, tinygltf::Mesh>::const_iterator itEnd(scene.meshes.end());
@@ -688,9 +689,8 @@ static void DrawModel(tinygltf::Model &model) {
   }
 #else
 
-  // TODO(syoyo): Support non-default scenes.
-  assert(model.defaultScene >= 0);
-  const tinygltf::Scene &scene = model.scenes[model.defaultScene];
+  assert(scene_idx < model.scenes.size());
+  const tinygltf::Scene &scene = model.scenes[scene_idx];
   for (size_t i = 0; i < scene.nodes.size(); i++) {
     DrawNode(model, model.nodes[scene.nodes[i]]);
   }
@@ -760,8 +760,18 @@ int main(int argc, char **argv) {
 
   Init();
 
+  if (model.scenes.empty()) {
+    std::cerr << "glTF model does not have scenes" << std::endl;
+    return EXIT_FAILURE;
+  }
+
   // DBG
-  PrintNodes(model.scenes[model.defaultScene]);
+  size_t scene_idx = size_t(model.defaultScene);
+  if (model.defaultScene == -1) {
+    scene_idx = 0;
+  }
+
+  PrintNodes(model.scenes[scene_idx]);
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;
@@ -853,7 +863,7 @@ int main(int argc, char **argv) {
 
     glScalef(scale, scale, scale);
 
-    DrawModel(model);
+    DrawModel(model, scene_idx);
 
     glMatrixMode(GL_PROJECTION);
     glPopMatrix();

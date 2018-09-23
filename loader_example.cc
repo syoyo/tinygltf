@@ -30,7 +30,8 @@ static std::string PrintMode(int mode) {
   } else if (mode == TINYGLTF_MODE_TRIANGLE_STRIP) {
     return "TRIANGLE_STRIP";
   }
-  return "**UNKNOWN**";
+
+  return "**UNKNOWN**(" + std::to_string(mode) + ")";
 }
 
 static std::string PrintTarget(int target) {
@@ -39,7 +40,7 @@ static std::string PrintTarget(int target) {
   } else if (target == 34963) {
     return "GL_ELEMENT_ARRAY_BUFFER";
   } else {
-    return "**UNKNOWN**";
+    return "**UNKNOWN**(" + std::to_string(target) + ")";
   }
 }
 
@@ -63,7 +64,7 @@ static std::string PrintType(int ty) {
   } else if (ty == TINYGLTF_TYPE_MAT4) {
     return "MAT4";
   }
-  return "**UNKNOWN**";
+  return "**UNKNOWN**(" + std::to_string(ty) + ")";
 }
 
 static std::string PrintComponentType(int ty) {
@@ -85,7 +86,7 @@ static std::string PrintComponentType(int ty) {
     return "DOUBLE";
   }
 
-  return "**UNKNOWN**";
+  return "**UNKNOWN**(" + std::to_string(ty) + ")";
 }
 
 #if 0
@@ -147,7 +148,7 @@ static std::string PrintWrapMode(int mode) {
     return "MIRRORED_REPEAT";
   }
 
-  return "**UNKNOWN**";
+  return "**UNKNOWN**(" + std::to_string(mode) + ")";
 }
 
 static std::string PrintFilterMode(int mode) {
@@ -164,7 +165,7 @@ static std::string PrintFilterMode(int mode) {
   } else if (mode == TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR) {
     return "LINEAR_MIPMAP_LINEAR";
   }
-  return "**UNKNOWN**";
+  return "**UNKNOWN**(" + std::to_string(mode) + ")";
 }
 
 static std::string PrintIntArray(const std::vector<int> &arr) {
