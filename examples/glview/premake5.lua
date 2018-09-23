@@ -1,9 +1,19 @@
+newoption {
+   trigger = "asan",
+   description = "Enable Address Sanitizer(gcc5+ ang clang only)"
+}
+
 solution "glview"
    -- location ( "build" )
    configurations { "Debug", "Release" }
    platforms {"native", "x64", "x32"}
-   
+
    project "glview"
+
+      -- Use clang for better asan expericen
+      if _OPTIONS["asan"] then
+         toolset "clang"
+      end
 
       kind "ConsoleApp"
       language "C++"
@@ -13,6 +23,12 @@ solution "glview"
       includedirs { "../../" }
 
       configuration { "linux" }
+
+         if _OPTIONS["asan"] then
+            buildoptions { "-fsanitize=address,undefined" }
+            linkoptions { "-fsanitize=address,undefined" }
+         end
+
          linkoptions { "`pkg-config --libs glfw3`" }
          links { "GL", "GLU", "m", "GLEW", "X11", "Xrandr", "Xinerama", "Xi", "Xxf86vm", "Xcursor", "dl" }
 

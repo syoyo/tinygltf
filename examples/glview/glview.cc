@@ -252,7 +252,7 @@ static void SetupMeshState(tinygltf::Model &model, GLuint progId) {
       const tinygltf::BufferView &bufferView = model.bufferViews[i];
       if (bufferView.target == 0) {
         std::cout << "WARN: bufferView.target is zero" << std::endl;
-        continue;  // Unsupported bufferView.
+        continue;  // Unsupported or not directly used bufferView.
       }
 
       const tinygltf::Buffer &buffer = model.buffers[bufferView.buffer];
@@ -529,6 +529,13 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
     for (; it != itEnd; it++) {
       assert(it->second >= 0);
       const tinygltf::Accessor &accessor = model.accessors[it->second];
+      const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+
+      if (bufferView.target == 0) {
+        // Unsupported or not directly used buffer
+        continue;
+      }
+
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
       int size = 1;
@@ -668,7 +675,10 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   // std::cout << it->first << std::endl;
   // FIXME(syoyo): Refactor.
   // DrawCurves(scene, it->second);
-  DrawMesh(model, model.meshes[node.mesh]);
+
+  if ((node.mesh >= 0) && (node.mesh < int(model.meshes.size()))) {
+    DrawMesh(model, model.meshes[node.mesh]);
+  }
 
   // Draw child nodes.
   for (size_t i = 0; i < node.children.size(); i++) {
