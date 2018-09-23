@@ -18,7 +18,7 @@ solution "skinning"
       kind "ConsoleApp"
       language "C++"
 	  cppdialect "C++11"
-      files { "main.cc", "skinning.cc", "trackball.cc" }
+      files { "main.cc", "skinning.cc", "../common/trackball.cc", "../common/matrix.cc" }
       includedirs { "./" }
       includedirs { "../../" }
 
@@ -45,7 +45,7 @@ solution "skinning"
          includedirs { "/usr/local/include" }
          buildoptions { "-Wno-deprecated-declarations" }
          libdirs { "/usr/local/lib" }
-         links { "glfw3", "GLEW" }
+         links { "glfw", "GLEW" }
          linkoptions { "-framework OpenGL", "-framework Cocoa", "-framework IOKit", "-framework CoreVideo" }
 
       configuration "Debug"
