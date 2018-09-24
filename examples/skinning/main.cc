@@ -785,7 +785,7 @@ static void ConstructNodeMatrix(const tinygltf::Node &node, example::mat4 *xform
 //
 // Hierarchically evalute skining matrix
 //
-static void ApplySkinningToMesh(const tinygltf::model &model, const tinygltf::Node &node, example::mat4 &parent_xform, std::vector<SkinnedMesh> *skinned_meshes) {
+static void ApplySkinningToMesh(const tinygltf::Model &model, const tinygltf::Node &node, example::mat4 &parent_xform, std::vector<SkinnedMesh> *skinned_meshes) {
   example::mat4 xform = parent_xform;
 
   if (node.mesh) {
@@ -794,7 +794,7 @@ static void ApplySkinningToMesh(const tinygltf::model &model, const tinygltf::No
   }
 
   for (auto &child : node.children) {
-    ApplySkinningToMesh(model.nodes[child], xform, skinned_meshes);
+    ApplySkinningToMesh(model, model.nodes[child], xform, skinned_meshes);
   }
 }
 
