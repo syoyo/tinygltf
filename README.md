@@ -57,13 +57,13 @@ v2.0.0 release(22 Aug, 2018)!
 
 ## TODOs
 
-* [ ] Write C++ code generator from jSON schema for robust parsing.
-* [x] Serialization
-* [ ] Compression/decompression(Open3DGC, etc)
+* [ ] Write C++ code generator which emits C++ code from JSON schema for robust parsing.
+* [ ] Mesh Compression/decompression(Open3DGC, etc)
+  * [ ] Load Draco compressed mesh
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
   * [ ] OpenEXR extension through TinyEXR.
-* [ ] Write tests for `animation` and `skin` 
+* [ ] Write exampple and tests for `animation` and `skin` 
 
 ## Licenses
 
