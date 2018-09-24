@@ -529,6 +529,12 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
     for (; it != itEnd; it++) {
       assert(it->second >= 0);
       const tinygltf::Accessor &accessor = model.accessors[it->second];
+      const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+
+      if (bufferView.target == 0) {
+        continue;
+      }
+
       glBindBuffer(GL_ARRAY_BUFFER, gBufferState[accessor.bufferView].vb);
       CheckErrors("bind buffer");
       int size = 1;
@@ -668,7 +674,9 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   // std::cout << it->first << std::endl;
   // FIXME(syoyo): Refactor.
   // DrawCurves(scene, it->second);
-  DrawMesh(model, model.meshes[node.mesh]);
+  if (node.mesh > -1) {
+    DrawMesh(model, model.meshes[node.mesh]);
+  }
 
   // Draw child nodes.
   for (size_t i = 0; i < node.children.size(); i++) {
