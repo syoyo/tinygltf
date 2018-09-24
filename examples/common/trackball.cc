@@ -52,11 +52,6 @@
 #include <math.h>
 #include "trackball.h"
 
-#ifdef _MSC_VER
-#pragma warning(disable : 4244)
-#pragma warning(disable : 4305)
-#endif
-
 /*
  * This size should really be based on the distance from the center of
  * rotation to the point on the object underneath the mouse.  That
@@ -173,11 +168,11 @@ void trackball(float q[4], float p1x, float p1y, float p2x, float p2y) {
   /*
    * Avoid problems with out-of-control values...
    */
-  if (t > 1.0f)
-    t = 1.0f;
-  if (t < -1.0f)
-    t = -1.0f;
-  phi = 2.0f * asinf(t);
+  if (t > 1.0)
+    t = 1.0;
+  if (t < -1.0)
+    t = -1.0;
+  phi = 2.0 * asin(t);
 
   axis_to_quat(a, phi, q);
 }

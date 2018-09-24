@@ -12,7 +12,10 @@
 #define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
 
-#include "trackball.h"
+#include "../common/trackball.h"
+#include "../common/matrix.h"
+
+#include "skinning.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
@@ -726,6 +729,44 @@ static void PrintNodes(const tinygltf::Scene &scene) {
   }
 }
 
+static void SetupSkinningState(const tinygltf::Model &model)
+{
+  for (auto &s : model.skins) {
+    if (s.inverseBindMatrices > -1) {
+
+      if (s.joints.size() > 0) {
+        for (auto const &j : s.joints) {
+          std::cout << j << std::endl;
+        }
+
+        std::vector<example::mat4> inverse_bind_matrices(s.joints.size());
+
+        const tinygltf::Accessor &accessor = model.accessors[s.inverseBindMatrices];
+        assert(accessor.type == TINYGLTF_TYPE_MAT4);
+
+        const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+
+        const tinygltf::Buffer &buffer = model.buffers[bufferView.buffer];
+
+        const float *ptr = reinterpret_cast<const float *>(buffer.data.data() + bufferView.byteOffset);
+
+        for (size_t j = 0; j < s.joints.size(); j++) {
+          example::mat4 m;
+          memcpy(m.m, ptr + j * 16 * sizeof(float), 16 * sizeof(float));
+
+          inverse_bind_matrices[j] = m;
+
+          std::cout << "j[" << j << "] = " << std::endl;
+          Matrix::Print(inverse_bind_matrices[j].m);
+        
+        }
+    
+      }
+    }
+    
+  }
+}
+
 int main(int argc, char **argv) {
   if (argc < 2) {
     std::cout << "glview input.gltf <scale>\n" << std::endl;
@@ -786,6 +827,8 @@ int main(int argc, char **argv) {
 
   // DBG
   PrintNodes(model.scenes[scene_idx]);
+
+  SetupSkinningState(model);
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;

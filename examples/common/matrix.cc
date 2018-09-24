@@ -99,6 +99,28 @@ void Matrix::LookAt(float m[4][4], float eye[3], float lookat[3],
 #endif
 }
 
+void Matrix::Identity(float m[4][4]) {
+  m[0][0] = 1.0f;
+  m[0][1] = 0.0f;
+  m[0][2] = 0.0f;
+  m[0][3] = 0.0f;
+
+  m[1][0] = 0.0f;
+  m[1][1] = 1.0f;
+  m[1][2] = 0.0f;
+  m[1][3] = 0.0f;
+
+  m[2][0] = 0.0f;
+  m[2][1] = 0.0f;
+  m[2][2] = 1.0f;
+  m[2][3] = 0.0f;
+
+  m[3][0] = 0.0f;
+  m[3][1] = 0.0f;
+  m[3][2] = 0.0f;
+  m[3][3] = 1.0f;
+}
+
 void Matrix::Inverse(float m[4][4]) {
   /*
    * codes from intel web
@@ -195,7 +217,16 @@ void Matrix::Inverse(float m[4][4]) {
   }
 }
 
-void Matrix::Mult(float dst[4][4], float m0[4][4], float m1[4][4]) {
+void Matrix::Add(float dst[4][4], const float m0[4][4], const float m1[4][4]) {
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      dst[i][j] += m0[i][j] + m1[i][j];
+    }
+  }
+}
+
+
+void Matrix::Mult(float dst[4][4], const float m0[4][4], const float m1[4][4]) {
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {
       dst[i][j] = 0;
@@ -206,11 +237,18 @@ void Matrix::Mult(float dst[4][4], float m0[4][4], float m1[4][4]) {
   }
 }
 
-void Matrix::MultV(float dst[3], float m[4][4], float v[3]) {
+void Matrix::MultV(float dst[3], const float m[4][4], const float v[3]) {
   // printf("v = %f, %f, %f\n", v[0], v[1], v[2]);
   dst[0] = m[0][0] * v[0] + m[1][0] * v[1] + m[2][0] * v[2] + m[3][0];
   dst[1] = m[0][1] * v[0] + m[1][1] * v[1] + m[2][1] * v[2] + m[3][1];
   dst[2] = m[0][2] * v[0] + m[1][2] * v[1] + m[2][2] * v[2] + m[3][2];
   // printf("m = %f, %f, %f\n", m[3][0], m[3][1], m[3][2]);
   // printf("dst = %f, %f, %f\n", dst[0], dst[1], dst[2]);
+}
+
+void Matrix::MultV4(float dst[4], const float m[4][4], const float v[4]) {
+  dst[0] = m[0][0] * v[0] + m[1][0] * v[1] + m[2][0] * v[2] + m[3][0] * v[3];
+  dst[1] = m[0][1] * v[0] + m[1][1] * v[1] + m[2][1] * v[2] + m[3][1] * v[3];
+  dst[2] = m[0][2] * v[0] + m[1][2] * v[1] + m[2][2] * v[2] + m[3][2] * v[3];
+  dst[3] = m[0][3] * v[0] + m[1][3] * v[1] + m[2][3] * v[2] + m[3][3] * v[3];
 }
