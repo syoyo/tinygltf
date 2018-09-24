@@ -2,6 +2,7 @@
 #define EXAMPLE_SKINNING_H_
 
 #include <vector>
+#include <cstddef>
 
 namespace example {
 

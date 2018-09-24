@@ -65,10 +65,23 @@ typedef struct {
   size_t count;  // byte count
 } GLCurvesState;
 
+
+// Stores vertex position transformed by skinning 
+typedef struct {
+  std::vector<float> positions; // float4
+} SkinnedMesh;
+
+typedef struct {
+  std::vector<example::mat4> inverseBindMatrices; // mat44
+} SkinningMatrices;
+
+
 std::map<int, GLBufferState> gBufferState;
 std::map<std::string, GLMeshState> gMeshState;
 std::map<int, GLCurvesState> gCurvesMesh;
 GLProgramState gGLProgramState;
+std::vector<SkinnedMesh> gSkinnedMesh;
+std::map<int, SkinningMatrices> gSkiningMatrices;
 
 void CheckErrors(std::string desc) {
   GLenum e = glGetError();
@@ -729,30 +742,89 @@ static void PrintNodes(const tinygltf::Scene &scene) {
   }
 }
 
-static void SetupSkinningState(const tinygltf::Model &model)
+static void ConstructNodeMatrix(const tinygltf::Node &node, example::mat4 *xform) {
+
+  if (node.matrix.size() == 16) {
+    for (size_t j = 0; j < 4; j++) {
+      for (size_t i = 0; i < 4; i++) {
+        xform->m[j][i] = node.matrix[j * 4 + i];
+      }
+    }
+
+    return;
+  }
+
+  float translation[3] = {0.0f, 0.0f, 0.0f};
+  float rotation[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  float scale[3] = {1.0f, 1.0f, 1.0f};
+
+  if (node.rotation.size() == 4) {
+    std::cout << "rotation " << node.rotation[3] << std::endl;
+    rotation[0] = node.rotation[0];
+    rotation[1] = node.rotation[1];
+    rotation[2] = node.rotation[2];
+    rotation[3] = node.rotation[3];
+  }
+
+  if (node.translation.size() == 3) {
+    translation[0] = node.translation[0];
+    translation[1] = node.translation[1];
+    translation[2] = node.translation[2];
+  }
+
+  if (node.scale.size() == 3) {
+    scale[0] = node.scale[0];
+    scale[1] = node.scale[1];
+    scale[2] = node.scale[2];
+  }
+
+  example::BuildTransofrmMatrix(translation, rotation, scale, xform);
+
+}
+
+//
+// Hierarchically evalute skining matrix
+//
+static void ApplySkinningToMesh(const tinygltf::model &model, const tinygltf::Node &node, example::mat4 &parent_xform, std::vector<SkinnedMesh> *skinned_meshes) {
+  example::mat4 xform = parent_xform;
+
+  if (node.mesh) {
+    if (node.skin) {
+    }
+  }
+
+  for (auto &child : node.children) {
+    ApplySkinningToMesh(model.nodes[child], xform, skinned_meshes);
+  }
+}
+
+//
+// Read inverseBindMatricies for each skin
+//
+static void SetupSkinningMatrices(const tinygltf::Model &model, std::map<int, SkinningMatrices> &skinning_matrices)
 {
-  for (auto &s : model.skins) {
-    if (s.inverseBindMatrices > -1) {
+  for (size_t s = 0; s < model.skins.size(); s++) {
+    const tinygltf::Skin &skin = model.skins[s];
 
-      if (s.joints.size() > 0) {
-        for (auto const &j : s.joints) {
-          std::cout << j << std::endl;
-        }
+    if (skin.inverseBindMatrices > -1) {
 
-        std::vector<example::mat4> inverse_bind_matrices(s.joints.size());
+      if (skin.joints.size() > 0) {
 
-        const tinygltf::Accessor &accessor = model.accessors[s.inverseBindMatrices];
+        const tinygltf::Accessor &accessor = model.accessors[skin.inverseBindMatrices];
         assert(accessor.type == TINYGLTF_TYPE_MAT4);
 
         const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
 
         const tinygltf::Buffer &buffer = model.buffers[bufferView.buffer];
 
-        const float *ptr = reinterpret_cast<const float *>(buffer.data.data() + bufferView.byteOffset);
+        const float *ptr = reinterpret_cast<const float *>(buffer.data.data() + accessor.byteOffset + bufferView.byteOffset);
+        std::cout << "count = " << accessor.count << std::endl;
 
-        for (size_t j = 0; j < s.joints.size(); j++) {
+        std::vector<example::mat4> inverse_bind_matrices(accessor.count);
+
+        for (size_t j = 0; j < skin.joints.size(); j++) {
           example::mat4 m;
-          memcpy(m.m, ptr + j * 16 * sizeof(float), 16 * sizeof(float));
+          memcpy(m.m, ptr + j * 16, 16 * sizeof(float));
 
           inverse_bind_matrices[j] = m;
 
@@ -760,7 +832,9 @@ static void SetupSkinningState(const tinygltf::Model &model)
           Matrix::Print(inverse_bind_matrices[j].m);
         
         }
-    
+
+        skinning_matrices[s].inverseBindMatrices = inverse_bind_matrices;
+
       }
     }
     
@@ -828,7 +902,9 @@ int main(int argc, char **argv) {
   // DBG
   PrintNodes(model.scenes[scene_idx]);
 
-  SetupSkinningState(model);
+  gSkinnedMesh.resize(model.meshes.size());
+
+  SetupSkinningMatrices(model, gSkiningMatrices);
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;
