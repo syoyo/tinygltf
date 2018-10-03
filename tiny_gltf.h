@@ -470,8 +470,16 @@ struct Image {
                          // "image/bmp", "image/gif"]
   std::string uri;       // (required if no mimeType)
   Value extras;
+  ExtensionMap extensions;
 
-  Image() { bufferView = -1; width = -1; height = -1; component = -1; }
+  // When this flag is true, data is stored to `image` in as-is format(e.g. jpeg compressed for "image/jpeg" mime)
+  // This feature is good if you use custom image loader function.
+  // (e.g. delayed decoding of images for faster glTF parsing)
+  // Default parser for Image does not provide as-is loading feature at the moment.
+  // (You can manipulate this by providing your own LoadImageData function)
+  bool as_is;
+  
+  Image() : as_is(false) { bufferView = -1; width = -1; height = -1; component = -1; }
   bool operator==(const Image&) const;
 };
 
@@ -994,7 +1002,6 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
 #pragma clang diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wdouble-promotion"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
 #pragma clang diagnostic ignored "-Wreserved-id-macro"
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
@@ -1006,6 +1013,9 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
 #pragma clang diagnostic ignored "-Wweak-vtables"
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
+#if __has_warning("-Wdouble-promotion")
+#pragma clang diagnostic ignored "-Wdouble-promotion"
+#endif
 #if __has_warning("-Wcomma")
 #pragma clang diagnostic ignored "-Wcomma"
 #endif
@@ -1654,14 +1664,19 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
                    int size, void *) {
   (void)warn;
 
-  int w, h, comp;
+  int w, h, comp, req_comp;
+  
+  // force 32-bit textures for common Vulkan compatibility. It appears that
+  // some GPU drivers do not support 24-bit images for Vulkan
+  req_comp = 4;
+  
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
   // FIXME we should only enter this function if the image is embedded. If
   // image->uri references
   // an image file, it should be left as it is. Image loading should not be
   // mandatory (to support other formats)
-  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, 0);
+  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
     // NOTE: you can use `warn` instead of `err`
     if (err) {
@@ -1700,9 +1715,9 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
 
   image->width = w;
   image->height = h;
-  image->component = comp;
-  image->image.resize(static_cast<size_t>(w * h * comp));
-  std::copy(data, data + w * h * comp, image->image.begin());
+  image->component = req_comp;
+  image->image.resize(static_cast<size_t>(w * h * req_comp));
+  std::copy(data, data + w * h * req_comp, image->image.begin());
 
   free(data);
 
@@ -2459,6 +2474,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
   }
 
   ParseStringProperty(&image->name, err, o, "name", false);
+  ParseExtensionsProperty(&image->extensions, err, o);
 
   if (hasBufferView) {
     double bufferView = -1;
@@ -4348,6 +4364,8 @@ static void SerializeGltfImage(Image &image, json &o) {
   if (image.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", image.extras, o);
   }
+
+  SerializeExtensionMap(image.extensions, o);
 }
 
 static void SerializeGltfMaterial(Material &material, json &o) {
