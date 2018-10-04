@@ -189,6 +189,11 @@ static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
   }
 }
 
+bool IsDataURI(const std::string &in);
+bool DecodeDataURI(std::vector<unsigned char> *out,
+	std::string &mime_type, const std::string &in,
+	size_t reqBytes, bool checkSize);
+
 #ifdef __clang__
 #pragma clang diagnostic push
 // Suppress warning for : static Value null_value
@@ -451,8 +456,16 @@ struct Image {
                          // "image/bmp", "image/gif"]
   std::string uri;       // (required if no mimeType)
   Value extras;
+  ExtensionMap extensions;
 
-  Image() { bufferView = -1; }
+  // When this flag is true, data is stored to `image` in as-is format(e.g. jpeg compressed for "image/jpeg" mime)
+  // This feature is good if you use custom image loader function.
+  // (e.g. delayed decoding of images for faster glTF parsing)
+  // Default parser for Image does not provide as-is loading feature at the moment.
+  // (You can manipulate this by providing your own LoadImageData function)
+  bool as_is;            
+
+  Image() : as_is(false) { bufferView = -1; }
 };
 
 struct Texture {
@@ -954,7 +967,6 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wexit-time-destructors"
 #pragma clang diagnostic ignored "-Wconversion"
 #pragma clang diagnostic ignored "-Wold-style-cast"
-#pragma clang diagnostic ignored "-Wdouble-promotion"
 #pragma clang diagnostic ignored "-Wglobal-constructors"
 #pragma clang diagnostic ignored "-Wreserved-id-macro"
 #pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
@@ -966,6 +978,9 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wimplicit-fallthrough"
 #pragma clang diagnostic ignored "-Wweak-vtables"
 #pragma clang diagnostic ignored "-Wcovered-switch-default"
+#if __has_warning("-Wdouble-promotion")
+#pragma clang diagnostic ignored "-Wdouble-promotion"
+#endif
 #if __has_warning("-Wcomma")
 #pragma clang diagnostic ignored "-Wcomma"
 #endif
@@ -1233,7 +1248,7 @@ std::string base64_decode(std::string const &encoded_string) {
 
 static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
                              std::string *warn, const std::string &filename,
-                             const std::string &basedir, size_t reqBytes,
+                             const std::string &basedir, bool required, size_t reqBytes,
                              bool checkSize, FsCallbacks *fs) {
   if (fs == nullptr || fs->FileExists == nullptr ||
       fs->ExpandFilePath == nullptr || fs->ReadWholeFile == nullptr) {
@@ -1244,6 +1259,8 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
     return false;
   }
 
+  std::string* failMsgOut = required ? err : warn;
+
   out->clear();
 
   std::vector<std::string> paths;
@@ -1252,8 +1269,8 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
 
   std::string filepath = FindFile(paths, filename, fs);
   if (filepath.empty() || filename.empty()) {
-    if (warn) {
-      (*warn) += "File not found : " + filename + "\n";
+    if (failMsgOut) {
+      (*failMsgOut) += "File not found : " + filename + "\n";
     }
     return false;
   }
@@ -1263,15 +1280,17 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   bool fileRead =
       fs->ReadWholeFile(&buf, &fileReadErr, filepath, fs->user_data);
   if (!fileRead) {
-    if (err) {
-      (*err) += "File read error : " + filepath + " : " + fileReadErr + "\n";
+    if (failMsgOut) {
+      (*failMsgOut) += "File read error : " + filepath + " : " + fileReadErr + "\n";
     }
     return false;
   }
 
   size_t sz = buf.size();
   if (sz == 0) {
-    (*err) += "File is empty : " + filepath + "\n";
+    if(failMsgOut) {
+      (*failMsgOut) += "File is empty : " + filepath + "\n";
+	}
     return false;
   }
 
@@ -1283,8 +1302,8 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
       std::stringstream ss;
       ss << "File size mismatch : " << filepath << ", requestedBytes "
          << reqBytes << ", but got " << sz << std::endl;
-      if (err) {
-        (*err) += ss.str();
+      if (failMsgOut) {
+        (*failMsgOut) += ss.str();
       }
       return false;
     }
@@ -1305,14 +1324,19 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
                    int size, void *) {
   (void)warn;
 
-  int w, h, comp;
+  int w, h, comp, req_comp;
+  
+  // force 32-bit textures for common Vulkan compatibility. It appears that
+  // some GPU drivers do not support 24-bit images for Vulkan
+  req_comp = 4;
+  
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
   // FIXME we should only enter this function if the image is embedded. If
   // image->uri references
   // an image file, it should be left as it is. Image loading should not be
   // mandatory (to support other formats)
-  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, 0);
+  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
     // NOTE: you can use `warn` instead of `err`
     if (err) {
@@ -1351,9 +1375,9 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
 
   image->width = w;
   image->height = h;
-  image->component = comp;
-  image->image.resize(static_cast<size_t>(w * h * comp));
-  std::copy(data, data + w * h * comp, image->image.begin());
+  image->component = req_comp;
+  image->image.resize(static_cast<size_t>(w * h * req_comp));
+  std::copy(data, data + w * h * req_comp, image->image.begin());
 
   free(data);
 
@@ -1615,7 +1639,7 @@ static void UpdateImageObject(Image &image, std::string &baseDir, int index,
   }
 }
 
-static bool IsDataURI(const std::string &in) {
+bool IsDataURI(const std::string &in) {
   std::string header = "data:application/octet-stream;base64,";
   if (in.find(header) == 0) {
     return true;
@@ -1654,7 +1678,7 @@ static bool IsDataURI(const std::string &in) {
   return false;
 }
 
-static bool DecodeDataURI(std::vector<unsigned char> *out,
+bool DecodeDataURI(std::vector<unsigned char> *out,
                           std::string &mime_type, const std::string &in,
                           size_t reqBytes, bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
@@ -2117,6 +2141,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
   }
 
   ParseStringProperty(&image->name, err, o, "name", false);
+  ParseExtensionsProperty(&image->extensions, err, o);
 
   if (hasBufferView) {
     double bufferView = -1;
@@ -2173,7 +2198,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
 #ifdef TINYGLTF_NO_EXTERNAL_IMAGE
     return true;
 #endif
-    if (!LoadExternalFile(&img, err, warn, uri, basedir, 0, false, fs)) {
+    if (!LoadExternalFile(&img, err, warn, uri, basedir, false, 0, false, fs)) {
       if (warn) {
         (*warn) += "Failed to load external 'uri' for image parameter\n";
       }
@@ -2268,7 +2293,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
       } else {
         // External .bin file.
         if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr, buffer->uri,
-                              basedir, bytes, true, fs)) {
+                              basedir, true, bytes, true, fs)) {
           return false;
         }
       }
@@ -2310,7 +2335,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
     } else {
       // Assume external .bin file.
       if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr, buffer->uri,
-                            basedir, bytes, true, fs)) {
+                            basedir, true, bytes, true, fs)) {
         return false;
       }
     }
@@ -4005,6 +4030,8 @@ static void SerializeGltfImage(Image &image, json &o) {
   if (image.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", image.extras, o);
   }
+
+  SerializeExtensionMap(image.extensions, o);
 }
 
 static void SerializeGltfMaterial(Material &material, json &o) {
