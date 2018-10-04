@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.0.1 Add comparsion feature(Thanks to @Selmar).
 //  - v2.0.0 glTF 2.0!.
 //
 // Tiny glTF loader is using following third party libraries:
