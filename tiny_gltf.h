@@ -493,7 +493,7 @@ struct Texture {
   std::string name;
 
   int sampler;
-  int source;  // Required (not specified in the spec ?)
+  int source;
   Value extras;
   ExtensionMap extensions;
 
@@ -1245,9 +1245,8 @@ bool Parameter::operator==(const Parameter &other) const {
       this->has_number_value != other.has_number_value)
     return false;
 
-  if (this->has_number_value)
-    if (!TINYGLTF_DOUBLE_EQUAL(this->number_value, other.number_value))
-      return false;
+  if (!TINYGLTF_DOUBLE_EQUAL(this->number_value, other.number_value))
+    return false;
 
   if (this->json_double_value.size() != other.json_double_value.size())
     return false;
@@ -2400,6 +2399,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
 
   ParseStringProperty(&image->name, err, o, "name", false);
   ParseExtensionsProperty(&image->extensions, err, o);
+  ParseExtrasProperty(&image->extras, o);
 
   if (hasBufferView) {
     double bufferView = -1;
@@ -4504,8 +4504,9 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   if (texture.sampler > -1) {
     SerializeNumberProperty("sampler", texture.sampler, o);
   }
-  SerializeNumberProperty("source", texture.source, o);
-
+  if (texture.source > -1) {
+    SerializeNumberProperty("source", texture.source, o);
+  }
   if (texture.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", texture.extras, o);
   }
@@ -4553,31 +4554,50 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   SerializeGltfAsset(model->asset, asset);
   output["asset"] = asset;
 
-  std::string binFilename = GetBaseFilename(filename);
-  std::string ext = ".bin";
-  std::string::size_type pos = binFilename.rfind('.', binFilename.length());
+  std::string defaultBinFilename = GetBaseFilename(filename);
+  std::string defaultBinFileExt = ".bin";
+  std::string::size_type pos = defaultBinFilename.rfind('.', defaultBinFilename.length());
 
   if (pos != std::string::npos) {
-    binFilename = binFilename.substr(0, pos) + ext;
-  } else {
-    binFilename = binFilename + ".bin";
+    defaultBinFilename = defaultBinFilename.substr(0, pos);
   }
   std::string baseDir = GetBaseDir(filename);
   if (baseDir.empty()) {
     baseDir = "./";
   }
 
-  std::string binSaveFilePath = JoinPath(baseDir, binFilename);
-
-  // BUFFERS (We expect only one buffer here)
+  // BUFFERS
+  std::vector<std::string> usedUris;
   json buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
     if (embedBuffers) {
       SerializeGltfBuffer(model->buffers[i], buffer);
     } else {
-      SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath,
-                          binFilename);
+      std::string binSavePath;
+      std::string binUri;
+      if (!model->buffers[i].uri.empty() 
+        && !IsDataURI(model->buffers[i].uri)) {
+        binUri = model->buffers[i].uri;
+      }
+      else {
+        binUri = defaultBinFilename + defaultBinFileExt;
+        bool inUse = true;
+        int numUsed = 0;
+        while(inUse) {
+          inUse = false;
+          for (const std::string& usedName : usedUris) {
+            if (binUri.compare(usedName) != 0) continue;
+            inUse = true;
+            binUri = defaultBinFilename + std::to_string(numUsed++) + defaultBinFileExt;
+            break;
+          }
+        }
+      }
+      usedUris.push_back(binUri);
+	  binSavePath = JoinPath(baseDir, binUri);
+      SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
+                          binUri);
     }
     buffers.push_back(buffer);
   }
