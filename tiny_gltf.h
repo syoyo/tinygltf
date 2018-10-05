@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.0.1 Add comparsion feature(Thanks to @Selmar).
 //  - v2.0.0 glTF 2.0!.
 //
 // Tiny glTF loader is using following third party libraries:
@@ -40,6 +41,7 @@
 #include <array>
 #include <cassert>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
@@ -134,6 +136,9 @@ namespace tinygltf {
 #define TINYGLTF_SHADER_TYPE_VERTEX_SHADER (35633)
 #define TINYGLTF_SHADER_TYPE_FRAGMENT_SHADER (35632)
 
+#define TINYGLTF_DOUBLE_EPS (1.e-12)
+#define TINYGLTF_DOUBLE_EQUAL(a, b) (std::fabs((b) - (a)) < TINYGLTF_DOUBLE_EPS)
+
 typedef enum {
   NULL_TYPE = 0,
   NUMBER_TYPE = 1,
@@ -190,9 +195,8 @@ static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
 }
 
 bool IsDataURI(const std::string &in);
-bool DecodeDataURI(std::vector<unsigned char> *out,
-	std::string &mime_type, const std::string &in,
-	size_t reqBytes, bool checkSize);
+bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
+                   const std::string &in, size_t reqBytes, bool checkSize);
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -294,6 +298,8 @@ class Value {
 
   size_t Size() const { return (IsArray() ? ArrayLen() : Keys().size()); }
 
+  bool operator==(const tinygltf::Value &other) const;
+
  protected:
   int type_;
 
@@ -338,12 +344,12 @@ TINYGLTF_VALUE_GET(Value::Object, object_value_)
 using ColorValue = std::array<double, 4>;
 
 struct Parameter {
-  bool bool_value;
+  bool bool_value = false;
   bool has_number_value = false;
   std::string string_value;
   std::vector<double> number_array;
   std::map<std::string, double> json_double_value;
-  double number_value;
+  double number_value = 0.0;
   // context sensitive methods. depending the type of the Parameter you are
   // accessing, these are either valid or not
   // If this parameter represent a texture map in a material, will return the
@@ -374,6 +380,8 @@ struct Parameter {
          number_array[0], number_array[1], number_array[2],
          (number_array.size() > 3 ? number_array[3] : 1.0)}};
   }
+
+  bool operator==(const Parameter &) const;
 };
 
 #ifdef __clang__
@@ -396,6 +404,7 @@ struct AnimationChannel {
   Value extras;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
+  bool operator==(const AnimationChannel &) const;
 };
 
 struct AnimationSampler {
@@ -406,6 +415,7 @@ struct AnimationSampler {
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
+  bool operator==(const AnimationSampler &) const;
 };
 
 struct Animation {
@@ -413,6 +423,8 @@ struct Animation {
   std::vector<AnimationChannel> channels;
   std::vector<AnimationSampler> samplers;
   Value extras;
+
+  bool operator==(const Animation &) const;
 };
 
 struct Skin {
@@ -425,6 +437,7 @@ struct Skin {
     inverseBindMatrices = -1;
     skeleton = -1;
   }
+  bool operator==(const Skin &) const;
 };
 
 struct Sampler {
@@ -443,6 +456,7 @@ struct Sampler {
   Sampler()
       : wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
+  bool operator==(const Sampler &) const;
 };
 
 struct Image {
@@ -458,25 +472,33 @@ struct Image {
   Value extras;
   ExtensionMap extensions;
 
-  // When this flag is true, data is stored to `image` in as-is format(e.g. jpeg compressed for "image/jpeg" mime)
-  // This feature is good if you use custom image loader function.
-  // (e.g. delayed decoding of images for faster glTF parsing)
-  // Default parser for Image does not provide as-is loading feature at the moment.
-  // (You can manipulate this by providing your own LoadImageData function)
-  bool as_is;            
+  // When this flag is true, data is stored to `image` in as-is format(e.g. jpeg
+  // compressed for "image/jpeg" mime) This feature is good if you use custom
+  // image loader function. (e.g. delayed decoding of images for faster glTF
+  // parsing) Default parser for Image does not provide as-is loading feature at
+  // the moment. (You can manipulate this by providing your own LoadImageData
+  // function)
+  bool as_is;
 
-  Image() : as_is(false) { bufferView = -1; }
+  Image() : as_is(false) {
+    bufferView = -1;
+    width = -1;
+    height = -1;
+    component = -1;
+  }
+  bool operator==(const Image &) const;
 };
 
 struct Texture {
   std::string name;
 
   int sampler;
-  int source;  // Required (not specified in the spec ?)
+  int source;
   Value extras;
   ExtensionMap extensions;
 
   Texture() : sampler(-1), source(-1) {}
+  bool operator==(const Texture &) const;
 };
 
 // Each extension should be stored in a ParameterMap.
@@ -490,6 +512,8 @@ struct Material {
 
   ExtensionMap extensions;
   Value extras;
+
+  bool operator==(const Material &) const;
 };
 
 struct BufferView {
@@ -503,6 +527,7 @@ struct BufferView {
   Value extras;
 
   BufferView() : byteOffset(0), byteStride(0) {}
+  bool operator==(const BufferView &) const;
 };
 
 struct Accessor {
@@ -559,32 +584,35 @@ struct Accessor {
   }
 
   Accessor() { bufferView = -1; }
+  bool operator==(const tinygltf::Accessor &) const;
 };
 
 struct PerspectiveCamera {
-  float aspectRatio;  // min > 0
-  float yfov;         // required. min > 0
-  float zfar;         // min > 0
-  float znear;        // required. min > 0
+  double aspectRatio;  // min > 0
+  double yfov;         // required. min > 0
+  double zfar;         // min > 0
+  double znear;        // required. min > 0
 
   PerspectiveCamera()
-      : aspectRatio(0.0f),
-        yfov(0.0f),
-        zfar(0.0f)  // 0 = use infinite projecton matrix
+      : aspectRatio(0.0),
+        yfov(0.0),
+        zfar(0.0)  // 0 = use infinite projecton matrix
         ,
-        znear(0.0f) {}
+        znear(0.0) {}
+  bool operator==(const PerspectiveCamera &) const;
 
   ExtensionMap extensions;
   Value extras;
 };
 
 struct OrthographicCamera {
-  float xmag;   // required. must not be zero.
-  float ymag;   // required. must not be zero.
-  float zfar;   // required. `zfar` must be greater than `znear`.
-  float znear;  // required
+  double xmag;   // required. must not be zero.
+  double ymag;   // required. must not be zero.
+  double zfar;   // required. `zfar` must be greater than `znear`.
+  double znear;  // required
 
-  OrthographicCamera() : xmag(0.0f), ymag(0.0f), zfar(0.0f), znear(0.0f) {}
+  OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
+  bool operator==(const OrthographicCamera &) const;
 
   ExtensionMap extensions;
   Value extras;
@@ -598,6 +626,7 @@ struct Camera {
   OrthographicCamera orthographic;
 
   Camera() {}
+  bool operator==(const Camera &) const;
 
   ExtensionMap extensions;
   Value extras;
@@ -612,7 +641,7 @@ struct Primitive {
                  // when rendering.
   int indices;   // The index of the accessor that contains the indices.
   int mode;      // one of TINYGLTF_MODE_***
-  std::vector<std::map<std::string, int>> targets;  // array of morph targets,
+  std::vector<std::map<std::string, int> > targets;  // array of morph targets,
   // where each target is a dict with attribues in ["POSITION, "NORMAL",
   // "TANGENT"] pointing
   // to their corresponding accessors
@@ -622,15 +651,18 @@ struct Primitive {
     material = -1;
     indices = -1;
   }
+  bool operator==(const Primitive &) const;
 };
 
 struct Mesh {
   std::string name;
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
-  std::vector<std::map<std::string, int>> targets;
+  std::vector<std::map<std::string, int> > targets;
   ExtensionMap extensions;
   Value extras;
+
+  bool operator==(const Mesh &) const;
 };
 
 class Node {
@@ -653,8 +685,8 @@ class Node {
     extensions = rhs.extensions;
     extras = rhs.extras;
   }
-
   ~Node() {}
+  bool operator==(const Node &) const;
 
   int camera;  // the index of the camera referenced by this node
 
@@ -678,6 +710,8 @@ struct Buffer {
   std::string
       uri;  // considered as required here but not in the spec (need to clarify)
   Value extras;
+
+  bool operator==(const Buffer &) const;
 };
 
 struct Asset {
@@ -687,6 +721,8 @@ struct Asset {
   std::string copyright;
   ExtensionMap extensions;
   Value extras;
+
+  bool operator==(const Asset &) const;
 };
 
 struct Scene {
@@ -695,18 +731,23 @@ struct Scene {
 
   ExtensionMap extensions;
   Value extras;
+
+  bool operator==(const Scene &) const;
 };
 
 struct Light {
   std::string name;
   std::vector<double> color;
   std::string type;
+
+  bool operator==(const Light &) const;
 };
 
 class Model {
  public:
   Model() {}
   ~Model() {}
+  bool operator==(const Model &) const;
 
   std::vector<Accessor> accessors;
   std::vector<Animation> animations;
@@ -952,7 +993,7 @@ class TinyGLTF {
 
 #endif  // TINY_GLTF_H_
 
-#ifdef TINYGLTF_IMPLEMENTATION
+#if defined(TINYGLTF_IMPLEMENTATION) || defined(__INTELLISENSE__)
 #include <algorithm>
 //#include <cassert>
 #ifndef TINYGLTF_NO_FS
@@ -1044,6 +1085,220 @@ using nlohmann::json;
 #endif
 
 namespace tinygltf {
+
+// Equals function for Value, for recursivity
+static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
+  if (one.Type() != other.Type()) return false;
+
+  switch (one.Type()) {
+    case NULL_TYPE:
+      return true;
+    case BOOL_TYPE:
+      return one.Get<bool>() == other.Get<bool>();
+    case NUMBER_TYPE:
+      return TINYGLTF_DOUBLE_EQUAL(one.Get<double>(), other.Get<double>());
+    case INT_TYPE:
+      return one.Get<int>() == other.Get<int>();
+    case OBJECT_TYPE: {
+      auto oneObj = one.Get<tinygltf::Value::Object>();
+      auto otherObj = other.Get<tinygltf::Value::Object>();
+      if (oneObj.size() != otherObj.size()) return false;
+      for (auto &it : oneObj) {
+        auto otherIt = otherObj.find(it.first);
+        if (otherIt == otherObj.end()) return false;
+
+        if (!Equals(it.second, otherIt->second)) return false;
+      }
+      return true;
+    }
+    case ARRAY_TYPE: {
+      if (one.Size() != other.Size()) return false;
+      for (int i = 0; i < int(one.Size()); ++i)
+        if (Equals(one.Get(i), other.Get(i))) return false;
+      return true;
+    }
+    case STRING_TYPE:
+      return one.Get<std::string>() == other.Get<std::string>();
+    case BINARY_TYPE:
+      return one.Get<std::vector<unsigned char> >() ==
+             other.Get<std::vector<unsigned char> >();
+    default: {
+      // unhandled type
+      return false;
+    }
+  }
+
+  return false;
+}
+
+// Equals function for std::vector<double> using TINYGLTF_DOUBLE_EPSILON
+static bool Equals(const std::vector<double> &one,
+                   const std::vector<double> &other) {
+  if (one.size() != other.size()) return false;
+  for (int i = 0; i < int(one.size()); ++i) {
+    if (!TINYGLTF_DOUBLE_EQUAL(one[size_t(i)], other[size_t(i)])) return false;
+  }
+  return true;
+}
+
+bool Accessor::operator==(const Accessor &other) const {
+  return this->bufferView == other.bufferView &&
+         this->byteOffset == other.byteOffset &&
+         this->componentType == other.componentType &&
+         this->count == other.count && this->extras == other.extras &&
+         Equals(this->maxValues, other.maxValues) &&
+         Equals(this->minValues, other.minValues) && this->name == other.name &&
+         this->normalized == other.normalized && this->type == other.type;
+}
+bool Animation::operator==(const Animation &other) const {
+  return this->channels == other.channels && this->extras == other.extras &&
+         this->name == other.name && this->samplers == other.samplers;
+}
+bool AnimationChannel::operator==(const AnimationChannel &other) const {
+  return this->extras == other.extras &&
+         this->target_node == other.target_node &&
+         this->target_path == other.target_path &&
+         this->sampler == other.sampler;
+}
+bool AnimationSampler::operator==(const AnimationSampler &other) const {
+  return this->extras == other.extras && this->input == other.input &&
+         this->interpolation == other.interpolation &&
+         this->output == other.output;
+}
+bool Asset::operator==(const Asset &other) const {
+  return this->copyright == other.copyright &&
+         this->extensions == other.extensions && this->extras == other.extras &&
+         this->generator == other.generator &&
+         this->minVersion == other.minVersion && this->version == other.version;
+}
+bool Buffer::operator==(const Buffer &other) const {
+  return this->data == other.data && this->extras == other.extras &&
+         this->name == other.name && this->uri == other.uri;
+}
+bool BufferView::operator==(const BufferView &other) const {
+  return this->buffer == other.buffer && this->byteLength == other.byteLength &&
+         this->byteOffset == other.byteOffset &&
+         this->byteStride == other.byteStride && this->name == other.name &&
+         this->target == other.target && this->extras == other.extras;
+}
+bool Camera::operator==(const Camera &other) const {
+  return this->name == other.name && this->extensions == other.extensions &&
+         this->extras == other.extras &&
+         this->orthographic == other.orthographic &&
+         this->perspective == other.perspective && this->type == other.type;
+}
+bool Image::operator==(const Image &other) const {
+  return this->bufferView == other.bufferView &&
+         this->component == other.component && this->extras == other.extras &&
+         this->height == other.height && this->image == other.image &&
+         this->mimeType == other.mimeType && this->name == other.name &&
+         this->uri == other.uri && this->width == other.width;
+}
+bool Light::operator==(const Light &other) const {
+  return Equals(this->color, other.color) && this->name == other.name &&
+         this->type == other.type;
+}
+bool Material::operator==(const Material &other) const {
+  return this->additionalValues == other.additionalValues &&
+         this->extensions == other.extensions && this->extras == other.extras &&
+         this->name == other.name && this->values == other.values;
+}
+bool Mesh::operator==(const Mesh &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         this->name == other.name && this->primitives == other.primitives &&
+         this->targets == other.targets && Equals(this->weights, other.weights);
+}
+bool Model::operator==(const Model &other) const {
+  return this->accessors == other.accessors &&
+         this->animations == other.animations && this->asset == other.asset &&
+         this->buffers == other.buffers &&
+         this->bufferViews == other.bufferViews &&
+         this->cameras == other.cameras &&
+         this->defaultScene == other.defaultScene &&
+         this->extensions == other.extensions &&
+         this->extensionsRequired == other.extensionsRequired &&
+         this->extensionsUsed == other.extensionsUsed &&
+         this->extras == other.extras && this->images == other.images &&
+         this->lights == other.lights && this->materials == other.materials &&
+         this->meshes == other.meshes && this->nodes == other.nodes &&
+         this->samplers == other.samplers && this->scenes == other.scenes &&
+         this->skins == other.skins && this->textures == other.textures;
+}
+bool Node::operator==(const Node &other) const {
+  return this->camera == other.camera && this->children == other.children &&
+         this->extensions == other.extensions && this->extras == other.extras &&
+         Equals(this->matrix, other.matrix) && this->mesh == other.mesh &&
+         this->name == other.name && Equals(this->rotation, other.rotation) &&
+         Equals(this->scale, other.scale) && this->skin == other.skin &&
+         Equals(this->translation, other.translation) &&
+         Equals(this->weights, other.weights);
+}
+bool OrthographicCamera::operator==(const OrthographicCamera &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         TINYGLTF_DOUBLE_EQUAL(this->xmag, other.xmag) &&
+         TINYGLTF_DOUBLE_EQUAL(this->ymag, other.ymag) &&
+         TINYGLTF_DOUBLE_EQUAL(this->zfar, other.zfar) &&
+         TINYGLTF_DOUBLE_EQUAL(this->znear, other.znear);
+}
+bool Parameter::operator==(const Parameter &other) const {
+  if (this->bool_value != other.bool_value ||
+      this->has_number_value != other.has_number_value)
+    return false;
+
+  if (!TINYGLTF_DOUBLE_EQUAL(this->number_value, other.number_value))
+    return false;
+
+  if (this->json_double_value.size() != other.json_double_value.size())
+    return false;
+  for (auto &it : this->json_double_value) {
+    auto otherIt = other.json_double_value.find(it.first);
+    if (otherIt == other.json_double_value.end()) return false;
+
+    if (!TINYGLTF_DOUBLE_EQUAL(it.second, otherIt->second)) return false;
+  }
+
+  if (!Equals(this->number_array, other.number_array)) return false;
+
+  if (this->string_value != other.string_value) return false;
+
+  return true;
+}
+bool PerspectiveCamera::operator==(const PerspectiveCamera &other) const {
+  return TINYGLTF_DOUBLE_EQUAL(this->aspectRatio, other.aspectRatio) &&
+         this->extensions == other.extensions && this->extras == other.extras &&
+         TINYGLTF_DOUBLE_EQUAL(this->yfov, other.yfov) &&
+         TINYGLTF_DOUBLE_EQUAL(this->zfar, other.zfar) &&
+         TINYGLTF_DOUBLE_EQUAL(this->znear, other.znear);
+}
+bool Primitive::operator==(const Primitive &other) const {
+  return this->attributes == other.attributes && this->extras == other.extras &&
+         this->indices == other.indices && this->material == other.material &&
+         this->mode == other.mode && this->targets == other.targets;
+}
+bool Sampler::operator==(const Sampler &other) const {
+  return this->extras == other.extras && this->magFilter == other.magFilter &&
+         this->minFilter == other.minFilter && this->name == other.name &&
+         this->wrapR == other.wrapR && this->wrapS == other.wrapS &&
+         this->wrapT == other.wrapT;
+}
+bool Scene::operator==(const Scene &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         this->name == other.name && this->nodes == other.nodes;
+  ;
+}
+bool Skin::operator==(const Skin &other) const {
+  return this->inverseBindMatrices == other.inverseBindMatrices &&
+         this->joints == other.joints && this->name == other.name &&
+         this->skeleton == other.skeleton;
+}
+bool Texture::operator==(const Texture &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         this->name == other.name && this->sampler == other.sampler &&
+         this->source == other.source;
+}
+bool Value::operator==(const Value &other) const {
+  return Equals(*this, other);
+}
 
 static void swap4(unsigned int *val) {
 #ifdef TINYGLTF_LITTLE_ENDIAN
@@ -1248,8 +1503,8 @@ std::string base64_decode(std::string const &encoded_string) {
 
 static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
                              std::string *warn, const std::string &filename,
-                             const std::string &basedir, bool required, size_t reqBytes,
-                             bool checkSize, FsCallbacks *fs) {
+                             const std::string &basedir, bool required,
+                             size_t reqBytes, bool checkSize, FsCallbacks *fs) {
   if (fs == nullptr || fs->FileExists == nullptr ||
       fs->ExpandFilePath == nullptr || fs->ReadWholeFile == nullptr) {
     // This is a developer error, assert() ?
@@ -1259,7 +1514,7 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
     return false;
   }
 
-  std::string* failMsgOut = required ? err : warn;
+  std::string *failMsgOut = required ? err : warn;
 
   out->clear();
 
@@ -1281,16 +1536,17 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
       fs->ReadWholeFile(&buf, &fileReadErr, filepath, fs->user_data);
   if (!fileRead) {
     if (failMsgOut) {
-      (*failMsgOut) += "File read error : " + filepath + " : " + fileReadErr + "\n";
+      (*failMsgOut) +=
+          "File read error : " + filepath + " : " + fileReadErr + "\n";
     }
     return false;
   }
 
   size_t sz = buf.size();
   if (sz == 0) {
-    if(failMsgOut) {
+    if (failMsgOut) {
       (*failMsgOut) += "File is empty : " + filepath + "\n";
-	}
+    }
     return false;
   }
 
@@ -1325,18 +1581,19 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
   (void)warn;
 
   int w, h, comp, req_comp;
-  
+
   // force 32-bit textures for common Vulkan compatibility. It appears that
   // some GPU drivers do not support 24-bit images for Vulkan
   req_comp = 4;
-  
+
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
   // FIXME we should only enter this function if the image is embedded. If
   // image->uri references
   // an image file, it should be left as it is. Image loading should not be
   // mandatory (to support other formats)
-  unsigned char *data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
+  unsigned char *data =
+      stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
     // NOTE: you can use `warn` instead of `err`
     if (err) {
@@ -1409,18 +1666,25 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   std::vector<unsigned char> data;
 
   if (ext == "png") {
-    stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
-                           image->height, image->component, &image->image[0],
-                           0);
+    if (!stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
+                                image->height, image->component,
+                                &image->image[0], 0)) {
+      return false;
+    }
     header = "data:image/png;base64,";
   } else if (ext == "jpg") {
-    stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
-                           image->height, image->component, &image->image[0],
-                           100);
+    if (!stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
+                                image->height, image->component,
+                                &image->image[0], 100)) {
+      return false;
+    }
     header = "data:image/jpeg;base64,";
   } else if (ext == "bmp") {
-    stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
-                           image->height, image->component, &image->image[0]);
+    if (!stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
+                                image->height, image->component,
+                                &image->image[0])) {
+      return false;
+    }
     header = "data:image/bmp;base64,";
   } else if (!embedImages) {
     // Error: can't output requested format to file
@@ -1445,6 +1709,7 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
       if (!fs->WriteWholeFile(&writeError, imagefilepath, data,
                               fs->user_data)) {
         // Could not write image file to disc; Throw error ?
+        return false;
       }
     } else {
       // Throw error?
@@ -1671,9 +1936,8 @@ bool IsDataURI(const std::string &in) {
   return false;
 }
 
-bool DecodeDataURI(std::vector<unsigned char> *out,
-                          std::string &mime_type, const std::string &in,
-                          size_t reqBytes, bool checkSize) {
+bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
+                   const std::string &in, size_t reqBytes, bool checkSize) {
   std::string header = "data:application/octet-stream;base64,";
   std::string data;
   if (in.find(header) == 0) {
@@ -2135,6 +2399,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
 
   ParseStringProperty(&image->name, err, o, "name", false);
   ParseExtensionsProperty(&image->extensions, err, o);
+  ParseExtrasProperty(&image->extras, o);
 
   if (hasBufferView) {
     double bufferView = -1;
@@ -2285,8 +2550,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
         }
       } else {
         // External .bin file.
-        if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr, buffer->uri,
-                              basedir, true, bytes, true, fs)) {
+        if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr,
+                              buffer->uri, basedir, true, bytes, true, fs)) {
           return false;
         }
       }
@@ -2837,10 +3102,10 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
   double zfar = 0.0;  // = invalid
   ParseNumberProperty(&zfar, err, o, "zfar", false, "PerspectiveCamera");
 
-  camera->aspectRatio = float(aspectRatio);
-  camera->zfar = float(zfar);
-  camera->yfov = float(yfov);
-  camera->znear = float(znear);
+  camera->aspectRatio = aspectRatio;
+  camera->zfar = zfar;
+  camera->yfov = yfov;
+  camera->znear = znear;
 
   ParseExtensionsProperty(&camera->extensions, err, o);
   ParseExtrasProperty(&(camera->extras), o);
@@ -2876,10 +3141,10 @@ static bool ParseOrthographicCamera(OrthographicCamera *camera,
   ParseExtensionsProperty(&camera->extensions, err, o);
   ParseExtrasProperty(&(camera->extras), o);
 
-  camera->xmag = float(xmag);
-  camera->ymag = float(ymag);
-  camera->zfar = float(zfar);
-  camera->znear = float(znear);
+  camera->xmag = xmag;
+  camera->ymag = ymag;
+  camera->zfar = zfar;
+  camera->znear = znear;
 
   // TODO(syoyo): Validate parameter values.
 
@@ -3891,6 +4156,7 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   }
 
   SerializeStringProperty("type", type, o);
+  if (!accessor.name.empty()) SerializeStringProperty("name", accessor.name, o);
 
   if (accessor.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", accessor.extras, o);
@@ -3921,7 +4187,8 @@ static void SerializeGltfAnimationSampler(AnimationSampler &sampler, json &o) {
 }
 
 static void SerializeGltfAnimation(Animation &animation, json &o) {
-  SerializeStringProperty("name", animation.name, o);
+  if (!animation.name.empty())
+    SerializeStringProperty("name", animation.name, o);
   json channels;
   for (unsigned int i = 0; i < animation.channels.size(); ++i) {
     json channel;
@@ -4112,7 +4379,7 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
 }
 
 static void SerializeGltfLight(Light &light, json &o) {
-  SerializeStringProperty("name", light.name, o);
+  if (!light.name.empty()) SerializeStringProperty("name", light.name, o);
   SerializeNumberArrayProperty("color", light.color, o);
   SerializeStringProperty("type", light.type, o);
 }
@@ -4147,7 +4414,7 @@ static void SerializeGltfNode(Node &node, json &o) {
   }
 
   SerializeExtensionMap(node.extensions, o);
-  SerializeStringProperty("name", node.name, o);
+  if (!node.name.empty()) SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
 }
 
@@ -4237,18 +4504,21 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   if (texture.sampler > -1) {
     SerializeNumberProperty("sampler", texture.sampler, o);
   }
-  SerializeNumberProperty("source", texture.source, o);
-
+  if (texture.source > -1) {
+    SerializeNumberProperty("source", texture.source, o);
+  }
   if (texture.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", texture.extras, o);
   }
   SerializeExtensionMap(texture.extensions, o);
 }
 
-static void WriteGltfFile(const std::string &output,
+static bool WriteGltfFile(const std::string &output,
                           const std::string &content) {
   std::ofstream gltfFile(output.c_str());
+  if (!gltfFile.is_open()) return false;
   gltfFile << content << std::endl;
+  return true;
 }
 
 bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
@@ -4284,31 +4554,50 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   SerializeGltfAsset(model->asset, asset);
   output["asset"] = asset;
 
-  std::string binFilename = GetBaseFilename(filename);
-  std::string ext = ".bin";
-  std::string::size_type pos = binFilename.rfind('.', binFilename.length());
+  std::string defaultBinFilename = GetBaseFilename(filename);
+  std::string defaultBinFileExt = ".bin";
+  std::string::size_type pos = defaultBinFilename.rfind('.', defaultBinFilename.length());
 
   if (pos != std::string::npos) {
-    binFilename = binFilename.substr(0, pos) + ext;
-  } else {
-    binFilename = binFilename + ".bin";
+    defaultBinFilename = defaultBinFilename.substr(0, pos);
   }
   std::string baseDir = GetBaseDir(filename);
   if (baseDir.empty()) {
     baseDir = "./";
   }
 
-  std::string binSaveFilePath = JoinPath(baseDir, binFilename);
-
-  // BUFFERS (We expect only one buffer here)
+  // BUFFERS
+  std::vector<std::string> usedUris;
   json buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
     if (embedBuffers) {
       SerializeGltfBuffer(model->buffers[i], buffer);
     } else {
-      SerializeGltfBuffer(model->buffers[i], buffer, binSaveFilePath,
-                          binFilename);
+      std::string binSavePath;
+      std::string binUri;
+      if (!model->buffers[i].uri.empty() 
+        && !IsDataURI(model->buffers[i].uri)) {
+        binUri = model->buffers[i].uri;
+      }
+      else {
+        binUri = defaultBinFilename + defaultBinFileExt;
+        bool inUse = true;
+        int numUsed = 0;
+        while(inUse) {
+          inUse = false;
+          for (const std::string& usedName : usedUris) {
+            if (binUri.compare(usedName) != 0) continue;
+            inUse = true;
+            binUri = defaultBinFilename + std::to_string(numUsed++) + defaultBinFileExt;
+            break;
+          }
+        }
+      }
+      usedUris.push_back(binUri);
+	  binSavePath = JoinPath(baseDir, binUri);
+      SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
+                          binUri);
     }
     buffers.push_back(buffer);
   }
@@ -4471,8 +4760,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     SerializeValue("extras", model->extras, output);
   }
 
-  WriteGltfFile(filename, output.dump());
-  return true;
+  return WriteGltfFile(filename, output.dump());
 }
 
 }  // namespace tinygltf
