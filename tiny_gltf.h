@@ -1245,9 +1245,8 @@ bool Parameter::operator==(const Parameter &other) const {
       this->has_number_value != other.has_number_value)
     return false;
 
-  if (this->has_number_value)
-    if (!TINYGLTF_DOUBLE_EQUAL(this->number_value, other.number_value))
-      return false;
+  if (!TINYGLTF_DOUBLE_EQUAL(this->number_value, other.number_value))
+    return false;
 
   if (this->json_double_value.size() != other.json_double_value.size())
     return false;
