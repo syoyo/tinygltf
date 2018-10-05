@@ -487,7 +487,7 @@ struct Texture {
   std::string name;
 
   int sampler;
-  int source;  // Required (not specified in the spec ?)
+  int source;
   Value extras;
   ExtensionMap extensions;
 
@@ -2475,6 +2475,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
 
   ParseStringProperty(&image->name, err, o, "name", false);
   ParseExtensionsProperty(&image->extensions, err, o);
+  ParseExtrasProperty(&image->extras, o);
 
   if (hasBufferView) {
     double bufferView = -1;
@@ -4578,8 +4579,9 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   if (texture.sampler > -1) {
     SerializeNumberProperty("sampler", texture.sampler, o);
   }
-  SerializeNumberProperty("source", texture.source, o);
-
+  if (texture.source > -1) {
+    SerializeNumberProperty("source", texture.source, o);
+  }
   if (texture.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", texture.extras, o);
   }
