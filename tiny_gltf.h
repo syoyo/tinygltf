@@ -4567,7 +4567,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   // BUFFERS
-  int numDefaultBufferNamesUsed = 0;
+  std::vector<std::string> usedUris;
   json buffers;
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
@@ -4575,17 +4575,26 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       SerializeGltfBuffer(model->buffers[i], buffer);
     } else {
       std::string binSavePath;
-	  std::string binUri;
-	  if (!model->buffers[i].uri.empty() 
+      std::string binUri;
+      if (!model->buffers[i].uri.empty() 
         && !IsDataURI(model->buffers[i].uri)) {
         binUri = model->buffers[i].uri;
-	  }
-	  else {
-        binUri = defaultBinFilename;
-        if(numDefaultBufferNamesUsed > 0)
-          binUri += std::to_string(numDefaultBufferNamesUsed++);
-        binUri += defaultBinFileExt;
-	  }
+      }
+      else {
+        binUri = defaultBinFilename + defaultBinFileExt;
+        bool inUse = true;
+		int numUsed = 0;
+        while(inUse) {
+          inUse = false;
+          for (const std::string& usedName : usedUris) {
+            if (binUri.compare(usedName) != 0) continue;
+            inUse = true;
+            binUri = defaultBinFilename + std::to_string(numUsed++) + defaultBinFileExt;
+            break;
+          }
+        }
+      }
+      usedUris.push_back(binUri);
 	  binSavePath = JoinPath(baseDir, binUri);
       SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
                           binUri);
