@@ -24,6 +24,7 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] Windows + MinGW
   * [x] Windows + Visual Studio 2015 Update 3 or later.
     * Visual Studio 2013 is not supported since they have limited C++11 support and failed to compile `json.hpp`.
+  * [x] Android NDK
   * [x] Android + CrystaX(NDK drop-in replacement) GCC
   * [x] Web using Emscripten(LLVM)
 * Moderate parsing time and memory consumption.
@@ -41,6 +42,7 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] JPEG(8bit only)
   * [x] BMP
   * [x] GIF
+  * [x] Custom Image decoder callback(e.g. for decoding OpenEXR image)
 
 ## Examples
 
@@ -63,7 +65,7 @@ v2.0.0 release(22 Aug, 2018)!
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
   * [ ] OpenEXR extension through TinyEXR.
-* [ ] Write exampple and tests for `animation` and `skin` 
+* [ ] Write example and tests for `animation` and `skin` 
 
 ## Licenses
 
