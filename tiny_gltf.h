@@ -4583,7 +4583,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       else {
         binUri = defaultBinFilename + defaultBinFileExt;
         bool inUse = true;
-		int numUsed = 0;
+        int numUsed = 0;
         while(inUse) {
           inUse = false;
           for (const std::string& usedName : usedUris) {
