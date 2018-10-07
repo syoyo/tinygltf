@@ -2,7 +2,9 @@
 
 Example use CPU implementation of skinning for the explanation of how to process skin property in glTF format.
 
-OpenGL is used to display transformed vertex.
+Animation and skinning code is based on SacchaWillems' Vulkan-glTF-PBR: https://github.com/SaschaWillems/Vulkan-glTF-PBR
+
+OpenGL is still used to display renderings.
 
 ## Build on Linux and macOS
 

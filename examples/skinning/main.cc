@@ -12,8 +12,8 @@
 #define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
 
-#include "../common/trackball.h"
 #include "../common/matrix.h"
+#include "../common/trackball.h"
 
 #include "skinning.h"
 
@@ -49,7 +49,9 @@ float eye[3], lookat[3], up[3];
 
 GLFWwindow *window;
 
-typedef struct { GLuint vb; } GLBufferState;
+typedef struct {
+  GLuint vb;
+} GLBufferState;
 
 typedef struct {
   std::vector<GLuint> diffuseTex;  // for each primitive in mesh
@@ -65,16 +67,36 @@ typedef struct {
   size_t count;  // byte count
 } GLCurvesState;
 
-
-// Stores vertex position transformed by skinning 
+// Stores vertex position transformed by skinning
 typedef struct {
-  std::vector<float> positions; // float4
+  std::vector<float> positions;  // float4
 } SkinnedMesh;
 
 typedef struct {
-  std::vector<example::mat4> inverseBindMatrices; // mat44
+  std::vector<example::mat4> inverseBindMatrices;  // mat44
 } SkinningMatrices;
 
+struct AnimationChannel {
+  enum PathType { TRANSLATION, ROTATION, SCALE };
+  PathType path;
+  // Node *node;
+  uint32_t samplerIndex;
+};
+
+struct AnimationSampler {
+  enum InterpolationType { LINEAR, STEP, CUBICSPLINE };
+  InterpolationType interpolation;
+  std::vector<float> inputs;
+  std::vector<example::vec4> outputsVec4;
+};
+
+struct Animation {
+  std::string name;
+  std::vector<AnimationSampler> samplers;
+  std::vector<AnimationChannel> channels;
+  float start = std::numeric_limits<float>::max();
+  float end = std::numeric_limits<float>::min();
+};
 
 std::map<int, GLBufferState> gBufferState;
 std::map<std::string, GLMeshState> gMeshState;
@@ -545,7 +567,8 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
     for (; it != itEnd; it++) {
       assert(it->second >= 0);
       const tinygltf::Accessor &accessor = model.accessors[it->second];
-      const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+      const tinygltf::BufferView &bufferView =
+          model.bufferViews[accessor.bufferView];
 
       if (bufferView.target == 0) {
         continue;
@@ -571,12 +594,13 @@ static void DrawMesh(tinygltf::Model &model, const tinygltf::Mesh &mesh) {
           (it->first.compare("TEXCOORD_0") == 0)) {
         if (gGLProgramState.attribs[it->first] >= 0) {
           // Compute byteStride from Accessor + BufferView combination.
-          int byteStride = accessor.ByteStride(model.bufferViews[accessor.bufferView]);
+          int byteStride =
+              accessor.ByteStride(model.bufferViews[accessor.bufferView]);
           assert(byteStride != -1);
           glVertexAttribPointer(gGLProgramState.attribs[it->first], size,
-                                accessor.componentType, accessor.normalized ? GL_TRUE : GL_FALSE,
-                                byteStride,
-                                BUFFER_OFFSET(accessor.byteOffset));
+                                accessor.componentType,
+                                accessor.normalized ? GL_TRUE : GL_FALSE,
+                                byteStride, BUFFER_OFFSET(accessor.byteOffset));
           CheckErrors("vertex attrib pointer");
           glEnableVertexAttribArray(gGLProgramState.attribs[it->first]);
           CheckErrors("enable vertex attrib array");
@@ -742,8 +766,9 @@ static void PrintNodes(const tinygltf::Scene &scene) {
   }
 }
 
-static void ConstructNodeMatrix(const tinygltf::Node &node, example::mat4 *xform) {
-
+#if 0
+static void ConstructNodeMatrix(const tinygltf::Node &node,
+                                example::mat4 *xform) {
   if (node.matrix.size() == 16) {
     for (size_t j = 0; j < 4; j++) {
       for (size_t i = 0; i < 4; i++) {
@@ -779,45 +804,54 @@ static void ConstructNodeMatrix(const tinygltf::Node &node, example::mat4 *xform
   }
 
   example::BuildTransofrmMatrix(translation, rotation, scale, xform);
-
 }
 
 //
-// Hierarchically evalute skining matrix
+// Hierarchically evalute skining
 //
-static void ApplySkinningToMesh(const tinygltf::model &model, const tinygltf::Node &node, example::mat4 &parent_xform, std::vector<SkinnedMesh> *skinned_meshes) {
-  example::mat4 xform = parent_xform;
+static void ApplySkinningToMesh(const tinygltf::Model &model,
+                                const tinygltf::Node &node,
+                                example::mat4 &parent_xform,
+                                std::vector<SkinnedMesh> *skinned_meshes) {
+  example::mat4 node_xform;
+  ConstructNodeMatrix(node, &node_xform);
 
   if (node.mesh) {
     if (node.skin) {
     }
   }
 
+  example::mat4 xform;
+  Matrix::Mult(xform.m, parent_xform.m, node_xform.m);
+
   for (auto &child : node.children) {
-    ApplySkinningToMesh(model.nodes[child], xform, skinned_meshes);
+    ApplySkinningToMesh(model, model.nodes[child], xform, skinned_meshes);
   }
 }
+#endif
 
 //
 // Read inverseBindMatricies for each skin
 //
-static void SetupSkinningMatrices(const tinygltf::Model &model, std::map<int, SkinningMatrices> &skinning_matrices)
-{
+static void SetupSkinningMatrices(
+    const tinygltf::Model &model,
+    std::map<int, SkinningMatrices> &skinning_matrices) {
   for (size_t s = 0; s < model.skins.size(); s++) {
     const tinygltf::Skin &skin = model.skins[s];
 
     if (skin.inverseBindMatrices > -1) {
-
       if (skin.joints.size() > 0) {
-
-        const tinygltf::Accessor &accessor = model.accessors[skin.inverseBindMatrices];
+        const tinygltf::Accessor &accessor =
+            model.accessors[skin.inverseBindMatrices];
         assert(accessor.type == TINYGLTF_TYPE_MAT4);
 
-        const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
+        const tinygltf::BufferView &bufferView =
+            model.bufferViews[accessor.bufferView];
 
         const tinygltf::Buffer &buffer = model.buffers[bufferView.buffer];
 
-        const float *ptr = reinterpret_cast<const float *>(buffer.data.data() + accessor.byteOffset + bufferView.byteOffset);
+        const float *ptr = reinterpret_cast<const float *>(
+            buffer.data.data() + accessor.byteOffset + bufferView.byteOffset);
         std::cout << "count = " << accessor.count << std::endl;
 
         std::vector<example::mat4> inverse_bind_matrices(accessor.count);
@@ -830,14 +864,11 @@ static void SetupSkinningMatrices(const tinygltf::Model &model, std::map<int, Sk
 
           std::cout << "j[" << j << "] = " << std::endl;
           Matrix::Print(inverse_bind_matrices[j].m);
-        
         }
 
         skinning_matrices[s].inverseBindMatrices = inverse_bind_matrices;
-
       }
     }
-    
   }
 }
 
@@ -862,7 +893,8 @@ int main(int argc, char **argv) {
   bool ret = false;
   if (ext.compare("glb") == 0) {
     // assume binary glTF.
-    ret = loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
+    ret =
+        loader.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
   } else {
     // assume ascii glTF.
     ret = loader.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
@@ -886,10 +918,11 @@ int main(int argc, char **argv) {
     std::cerr << "Scene is empty" << std::endl;
     return EXIT_FAILURE;
   }
-  
+
   std::cout << "defaultScene = " << model.defaultScene << std::endl;
   if (model.defaultScene >= int(model.scenes.size())) {
-    std::cerr << "Invalid defualtScene value : " << model.defaultScene << std::endl;
+    std::cerr << "Invalid defualtScene value : " << model.defaultScene
+              << std::endl;
     return EXIT_FAILURE;
   }
 
