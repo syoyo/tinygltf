@@ -8,7 +8,7 @@ solution "glview"
       kind "ConsoleApp"
       language "C++"
 	  cppdialect "C++11"
-      files { "glview.cc", "trackball.cc" }
+      files { "glview.cc", "../common/trackball.cc" }
       includedirs { "./" }
       includedirs { "../../" }
 
