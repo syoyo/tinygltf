@@ -41,4 +41,48 @@ TEST_CASE("datauri-in-glb", "[issue-79]") {
   REQUIRE(true == ret);
 }
 
+TEST_CASE("extension-with-empty-object", "[issue-97]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/Extensions-issue97/test.gltf");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+  REQUIRE(true == ret);
+
+  REQUIRE(model.extensionsUsed.size() == 1);
+  REQUIRE(model.extensionsUsed[0].compare("VENDOR_material_some_ext") == 0);
+
+  REQUIRE(model.materials.size() == 1);
+  REQUIRE(model.materials[0].extensions.size() == 1);
+  REQUIRE(model.materials[0].extensions.count("VENDOR_material_some_ext") == 1);
+
+  // TODO(syoyo): create temp directory.
+  {
+    ret = ctx.WriteGltfSceneToFile(&model, "issue-97.gltf", true, true);
+    REQUIRE(true == ret);
+
+    tinygltf::Model m;
+
+    // read back serialized glTF
+    bool ret = ctx.LoadASCIIFromFile(&m, &err, &warn, "issue-97.gltf");
+    if (!err.empty()) {
+      std::cerr << err << std::endl;
+    }
+    REQUIRE(true == ret);
+
+    REQUIRE(m.extensionsUsed.size() == 1);
+    REQUIRE(m.extensionsUsed[0].compare("VENDOR_material_some_ext") == 0);
+
+    REQUIRE(m.materials.size() == 1);
+    REQUIRE(m.materials[0].extensions.size() == 1);
+    REQUIRE(m.materials[0].extensions.count("VENDOR_material_some_ext") == 1);
+  }
+    
+}
+
 

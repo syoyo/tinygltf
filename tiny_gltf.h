@@ -4115,7 +4115,17 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
   for (ExtensionMap::iterator extIt = extensions.begin();
        extIt != extensions.end(); ++extIt) {
     json extension_values;
-    SerializeValue(extIt->first, extIt->second, extMap);
+
+    // Allow an empty object for extension(#97)
+    json ret;
+    if (ValueToJson(extIt->second, &ret)) {
+      extMap[extIt->first] = ret;
+    } else {
+      if (!(extIt->first.empty())) { // name should not be empty, but for sure 
+        // create empty object so that an extension name is still included in json.
+        extMap[extIt->first] = json({});
+      }
+    }
   }
   o["extensions"] = extMap;
 }
@@ -4760,7 +4770,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     SerializeValue("extras", model->extras, output);
   }
 
-  return WriteGltfFile(filename, output.dump());
+  // pretty printing with spacing 2
+  return WriteGltfFile(filename, output.dump(2));
 }
 
 }  // namespace tinygltf
