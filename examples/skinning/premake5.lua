@@ -18,7 +18,7 @@ solution "skinning"
       kind "ConsoleApp"
       language "C++"
 	  cppdialect "C++11"
-      files { "main.cc", "skinning.cc", "../common/trackball.cc", "../common/matrix.cc" }
+      files { "main.cc", "skinning.cc", "morph-targets.cc", "../common/trackball.cc", "../common/matrix.cc" }
       includedirs { "./" }
       includedirs { "../../" }
 
