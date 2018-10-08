@@ -923,7 +923,8 @@ class TinyGLTF {
   ///
   bool WriteGltfSceneToFile(Model *model, const std::string &filename,
                             bool embedImages,
-                            bool embedBuffers /*, bool writeBinary*/);
+                            bool embedBuffers,
+                            bool prettyPrint /*, bool writeBinary*/);
 
   ///
   /// Set callback to use for loading image data
@@ -2347,7 +2348,12 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
   json::const_iterator extIt = it.value().begin();
   for (; extIt != it.value().end(); extIt++) {
     if (!extIt.value().is_object()) continue;
-    ParseJsonAsValue(&extensions[extIt.key()], extIt.value());
+	if (!ParseJsonAsValue(&extensions[extIt.key()], extIt.value())) {
+      if (!extIt.key().empty()) {
+        // create empty object so that an extension object is still of type object
+        extensions[extIt.key()] = Value{ Value::Object{} };
+      }
+	}
   }
   if (ret) {
     (*ret) = extensions;
@@ -4471,7 +4477,7 @@ static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
 static void SerializeGltfCamera(const Camera &camera, json &o) {
   SerializeStringProperty("type", camera.type, o);
   if (!camera.name.empty()) {
-    SerializeStringProperty("name", camera.type, o);
+    SerializeStringProperty("name", camera.name, o);
   }
 
   if (camera.type.compare("orthographic") == 0) {
@@ -4533,7 +4539,8 @@ static bool WriteGltfFile(const std::string &output,
 
 bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
                                     bool embedImages = false,
-                                    bool embedBuffers = false
+                                    bool embedBuffers = false,
+                                    bool prettyPrint = true
                                     /*, bool writeBinary*/) {
   json output;
 
@@ -4771,7 +4778,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   // pretty printing with spacing 2
-  return WriteGltfFile(filename, output.dump(2));
+  return WriteGltfFile(filename, output.dump(prettyPrint ? 2 : 0));
 }
 
 }  // namespace tinygltf
