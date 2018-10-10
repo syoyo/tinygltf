@@ -4126,7 +4126,8 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
     json ret;
     if (ValueToJson(extIt->second, &ret)) {
       extMap[extIt->first] = ret;
-    } else {
+    }
+    if(ret.is_null()) {
       if (!(extIt->first.empty())) { // name should not be empty, but for sure 
         // create empty object so that an extension name is still included in json.
         extMap[extIt->first] = json({});
