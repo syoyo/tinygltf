@@ -4077,12 +4077,14 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
   SerializeStringProperty("uri", header + encodedData, o);
 }
 
-static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
+static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     const std::string &binFilename) {
   std::ofstream output(binFilename.c_str(), std::ofstream::binary);
+  if(!output.is_open()) return false;
   output.write(reinterpret_cast<const char *>(&data[0]),
                std::streamsize(data.size()));
   output.close();
+  return true;
 }
 
 static void SerializeParameterMap(ParameterMap &param, json &o) {
@@ -4257,10 +4259,10 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o) {
   }
 }
 
-static void SerializeGltfBuffer(Buffer &buffer, json &o,
+static bool SerializeGltfBuffer(Buffer &buffer, json &o,
                                 const std::string &binFilename,
                                 const std::string &binBaseFilename) {
-  SerializeGltfBufferData(buffer.data, binFilename);
+  if(!SerializeGltfBufferData(buffer.data, binFilename)) return false;
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
   SerializeStringProperty("uri", binBaseFilename, o);
 
@@ -4269,6 +4271,7 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o,
   if (buffer.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", buffer.extras, o);
   }
+  return true;
 }
 
 static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
@@ -4614,8 +4617,10 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       }
       usedUris.push_back(binUri);
 	  binSavePath = JoinPath(baseDir, binUri);
-      SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
-                          binUri);
+      if(!SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
+                          binUri)) {
+        return false;
+      }
     }
     buffers.push_back(buffer);
   }
