@@ -923,7 +923,8 @@ class TinyGLTF {
   ///
   bool WriteGltfSceneToFile(Model *model, const std::string &filename,
                             bool embedImages,
-                            bool embedBuffers /*, bool writeBinary*/);
+                            bool embedBuffers,
+                            bool prettyPrint /*, bool writeBinary*/);
 
   ///
   /// Set callback to use for loading image data
@@ -2347,7 +2348,12 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
   json::const_iterator extIt = it.value().begin();
   for (; extIt != it.value().end(); extIt++) {
     if (!extIt.value().is_object()) continue;
-    ParseJsonAsValue(&extensions[extIt.key()], extIt.value());
+	if (!ParseJsonAsValue(&extensions[extIt.key()], extIt.value())) {
+      if (!extIt.key().empty()) {
+        // create empty object so that an extension object is still of type object
+        extensions[extIt.key()] = Value{ Value::Object{} };
+      }
+	}
   }
   if (ret) {
     (*ret) = extensions;
@@ -4071,12 +4077,14 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
   SerializeStringProperty("uri", header + encodedData, o);
 }
 
-static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
+static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     const std::string &binFilename) {
   std::ofstream output(binFilename.c_str(), std::ofstream::binary);
+  if(!output.is_open()) return false;
   output.write(reinterpret_cast<const char *>(&data[0]),
                std::streamsize(data.size()));
   output.close();
+  return true;
 }
 
 static void SerializeParameterMap(ParameterMap &param, json &o) {
@@ -4120,7 +4128,8 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
     json ret;
     if (ValueToJson(extIt->second, &ret)) {
       extMap[extIt->first] = ret;
-    } else {
+    }
+    if(ret.is_null()) {
       if (!(extIt->first.empty())) { // name should not be empty, but for sure 
         // create empty object so that an extension name is still included in json.
         extMap[extIt->first] = json({});
@@ -4250,10 +4259,10 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o) {
   }
 }
 
-static void SerializeGltfBuffer(Buffer &buffer, json &o,
+static bool SerializeGltfBuffer(Buffer &buffer, json &o,
                                 const std::string &binFilename,
                                 const std::string &binBaseFilename) {
-  SerializeGltfBufferData(buffer.data, binFilename);
+  if(!SerializeGltfBufferData(buffer.data, binFilename)) return false;
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
   SerializeStringProperty("uri", binBaseFilename, o);
 
@@ -4262,6 +4271,7 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o,
   if (buffer.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", buffer.extras, o);
   }
+  return true;
 }
 
 static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
@@ -4471,7 +4481,7 @@ static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
 static void SerializeGltfCamera(const Camera &camera, json &o) {
   SerializeStringProperty("type", camera.type, o);
   if (!camera.name.empty()) {
-    SerializeStringProperty("name", camera.type, o);
+    SerializeStringProperty("name", camera.name, o);
   }
 
   if (camera.type.compare("orthographic") == 0) {
@@ -4533,7 +4543,8 @@ static bool WriteGltfFile(const std::string &output,
 
 bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
                                     bool embedImages = false,
-                                    bool embedBuffers = false
+                                    bool embedBuffers = false,
+                                    bool prettyPrint = true
                                     /*, bool writeBinary*/) {
   json output;
 
@@ -4606,8 +4617,10 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       }
       usedUris.push_back(binUri);
 	  binSavePath = JoinPath(baseDir, binUri);
-      SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
-                          binUri);
+      if(!SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
+                          binUri)) {
+        return false;
+      }
     }
     buffers.push_back(buffer);
   }
@@ -4771,7 +4784,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   // pretty printing with spacing 2
-  return WriteGltfFile(filename, output.dump(2));
+  return WriteGltfFile(filename, output.dump(prettyPrint ? 2 : 0));
 }
 
 }  // namespace tinygltf
