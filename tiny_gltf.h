@@ -1703,7 +1703,7 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   } else {
     // Write image to disc
     FsCallbacks *fs = reinterpret_cast<FsCallbacks *>(fsPtr);
-    if (fs != nullptr && fs->WriteWholeFile == nullptr) {
+    if ((fs != nullptr) && (fs->WriteWholeFile != nullptr)) {
       const std::string imagefilepath = JoinPath(*basepath, *filename);
       std::string writeError;
       if (!fs->WriteWholeFile(&writeError, imagefilepath, data,
