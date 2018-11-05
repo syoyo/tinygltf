@@ -11,6 +11,7 @@ solution "glview"
       files { "glview.cc", "../common/trackball.cc" }
       includedirs { "./" }
       includedirs { "../../" }
+      includedirs { "../common/" }
 
       configuration { "linux" }
          linkoptions { "`pkg-config --libs glfw3`" }

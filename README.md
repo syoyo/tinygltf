@@ -33,10 +33,10 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] Binary glTF(GLB)
   * [x] PBR material description
 * Buffers
-  * [x] Parse BASE64 encoded embedded buffer fata(DataURI).
+  * [x] Parse BASE64 encoded embedded buffer data(DataURI).
   * [x] Load `.bin` file.
 * Image(Using stb_image)
-  * [x] Parse BASE64 encoded embedded image fata(DataURI).
+  * [x] Parse BASE64 encoded embedded image data(DataURI).
   * [x] Load external image file.
   * [x] PNG(8bit only)
   * [x] JPEG(8bit only)
