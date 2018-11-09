@@ -1704,7 +1704,7 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   } else {
     // Write image to disc
     FsCallbacks *fs = reinterpret_cast<FsCallbacks *>(fsPtr);
-    if (fs != nullptr && fs->WriteWholeFile == nullptr) {
+    if ((fs != nullptr) && (fs->WriteWholeFile != nullptr)) {
       const std::string imagefilepath = JoinPath(*basepath, *filename);
       std::string writeError;
       if (!fs->WriteWholeFile(&writeError, imagefilepath, data,
@@ -4130,7 +4130,7 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
       extMap[extIt->first] = ret;
     }
     if(ret.is_null()) {
-      if (!(extIt->first.empty())) { // name should not be empty, but for sure 
+      if (!(extIt->first.empty())) { // name should not be empty, but for sure
         // create empty object so that an extension name is still included in json.
         extMap[extIt->first] = json({});
       }
@@ -4598,7 +4598,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     } else {
       std::string binSavePath;
       std::string binUri;
-      if (!model->buffers[i].uri.empty() 
+      if (!model->buffers[i].uri.empty()
         && !IsDataURI(model->buffers[i].uri)) {
         binUri = model->buffers[i].uri;
       }
@@ -4655,7 +4655,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       json image;
 
       UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
-                        &this->WriteImageData, &this->write_image_user_data_);
+                        &this->WriteImageData, this->write_image_user_data_);
       SerializeGltfImage(model->images[i], image);
       images.push_back(image);
     }
