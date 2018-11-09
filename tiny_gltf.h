@@ -4441,6 +4441,7 @@ static void SerializeGltfNode(Node &node, json &o) {
 static void SerializeGltfSampler(Sampler &sampler, json &o) {
   SerializeNumberProperty("magFilter", sampler.magFilter, o);
   SerializeNumberProperty("minFilter", sampler.minFilter, o);
+  SerializeNumberProperty("wrapR", sampler.wrapR, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
 
