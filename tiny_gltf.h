@@ -924,7 +924,8 @@ class TinyGLTF {
   bool WriteGltfSceneToFile(Model *model, const std::string &filename,
                             bool embedImages,
                             bool embedBuffers,
-                            bool prettyPrint /*, bool writeBinary*/);
+                            bool prettyPrint,
+                            bool writeBinary);
 
   ///
   /// Set callback to use for loading image data
@@ -4541,11 +4542,40 @@ static bool WriteGltfFile(const std::string &output,
   return true;
 }
 
+static void WriteBinaryGltfFile(const std::string &output,
+                                const std::string &content) {
+  std::ofstream gltfFile(output.c_str(), std::ios::binary);
+
+  const std::string header = "glTF";
+  const int version = 2;
+  const int padding_size = content.size() % 4;
+
+  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, padding
+  const int length = 12 + 8 + content.size() + padding_size;
+  
+  gltfFile.write(header.c_str(), header.size());
+  gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
+  gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
+
+  // JSON chunk info, then JSON data
+  const int model_length = content.size() + padding_size;
+  const int model_format = 0x4E4F534A;
+  gltfFile.write(reinterpret_cast<const char *>(&model_length), sizeof(model_length));
+  gltfFile.write(reinterpret_cast<const char *>(&model_format), sizeof(model_format));
+  gltfFile.write(content.c_str(), content.size());
+
+  // Chunk must be multiplies of 4, so pad with spaces
+  if (padding_size > 0) {
+    const std::string padding = std::string(padding_size, ' ');
+    gltfFile.write(padding.c_str(), padding.size());
+  }
+}
+
 bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
                                     bool embedImages = false,
                                     bool embedBuffers = false,
-                                    bool prettyPrint = true
-                                    /*, bool writeBinary*/) {
+                                    bool prettyPrint = true,
+                                    bool writeBinary = false) {
   json output;
 
   // ACCESSORS
@@ -4783,8 +4813,13 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     SerializeValue("extras", model->extras, output);
   }
 
-  // pretty printing with spacing 2
-  return WriteGltfFile(filename, output.dump(prettyPrint ? 2 : 0));
+  if (writeBinary) {
+    WriteBinaryGltfFile(filename, output.dump());
+  } else {
+    WriteGltfFile(filename, output.dump(prettyPrint ? 2 : 0));
+  }
+
+  return true;
 }
 
 }  // namespace tinygltf
