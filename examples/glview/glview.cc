@@ -12,12 +12,22 @@
 #define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
 
+#ifdef _WIN32
 #include "../common/trackball.h"
+#else
+#include "trackball.h"
+#endif
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+
+#ifdef _WIN32
 #include "../../tiny_gltf.h"
+#else
+#include "tiny_gltf.h"
+#endif
+
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -736,9 +746,9 @@ int main(int argc, char **argv) {
   std::string warn;
 
 #ifdef _WIN32
-  #ifdef _DEBUG
+#ifdef _DEBUG
     std::string input_filename(argv[1] ? argv[1] : "../../../models/Cube/Cube.gltf");
-  #endif
+#endif
 #else
   std::string input_filename(argv[1] ? argv[1] : "../../models/Cube/Cube.gltf");
 #endif
@@ -807,10 +817,10 @@ int main(int argc, char **argv) {
   GLuint vertId = 0, fragId = 0, progId = 0;
 
 #ifdef _WIN32
-  #ifdef _DEBUG
+#ifdef _DEBUG
     const char *shader_frag_filename = "../shader.frag";
     const char *shader_vert_filename = "../shader.vert";
-  #endif
+#endif
 #else
   const char *shader_frag_filename = "shader.frag";
   const char *shader_vert_filename = "shader.vert";
