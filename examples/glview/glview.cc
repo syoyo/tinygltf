@@ -12,12 +12,22 @@
 #define GLFW_INCLUDE_GLU
 #include <GLFW/glfw3.h>
 
+#ifdef _WIN32
+#include "../common/trackball.h"
+#else
 #include "trackball.h"
+#endif
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+
+#ifdef _WIN32
+#include "../../tiny_gltf.h"
+#else
 #include "tiny_gltf.h"
+#endif
+
 
 #define BUFFER_OFFSET(i) ((char *)NULL + (i))
 
@@ -721,8 +731,8 @@ static void PrintNodes(const tinygltf::Scene &scene) {
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    std::cout << "glview input.gltf <scale>\n" << std::endl;
-    return 0;
+    std::cout << "glview input.gltf <scale>" << std::endl;
+    std::cout << "defaulting to example cube model" << std::endl;
   }
 
   float scale = 1.0f;
@@ -734,7 +744,15 @@ int main(int argc, char **argv) {
   tinygltf::TinyGLTF loader;
   std::string err;
   std::string warn;
-  std::string input_filename(argv[1]);
+
+#ifdef _WIN32
+#ifdef _DEBUG
+    std::string input_filename(argv[1] ? argv[1] : "../../../models/Cube/Cube.gltf");
+#endif
+#else
+  std::string input_filename(argv[1] ? argv[1] : "../../models/Cube/Cube.gltf");
+#endif
+
   std::string ext = GetFilePathExtension(input_filename);
 
   bool ret = false;
@@ -797,12 +815,24 @@ int main(int argc, char **argv) {
   reshapeFunc(window, width, height);
 
   GLuint vertId = 0, fragId = 0, progId = 0;
-  if (false == LoadShader(GL_VERTEX_SHADER, vertId, "shader.vert")) {
+
+#ifdef _WIN32
+#ifdef _DEBUG
+    const char *shader_frag_filename = "../shader.frag";
+    const char *shader_vert_filename = "../shader.vert";
+#endif
+#else
+  const char *shader_frag_filename = "shader.frag";
+  const char *shader_vert_filename = "shader.vert";
+#endif
+
+
+  if (false == LoadShader(GL_VERTEX_SHADER, vertId, shader_vert_filename)) {
     return -1;
   }
   CheckErrors("load vert shader");
 
-  if (false == LoadShader(GL_FRAGMENT_SHADER, fragId, "shader.frag")) {
+  if (false == LoadShader(GL_FRAGMENT_SHADER, fragId, shader_frag_filename)) {
     return -1;
   }
   CheckErrors("load frag shader");
