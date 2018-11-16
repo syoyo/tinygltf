@@ -1129,8 +1129,6 @@ static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
       return false;
     }
   }
-
-  return false;
 }
 
 // Equals function for std::vector<double> using TINYGLTF_DOUBLE_EPSILON
@@ -2211,7 +2209,7 @@ static bool ParseStringProperty(
   }
 
   if (ret) {
-    (*ret) = it.value();
+    (*ret) = it.value().get<std::string>();
   }
 
   return true;
