@@ -3479,6 +3479,29 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
   }
 
+  // Assign missing bufferView target types
+  // - Look for missing Mesh indices
+  // - Look for missing bufferView targets
+  for (auto &mesh : model->meshes)
+  {
+    for (auto &primitive : mesh.primitives)
+    {
+      if (primitive.indices > -1) // has indices from parsing step, must be Element Array Buffer
+      {
+        model->bufferViews[primitive.indices].target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+        // we could optionally check if acessors' bufferView type is Scalar, as it should be
+      }
+    }
+  }
+  // find any missing targets, must be an array buffer type if not fulfilled from previous check
+  for (auto &bufferView : model->bufferViews)
+  {
+    if (bufferView.target == 0) // missing target type
+    {
+      bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    }
+  }
+
   // 7. Parse Node
   {
     json::const_iterator rootIt = v.find("nodes");
