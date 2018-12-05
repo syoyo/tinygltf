@@ -455,7 +455,8 @@ struct Sampler {
 
   Sampler()
       : wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
-        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
+        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
+        wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT){}
   bool operator==(const Sampler &) const;
 };
 
@@ -4815,7 +4816,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   if (writeBinary) {
     WriteBinaryGltfFile(filename, output.dump());
   } else {
-    WriteGltfFile(filename, output.dump(prettyPrint ? 2 : 0));
+    WriteGltfFile(filename, output.dump(prettyPrint ? 2 : -1));
   }
 
   return true;
