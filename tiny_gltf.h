@@ -455,7 +455,8 @@ struct Sampler {
 
   Sampler()
       : wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
-        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
+        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
+        wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT){}
   bool operator==(const Sampler &) const;
 };
 
@@ -1129,8 +1130,6 @@ static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
       return false;
     }
   }
-
-  return false;
 }
 
 // Equals function for std::vector<double> using TINYGLTF_DOUBLE_EPSILON
@@ -2211,7 +2210,7 @@ static bool ParseStringProperty(
   }
 
   if (ret) {
-    (*ret) = it.value();
+    (*ret) = it.value().get<std::string>();
   }
 
   return true;
@@ -4817,7 +4816,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   if (writeBinary) {
     WriteBinaryGltfFile(filename, output.dump());
   } else {
-    WriteGltfFile(filename, output.dump(prettyPrint ? 2 : 0));
+    WriteGltfFile(filename, output.dump(prettyPrint ? 2 : -1));
   }
 
   return true;
