@@ -7,3 +7,9 @@ include_directories(../../)
 
 file(GLOB gltfutil_sources *.cc *.h)
 add_executable(gltfutil ${gltfutil_sources})
+
+install ( TARGETS
+  gltfutil
+  DESTINATION
+  bin
+  )
