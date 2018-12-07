@@ -20,3 +20,9 @@ INSTALL ( FILES
   DESTINATION
   include
   )
+
+INSTALL ( FILES
+  cmake/glTFConfig.cmake
+  DESTINATION
+  cmake
+  )
