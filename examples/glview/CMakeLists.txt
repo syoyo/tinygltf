@@ -32,3 +32,9 @@ target_link_libraries ( glview
   ${COREVIDEO_LIBRARY}
   ${IOKIT_LIBRARY}
   )
+
+install ( TARGETS
+  glview
+  DESTINATION
+  bin
+  )
