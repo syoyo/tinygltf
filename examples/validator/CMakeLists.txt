@@ -45,3 +45,9 @@ endif()
 
 # test-zone
 # enable_testing()
+
+install ( TARGETS
+  tinygltf-validator
+  DESTINATION
+  bin
+  )
