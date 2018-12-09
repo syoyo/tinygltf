@@ -3488,7 +3488,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     {
       if (primitive.indices > -1) // has indices from parsing step, must be Element Array Buffer
       {
-        model->bufferViews[primitive.indices].target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+        model->bufferViews[model->accessors[primitive.indices].bufferView]
+            .target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
         // we could optionally check if acessors' bufferView type is Scalar, as it should be
       }
     }
