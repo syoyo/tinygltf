@@ -43,6 +43,9 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] BMP
   * [x] GIF
   * [x] Custom Image decoder callback(e.g. for decoding OpenEXR image)
+* Load from memory
+* Custom callback handler
+  * [x] Image load
 
 ## Examples
 
@@ -66,6 +69,8 @@ v2.0.0 release(22 Aug, 2018)!
 * [ ] HDR image?
   * [ ] OpenEXR extension through TinyEXR.
 * [ ] Write example and tests for `animation` and `skin` 
+  * [ ] Skinning
+  * [ ] Morph targets
 
 ## Licenses
 
