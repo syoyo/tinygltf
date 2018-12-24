@@ -11,6 +11,12 @@ if (apple)
   find_library(COCOA_LIBRARY Cocoa)
   find_library(COREVIDEO_LIBRARY CoreVideo)
   find_library(IOKIT_LIBRARY IOKit)
+else ()
+  if (NOT win32)
+	# This means it is Unices
+	set ( GLFW3_UNIX_LINK_LIBRARIES X11 Xxf86vm Xrandr Xi Xinerama Xcursor )
+	find_package (Threads)
+  endif()
 endif (apple)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -29,6 +35,7 @@ add_executable(glview
   )
 
 target_link_libraries ( glview
+  ${GLFW3_UNIX_LINK_LIBRARIES}
   ${GLEW_LIBRARY}
   ${GLFW3_glfw_LIBRARY}
   ${OPENGL_gl_LIBRARY}
@@ -36,6 +43,8 @@ target_link_libraries ( glview
   ${COCOA_LIBRARY}
   ${COREVIDEO_LIBRARY}
   ${IOKIT_LIBRARY}
+  ${CMAKE_DL_LIBS}
+  ${CMAKE_THREAD_LIBS_INIT}
   )
 
 install ( TARGETS
