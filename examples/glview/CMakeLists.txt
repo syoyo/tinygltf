@@ -7,17 +7,17 @@ find_package ( GLEW REQUIRED )
 find_package ( GLFW3 REQUIRED )
 find_package ( OpenGL REQUIRED )
 
-if (apple)
+if (APPLE)
   find_library(COCOA_LIBRARY Cocoa)
   find_library(COREVIDEO_LIBRARY CoreVideo)
   find_library(IOKIT_LIBRARY IOKit)
 else ()
-  if (NOT win32)
+  if (NOT WIN32)
 	# This means it is Unices
 	set ( GLFW3_UNIX_LINK_LIBRARIES X11 Xxf86vm Xrandr Xi Xinerama Xcursor )
 	find_package (Threads)
   endif()
-endif (apple)
+endif (APPLE)
 
 set(CMAKE_CXX_STANDARD 11)
 
