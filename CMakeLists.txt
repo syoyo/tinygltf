@@ -22,7 +22,7 @@ INSTALL ( FILES
   )
 
 INSTALL ( FILES
-  cmake/glTFConfig.cmake
+  cmake/TinyGLTFConfig.cmake
   DESTINATION
   cmake
   )
