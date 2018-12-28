@@ -56,6 +56,7 @@ namespace tinygltf {
 #define TINYGLTF_MODE_TRIANGLE_STRIP (5)
 #define TINYGLTF_MODE_TRIANGLE_FAN (6)
 
+#define TINYGLTF_COMPONENT_TYPE_INVALID (-1)
 #define TINYGLTF_COMPONENT_TYPE_BYTE (5120)
 #define TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE (5121)
 #define TINYGLTF_COMPONENT_TYPE_SHORT (5122)
@@ -106,6 +107,7 @@ namespace tinygltf {
 
 // End parameter types
 
+#define TINYGLTF_TYPE_INVALID (-1)
 #define TINYGLTF_TYPE_VEC2 (2)
 #define TINYGLTF_TYPE_VEC3 (3)
 #define TINYGLTF_TYPE_VEC4 (4)
@@ -192,6 +194,20 @@ static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
     // Unknown componenty type
     return -1;
   }
+}
+
+// Utility function for decoding animation value
+static inline float DecodeAnimationChannelValue(int8_t c) {
+  return std::max(float(c) / 127.0f, -1.0f);
+}
+static inline float DecodeAnimationChannelValue(uint8_t c) {
+  return float(c) / 255.0f;
+}
+static inline float DecodeAnimationChannelValue(int16_t c) {
+  return std::max(float(c) / 32767.0f, -1.0f);
+}
+static inline float DecodeAnimationChannelValue(uint16_t c) {
+  return float(c) / 65525.0f;
 }
 
 bool IsDataURI(const std::string &in);
@@ -416,6 +432,7 @@ struct AnimationSampler {
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
   bool operator==(const AnimationSampler &) const;
+
 };
 
 struct Animation {
@@ -535,11 +552,11 @@ struct Accessor {
   int bufferView;  // optional in spec but required here since sparse accessor
                    // are not supported
   std::string name;
-  size_t byteOffset;
-  bool normalized;    // optinal.
-  int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
-  size_t count;       // required
-  int type;           // (required) One of TINYGLTF_TYPE_***   ..
+  size_t byteOffset = 0;
+  bool normalized = false;    // optinal.
+  int componentType = TINYGLTF_COMPONENT_TYPE_INVALID;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
+  size_t count = 0;       // required
+  int type = TINYGLTF_TYPE_INVALID;           // (required) One of TINYGLTF_TYPE_***   ..
   Value extras;
 
   std::vector<double> minValues;  // optional
@@ -587,6 +604,7 @@ struct Accessor {
   Accessor() { bufferView = -1; }
   bool operator==(const tinygltf::Accessor &) const;
 };
+
 
 struct PerspectiveCamera {
   double aspectRatio;  // min > 0
@@ -774,6 +792,14 @@ class Model {
 
   Value extras;
 };
+
+///
+/// Utility function to get an address of underlying buffer for i'th element.
+/// Returns nullptr for invalid parameter or invalid data.
+/// Assume `buffer` parameter = model.buffers[bufferViewObject.buffer]
+///
+const uint8_t *GetBufferAddress(const int i, const Accessor &accessor, const BufferView &bufferViewObject, const Buffer &buffer);
+
 
 enum SectionCheck {
   NO_REQUIRE = 0x00,
@@ -2006,6 +2032,21 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
   }
   std::copy(data.begin(), data.end(), out->begin());
   return true;
+}
+
+const uint8_t *GetBufferAddress(const int i, const Accessor &accessor, const BufferView &bufferViewObject, const Buffer &buffer) {
+
+  if (i >= accessor.count) return nullptr;
+
+  int byte_stride = accessor.ByteStride(bufferViewObject);
+  if (byte_stride == -1) {
+    return nullptr;
+  }
+
+  // TODO(syoyo): Bounds check.
+  const uint8_t *base_addr = buffer.data.data() + bufferViewObject.byteOffset + accessor.byteOffset;
+  const uint8_t *addr = base_addr + i * byte_stride;
+  return addr;
 }
 
 static bool ParseJsonAsValue(Value *ret, const json &o) {

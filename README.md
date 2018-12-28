@@ -62,6 +62,7 @@ v2.0.0 release(22 Aug, 2018)!
 
 ## TODOs
 
+* [ ] Sparse accesors(e.g. for efficient morph targets)
 * [ ] Write C++ code generator which emits C++ code from JSON schema for robust parsing.
 * [ ] Mesh Compression/decompression(Open3DGC, etc)
   * [ ] Load Draco compressed mesh

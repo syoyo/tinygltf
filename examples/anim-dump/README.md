@@ -1,0 +1,2 @@
+# Simple animation value dumper
+
