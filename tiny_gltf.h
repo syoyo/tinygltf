@@ -47,6 +47,12 @@
 #include <string>
 #include <vector>
 
+#ifdef __ANDROID__
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+#include <android/asset_manager.h>
+#endif
+#endif
+
 namespace tinygltf {
 
 #define TINYGLTF_MODE_POINTS (0)
@@ -138,6 +144,12 @@ namespace tinygltf {
 
 #define TINYGLTF_DOUBLE_EPS (1.e-12)
 #define TINYGLTF_DOUBLE_EQUAL(a, b) (std::fabs((b) - (a)) < TINYGLTF_DOUBLE_EPS)
+
+#ifdef __ANDROID__
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+  AAssetManager* asset_manager = nullptr;
+#endif
+#endif
 
 typedef enum {
   NULL_TYPE = 0,
@@ -1729,6 +1741,18 @@ void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) { fs = callbacks; }
 
 bool FileExists(const std::string &abs_filename, void *) {
   bool ret;
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+    if (asset_manager) {
+        AAsset* asset = AAssetManager_open(asset_manager, abs_filename.c_str(), AASSET_MODE_STREAMING);
+        if (!asset) {
+            return false;
+        }
+        AAsset_close(asset);
+        ret = true;
+    } else {
+      return false;
+    }
+#else
 #ifdef _WIN32
   FILE *fp;
   errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
@@ -1744,6 +1768,7 @@ bool FileExists(const std::string &abs_filename, void *) {
   } else {
     ret = false;
   }
+#endif
 
   return ret;
 }
@@ -1797,6 +1822,33 @@ std::string ExpandFilePath(const std::string &filepath, void *) {
 
 bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
                    const std::string &filepath, void *) {
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+  if (asset_manager) {
+    AAsset* asset = AAssetManager_open(asset_manager, filepath.c_str(), AASSET_MODE_STREAMING);
+    if (!asset) {
+      if (err) {
+        (*err) += "File open error : " + filepath + "\n";
+      }
+      return false;
+    }
+    size_t size = AAsset_getLength(asset);
+    if (size <= 0) {
+      if (err) {
+        (*err) += "Invalid file size : " + filepath +
+                  " (does the path point to a directory?)";
+      }
+    }
+    out->resize(size);
+    AAsset_read(asset, reinterpret_cast<char *>(&out->at(0)), size);
+    AAsset_close(asset);
+    return true;
+  } else {
+    if (err) {
+      (*err) += "No asset manager specified : " + filepath + "\n";
+    }
+    return false;
+  }
+#else
   std::ifstream f(filepath.c_str(), std::ifstream::binary);
   if (!f) {
     if (err) {
@@ -1828,6 +1880,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   f.close();
 
   return true;
+#endif
 }
 
 bool WriteWholeFile(std::string *err, const std::string &filepath,
