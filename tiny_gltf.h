@@ -196,20 +196,6 @@ static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
   }
 }
 
-// Utility function for decoding animation value
-static inline float DecodeAnimationChannelValue(int8_t c) {
-  return std::max(float(c) / 127.0f, -1.0f);
-}
-static inline float DecodeAnimationChannelValue(uint8_t c) {
-  return float(c) / 255.0f;
-}
-static inline float DecodeAnimationChannelValue(int16_t c) {
-  return std::max(float(c) / 32767.0f, -1.0f);
-}
-static inline float DecodeAnimationChannelValue(uint16_t c) {
-  return float(c) / 65525.0f;
-}
-
 bool IsDataURI(const std::string &in);
 bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
                    const std::string &in, size_t reqBytes, bool checkSize);
@@ -2036,7 +2022,7 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
 
 const uint8_t *GetBufferAddress(const int i, const Accessor &accessor, const BufferView &bufferViewObject, const Buffer &buffer) {
 
-  if (i >= accessor.count) return nullptr;
+  if (i >= int(accessor.count)) return nullptr;
 
   int byte_stride = accessor.ByteStride(bufferViewObject);
   if (byte_stride == -1) {
@@ -3529,7 +3515,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     {
       if (primitive.indices > -1) // has indices from parsing step, must be Element Array Buffer
       {
-        model->bufferViews[model->accessors[primitive.indices].bufferView]
+        model->bufferViews[size_t(model->accessors[size_t(primitive.indices)].bufferView)]
             .target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
         // we could optionally check if acessors' bufferView type is Scalar, as it should be
       }
@@ -4616,23 +4602,23 @@ static void WriteBinaryGltfFile(const std::string &output,
   const int padding_size = content.size() % 4;
 
   // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, padding
-  const int length = 12 + 8 + content.size() + padding_size;
+  const int length = 12 + 8 + int(content.size()) + padding_size;
   
-  gltfFile.write(header.c_str(), header.size());
+  gltfFile.write(header.c_str(), std::streamsize(header.size()));
   gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
   gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
 
   // JSON chunk info, then JSON data
-  const int model_length = content.size() + padding_size;
+  const int model_length = int(content.size()) + padding_size;
   const int model_format = 0x4E4F534A;
   gltfFile.write(reinterpret_cast<const char *>(&model_length), sizeof(model_length));
   gltfFile.write(reinterpret_cast<const char *>(&model_format), sizeof(model_format));
-  gltfFile.write(content.c_str(), content.size());
+  gltfFile.write(content.c_str(), std::streamsize(content.size()));
 
   // Chunk must be multiplies of 4, so pad with spaces
   if (padding_size > 0) {
-    const std::string padding = std::string(padding_size, ' ');
-    gltfFile.write(padding.c_str(), padding.size());
+    const std::string padding = std::string(size_t(padding_size), ' ');
+    gltfFile.write(padding.c_str(), std::streamsize(padding.size()));
   }
 }
 
