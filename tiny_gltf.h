@@ -48,6 +48,12 @@
 #include <string>
 #include <vector>
 
+#ifdef __ANDROID__
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+#include <android/asset_manager.h>
+#endif
+#endif
+
 namespace tinygltf {
 
 #define TINYGLTF_MODE_POINTS (0)
@@ -139,6 +145,12 @@ namespace tinygltf {
 
 #define TINYGLTF_DOUBLE_EPS (1.e-12)
 #define TINYGLTF_DOUBLE_EQUAL(a, b) (std::fabs((b) - (a)) < TINYGLTF_DOUBLE_EPS)
+
+#ifdef __ANDROID__
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+  AAssetManager* asset_manager = nullptr;
+#endif
+#endif
 
 typedef enum {
   NULL_TYPE = 0,
@@ -790,7 +802,7 @@ enum SectionCheck {
 ///
 /// LoadImageDataFunction type. Signature for custom image loading callbacks.
 ///
-typedef bool (*LoadImageDataFunction)(Image *, std::string *, std::string *,
+typedef bool (*LoadImageDataFunction)(Image *, const int, std::string *, std::string *,
                                       int, int, const unsigned char *, int,
                                       void *);
 
@@ -802,7 +814,7 @@ typedef bool (*WriteImageDataFunction)(const std::string *, const std::string *,
 
 #ifndef TINYGLTF_NO_STB_IMAGE
 // Declaration of default image loader callback
-bool LoadImageData(Image *image, std::string *err, std::string *warn,
+bool LoadImageData(Image *image, const int image_idx, std::string *err, std::string *warn,
                    int req_width, int req_height, const unsigned char *bytes,
                    int size, void *);
 #endif
@@ -1581,9 +1593,9 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
 }
 
 #ifndef TINYGLTF_NO_STB_IMAGE
-bool LoadImageData(Image *image, std::string *err, std::string *warn,
+bool LoadImageData(Image *image, const int image_idx, std::string *err, std::string *warn,
                    int req_width, int req_height, const unsigned char *bytes,
-                   int size, void *) {
+                   int size, void *user_data) {
   (void)warn;
 
   int w, h, comp, req_comp;
@@ -1603,7 +1615,7 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
   if (!data) {
     // NOTE: you can use `warn` instead of `err`
     if (err) {
-      (*err) += "Unknown image format.\n";
+      (*err) += "Unknown image format. STB cannot decode image data for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\". Proably 16bit PNG?\n";
     }
     return false;
   }
@@ -1611,7 +1623,7 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
   if (w < 1 || h < 1) {
     free(data);
     if (err) {
-      (*err) += "Invalid image data.\n";
+      (*err) += "Invalid image data for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
     }
     return false;
   }
@@ -1620,7 +1632,7 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
     if (req_width != w) {
       free(data);
       if (err) {
-        (*err) += "Image width mismatch.\n";
+        (*err) += "Image width mismatch for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
       }
       return false;
     }
@@ -1630,7 +1642,7 @@ bool LoadImageData(Image *image, std::string *err, std::string *warn,
     if (req_height != h) {
       free(data);
       if (err) {
-        (*err) += "Image height mismatch.\n";
+        (*err) += "Image height mismatch. for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
       }
       return false;
     }
@@ -1734,6 +1746,18 @@ void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) { fs = callbacks; }
 
 bool FileExists(const std::string &abs_filename, void *) {
   bool ret;
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+    if (asset_manager) {
+        AAsset* asset = AAssetManager_open(asset_manager, abs_filename.c_str(), AASSET_MODE_STREAMING);
+        if (!asset) {
+            return false;
+        }
+        AAsset_close(asset);
+        ret = true;
+    } else {
+      return false;
+    }
+#else
 #ifdef _WIN32
   FILE *fp;
   errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
@@ -1749,6 +1773,7 @@ bool FileExists(const std::string &abs_filename, void *) {
   } else {
     ret = false;
   }
+#endif
 
   return ret;
 }
@@ -1802,6 +1827,33 @@ std::string ExpandFilePath(const std::string &filepath, void *) {
 
 bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
                    const std::string &filepath, void *) {
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+  if (asset_manager) {
+    AAsset* asset = AAssetManager_open(asset_manager, filepath.c_str(), AASSET_MODE_STREAMING);
+    if (!asset) {
+      if (err) {
+        (*err) += "File open error : " + filepath + "\n";
+      }
+      return false;
+    }
+    size_t size = AAsset_getLength(asset);
+    if (size <= 0) {
+      if (err) {
+        (*err) += "Invalid file size : " + filepath +
+                  " (does the path point to a directory?)";
+      }
+    }
+    out->resize(size);
+    AAsset_read(asset, reinterpret_cast<char *>(&out->at(0)), size);
+    AAsset_close(asset);
+    return true;
+  } else {
+    if (err) {
+      (*err) += "No asset manager specified : " + filepath + "\n";
+    }
+    return false;
+  }
+#else
   std::ifstream f(filepath.c_str(), std::ifstream::binary);
   if (!f) {
     if (err) {
@@ -1833,6 +1885,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   f.close();
 
   return true;
+#endif
 }
 
 bool WriteWholeFile(std::string *err, const std::string &filepath,
@@ -2379,7 +2432,7 @@ static bool ParseAsset(Asset *asset, std::string *err, const json &o) {
   return true;
 }
 
-static bool ParseImage(Image *image, std::string *err, std::string *warn,
+static bool ParseImage(Image *image, const int image_idx, std::string *err, std::string *warn,
                        const json &o, const std::string &basedir,
                        FsCallbacks *fs,
                        LoadImageDataFunction *LoadImageData = nullptr,
@@ -2391,24 +2444,25 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
   bool hasBufferView = (o.find("bufferView") != o.end());
   bool hasURI = (o.find("uri") != o.end());
 
+  ParseStringProperty(&image->name, err, o, "name", false);
+
   if (hasBufferView && hasURI) {
     // Should not both defined.
     if (err) {
       (*err) +=
           "Only one of `bufferView` or `uri` should be defined, but both are "
-          "defined for Image.\n";
+          "defined for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
     }
     return false;
   }
 
   if (!hasBufferView && !hasURI) {
     if (err) {
-      (*err) += "Neither required `bufferView` nor `uri` defined for Image.\n";
+      (*err) += "Neither required `bufferView` nor `uri` defined for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
     }
     return false;
   }
 
-  ParseStringProperty(&image->name, err, o, "name", false);
   ParseExtensionsProperty(&image->extensions, err, o);
   ParseExtrasProperty(&image->extras, o);
 
@@ -2416,7 +2470,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
     double bufferView = -1;
     if (!ParseNumberProperty(&bufferView, err, o, "bufferView", true)) {
       if (err) {
-        (*err) += "Failed to parse `bufferView` for Image.\n";
+        (*err) += "Failed to parse `bufferView` for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
       }
       return false;
     }
@@ -2446,7 +2500,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
   std::string tmp_err;
   if (!ParseStringProperty(&uri, &tmp_err, o, "uri", true)) {
     if (err) {
-      (*err) += "Failed to parse `uri` for Image.\n";
+      (*err) += "Failed to parse `uri` for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
     }
     return false;
   }
@@ -2456,7 +2510,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
   if (IsDataURI(uri)) {
     if (!DecodeDataURI(&img, image->mimeType, uri, 0, false)) {
       if (err) {
-        (*err) += "Failed to decode 'uri' for image parameter.\n";
+        (*err) += "Failed to decode 'uri' for image[" + std::to_string(image_idx) + "] name = [" + image->name + "]\n";
       }
       return false;
     }
@@ -2470,7 +2524,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
 #endif
     if (!LoadExternalFile(&img, err, warn, uri, basedir, false, 0, false, fs)) {
       if (warn) {
-        (*warn) += "Failed to load external 'uri' for image parameter\n";
+        (*warn) += "Failed to load external 'uri' for image[" + std::to_string(image_idx) + "] name = [" + image->name + "]\n";
       }
       // If the image cannot be loaded, keep uri as image->uri.
       return true;
@@ -2478,7 +2532,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
 
     if (img.empty()) {
       if (warn) {
-        (*warn) += "Image is empty.\n";
+        (*warn) += "Image data is empty for image[" + std::to_string(image_idx) + "] name = [" + image->name + "] \n";
       }
       return false;
     }
@@ -2490,7 +2544,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
     }
     return false;
   }
-  return (*LoadImageData)(image, err, warn, 0, 0, &img.at(0),
+  return (*LoadImageData)(image, image_idx, err, warn, 0, 0, &img.at(0),
                           static_cast<int>(img.size()), load_image_user_data);
 }
 
@@ -3618,15 +3672,16 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
       json::const_iterator it(root.begin());
       json::const_iterator itEnd(root.end());
-      for (; it != itEnd; it++) {
+      int idx = 0;
+      for (; it != itEnd; it++, idx++) {
         if (!it.value().is_object()) {
           if (err) {
-            (*err) += "`images' does not contain an JSON object.";
+            (*err) += "image[" + std::to_string(idx) + "] is not a JSON object.";
           }
           return false;
         }
         Image image;
-        if (!ParseImage(&image, err, warn, it.value(), base_dir, &fs,
+        if (!ParseImage(&image, idx, err, warn, it.value(), base_dir, &fs,
                         &this->LoadImageData, load_image_user_data_)) {
           return false;
         }
@@ -3636,7 +3691,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           if (size_t(image.bufferView) >= model->bufferViews.size()) {
             if (err) {
               std::stringstream ss;
-              ss << "bufferView \"" << image.bufferView
+              ss << "image[" << idx << "] bufferView \"" << image.bufferView
                  << "\" not found in the scene." << std::endl;
               (*err) += ss.str();
             }
@@ -3653,7 +3708,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
             }
             return false;
           }
-          bool ret = LoadImageData(&image, err, warn, image.width, image.height,
+          bool ret = LoadImageData(&image, idx, err, warn, image.width, image.height,
                                    &buffer.data[bufferView.byteOffset],
                                    static_cast<int>(bufferView.byteLength),
                                    load_image_user_data_);
