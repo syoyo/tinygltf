@@ -82,6 +82,7 @@ TinyGLTF uses the following third party libraries.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
 * stb_image.h : v2.08 - public domain image loader - [Github link](https://github.com/nothings/stb/blob/master/stb_image.h)
 * stb_image_write.h : v1.09 - public domain image writer - [Github link](https://github.com/nothings/stb/blob/master/stb_image_write.h)
+* lodepng : Copyright (c) 2005-2018 Lode Vandevenne. zlib license. https://lodev.org/lodepng/
 
 
 ## Build and example
@@ -128,6 +129,7 @@ if (!ret) {
 * `TINYGLTF_NO_STB_IMAGE` : Do not load images with stb_image. Instead use `TinyGLTF::SetImageLoader(LoadimageDataFunction LoadImageData, void *user_data)` to set a callback for loading images.
 * `TINYGLTF_NO_STB_IMAGE_WRITE` : Do not write images with stb_image_write. Instead use `TinyGLTF::SetImageWriter(WriteimageDataFunction WriteImageData, void *user_data)` to set a callback for writing images.
 * `TINYGLTF_NO_EXTERNAL_IMAGE` : Do not try to load external image file. This option woulde be helpful if you do not want load image file during glTF parsing.
+* `TINYGLTF_NO_LODEPNG` : Do not load 16bit PNG image with lodepng. Instead use `TinyGLTF::SetImageLoader(LoadimageDataFunction LoadImageData, void *user_data)` to set a callback for loading images(You'll also need to disable stb image with `TINYGLTF_NO_STB_IMAGE`).
 
 ### Saving gltTF 2.0 model
 * [ ] Buffers.
@@ -169,4 +171,5 @@ $ ./tester_noexcept
 
 * json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
 * stb_image : Public domain.
+* lodepng : zlib license
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.

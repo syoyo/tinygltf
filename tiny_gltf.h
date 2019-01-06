@@ -34,6 +34,7 @@
 //  - jsonhpp: C++ JSON library.
 //  - base64: base64 decode/encode library.
 //  - stb_image: Image loading library.
+//  - lodepng: Load 16bit PNG.
 //
 #ifndef TINY_GLTF_H_
 #define TINY_GLTF_H_
@@ -1056,6 +1057,10 @@ class TinyGLTF {
 
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
 #include "./stb_image_write.h"
+#endif
+
+#ifndef TINYGLTF_NO_LODEPNG
+#include "./lodepng.h"
 #endif
 
 #ifdef __clang__
@@ -2460,6 +2465,7 @@ static bool ParseImage(Image *image, std::string *err, std::string *warn,
     // Keep texture path (for textures that cannot be decoded)
     image->uri = uri;
 #ifdef TINYGLTF_NO_EXTERNAL_IMAGE
+    // TODO(syoyo): Call LoadImageData callback?
     return true;
 #endif
     if (!LoadExternalFile(&img, err, warn, uri, basedir, false, 0, false, fs)) {
