@@ -477,8 +477,10 @@ struct Image {
   std::string name;
   int width;
   int height;
-  int component;
-  std::vector<unsigned char> image;
+  int component;  // channels. e.g. RGB=3, RGBA=4
+  int bits;       // bit depth per channel. 8(byte), 16 or 32.
+  int pixel_type; // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually UBYTE(bits = 8) or USHORT(bits = 16) 
+  std::vector<unsigned char> image; // width * height * component * (bits/8)
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png",
                          // "image/bmp", "image/gif"]
@@ -499,6 +501,8 @@ struct Image {
     width = -1;
     height = -1;
     component = -1;
+    bits = -1;
+    pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
   }
   bool operator==(const Image &) const;
 };
@@ -1208,6 +1212,7 @@ bool Camera::operator==(const Camera &other) const {
 bool Image::operator==(const Image &other) const {
   return this->bufferView == other.bufferView &&
          this->component == other.component && this->extras == other.extras &&
+         this->bits == other.bits &&
          this->height == other.height && this->image == other.image &&
          this->mimeType == other.mimeType && this->name == other.name &&
          this->uri == other.uri && this->width == other.width;
@@ -1604,6 +1609,9 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   // some GPU drivers do not support 24-bit images for Vulkan
   req_comp = 4;
 
+  int bits = 8;
+  int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+
   // if image cannot be decoded, ignore parsing and keep it by its path
   // don't break in this case
   // FIXME we should only enter this function if the image is embedded. If
@@ -1613,11 +1621,28 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   unsigned char *data =
       stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
+#if !defined(TINYGLTF_NO_LODEPNG)
+    // try to load as 16bit PNG RGBA
+    unsigned ret = lodepng_decode_memory(&data, reinterpret_cast<unsigned *>(&w), reinterpret_cast<unsigned *>(&h), bytes, size, LCT_RGBA, /* bitdepth*/16);
+
+    if (ret != 0) {
+      // NOTE: you can use `warn` instead of `err`
+      if (err) {
+        (*err) += "Unknown image format. STB and LodePNG cannot decode image data for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
+      }
+      return false;
+    }
+
+    bits = 16;
+    pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+
+#else
     // NOTE: you can use `warn` instead of `err`
     if (err) {
       (*err) += "Unknown image format. STB cannot decode image data for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\". Proably 16bit PNG?\n";
     }
     return false;
+#endif
   }
 
   if (w < 1 || h < 1) {
@@ -1651,8 +1676,10 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   image->width = w;
   image->height = h;
   image->component = req_comp;
-  image->image.resize(static_cast<size_t>(w * h * req_comp));
-  std::copy(data, data + w * h * req_comp, image->image.begin());
+  image->bits = bits;
+  image->pixel_type = pixel_type;
+  image->image.resize(static_cast<size_t>(w * h * req_comp * (bits/8)));
+  std::copy(data, data + w * h * req_comp * (bits/8), image->image.begin());
 
   free(data);
 
