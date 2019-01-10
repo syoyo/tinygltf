@@ -9,7 +9,7 @@ newoption {
 }
 
 sources = {
-   "stbi-impl.cc",
+   "img-loaders.cc",
    "main.cc",
    "render.cc",
    "render-config.cc",
