@@ -19,7 +19,7 @@ uniform vec3 sun_color; \n\
 out vec4 color;\n\
 void main() {\n\
 	float lum = max(dot(normal, normalize(sun_position)), 0.0);\n\
-	color = texture2D(tex, texcoord) * vec4((0.3 + 0.7 * lum) * sun_color, 1.0);\n\
+	color = texture(tex, texcoord) * vec4((0.3 + 0.7 * lum) * sun_color, 1.0);\n\
 }\n\
 ";
 
