@@ -1075,7 +1075,7 @@ class TinyGLTF {
 #include "./stb_image_write.h"
 #endif
 
-#ifndef TINYGLTF_NO_LODEPNG
+#if defined(TINYGLTF_USE_LODEPNG)
 #include "./lodepng.h"
 #endif
 
@@ -1621,7 +1621,7 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   unsigned char *data =
       stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
-#if !defined(TINYGLTF_NO_LODEPNG)
+#if defined(TINYGLTF_USE_LODEPNG)
     // try to load as 16bit PNG RGBA
     unsigned ret = lodepng_decode_memory(&data, reinterpret_cast<unsigned *>(&w), reinterpret_cast<unsigned *>(&h), bytes, size, LCT_RGBA, /* bitdepth*/16);
 
