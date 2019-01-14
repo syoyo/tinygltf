@@ -2,10 +2,12 @@
 
 ## Requirements
 
+* glew
 * glfw3
 * premake5(linux)
+* OpenGL 3.3+ GPU
 
-## Build on Linux
+## Build on Linux and macOS
 
 ```
 $ premake5 gmake

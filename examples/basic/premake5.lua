@@ -30,7 +30,7 @@ solution "basic_viewer"
          includedirs { "/usr/local/include" }
          buildoptions { "-Wno-deprecated-declarations" }
          libdirs { "/usr/local/lib" }
-         links { "glfw3", "GLEW" }
+         links { "glfw", "GLEW" }
          linkoptions { "-framework OpenGL", "-framework Cocoa", "-framework IOKit", "-framework CoreVideo" }
 
       configuration "Debug"
