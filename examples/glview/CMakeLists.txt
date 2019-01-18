@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.5)
 project(glview)
 
 set ( CMAKE_PREFIX_PATH cmake )
+
+set ( DRACO_DIR "" CACHE STRING "Path to draco" )
 
 find_package ( GLEW REQUIRED )
 find_package ( GLFW3 REQUIRED )
@@ -20,6 +22,12 @@ else ()
 endif (APPLE)
 
 set(CMAKE_CXX_STANDARD 11)
+
+if (${DRACO_DIR} STREQUAL "")
+else ()
+  add_definitions(-DTINYGLTF_USE_DRACO)
+  include_directories(${DRACO_DIR}/include)
+endif ()
 
 include_directories(
   ../../
