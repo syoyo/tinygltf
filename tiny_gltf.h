@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.1.0 Add draco compression.
 //  - v2.0.1 Add comparsion feature(Thanks to @Selmar).
 //  - v2.0.0 glTF 2.0!.
 //
@@ -1069,6 +1070,10 @@ class TinyGLTF {
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
 #include "./stb_image_write.h"
 #endif
+
+#ifdef TINYGLTF_USE_DRACO
+#include "draco/compression/decode.h"
+#endif // TINYGLTF_USE_DRACO
 
 #ifdef __clang__
 #pragma clang diagnostic pop
