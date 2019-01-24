@@ -1078,10 +1078,6 @@ class TinyGLTF {
 #include "stb_image_write.h"
 #endif
 
-#ifdef TINYGLTF_USE_DRACO
-#include "draco/compression/decode.h"
-#endif // TINYGLTF_USE_DRACO
-
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
