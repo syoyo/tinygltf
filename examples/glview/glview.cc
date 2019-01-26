@@ -677,10 +677,14 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   // std::cout << it->first << std::endl;
   // FIXME(syoyo): Refactor.
   // DrawCurves(scene, it->second);
-  DrawMesh(model, model.meshes[node.mesh]);
+  if (node.mesh > -1) {
+    assert(node.mesh < model.meshes.size());
+    DrawMesh(model, model.meshes[node.mesh]);
+  }
 
   // Draw child nodes.
   for (size_t i = 0; i < node.children.size(); i++) {
+    assert(node.children[i] < model.nodes.size());
     DrawNode(model, model.nodes[node.children[i]]);
   }
 
@@ -786,10 +790,12 @@ int main(int argc, char **argv) {
     return -1;
   }
 
-  char title[1024];
-  sprintf(title, "Simple glTF viewer: %s", input_filename.c_str());
+  std::stringstream ss;
+  ss << "Simple glTF viewer: " << input_filename;
 
-  window = glfwCreateWindow(width, height, title, NULL, NULL);
+  std::string title = ss.str();
+
+  window = glfwCreateWindow(width, height, title.c_str(), NULL, NULL);
   if (window == NULL) {
     std::cerr << "Failed to open GLFW window. " << std::endl;
     glfwTerminate();
