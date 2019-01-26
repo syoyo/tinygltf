@@ -27,6 +27,17 @@ Open .sln in Visual Studio 2013
 
 When running .exe, glew and glfw dll must exist in the working directory.
 
+#### Build with Draco(optional)
+
+Assume CMake build.
+
+```
+$ mkdir build
+$ cd build
+$ cmake -DDRACO_DIR=/path/to/draco ../
+$ make
+```
+
 ## TODO
 
 * [ ] PBR Material

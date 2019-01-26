@@ -25,8 +25,12 @@ set(CMAKE_CXX_STANDARD 11)
 
 if (${DRACO_DIR} STREQUAL "")
 else ()
-  add_definitions(-DTINYGLTF_USE_DRACO)
+  # TODO(syoyo): better CMake script for draco
+  add_definitions(-DTINYGLTF_ENABLE_DRACO)
   include_directories(${DRACO_DIR}/include)
+
+  link_directories(${DRACO_DIR}/lib)
+  set(DRACO_LIBRARY draco)
 endif ()
 
 include_directories(
@@ -43,6 +47,7 @@ add_executable(glview
   )
 
 target_link_libraries ( glview
+  ${DRACO_LIBRARY} 
   ${GLFW3_UNIX_LINK_LIBRARIES}
   ${GLEW_LIBRARY}
   ${GLFW3_glfw_LIBRARY}
