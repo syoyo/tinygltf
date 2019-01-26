@@ -1200,7 +1200,8 @@ bool BufferView::operator==(const BufferView &other) const {
   return this->buffer == other.buffer && this->byteLength == other.byteLength &&
          this->byteOffset == other.byteOffset &&
          this->byteStride == other.byteStride && this->name == other.name &&
-         this->target == other.target && this->extras == other.extras;
+         this->target == other.target && this->extras == other.extras &&
+         this->dracoDecoded == other.dracoDecoded;
 }
 bool Camera::operator==(const Camera &other) const {
   return this->name == other.name && this->extensions == other.extensions &&
@@ -2865,40 +2866,33 @@ static bool GetAttributeForAllPoints(draco::Mesh* mesh, const draco::PointAttrib
   return true;
 }
 
-static bool GetAttributeForAllPoints(draco::Mesh* mesh, const draco::PointAttribute* pAttribute, std::vector<uint8_t>& outBuffer)
+static bool GetAttributeForAllPoints(uint32_t componentType, draco::Mesh* mesh, const draco::PointAttribute* pAttribute, std::vector<uint8_t>& outBuffer)
 {
   bool decodeResult = false;
-  switch (pAttribute->data_type())
+  switch (componentType)
   {
-  case draco::DT_BOOL:
-  case draco::DT_UINT8:
+  case TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE:
     decodeResult = GetAttributeForAllPoints<uint8_t>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_INT8:
+  case TINYGLTF_COMPONENT_TYPE_BYTE:
     decodeResult = GetAttributeForAllPoints<int8_t>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_UINT16:
+  case TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT:
     decodeResult = GetAttributeForAllPoints<uint16_t>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_INT16:
+  case TINYGLTF_COMPONENT_TYPE_SHORT:
     decodeResult = GetAttributeForAllPoints<int16_t>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_INT32:
+  case TINYGLTF_COMPONENT_TYPE_INT:
     decodeResult = GetAttributeForAllPoints<int32_t>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_INT64:
-    decodeResult = GetAttributeForAllPoints<int64_t>(mesh, pAttribute, outBuffer);
-    break;
-  case draco::DT_UINT32:
+  case TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT:
     decodeResult = GetAttributeForAllPoints<uint32_t>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_UINT64:
-    decodeResult = GetAttributeForAllPoints<uint64_t>(mesh, pAttribute, outBuffer);
-    break;
-  case draco::DT_FLOAT32:
+  case TINYGLTF_COMPONENT_TYPE_FLOAT:
     decodeResult = GetAttributeForAllPoints<float>(mesh, pAttribute, outBuffer);
     break;
-  case draco::DT_FLOAT64:
+  case TINYGLTF_COMPONENT_TYPE_DOUBLE:
     decodeResult = GetAttributeForAllPoints<double>(mesh, pAttribute, outBuffer);
     break;
   default:
@@ -2960,23 +2954,28 @@ static bool ParseDracoExtension(Primitive *primitive, Model *model, std::string 
     model->bufferViews.emplace_back(std::move(decodedIndexBufferView));
 
     model->accessors[primitive->indices].bufferView = int(model->bufferViews.size() - 1);
+    model->accessors[primitive->indices].count = int(mesh->num_faces() * 3);
   }
 
   for (const auto& attribute : attributesObject)
   {
     if (!attribute.second.IsInt())
       return false;
+    auto primitiveAttribute = primitive->attributes.find(attribute.first);
+    if (primitiveAttribute == primitive->attributes.end())
+      return false;
 
     int dracoAttributeIndex = attribute.second.Get<int>();
     const auto pAttribute = mesh->GetAttributeByUniqueId(dracoAttributeIndex);
     const auto pBuffer = pAttribute->buffer();
+    const auto componentType = model->accessors[primitiveAttribute->second].componentType;
 
     // Create a new buffer for this decoded buffer
     Buffer decodedBuffer;
-    size_t bufferSize = mesh->num_points() * pAttribute->num_components() * draco::DataTypeLength(pAttribute->data_type());
+    size_t bufferSize = mesh->num_points() * pAttribute->num_components() * GetComponentSizeInBytes(componentType);
     decodedBuffer.data.resize(bufferSize);
 
-    if (!GetAttributeForAllPoints(mesh.get(), pAttribute, decodedBuffer.data))
+    if (!GetAttributeForAllPoints(componentType, mesh.get(), pAttribute, decodedBuffer.data))
       return false;
 
     model->buffers.emplace_back(std::move(decodedBuffer));
@@ -2989,11 +2988,8 @@ static bool ParseDracoExtension(Primitive *primitive, Model *model, std::string 
     decodedBufferView.target = primitive->indices >= 0 ? TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER : TINYGLTF_TARGET_ARRAY_BUFFER;
     model->bufferViews.emplace_back(std::move(decodedBufferView));
 
-    auto primitiveAttribute = primitive->attributes.find(attribute.first);
-    if (primitiveAttribute != primitive->attributes.end())
-    {
-      model->accessors[primitiveAttribute->second].bufferView = int(model->bufferViews.size() - 1);
-    }
+    model->accessors[primitiveAttribute->second].bufferView = int(model->bufferViews.size() - 1);
+    model->accessors[primitiveAttribute->second].count = int(mesh->num_points());
   }
 
   return true;
@@ -4827,14 +4823,14 @@ static void WriteBinaryGltfFile(const std::string &output,
   const int padding_size = content.size() % 4;
 
   // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, padding
-  const int length = 12 + 8 + content.size() + padding_size;
+  const int length = 12 + 8 + int(content.size()) + padding_size;
   
   gltfFile.write(header.c_str(), header.size());
   gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
   gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
 
   // JSON chunk info, then JSON data
-  const int model_length = content.size() + padding_size;
+  const int model_length = int(content.size()) + padding_size;
   const int model_format = 0x4E4F534A;
   gltfFile.write(reinterpret_cast<const char *>(&model_length), sizeof(model_length));
   gltfFile.write(reinterpret_cast<const char *>(&model_format), sizeof(model_format));
