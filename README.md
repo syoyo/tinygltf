@@ -46,11 +46,14 @@ v2.0.0 release(22 Aug, 2018)!
 * Load from memory
 * Custom callback handler
   * [x] Image load
+* Extensions
+  * [x] Draco mesh decoding
 
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
 * [validator](examples/validator) : Simple glTF validator with JSON schema.
+* [basic](examples/basic) : Basic glTF viewer with texturing support.
 
 ## Projects using TinyGLTF
 
@@ -64,7 +67,8 @@ v2.0.0 release(22 Aug, 2018)!
 
 * [ ] Write C++ code generator which emits C++ code from JSON schema for robust parsing.
 * [ ] Mesh Compression/decompression(Open3DGC, etc)
-  * [ ] Load Draco compressed mesh
+  * [x] Load Draco compressed mesh
+  * [x] Save Draco compressed mesh
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
   * [ ] OpenEXR extension through TinyEXR.
@@ -129,6 +133,7 @@ if (!ret) {
 * `TINYGLTF_NO_STB_IMAGE_WRITE` : Do not write images with stb_image_write. Instead use `TinyGLTF::SetImageWriter(WriteimageDataFunction WriteImageData, void *user_data)` to set a callback for writing images.
 * `TINYGLTF_NO_EXTERNAL_IMAGE` : Do not try to load external image file. This option woulde be helpful if you do not want load image file during glTF parsing.
 * `TINYGLTF_ANDROID_LOAD_FROM_ASSETS`: Load all files from packaged app assets instead of the regular file system. **Note:** You must pass a valid asset manager from your android app to `tinygltf::asset_manager` beforehand.
+* `TINYGLTF_ENABLE_DRACO`: Enable Draco compression. User must provide include path and link correspnding libraries in your project file.
 
 ### Saving gltTF 2.0 model
 * [ ] Buffers.
