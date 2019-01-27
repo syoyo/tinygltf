@@ -783,7 +783,7 @@ int main(int argc, char **argv) {
   Init();
 
   // DBG
-  PrintNodes(model.scenes[model.defaultScene]);
+  PrintNodes(model.scenes[model.defaultScene > -1 ? model.defaultScene : 0]);
 
   if (!glfwInit()) {
     std::cerr << "Failed to initialize GLFW." << std::endl;
