@@ -701,10 +701,11 @@ static void DrawModel(tinygltf::Model &model) {
     DrawCurves(scene, it->second);
   }
 #else
-
-  // TODO(syoyo): Support non-default scenes.
-  assert(model.defaultScene >= 0);
-  const tinygltf::Scene &scene = model.scenes[model.defaultScene];
+  //If the glTF asset has at least one scene, and doesn't define a default one
+  //just show the first one we can find
+  assert(model.scenes.size() > 0);
+  int scene_to_display = model.defaultScene > -1 ? model.defaultScene : 0;
+  const tinygltf::Scene &scene = model.scenes[scene_to_display];
   for (size_t i = 0; i < scene.nodes.size(); i++) {
     DrawNode(model, model.nodes[scene.nodes[i]]);
   }
