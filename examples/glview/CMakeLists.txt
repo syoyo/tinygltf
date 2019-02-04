@@ -23,15 +23,17 @@ endif (APPLE)
 
 set(CMAKE_CXX_STANDARD 11)
 
-if (${DRACO_DIR} STREQUAL "")
-else ()
-  # TODO(syoyo): better CMake script for draco
-  add_definitions(-DTINYGLTF_ENABLE_DRACO)
-  include_directories(${DRACO_DIR}/include)
-
-  link_directories(${DRACO_DIR}/lib)
-  set(DRACO_LIBRARY draco)
-endif ()
+if (DEFINED DRACO_DIR)
+  if (DRACO_DIR STREQUAL "")
+  else ()
+    # TODO(syoyo): better CMake script for draco
+    add_definitions(-DTINYGLTF_ENABLE_DRACO)
+    include_directories(${DRACO_DIR}/include)
+  
+    link_directories(${DRACO_DIR}/lib)
+    set(DRACO_LIBRARY draco)
+  endif ()
+endif()
 
 include_directories(
   ../../
