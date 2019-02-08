@@ -2,11 +2,12 @@
 
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
-`TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
+`TinyGLTF` uses dropbox/json11 JSON library(https://github.com/dropbox/json11), so now it requires C++11 compiler.
 If you are looking for old, C++03 version, please use `devel-picojson` branch.  
 
 ## Status
 
+v2.2.0 Use dropbox/json11 instead of nlohmann's json.hpp
 v2.0.0 release(22 Aug, 2018)! 
 
 ## Builds
@@ -23,7 +24,7 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] Linux + gcc/clang
   * [x] Windows + MinGW
   * [x] Windows + Visual Studio 2015 Update 3 or later.
-    * Visual Studio 2013 is not supported since they have limited C++11 support and failed to compile `json.hpp`.
+    * Visual Studio 2013 is not supported since they have limited C++11 support.
   * [x] Android NDK
   * [x] Android + CrystaX(NDK drop-in replacement) GCC
   * [x] Web using Emscripten(LLVM)
@@ -82,7 +83,7 @@ TinyGLTF is licensed under MIT license.
 
 TinyGLTF uses the following third party libraries.
 
-* json.hpp : Copyright (c) 2013-2017 Niels Lohmann. MIT license.
+* json11 : Copyright (c) 2013 Dropbox, Inc. MIT license.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
 * stb_image.h : v2.08 - public domain image loader - [Github link](https://github.com/nothings/stb/blob/master/stb_image.h)
 * stb_image_write.h : v1.09 - public domain image writer - [Github link](https://github.com/nothings/stb/blob/master/stb_image_write.h)
@@ -173,6 +174,6 @@ $ ./tester_noexcept
 
 ## Third party licenses
 
-* json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
+* json11 : Licensed under the MIT License <http://opensource.org/licenses/MIT>. 
 * stb_image : Public domain.
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
