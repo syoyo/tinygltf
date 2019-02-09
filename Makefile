@@ -3,7 +3,7 @@
 #EXTRA_CXXFLAGS := -fsanitize=address -Wall -Werror -Weverything -Wno-c++11-long-long -Wno-c++98-compat
 
 all:
-	clang++  $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o loader_example loader_example.cc
+	clang++  $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o loader_example loader_example.cc json11.cpp
 
 lint:
 	deps/cpplint.py tiny_gltf.h
