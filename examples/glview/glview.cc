@@ -678,13 +678,13 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   // FIXME(syoyo): Refactor.
   // DrawCurves(scene, it->second);
   if (node.mesh > -1) {
-    assert(node.mesh < model.meshes.size());
+    assert(node.mesh < int(model.meshes.size()));
     DrawMesh(model, model.meshes[node.mesh]);
   }
 
   // Draw child nodes.
   for (size_t i = 0; i < node.children.size(); i++) {
-    assert(node.children[i] < model.nodes.size());
+    assert(node.children[i] < int(model.nodes.size()));
     DrawNode(model, model.nodes[node.children[i]]);
   }
 
