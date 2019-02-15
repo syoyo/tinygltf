@@ -28,6 +28,7 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] Android NDK
   * [x] Android + CrystaX(NDK drop-in replacement) GCC
   * [x] Web using Emscripten(LLVM)
+  * [x] Can be compiled with no RTTI, noexception.
 * Moderate parsing time and memory consumption.
 * glTF specification v2.0.0
   * [x] ASCII glTF
@@ -91,7 +92,8 @@ TinyGLTF uses the following third party libraries.
 
 ## Build and example
 
-Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your project.
+Copy `stb_image.h`, `stb_image_write.h`, and `tiny_gltf.h` to your project.
+json11 code is embeded into `tiny_gltf.h`
 
 ### Loading glTF 2.0 model
 
@@ -100,7 +102,9 @@ Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your pr
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-// #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
+// Optional. Uncomment these if you want external json11.cpp instead of embedded json11.cpp code 
+//#define TINYGLTF_USE_EXTERNAL_JSON11_CPP
+//#include "json11.hpp"
 #include "tiny_gltf.h"
 
 using namespace tinygltf;
@@ -129,12 +133,12 @@ if (!ret) {
 
 ## Compile options
 
-* `TINYGLTF_NOEXCEPTION` : Disable C++ exception in JSON parsing. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` and `TINYGLTF_NOEXCEPTION`  to fully remove C++ exception codes when compiling TinyGLTF.
 * `TINYGLTF_NO_STB_IMAGE` : Do not load images with stb_image. Instead use `TinyGLTF::SetImageLoader(LoadimageDataFunction LoadImageData, void *user_data)` to set a callback for loading images.
 * `TINYGLTF_NO_STB_IMAGE_WRITE` : Do not write images with stb_image_write. Instead use `TinyGLTF::SetImageWriter(WriteimageDataFunction WriteImageData, void *user_data)` to set a callback for writing images.
 * `TINYGLTF_NO_EXTERNAL_IMAGE` : Do not try to load external image file. This option woulde be helpful if you do not want load image file during glTF parsing.
 * `TINYGLTF_ANDROID_LOAD_FROM_ASSETS`: Load all files from packaged app assets instead of the regular file system. **Note:** You must pass a valid asset manager from your android app to `tinygltf::asset_manager` beforehand.
 * `TINYGLTF_ENABLE_DRACO`: Enable Draco compression. User must provide include path and link correspnding libraries in your project file.
+* `TINYGLTF_USE_EXTERNAL_JSON11_CPP` : Use externally supplied json11.cpp/json11.hpp. This option may be helpful if you use json11.cpp in other source codes of your project.
 
 ### Saving gltTF 2.0 model
 * [ ] Buffers.

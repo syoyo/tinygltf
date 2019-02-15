@@ -10,10 +10,8 @@ ADD_EXECUTABLE ( loader_example
 
 ADD_SUBDIRECTORY ( examples/gltfutil )
 ADD_SUBDIRECTORY ( examples/glview )
-ADD_SUBDIRECTORY ( examples/validator )
 
 INSTALL ( FILES
-  json.hpp
   stb_image.h
   stb_image_write.h
   tiny_gltf.h

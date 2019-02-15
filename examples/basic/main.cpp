@@ -312,7 +312,11 @@ int main(int argc, char **argv) {
   glewExperimental = GL_TRUE;
 #endif
 
-  glewInit();
+  if (glewInit() != GLEW_OK) {
+    std::cerr << "glew init error." << std::endl;
+    return EXIT_FAILURE;
+  }
+    
   std::cout << glGetString(GL_RENDERER) << ", " << glGetString(GL_VERSION)
             << std::endl;
 

@@ -3,4 +3,4 @@
 
 all: ../tiny_gltf.h
 	clang++  -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester tester.cc
-	clang++ -DTINYGLTF_NOEXCEPTION -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester_noexcept tester.cc
+#	clang++ -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester_noexcept tester.cc

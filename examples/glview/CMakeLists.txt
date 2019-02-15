@@ -45,7 +45,6 @@ include_directories(
 
 add_executable(glview
   glview.cc
-  ../../json11.cpp
   ../common/trackball.cc
   )
 
