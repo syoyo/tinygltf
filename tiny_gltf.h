@@ -1095,7 +1095,15 @@ class TinyGLTF {
 #define NOMINMAX
 #endif
 
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#define TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h> // include API for expanding a file path
+
+#ifdef TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
+#undef WIN32_LEAN_AND_MEAN
+#endif
 
 #if defined(TINYGLTF_INTERNAL_NOMINMAX)
 #undef NOMINMAX
