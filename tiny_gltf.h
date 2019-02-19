@@ -1086,7 +1086,21 @@ class TinyGLTF {
 #endif
 
 #ifdef _WIN32
-#include <windows.h>
+
+// issue 143.
+// Define NOMINMAX to avoid min/max defines,
+// but undef it after included windows.h
+#ifndef NOMINMAX
+#define TINYGLTF_INTERNAL_NOMINMAX
+#define NOMINMAX
+#endif
+
+#include <windows.h> // include API for expanding a file path
+
+#if defined(TINYGLTF_INTERNAL_NOMINMAX)
+#undef NOMINMAX
+#endif
+
 #elif !defined(__ANDROID__)
 #include <wordexp.h>
 #endif
