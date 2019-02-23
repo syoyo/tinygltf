@@ -380,6 +380,17 @@ struct Parameter {
     return -1;
   }
 
+  /// Return the index of a texture coordinate set if this Parameter is a texture map.
+  /// Returned value is only valid if the parameter represent a texture from a
+  /// material
+  int TextureTexCoord() const {
+      const auto it = json_double_value.find("texCoord");
+      if (it != std::end(json_double_value)) {
+          return int(it->second);
+      }
+      return 0;
+  }
+
   /// Material factor, like the roughness or metalness of a material
   /// Returned value is only valid if the parameter represent a texture from a
   /// material
