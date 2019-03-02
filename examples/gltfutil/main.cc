@@ -20,8 +20,8 @@ int usage(int ret = 0) {
           "[path to output directory])\n\n"
        //<< "\t\t -i: start in interactive mode\n"
        << "\t\t -d: dump enclosed content (image assets)\n"
-       << "\t\t -f: file format for image output"
-       << "\t\t -o: ouptput directory path"
+       << "\t\t -f: file format for image output\n"
+       << "\t\t -o: ouptput directory path\n"
        << "\t\t -h: print this help\n";
   return ret;
 }
