@@ -134,6 +134,10 @@ if (!ret) {
 * `TINYGLTF_NO_EXTERNAL_IMAGE` : Do not try to load external image file. This option woulde be helpful if you do not want load image file during glTF parsing.
 * `TINYGLTF_ANDROID_LOAD_FROM_ASSETS`: Load all files from packaged app assets instead of the regular file system. **Note:** You must pass a valid asset manager from your android app to `tinygltf::asset_manager` beforehand.
 * `TINYGLTF_ENABLE_DRACO`: Enable Draco compression. User must provide include path and link correspnding libraries in your project file.
+* `TINYGLTF_BYPASS_INCLUDE_JSON `: Disable including `json.hpp` from within `tiny_gltf.h` (usually because it has been included before).
+* `TINYGLTF_BYPASS_INCLUDE_STB_IMAGE `: Disable including `stb_image.h` from within `tiny_gltf.h` (usually because it has been included before).
+* `TINYGLTF_BYPASS_INCLUDE_STB_IMAGE_WRITE `: Disable including `stb_image_write.h` from within `tiny_gltf.h` (usually because it has been included before).
+
 
 ### Saving gltTF 2.0 model
 * [ ] Buffers.
