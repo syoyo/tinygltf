@@ -1087,18 +1087,14 @@ class TinyGLTF {
 #endif
 
 #ifndef TINYGLTF_NO_STB_IMAGE
-#ifndef STB_IMAGE_IMPLEMENTATION
 #ifndef TINYGLTF_BYPASS_INCLUDE_STB_IMAGE
 #include "stb_image.h"
 #endif
 #endif
-#endif
 
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
-#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #ifndef TINYGLTF_BYPASS_INCLUDE_STB_IMAGE
 #include "stb_image_write.h"
-#endif
 #endif
 #endif
 
