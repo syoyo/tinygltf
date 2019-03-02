@@ -1635,14 +1635,14 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
 }
 
 #ifndef TINYGLTF_NO_STB_IMAGE
-bool LoadImageData(Image *image, const int image_idx, std::string *err, std::string *warn,
-                   int req_width, int req_height, const unsigned char *bytes,
-                   int size, void *user_data) {
+bool LoadImageData(Image *image, const int image_idx, std::string *err,
+                   std::string *warn, int req_width, int req_height,
+                   const unsigned char *bytes, int size, void *user_data) {
   (void)warn;
 
   int w, h, comp, req_comp;
 
-  unsigned char* data = nullptr;
+  unsigned char *data = nullptr;
 
   // force 32-bit textures for common Vulkan compatibility. It appears that
   // some GPU drivers do not support 24-bit images for Vulkan
@@ -1650,18 +1650,19 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   int bits = 8;
   int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
 
-
   // It is possible that the image we want to load is a 16bit per channel image
   // We are going to attempt to load it as 16bit per channel, and if it worked,
   // set the image data accodingly. We are casting the returned pointer into
   // unsigned char, because we are representing "bytes". But we are updating
   // the Image metadata to signal that this image uses 2 bytes (16bits) per
   // channel:
-  if(stbi_is_16_bit_from_memory(bytes, size))
-  {
-    data = (unsigned char*)stbi_load_16_from_memory(bytes, size, &w, &h, &comp, req_comp);
-    bits = 16;
-  	pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+  if (stbi_is_16_bit_from_memory(bytes, size)) {
+    data = (unsigned char *)stbi_load_16_from_memory(bytes, size, &w, &h, &comp,
+                                                     req_comp);
+    if (data) {
+      bits = 16;
+      pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+    }
   }
 
   // at this point, if data is still NULL, it means that the image wasn't
@@ -1673,12 +1674,13 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   // image->uri references
   // an image file, it should be left as it is. Image loading should not be
   // mandatory (to support other formats)
-  if(!data) data = 
-      stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
+  if (!data) data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
   if (!data) {
     // NOTE: you can use `warn` instead of `err`
     if (err) {
-      (*err) += "Unknown image format. STB cannot decode image data for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
+      (*err) +=
+          "Unknown image format. STB cannot decode image data for image[" +
+          std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
     }
     return false;
   }
@@ -1686,16 +1688,19 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   if (w < 1 || h < 1) {
     stbi_image_free(data);
     if (err) {
-      (*err) += "Invalid image data for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
+      (*err) += "Invalid image data for image[" + std::to_string(image_idx) +
+                "] name = \"" + image->name + "\"\n";
     }
     return false;
   }
 
   if (req_width > 0) {
     if (req_width != w) {
-	  	stbi_image_free(data);
+      stbi_image_free(data);
       if (err) {
-        (*err) += "Image width mismatch for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
+        (*err) += "Image width mismatch for image[" +
+                  std::to_string(image_idx) + "] name = \"" + image->name +
+                  "\"\n";
       }
       return false;
     }
@@ -1703,9 +1708,11 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
 
   if (req_height > 0) {
     if (req_height != h) {
-		  stbi_image_free(data);
+      stbi_image_free(data);
       if (err) {
-        (*err) += "Image height mismatch. for image[" + std::to_string(image_idx) + "] name = \"" + image->name + "\"\n";
+        (*err) += "Image height mismatch. for image[" +
+                  std::to_string(image_idx) + "] name = \"" + image->name +
+                  "\"\n";
       }
       return false;
     }
@@ -1716,8 +1723,8 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err, std::str
   image->component = req_comp;
   image->bits = bits;
   image->pixel_type = pixel_type;
-  image->image.resize(static_cast<size_t>(w * h * req_comp) * (bits/8));
-  std::copy(data, data + w * h * req_comp * (bits/8), image->image.begin());
+  image->image.resize(static_cast<size_t>(w * h * req_comp) * (bits / 8));
+  std::copy(data, data + w * h * req_comp * (bits / 8), image->image.begin());
   stbi_image_free(data);
 
   return true;
