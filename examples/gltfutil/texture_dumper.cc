@@ -44,21 +44,11 @@ static void ToBigEndian(std::vector<uint8_t>* image) {
     return;
   }
 
-  auto swap2 =
-      [](uint16_t* val) {
-        uint16_t tmp = *val;
-        uint8_t* dst = reinterpret_cast<uint8_t*>(val);
-        uint8_t* src = reinterpret_cast<uint8_t*>(&tmp);
-
-        dst[0] = src[1];
-        dst[1] = src[0];
-      };
-
   uint16_t *ptr = reinterpret_cast<uint16_t *>(image->data());
   size_t n = image->size() / 2;
 
   for (size_t i = 0; i < n; i++) {
-    swap2(&ptr[i]);
+    ptr[i] = ((0xFF00 & ptr[i]) >> 8) | ((0x00FF & ptr[i]) << 8);
   }
 }
 
