@@ -49,6 +49,7 @@ struct configuration {
   cli_action action = cli_action::not_set;
   texture_dumper::texture_output_format requested_format =
       texture_dumper::texture_output_format::not_specified;
+  bool use_exr = false;
 
   bool has_output_dir;
   bool is_valid() {

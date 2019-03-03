@@ -11,6 +11,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr.h"
+
 namespace gltfutil {
 int usage(int ret = 0) {
   using std::cout;
@@ -22,6 +25,7 @@ int usage(int ret = 0) {
        << "\t\t -d: dump enclosed content (image assets)\n"
        << "\t\t -f: file format for image output\n"
        << "\t\t -o: ouptput directory path\n"
+       << "\t\t -e: Use OpenEXR format for 16bit image\n"
        << "\t\t -h: print this help\n";
   return ret;
 }
@@ -43,6 +47,9 @@ int parse_args(int argc, char** argv) {
         case 'd':
           config.mode = ui_mode::cli;
           config.action = cli_action::dump;
+          break;
+        case 'e':
+          config.use_exr = true;
           break;
         case 'i':
           config.mode = ui_mode::interactive;
@@ -97,6 +104,11 @@ int parse_args(int argc, char** argv) {
 
         case cli_action::dump: {
           texture_dumper dumper(model);
+
+          if (config.use_exr) {
+            dumper.set_use_exr(true);
+          }
+
           if (config.requested_format !=
               texture_dumper::texture_output_format::not_specified)
             dumper.set_output_format(config.requested_format);
