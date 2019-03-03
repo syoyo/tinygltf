@@ -1077,7 +1077,19 @@ class TinyGLTF {
 #if __has_warning("-Wnewline-eof")
 #pragma clang diagnostic ignored "-Wnewline-eof"
 #endif
+#if __has_warning("-Wunused-parameter")
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #endif
+#if __has_warning("-Wmismatched-tags")
+#pragma clang diagnostic ignored "-Wmismatched-tags"
+#endif
+#endif
+
+// Disable GCC warnigs
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif // __GNUC__
 
 #include "json.hpp"
 
@@ -1096,6 +1108,10 @@ class TinyGLTF {
 
 #ifdef __clang__
 #pragma clang diagnostic pop
+#endif
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
 #endif
 
 #ifdef _WIN32
@@ -1638,6 +1654,7 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
 bool LoadImageData(Image *image, const int image_idx, std::string *err,
                    std::string *warn, int req_width, int req_height,
                    const unsigned char *bytes, int size, void *user_data) {
+  (void)user_data;
   (void)warn;
 
   int w, h, comp, req_comp;
@@ -3111,6 +3128,8 @@ static bool ParsePrimitive(Primitive *primitive, Model *model, std::string *err,
   {
       ParseDracoExtension(primitive, model, err, dracoExtension->second);
   }
+#else
+  (void)model;
 #endif
 
   return true;

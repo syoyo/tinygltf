@@ -50,8 +50,9 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
                    From spec2.0 readme:
                    https://github.com/KhronosGroup/glTF/tree/master/specification/2.0
                             ... drawArrays function should be used with a count equal to
-                   the count            property of any of the accessors referenced by the attributes
-                   property            (they are all equal for a given primitive).
+                   the count            property of any of the accessors referenced by the
+                   attributes            property            (they are all equal for a given
+                   primitive).
                  */
     }
 
@@ -112,8 +113,29 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
+    GLenum format = GL_RGBA;
+
+    if (image.component == 1) {
+      format = GL_RED;
+    } else if (image.component == 2) {
+      format = GL_RG;
+    } else if (image.component == 3) {
+      format = GL_RGB;
+    } else {
+      // ???
+    }
+
+    GLenum type = GL_UNSIGNED_BYTE;
+    if (image.bits == 8) {
+      // ok
+    } else if (image.bits == 16) {
+      type = GL_UNSIGNED_SHORT;
+    } else {
+      // ???
+    }
+
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, &image.image.at(0));
+                 format, type, &image.image.at(0));
   }
 
   return vbos;
@@ -255,7 +277,7 @@ void displayLoop(Window &window, const std::string &filename) {
   glm::vec3 model_pos = glm::vec3(-3, 0, -3);
 
   // generate a camera view, based on eye-position and lookAt world-position
-  glm::mat4 view_mat = genView(glm::vec3(2, 2, 2), model_pos);
+  glm::mat4 view_mat = genView(glm::vec3(2, 2, 20), model_pos);
 
   glm::vec3 sun_position = glm::vec3(3.0, 10.0, -5.0);
   glm::vec3 sun_color = glm::vec3(1.0);
@@ -287,6 +309,11 @@ void displayLoop(Window &window, const std::string &filename) {
   }
 }
 
+static void error_callback(int error, const char *description) {
+  (void)error;
+  fprintf(stderr, "Error: %s\n", description);
+}
+
 int main(int argc, char **argv) {
   std::string filename = "../../models/Cube/Cube.gltf";
 
@@ -294,14 +321,18 @@ int main(int argc, char **argv) {
     filename = argv[1];
   }
 
+  glfwSetErrorCallback(error_callback);
+
   if (!glfwInit()) return -1;
 
-  // Force create 3.3 profile.
+  // Force create OpenGL 3.3
+  // NOTE(syoyo): Linux + NVIDIA driver segfaults for some reason? commenting out glfwWindowHint will work.
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#endif
 #endif
 
   Window window = Window(800, 600, "TinyGLTF basic example");

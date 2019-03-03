@@ -4,11 +4,29 @@
 #include "stb_image_write.h"
 #include "texture_dumper.h"
 
+#include "lodepng.h" // ../common
+
 #include <tiny_gltf.h>
 
 using namespace gltfutil;
 using namespace tinygltf;
 using std::cout;
+
+static LodePNGColorType GetLodePNGColorType(int channels)
+{
+  if (channels == 1) {
+    return LodePNGColorType::LCT_GREY; 
+  } else if (channels == 2) {
+    return LodePNGColorType::LCT_GREY_ALPHA; 
+  } else if (channels == 3) {
+    return LodePNGColorType::LCT_RGB; 
+  } else if (channels == 4) {
+    return LodePNGColorType::LCT_RGBA; 
+  } else {
+    std::cerr << "??? unsupported channels " << channels << "\n";
+    return LodePNGColorType::LCT_RGB;  // FIXME(syoyo): Raise error
+  }
+}
 
 texture_dumper::texture_dumper(const Model& input)
     : model(input), configured_format(texture_output_format::png) {
@@ -29,31 +47,24 @@ void texture_dumper::dump_to_folder(const std::string& path) {
     cout << "pixel bit depth :" << image.bits << '\n';
     std::string name = image.name.empty() ? std::to_string(index) : image.name;
 
-    // TODO stb_image_write doesn't support any 16bit wirtes;
     unsigned char* bytes_to_write =
         const_cast<unsigned char*>(image.image.data());
-    unsigned char* tmp_buffer = nullptr;
-    if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
-      unsigned short max = 0xFFFF;
-      tmp_buffer = new unsigned char[image.width * image.height *
-                                     image.component * sizeof(unsigned char)];
-
-      unsigned short* buffer_as_shorts = (unsigned short*)bytes_to_write;
-      for (int i = 0; i < image.component * image.width * image.height; ++i) {
-        tmp_buffer[i] =
-            (unsigned char)(0xFF * (float(buffer_as_shorts[i]) / float(max)));
-      }
-      bytes_to_write =
-          tmp_buffer;  // swap the pointer, but keep tmp_buffer around as we
-                       // need to delete that memory later
-    }
 
     switch (configured_format) {
       case texture_output_format::png:
         name = path + "/" + name + ".png";
         std::cout << "Image will be written to " << name << '\n';
-        stbi_write_png(name.c_str(), image.width, image.height, image.component,
-                       bytes_to_write, 0);
+
+        if (image.pixel_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+          // Use lodepng to save 16bit PNG.
+          // TODO(syoyo): check status
+          unsigned ret = lodepng::encode(name, bytes_to_write, image.width, image.height, GetLodePNGColorType(image.component), /* bits */16);
+          assert(ret == 0); // 0 = no err.
+        } else {
+          // TODO(syoyo): check status
+          stbi_write_png(name.c_str(), image.width, image.height, image.component,
+                         bytes_to_write, 0);
+        }
         break;
       case texture_output_format::bmp:
         std::cout << "Image will be written to " << name << '\n';
@@ -68,8 +79,6 @@ void texture_dumper::dump_to_folder(const std::string& path) {
                        bytes_to_write);
         break;
     }
-
-    delete[] tmp_buffer;
   }
 }
 
