@@ -1079,7 +1079,9 @@ class TinyGLTF {
 #endif
 #endif
 
+#ifndef TINYGLTF_NO_INCLUDE_JSON
 #include "json.hpp"
+#endif
 
 #ifdef TINYGLTF_ENABLE_DRACO
 #include "draco/core/decoder_buffer.h"
@@ -1087,11 +1089,15 @@ class TinyGLTF {
 #endif
 
 #ifndef TINYGLTF_NO_STB_IMAGE
+#ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE
 #include "stb_image.h"
+#endif
 #endif
 
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+#ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
 #include "stb_image_write.h"
+#endif
 #endif
 
 #ifdef __clang__
