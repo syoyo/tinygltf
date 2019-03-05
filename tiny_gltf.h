@@ -5188,6 +5188,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   if (writeBinary) {
+    model->buffers[0].byteLength = model->buffers[0].data.size();
     WriteBinaryGltfFile(filename, output.dump(), model->buffers[0].data);
   } else {
     WriteGltfFile(filename, output.dump(prettyPrint ? 2 : -1));
