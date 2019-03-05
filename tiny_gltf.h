@@ -493,7 +493,7 @@ struct Image {
   int height;
   int component;
   int bits; // bit depth per channel. 8(byte), 16 or 32.
-  int pixel_type; // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually UBYTE(bits = 8) or USHORT(bits = 16) 
+  int pixel_type; // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually UBYTE(bits = 8) or USHORT(bits = 16)
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png",
@@ -742,7 +742,7 @@ struct Buffer {
   std::string
       uri;  // considered as required here but not in the spec (need to clarify)
   Value extras;
-
+  size_t byteLength;
   bool operator==(const Buffer &) const;
 };
 
@@ -4588,11 +4588,17 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
   SerializeExtensionMap(asset.extensions, o);
 }
 
-static void SerializeGltfBuffer(Buffer &buffer, json &o) {
-  SerializeNumberProperty("byteLength", buffer.data.size(), o);
-  SerializeGltfBufferData(buffer.data, o);
+static void SerializeGltfBuffer(Buffer &buffer, json &o, bool writeBinary=false) {
 
-  if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
+  if (writeBinary) {
+    SerializeNumberProperty("byteLength", buffer.data.size(), o);
+  } else {
+    SerializeGltfBufferData(buffer.data, o);
+  }
+
+  if (buffer.name.size()) {
+      SerializeStringProperty("name", buffer.name, o);
+  }
 
   if (buffer.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", buffer.extras, o);
@@ -4640,11 +4646,21 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
   }
 }
 
-static void SerializeGltfImage(Image &image, json &o) {
-  SerializeStringProperty("uri", image.uri, o);
+static void SerializeGltfImage(Image &image, json &o, bool writeBinary=false) {
+
+  if (!writeBinary) {
+    SerializeStringProperty("uri", image.uri, o);
+  }
 
   if (image.name.size()) {
     SerializeStringProperty("name", image.name, o);
+  }
+
+  if (writeBinary) {
+    SerializeNumberProperty("bufferView", image.bufferView, o);
+    if (image.mimeType.size()) {
+      SerializeStringProperty("mimeType", image.mimeType, o);
+    }
   }
 
   if (image.extras.Type() != NULL_TYPE) {
@@ -4781,7 +4797,8 @@ static void SerializeGltfNode(Node &node, json &o) {
 static void SerializeGltfSampler(Sampler &sampler, json &o) {
   SerializeNumberProperty("magFilter", sampler.magFilter, o);
   SerializeNumberProperty("minFilter", sampler.minFilter, o);
-  SerializeNumberProperty("wrapR", sampler.wrapR, o);
+  // wrapR not part of the spec
+  //SerializeNumberProperty("wrapR", sampler.wrapR, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
 
@@ -4883,16 +4900,18 @@ static bool WriteGltfFile(const std::string &output,
 }
 
 static void WriteBinaryGltfFile(const std::string &output,
-                                const std::string &content) {
+                                const std::string &content,
+                                const std::vector<unsigned char> & data) {
   std::ofstream gltfFile(output.c_str(), std::ios::binary);
 
   const std::string header = "glTF";
   const int version = 2;
-  const int padding_size = content.size() % 4;
+  const int padding_size = 4 - (content.size() % 4);
+  const int bin_padding_size = 4 - (data.size() % 4);
 
-  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, padding
-  const int length = 12 + 8 + int(content.size()) + padding_size;
-  
+  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, 8 bytes for BIN chunk, padding
+  const int length = 12 + 16 + int(content.size()) + int(data.size()) + padding_size + bin_padding_size;
+
   gltfFile.write(header.c_str(), header.size());
   gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
   gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
@@ -4909,6 +4928,17 @@ static void WriteBinaryGltfFile(const std::string &output,
     const std::string padding = std::string(padding_size, ' ');
     gltfFile.write(padding.c_str(), padding.size());
   }
+
+  {
+    const int bin_length = int(data.size()) + bin_padding_size;
+    const int bin_format = 0x004E4942;
+    gltfFile.write(reinterpret_cast<const char *>(&bin_length), sizeof(bin_length));
+    gltfFile.write(reinterpret_cast<const char *>(&bin_format), sizeof(bin_format));
+    gltfFile.write((const char*)&data.at(0), data.size());
+    for (int i = 0; i < bin_padding_size; i++) {
+      gltfFile << 0x0;
+    }
+  }
 }
 
 bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
@@ -4918,6 +4948,10 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
                                     bool writeBinary = false) {
   json output;
 
+  if (writeBinary) {
+    embedImages = true;
+    embedBuffers = true;
+  }
   // ACCESSORS
   json accessors;
   for (unsigned int i = 0; i < model->accessors.size(); ++i) {
@@ -4963,7 +4997,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
     if (embedBuffers) {
-      SerializeGltfBuffer(model->buffers[i], buffer);
+      SerializeGltfBuffer(model->buffers[i], buffer, writeBinary);
     } else {
       std::string binSavePath;
       std::string binUri;
@@ -5025,7 +5059,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
 
       UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
                         &this->WriteImageData, this->write_image_user_data_);
-      SerializeGltfImage(model->images[i], image);
+      SerializeGltfImage(model->images[i], image, writeBinary);
       images.push_back(image);
     }
     output["images"] = images;
@@ -5154,7 +5188,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   if (writeBinary) {
-    WriteBinaryGltfFile(filename, output.dump());
+    WriteBinaryGltfFile(filename, output.dump(), model->buffers[0].data);
   } else {
     WriteGltfFile(filename, output.dump(prettyPrint ? 2 : -1));
   }
