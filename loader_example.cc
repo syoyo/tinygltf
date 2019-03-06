@@ -228,7 +228,8 @@ static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
 #endif
 
 static std::string PrintValue(const std::string &name,
-                              const tinygltf::Value &value, const int indent, const bool tag = true) {
+                              const tinygltf::Value &value, const int indent,
+                              const bool tag = true) {
   std::stringstream ss;
 
   if (value.IsObject()) {
@@ -265,11 +266,10 @@ static std::string PrintValue(const std::string &name,
   } else if (value.IsArray()) {
     ss << Indent(indent) << name << " [ ";
     for (size_t i = 0; i < value.Size(); i++) {
-      ss << PrintValue("", value.Get(int(i)), indent + 1, /* tag */false);
-      if (i != (value.ArrayLen()-1)) {
+      ss << PrintValue("", value.Get(int(i)), indent + 1, /* tag */ false);
+      if (i != (value.ArrayLen() - 1)) {
         ss << ", ";
       }
-
     }
     ss << Indent(indent) << "] ";
   }
@@ -330,13 +330,13 @@ static void DumpPrimitive(const tinygltf::Primitive &primitive, int indent) {
             << PrintValue("extras", primitive.extras, indent + 1) << std::endl;
 }
 
-static void DumpExtensions(const tinygltf::ExtensionMap &extension, const int indent)
-{
+static void DumpExtensions(const tinygltf::ExtensionMap &extension,
+                           const int indent) {
   // TODO(syoyo): pritty print Value
   for (auto &e : extension) {
     std::cout << Indent(indent) << e.first << std::endl;
-    std::cout << PrintValue("extensions", e.second, indent+1) << std::endl;
-  }  
+    std::cout << PrintValue("extensions", e.second, indent + 1) << std::endl;
+  }
 }
 
 static void Dump(const tinygltf::Model &model) {
@@ -408,6 +408,30 @@ static void Dump(const tinygltf::Model &model) {
                     << ((k != accessor.maxValues.size() - 1) ? ", " : "");
         }
         std::cout << "]" << std::endl;
+      }
+
+      if (accessor.sparse.isSparse) {
+        std::cout << Indent(2) << "sparse:" << std::endl;
+        std::cout << Indent(3) << "count  : " << accessor.sparse.count
+                  << std::endl;
+        std::cout << Indent(3) << "indices: " << std::endl;
+        std::cout << Indent(4)
+                  << "bufferView   : " << accessor.sparse.indices.bufferView
+                  << std::endl;
+        std::cout << Indent(4)
+                  << "byteOffset   : " << accessor.sparse.indices.byteOffset
+                  << std::endl;
+        std::cout << Indent(4) << "componentType: "
+                  << PrintComponentType(accessor.sparse.indices.componentType)
+                  << "(" << accessor.sparse.indices.componentType << ")"
+                  << std::endl;
+        std::cout << Indent(3) << "values : " << std::endl;
+        std::cout << Indent(4)
+                  << "bufferView   : " << accessor.sparse.values.bufferView
+                  << std::endl;
+        std::cout << Indent(4)
+                  << "byteOffset   : " << accessor.sparse.values.byteOffset
+                  << std::endl;
       }
     }
   }
@@ -585,10 +609,11 @@ static void Dump(const tinygltf::Model &model) {
       }
     }
   }
-  
+
   // toplevel extensions
   {
-    std::cout << "extensions(items=" << model.extensions.size() << ")" << std::endl;
+    std::cout << "extensions(items=" << model.extensions.size() << ")"
+              << std::endl;
     DumpExtensions(model.extensions, 1);
   }
 }
@@ -602,7 +627,7 @@ int main(int argc, char **argv) {
   tinygltf::Model model;
   tinygltf::TinyGLTF gltf_ctx;
   std::string err;
-  std::string warn; 
+  std::string warn;
   std::string input_filename(argv[1]);
   std::string ext = GetFilePathExtension(input_filename);
 
@@ -610,17 +635,18 @@ int main(int argc, char **argv) {
   if (ext.compare("glb") == 0) {
     std::cout << "Reading binary glTF" << std::endl;
     // assume binary glTF.
-    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn, input_filename.c_str());
+    ret = gltf_ctx.LoadBinaryFromFile(&model, &err, &warn,
+                                      input_filename.c_str());
   } else {
     std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
-    ret = gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+    ret =
+        gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
   }
 
   if (!warn.empty()) {
     printf("Warn: %s\n", warn.c_str());
   }
-
 
   if (!err.empty()) {
     printf("Err: %s\n", err.c_str());
