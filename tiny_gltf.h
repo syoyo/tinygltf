@@ -626,7 +626,7 @@ struct Accessor {
     return 0;
   }
 
-  Accessor() { bufferView = -1; sparse.isSparse = false }
+  Accessor() { bufferView = -1; sparse.isSparse = false; }
   bool operator==(const tinygltf::Accessor &) const;
 };
 
