@@ -581,7 +581,7 @@ struct Accessor {
 	  struct {
 		  int byteOffset;
 		  int bufferView;
-		  int component_type; // a TINYGLTF_COMPONENT_TYPE_ value
+		  int componentType; // a TINYGLTF_COMPONENT_TYPE_ value
 	  } indices;
 	  struct {
 		  int bufferView;
@@ -2816,8 +2816,53 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
   bufferView->byteOffset = static_cast<size_t>(byteOffset);
   bufferView->byteLength = static_cast<size_t>(byteLength);
   bufferView->byteStride = static_cast<size_t>(byteStride);
-
   return true;
+}
+
+static bool ParseSparseAccessor(Accessor* accessor, std::string* err, const json &o)
+{
+	accessor->sparse.isSparse = true;
+
+	double count = 0.0;
+	ParseNumberProperty(&count, err, o, "count", true);
+
+	const auto indices_iterator = o.find("indices");
+	const auto values_iterator = o.find("values");
+	if(indices_iterator == o.end())
+	{
+		(*err) = "the sparse object of this accessor doesn't have indices";
+		return false;
+	}
+
+	if(values_iterator == o.end())
+	{
+		(*err) = "the sparse object ob ths accessor doesn't have values";
+		return false;
+	}
+	
+
+	const json& indices_obj = *indices_iterator;
+	const json& values_obj = *values_iterator;
+
+	double indices_buffer_view = 0.0, indices_byte_offset = 0.0, component_type = 0.0;
+	ParseNumberProperty(&indices_buffer_view, err, indices_obj, "bufferView", true);
+	ParseNumberProperty(&indices_byte_offset, err, indices_obj, "byteOffset", true);
+	ParseNumberProperty(&component_type, err, indices_obj, "componentType", true);
+
+	double values_buffer_view = 0.0, values_byte_offset = 0.0;
+	ParseNumberProperty(&values_buffer_view, err, values_obj, "bufferView", true);
+	ParseNumberProperty(&values_byte_offset, err, values_obj, "byteOffset", true);
+
+	accessor->sparse.count = static_cast<int>(count);
+	accessor->sparse.indices.bufferView = static_cast<int>(indices_buffer_view);
+	accessor->sparse.indices.byteOffset = static_cast<int>(indices_byte_offset);
+	accessor->sparse.indices.componentType = static_cast<int>(component_type);
+	accessor->sparse.values.bufferView = static_cast<int>(values_buffer_view);
+	accessor->sparse.values.byteOffset = static_cast<int>(values_byte_offset);
+
+	//todo check theses values
+
+	return true;
 }
 
 static bool ParseAccessor(Accessor *accessor, std::string *err, const json &o) {
@@ -2900,6 +2945,14 @@ static bool ParseAccessor(Accessor *accessor, std::string *err, const json &o) {
   }
 
   ParseExtrasProperty(&(accessor->extras), o);
+
+  //check if accessor has a "sparse" object:
+  const auto iterator = o.find("sparse");
+  if(iterator != o.end())
+  {
+  	  //here this accessor has a "sparse" subobject
+  	  return ParseSparseAccessor(accessor, err, *iterator);
+  }
 
   return true;
 }
