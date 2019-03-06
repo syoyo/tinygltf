@@ -43,9 +43,9 @@ v2.0.0 release(22 Aug, 2018)!
   * [x] BMP
   * [x] GIF
   * [x] Custom Image decoder callback(e.g. for decoding OpenEXR image)
-* Load from memory
-* Custom callback handler
-  * [x] Image load
+* Morph traget
+  * [x] Sparse accessor
+* Load glTF from memory
 * Extensions
   * [x] Draco mesh decoding
 
