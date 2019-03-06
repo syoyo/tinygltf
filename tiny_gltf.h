@@ -575,7 +575,19 @@ struct Accessor {
   std::vector<double> minValues;  // optional
   std::vector<double> maxValues;  // optional
 
-  // TODO(syoyo): "sparse"
+  struct {
+	  int count;
+		 bool isSparse;
+	  struct {
+		  int byteOffset;
+		  int bufferView;
+		  int component_type; // a TINYGLTF_COMPONENT_TYPE_ value
+	  } indices;
+	  struct {
+		  int bufferView;
+		  int byteOffset;
+	  } values;
+  } sparse;
 
   ///
   /// Utility function to compute byteStride for a given bufferView object.
@@ -614,7 +626,7 @@ struct Accessor {
     return 0;
   }
 
-  Accessor() { bufferView = -1; }
+  Accessor() { bufferView = -1; sparse.isSparse = false }
   bool operator==(const tinygltf::Accessor &) const;
 };
 
