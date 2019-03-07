@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.2.0 Add loading 16bit PNG support.
 //  - v2.1.0 Add draco compression.
 //  - v2.0.1 Add comparsion feature(Thanks to @Selmar).
 //  - v2.0.0 glTF 2.0!.
@@ -493,7 +494,7 @@ struct Image {
   int height;
   int component;
   int bits; // bit depth per channel. 8(byte), 16 or 32.
-  int pixel_type; // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually UBYTE(bits = 8) or USHORT(bits = 16) 
+  int pixel_type; // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually UBYTE(bits = 8) or USHORT(bits = 16)
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png",
@@ -1772,6 +1773,11 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   std::vector<unsigned char> data;
 
   if (ext == "png") {
+    if ((image->bits != 8) || (image->pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)) {
+      // Unsupported pixel format
+      return false;
+    }
+
     if (!stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
                                 image->height, image->component,
                                 &image->image[0], 0)) {
@@ -4905,7 +4911,7 @@ static void WriteBinaryGltfFile(const std::string &output,
 
   // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info, padding
   const int length = 12 + 8 + int(content.size()) + padding_size;
-  
+
   gltfFile.write(header.c_str(), header.size());
   gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
   gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
