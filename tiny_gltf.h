@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (c) 2015 - 2018 Syoyo Fujita, Aurélien Chatelain and many
+// Copyright (c) 2015 - 2019 Syoyo Fujita, Aurélien Chatelain and many
 // contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -26,6 +26,8 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.2.0 Add loading 16bit PNG support. Add Sparse accessor support(Thanks
+//  to @Ybalrid)
 //  - v2.1.0 Add draco compression.
 //  - v2.0.1 Add comparsion feature(Thanks to @Selmar).
 //  - v2.0.0 glTF 2.0!.
@@ -1091,7 +1093,19 @@ class TinyGLTF {
 #if __has_warning("-Wnewline-eof")
 #pragma clang diagnostic ignored "-Wnewline-eof"
 #endif
+#if __has_warning("-Wunused-parameter")
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #endif
+#if __has_warning("-Wmismatched-tags")
+#pragma clang diagnostic ignored "-Wmismatched-tags"
+#endif
+#endif
+
+// Disable GCC warnigs
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif  // __GNUC__
 
 #ifndef TINYGLTF_NO_INCLUDE_JSON
 #include "json.hpp"
@@ -1116,6 +1130,10 @@ class TinyGLTF {
 
 #ifdef __clang__
 #pragma clang diagnostic pop
+#endif
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
 #endif
 
 #ifdef _WIN32
@@ -1658,6 +1676,7 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
 bool LoadImageData(Image *image, const int image_idx, std::string *err,
                    std::string *warn, int req_width, int req_height,
                    const unsigned char *bytes, int size, void *user_data) {
+  (void)user_data;
   (void)warn;
 
   int w, h, comp, req_comp;
@@ -1775,6 +1794,12 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   std::vector<unsigned char> data;
 
   if (ext == "png") {
+    if ((image->bits != 8) ||
+        (image->pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)) {
+      // Unsupported pixel format
+      return false;
+    }
+
     if (!stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
                                 image->height, image->component,
                                 &image->image[0], 0)) {
@@ -3213,6 +3238,8 @@ static bool ParsePrimitive(Primitive *primitive, Model *model, std::string *err,
   if (dracoExtension != primitive->extensions.end()) {
     ParseDracoExtension(primitive, model, err, dracoExtension->second);
   }
+#else
+  (void)model;
 #endif
 
   return true;
