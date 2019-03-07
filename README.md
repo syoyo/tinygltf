@@ -3,11 +3,13 @@
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 `TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
-If you are looking for old, C++03 version, please use `devel-picojson` branch.  
+If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 ## Status
 
-v2.0.0 release(22 Aug, 2018)! 
+v2.2.0 release(Support loading 16bit PNG)
+v2.1.0 release(Draco support)
+v2.0.0 release(22 Aug, 2018)!
 
 ## Builds
 
@@ -38,14 +40,15 @@ v2.0.0 release(22 Aug, 2018)!
 * Image(Using stb_image)
   * [x] Parse BASE64 encoded embedded image data(DataURI).
   * [x] Load external image file.
-  * [x] PNG(8bit only)
-  * [x] JPEG(8bit only)
-  * [x] BMP
-  * [x] GIF
+  * [x] Load PNG(8bit and 16bit)
+  * [x] Load JPEG(8bit only)
+  * [x] Load BMP
+  * [x] Load GIF
   * [x] Custom Image decoder callback(e.g. for decoding OpenEXR image)
 * Load from memory
 * Custom callback handler
   * [x] Image load
+  * [x] Image save
 * Extensions
   * [x] Draco mesh decoding
 
@@ -69,10 +72,12 @@ v2.0.0 release(22 Aug, 2018)!
 * [ ] Mesh Compression/decompression(Open3DGC, etc)
   * [x] Load Draco compressed mesh
   * [x] Save Draco compressed mesh
+  * [ ] Open3DGC?
 * [ ] Support `extensions` and `extras` property
 * [ ] HDR image?
   * [ ] OpenEXR extension through TinyEXR.
-* [ ] Write example and tests for `animation` and `skin` 
+* [ ] 16bit PNG support in Serialization
+* [ ] Write example and tests for `animation` and `skin`
   * [ ] Skinning
   * [ ] Morph targets
 
@@ -104,13 +109,13 @@ Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your pr
 
 using namespace tinygltf;
 
-Model model; 
+Model model;
 TinyGLTF loader;
 std::string err;
 std::string warn;
-  
+
 bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, argv[1]);
-//bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]); // for binary glTF(.glb) 
+//bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]); // for binary glTF(.glb)
 
 if (!warn.empty()) {
   printf("Warn: %s\n", warn.c_str());
