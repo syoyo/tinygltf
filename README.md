@@ -7,9 +7,9 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 ## Status
 
-v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
-v2.1.0 release(Draco support)
-v2.0.0 release(22 Aug, 2018)!
+ - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
+ - v2.1.0 release(Draco support)
+ - v2.0.0 release(22 Aug, 2018)!
 
 ## Builds
 
