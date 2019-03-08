@@ -14,6 +14,7 @@ import subprocess
 sample_model_dir = "/home/syoyo/work/glTF-Sample-Models"
 base_model_dir = os.path.join(sample_model_dir, "2.0")
 
+# Include `glTF-Draco` when you build `loader_example` with draco support.
 kinds = [ "glTF", "glTF-Binary", "glTF-Embedded", "glTF-MaterialsCommon"]
 # ---------------------------------
 
