@@ -569,7 +569,7 @@ struct Accessor {
                    // are not supported
   std::string name;
   size_t byteOffset;
-  bool normalized;    // optinal.
+  bool normalized;    // optional.
   int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
   size_t count;       // required
   int type;           // (required) One of TINYGLTF_TYPE_***   ..
@@ -4615,6 +4615,7 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   SerializeNumberProperty<size_t>("count", accessor.count, o);
   SerializeNumberArrayProperty<double>("min", accessor.minValues, o);
   SerializeNumberArrayProperty<double>("max", accessor.maxValues, o);
+  SerializeValue("normalized", Value(accessor.normalized), o);
   std::string type;
   switch (accessor.type) {
     case TINYGLTF_TYPE_SCALAR:
