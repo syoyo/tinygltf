@@ -1213,7 +1213,7 @@ static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
     case ARRAY_TYPE: {
       if (one.Size() != other.Size()) return false;
       for (int i = 0; i < int(one.Size()); ++i)
-        if (Equals(one.Get(i), other.Get(i))) return false;
+        if (!Equals(one.Get(i), other.Get(i))) return false;
       return true;
     }
     case STRING_TYPE:
