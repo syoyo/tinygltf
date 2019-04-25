@@ -42,6 +42,10 @@ script:
   - ${CC} -v
   - ${CXX} ${EXTRA_CXXFLAGS} -std=c++11 -Wall -g -o loader_example loader_example.cc
   - ./loader_example ./models/Cube/Cube.gltf
-  - cd examples/raytrace
+  - cd tests
+  - make
+  - ./tester
+  - ./tester_noexcept
+  - cd ../examples/raytrace
   - ../../premake5 gmake
   - make
