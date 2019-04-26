@@ -3926,8 +3926,24 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       if (primitive.indices >
           -1)  // has indices from parsing step, must be Element Array Buffer
       {
-        model->bufferViews[model->accessors[primitive.indices].bufferView]
-            .target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+        if (size_t(primitive.indices) >= model->accessors.size()) {
+          if (err) {
+            (*err) += "primitive indices accessor out of bounds";
+          }
+          return false;
+        }
+
+        auto bufferView = model->accessors[primitive.indices].bufferView;
+        if (bufferView < 0 || size_t(bufferView) >= model->bufferViews.size()) {
+          if (err) {
+            (*err) += "accessor[" + std::to_string(primitive.indices) +
+                      "] invalid bufferView";
+          }
+          return false;
+        }
+
+        model->bufferViews[bufferView].target =
+            TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
         // we could optionally check if acessors' bufferView type is Scalar, as
         // it should be
       }
@@ -4080,6 +4096,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
           const BufferView &bufferView =
               model->bufferViews[size_t(image.bufferView)];
+          if (size_t(bufferView.buffer) >= model->buffers.size()) {
+            if (err) {
+              std::stringstream ss;
+              ss << "image[" << idx << "] buffer \"" << bufferView.buffer
+                 << "\" not found in the scene." << std::endl;
+              (*err) += ss.str();
+            }
+            return false;
+          }
           const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
 
           if (*LoadImageData == nullptr) {
@@ -4371,7 +4396,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   // In case the Bin buffer is not present, the size is exactly 20 + size of
   // JSON contents,
   // so use "greater than" operator.
-  if ((20 + model_length > size) || (model_length < 1) ||
+  if ((20 + model_length > size) || (model_length < 1) || (length > size) ||
       (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";

@@ -82,7 +82,69 @@ TEST_CASE("extension-with-empty-object", "[issue-97]") {
     REQUIRE(m.materials[0].extensions.size() == 1);
     REQUIRE(m.materials[0].extensions.count("VENDOR_material_some_ext") == 1);
   }
-    
+
 }
 
+TEST_CASE("invalid-primitive-indices", "[bounds-checking]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
 
+  // Loading is expected to fail, but not crash.
+  bool ret = ctx.LoadASCIIFromFile(
+      &model, &err, &warn,
+      "../models/BoundsChecking/invalid-primitive-indices.gltf");
+  REQUIRE_THAT(err,
+               Catch::Contains("primitive indices accessor out of bounds"));
+  REQUIRE_FALSE(ret);
+}
+
+TEST_CASE("invalid-buffer-view-index", "[bounds-checking]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  // Loading is expected to fail, but not crash.
+  bool ret = ctx.LoadASCIIFromFile(
+      &model, &err, &warn,
+      "../models/BoundsChecking/invalid-buffer-view-index.gltf");
+  REQUIRE_THAT(err, Catch::Contains("accessor[0] invalid bufferView"));
+  REQUIRE_FALSE(ret);
+}
+
+TEST_CASE("invalid-buffer-index", "[bounds-checking]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  // Loading is expected to fail, but not crash.
+  bool ret = ctx.LoadASCIIFromFile(
+      &model, &err, &warn,
+      "../models/BoundsChecking/invalid-buffer-index.gltf");
+  REQUIRE_THAT(
+      err, Catch::Contains("image[0] buffer \"1\" not found in the scene."));
+  REQUIRE_FALSE(ret);
+}
+
+TEST_CASE("glb-invalid-length", "[bounds-checking]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  // This glb has a much longer length than the provided data and should fail
+  // initial range checks.
+  const unsigned char glb_invalid_length[] = "glTF"
+      "\x20\x00\x00\x00" "\x6c\x66\x00\x00"     //
+  //  |     version     |     length      |
+      "\x02\x00\x00\x00" "\x4a\x53\x4f\x4e{}";  //
+  //  |  model length   |   model format  |
+
+  bool ret = ctx.LoadBinaryFromMemory(&model, &err, &warn, glb_invalid_length,
+                                      sizeof(glb_invalid_length));
+  REQUIRE_THAT(err, Catch::Contains("Invalid glTF binary."));
+  REQUIRE_FALSE(ret);
+}
