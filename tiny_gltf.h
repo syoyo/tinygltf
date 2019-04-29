@@ -4892,7 +4892,14 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
 }
 
 static void SerializeGltfImage(Image &image, json &o) {
-  SerializeStringProperty("uri", image.uri, o);
+ 	// if uri empty, the mimeType and bufferview should be set
+  if (image.uri.empty()) {
+		SerializeStringProperty("mimeType", image.mimeType, o);
+		SerializeNumberProperty<int>("bufferView", image.bufferView, o);
+	}
+  else {
+		SerializeStringProperty("uri", image.uri, o);
+	}
 
   if (image.name.size()) {
     SerializeStringProperty("name", image.name, o);
