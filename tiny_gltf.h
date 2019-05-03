@@ -826,13 +826,14 @@ class Model {
 
 enum SectionCheck {
   NO_REQUIRE = 0x00,
-  REQUIRE_SCENE = 0x01,
-  REQUIRE_SCENES = 0x02,
-  REQUIRE_NODES = 0x04,
-  REQUIRE_ACCESSORS = 0x08,
-  REQUIRE_BUFFERS = 0x10,
-  REQUIRE_BUFFER_VIEWS = 0x20,
-  REQUIRE_ALL = 0x3f
+  REQUIRE_VERSION = 0x01,
+  REQUIRE_SCENE = 0x02,
+  REQUIRE_SCENES = 0x04,
+  REQUIRE_NODES = 0x08,
+  REQUIRE_ACCESSORS = 0x10,
+  REQUIRE_BUFFERS = 0x20,
+  REQUIRE_BUFFER_VIEWS = 0x40,
+  REQUIRE_ALL = 0x7f
 };
 
 ///
@@ -934,7 +935,7 @@ class TinyGLTF {
   ///
   bool LoadASCIIFromFile(Model *model, std::string *err, std::string *warn,
                          const std::string &filename,
-                         unsigned int check_sections = REQUIRE_ALL);
+                         unsigned int check_sections = REQUIRE_VERSION);
 
   ///
   /// Loads glTF ASCII asset from string(memory).
@@ -945,7 +946,7 @@ class TinyGLTF {
   bool LoadASCIIFromString(Model *model, std::string *err, std::string *warn,
                            const char *str, const unsigned int length,
                            const std::string &base_dir,
-                           unsigned int check_sections = REQUIRE_ALL);
+                           unsigned int check_sections = REQUIRE_VERSION);
 
   ///
   /// Loads glTF binary asset from a file.
@@ -954,7 +955,7 @@ class TinyGLTF {
   ///
   bool LoadBinaryFromFile(Model *model, std::string *err, std::string *warn,
                           const std::string &filename,
-                          unsigned int check_sections = REQUIRE_ALL);
+                          unsigned int check_sections = REQUIRE_VERSION);
 
   ///
   /// Loads glTF binary asset from memory.
@@ -966,7 +967,7 @@ class TinyGLTF {
                             const unsigned char *bytes,
                             const unsigned int length,
                             const std::string &base_dir = "",
-                            unsigned int check_sections = REQUIRE_ALL);
+                            unsigned int check_sections = REQUIRE_VERSION);
 
   ///
   /// Write glTF to file.
@@ -3812,6 +3813,25 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       (*err) = "Root element is not a JSON object\n";
     }
     return false;
+  }
+
+  {
+    bool version_found = false;
+    json::const_iterator it = v.find("asset");
+    if ((it != v.end()) && it.value().is_object()) {
+      json::const_iterator version_it = it.value().find("version");
+      if ((version_it != it.value().end() && version_it.value().is_string())) {
+        version_found = true;
+      }
+    }
+    if (version_found) {
+      // OK
+    } else if (check_sections & REQUIRE_VERSION) {
+      if (err) {
+        (*err) += "\"asset\" object not found in .gltf or not an object type\n";
+      }
+      return false;
+    }
   }
 
   // scene is not mandatory.
