@@ -1,0 +1,53 @@
+{
+  "scenes": [],
+  "nodes": [],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {},
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "simpleTriangle.bin",
+      "byteLength": 44
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 6,
+      "target": 34963
+    },
+    {
+      "buffer": 1,
+      "byteOffset": 0,
+      "byteLength": 6,
+      "target": 34963
+    }
+  ],
+  "images": [
+    {
+      "bufferView": 1,
+      "mimeType": "image/png"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5123,
+      "count": 3,
+      "type": "SCALAR",
+      "max": [2],
+      "min": [0]
+    }
+  ],
+  "asset": {
+    "version": "2.0"
+  }
+}

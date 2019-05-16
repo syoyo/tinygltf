@@ -1,0 +1,36 @@
+{
+  "scenes": [],
+  "nodes": [],
+  "buffers": [],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {},
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 6,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 1,
+      "componentType": 5123,
+      "count": 3,
+      "type": "SCALAR",
+      "max": [2],
+      "min": [0]
+    }
+  ],
+  "asset": {
+    "version": "2.0"
+  }
+}
