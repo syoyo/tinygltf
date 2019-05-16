@@ -67,4 +67,5 @@ imgui.ini
 loader_example
 tests/tester
 tests/tester_noexcept
+tests/issue-97.gltf
 
