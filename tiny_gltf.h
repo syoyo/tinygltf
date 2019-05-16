@@ -437,8 +437,7 @@ struct AnimationChannel {
 struct AnimationSampler {
   int input;                  // required
   int output;                 // required
-  std::string interpolation;  // in ["LINEAR", "STEP", "CATMULLROMSPLINE",
-                              // "CUBICSPLINE"], default "LINEAR"
+  std::string interpolation;  // "LINEAR", "STEP","CUBICSPLINE" or user defined string. default "LINEAR"
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
