@@ -708,7 +708,6 @@ struct Mesh {
   std::string name;
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
-  std::vector<std::map<std::string, int> > targets;
   ExtensionMap extensions;
   Value extras;
 
@@ -1304,8 +1303,7 @@ bool Material::operator==(const Material &other) const {
 }
 bool Mesh::operator==(const Mesh &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
-         this->name == other.name && this->primitives == other.primitives &&
-         this->targets == other.targets && Equals(this->weights, other.weights);
+         this->name == other.name && this->primitives == other.primitives;
 }
 bool Model::operator==(const Model &other) const {
   return this->accessors == other.accessors &&
@@ -3383,24 +3381,6 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
     }
   }
 
-  // Look for morph targets
-  json::const_iterator targetsObject = o.find("targets");
-  if ((targetsObject != o.end()) && targetsObject.value().is_array()) {
-    for (json::const_iterator i = targetsObject.value().begin();
-         i != targetsObject.value().end(); i++) {
-      std::map<std::string, int> targetAttribues;
-
-      const json &dict = i.value();
-      json::const_iterator dictIt(dict.begin());
-      json::const_iterator dictItEnd(dict.end());
-
-      for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt.key()] = static_cast<int>(dictIt.value());
-      }
-      mesh->targets.push_back(targetAttribues);
-    }
-  }
-
   // Should probably check if has targets and if dimensions fit
   ParseNumberArrayProperty(&mesh->weights, err, o, "weights", false);
 
@@ -4912,14 +4892,13 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
 }
 
 static void SerializeGltfImage(Image &image, json &o) {
- 	// if uri empty, the mimeType and bufferview should be set
+  // if uri empty, the mimeType and bufferview should be set
   if (image.uri.empty()) {
-		SerializeStringProperty("mimeType", image.mimeType, o);
-		SerializeNumberProperty<int>("bufferView", image.bufferView, o);
-	}
-  else {
-		SerializeStringProperty("uri", image.uri, o);
-	}
+    SerializeStringProperty("mimeType", image.mimeType, o);
+    SerializeNumberProperty<int>("bufferView", image.bufferView, o);
+  } else {
+    SerializeStringProperty("uri", image.uri, o);
+  }
 
   if (image.name.size()) {
     SerializeStringProperty("name", image.name, o);
