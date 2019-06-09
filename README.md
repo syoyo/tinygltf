@@ -2,8 +2,7 @@
 
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
-`TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
-If you are looking for old, C++03 version, please use `devel-picojson` branch.
+`TinyGLTF` uses single-header version of RapidJson(https://github.com/Tencent/rapidjson) as a JSON parser.
 
 ## Status
 
@@ -68,6 +67,10 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 * [TinyGltfImporter](http://doc.magnum.graphics/magnum/classMagnum_1_1Trade_1_1TinyGltfImporter.html) plugin for [Magnum](https://github.com/mosra/magnum), a lightweight and modular C++11/C++14 graphics middleware for games and data visualization.
 * Your projects here! (Please send PR)
 
+## For developer
+
+Generate single rapidjson file using this node.js script: https://github.com/Tencent/rapidjson/issues/863
+
 ## TODOs
 
 * [ ] Write C++ code generator which emits C++ code from JSON schema for robust parsing.
@@ -95,7 +98,7 @@ TinyGLTF uses the following third party libraries.
 
 ## Build and example
 
-Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your project.
+Copy `stb_image.h`, `stb_image_write.h`, `rapidjson-amalgamation.h` and `tiny_gltf.h` to your project.
 
 ### Loading glTF 2.0 model
 

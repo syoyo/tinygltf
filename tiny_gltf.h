@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.3.0 Switch to use RapidJson.
 //  - v2.2.0 Add loading 16bit PNG support. Add Sparse accessor support(Thanks
 //  to @Ybalrid)
 //  - v2.1.0 Add draco compression.
@@ -34,7 +35,7 @@
 //
 // Tiny glTF loader is using following third party libraries:
 //
-//  - jsonhpp: C++ JSON library.
+//  - rapidjson-amalgamation.h: C++ JSON library.
 //  - base64: base64 decode/encode library.
 //  - stb_image: Image loading library.
 //
@@ -1107,8 +1108,8 @@ class TinyGLTF {
 #pragma GCC diagnostic ignored "-Wtype-limits"
 #endif  // __GNUC__
 
-#ifndef TINYGLTF_NO_INCLUDE_JSON
-#include "json.hpp"
+#ifndef TINYGLTF_NO_INCLUDE_RAPIDJSON
+#include "rapidjson-amalgamation.h"
 #endif
 
 #ifdef TINYGLTF_ENABLE_DRACO
@@ -1171,8 +1172,6 @@ class TinyGLTF {
 #define TINYGLTF_LITTLE_ENDIAN 1
 #endif
 #endif
-
-using nlohmann::json;
 
 #ifdef __APPLE__
 #include "TargetConditionals.h"
@@ -2184,65 +2183,76 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
   return true;
 }
 
-static bool ParseJsonAsValue(Value *ret, const json &o) {
+static bool ParseJsonAsValue(Value *ret, const rapidjson::Value &o) {
   Value val{};
-  switch (o.type()) {
-    case json::value_t::object: {
-      Value::Object value_object;
-      for (auto it = o.begin(); it != o.end(); it++) {
-        Value entry;
-        ParseJsonAsValue(&entry, it.value());
-        if (entry.Type() != NULL_TYPE) value_object[it.key()] = entry;
+  if (o.IsObject()) {
+    Value::Object value_object;
+    for (auto it = o.MemberBegin(); it != o.MemberEnd(); it++) {
+      Value entry;
+      ParseJsonAsValue(&entry, it->value);
+      if (entry.Type() != NULL_TYPE) value_object[it->name.GetString()] = entry;
+    }
+
+    if (value_object.size() > 0) {
+      val = Value(value_object);
+    }
+
+    /*
+        } break;
+        case json::value_t::array: {
+          Value::Array value_array;
+          for (auto it = o.begin(); it != o.MemberEnd(); it++) {
+            Value entry;
+            ParseJsonAsValue(&entry, it.value());
+            if (entry.Type() != NULL_TYPE) value_array.push_back(entry);
+          }
+          if (value_array.size() > 0) val = Value(value_array);
+        } break;
+        case json::value_t::string:
+          val = Value(o.get<std::string>());
+          break;
+        case json::value_t::boolean:
+          val = Value(o.get<bool>());
+          break;
+        case json::value_t::number_integer:
+        case json::value_t::number_unsigned:
+          val = Value(static_cast<int>(o.get<int64_t>()));
+          break;
+        case json::value_t::number_float:
+          val = Value(o.get<double>());
+          break;
+        case json::value_t::null:
+        case json::value_t::discarded:
+          // default:
+          break;
       }
-      if (value_object.size() > 0) val = Value(value_object);
-    } break;
-    case json::value_t::array: {
-      Value::Array value_array;
-      for (auto it = o.begin(); it != o.end(); it++) {
-        Value entry;
-        ParseJsonAsValue(&entry, it.value());
-        if (entry.Type() != NULL_TYPE) value_array.push_back(entry);
-      }
-      if (value_array.size() > 0) val = Value(value_array);
-    } break;
-    case json::value_t::string:
-      val = Value(o.get<std::string>());
-      break;
-    case json::value_t::boolean:
-      val = Value(o.get<bool>());
-      break;
-    case json::value_t::number_integer:
-    case json::value_t::number_unsigned:
-      val = Value(static_cast<int>(o.get<int64_t>()));
-      break;
-    case json::value_t::number_float:
-      val = Value(o.get<double>());
-      break;
-    case json::value_t::null:
-    case json::value_t::discarded:
-      // default:
-      break;
+    */
+  } else if (o.IsNull()) {
+    // Do nothing
+  } else {
+    // ???
   }
   if (ret) *ret = val;
 
   return val.Type() != NULL_TYPE;
 }
 
-static bool ParseExtrasProperty(Value *ret, const json &o) {
-  json::const_iterator it = o.find("extras");
-  if (it == o.end()) {
+static bool ParseExtrasProperty(Value *ret, const rapidjson::Value &o) {
+  auto it = o.FindMember("extras");
+  if (it == o.MemberEnd()) {
     return false;
   }
 
-  return ParseJsonAsValue(ret, it.value());
+  return ParseJsonAsValue(ret, it->value);
 }
 
-static bool ParseBooleanProperty(bool *ret, std::string *err, const json &o,
+static bool ParseBooleanProperty(bool *ret, std::string *err,
+                                 const rapidjson::Value &o,
                                  const std::string &property,
                                  const bool required,
                                  const std::string &parent_node = "") {
-  json::const_iterator it = o.find(property);
-  if (it == o.end()) {
+  auto it = o.FindMember(property.c_str());
+  if (it == o.MemberEnd()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is missing";
@@ -2255,7 +2265,7 @@ static bool ParseBooleanProperty(bool *ret, std::string *err, const json &o,
     return false;
   }
 
-  if (!it.value().is_boolean()) {
+  if (!it->value.IsBool()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a bool type.\n";
@@ -2265,18 +2275,19 @@ static bool ParseBooleanProperty(bool *ret, std::string *err, const json &o,
   }
 
   if (ret) {
-    (*ret) = it.value().get<bool>();
+    (*ret) = it->value.GetBool();
   }
 
   return true;
 }
 
-static bool ParseNumberProperty(double *ret, std::string *err, const json &o,
+static bool ParseNumberProperty(double *ret, std::string *err,
+                                const rapidjson::Value &o,
                                 const std::string &property,
                                 const bool required,
                                 const std::string &parent_node = "") {
-  json::const_iterator it = o.find(property);
-  if (it == o.end()) {
+  auto it = o.FindMember(property.c_str());
+  if (it == o.MemberEnd()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is missing";
@@ -2289,7 +2300,7 @@ static bool ParseNumberProperty(double *ret, std::string *err, const json &o,
     return false;
   }
 
-  if (!it.value().is_number()) {
+  if (!it->value.IsNumber()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a number type.\n";
@@ -2299,18 +2310,18 @@ static bool ParseNumberProperty(double *ret, std::string *err, const json &o,
   }
 
   if (ret) {
-    (*ret) = it.value().get<double>();
+    (*ret) = it->value.GetDouble();
   }
 
   return true;
 }
 
 static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
-                                     const json &o, const std::string &property,
-                                     bool required,
+                                     const rapidjson::Value &o,
+                                     const std::string &property, bool required,
                                      const std::string &parent_node = "") {
-  json::const_iterator it = o.find(property);
-  if (it == o.end()) {
+  auto it = o.FindMember(property.c_str());
+  if (it == o.MemberEnd()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is missing";
@@ -2323,7 +2334,7 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
     return false;
   }
 
-  if (!it.value().is_array()) {
+  if (!it->value.IsArray()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not an array";
@@ -2337,9 +2348,8 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
   }
 
   ret->clear();
-  for (json::const_iterator i = it.value().begin(); i != it.value().end();
-       i++) {
-    if (!i.value().is_number()) {
+  for (auto i = it->value.Begin(); i != it->value.End(); i++) {
+    if (!i->IsNumber()) {
       if (required) {
         if (err) {
           (*err) += "'" + property + "' property is not a number.\n";
@@ -2351,18 +2361,18 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
       }
       return false;
     }
-    ret->push_back(i.value());
+    ret->push_back(i->GetDouble());
   }
 
   return true;
 }
 
 static bool ParseStringProperty(
-    std::string *ret, std::string *err, const json &o,
+    std::string *ret, std::string *err, const rapidjson::Value &o,
     const std::string &property, bool required,
     const std::string &parent_node = std::string()) {
-  json::const_iterator it = o.find(property);
-  if (it == o.end()) {
+  auto it = o.FindMember(property.c_str());
+  if (it == o.MemberEnd()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is missing";
@@ -2376,7 +2386,7 @@ static bool ParseStringProperty(
     return false;
   }
 
-  if (!it.value().is_string()) {
+  if (!it->value.IsString()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a string type.\n";
@@ -2386,18 +2396,18 @@ static bool ParseStringProperty(
   }
 
   if (ret) {
-    (*ret) = it.value().get<std::string>();
+    (*ret) = it->value.GetString();
   }
 
   return true;
 }
 
 static bool ParseStringIntProperty(std::map<std::string, int> *ret,
-                                   std::string *err, const json &o,
+                                   std::string *err, const rapidjson::Value &o,
                                    const std::string &property, bool required,
                                    const std::string &parent = "") {
-  json::const_iterator it = o.find(property);
-  if (it == o.end()) {
+  auto it = o.FindMember(property.c_str());
+  if (it == o.MemberEnd()) {
     if (required) {
       if (err) {
         if (!parent.empty()) {
@@ -2412,7 +2422,7 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   }
 
   // Make sure we are dealing with an object / dictionary.
-  if (!it.value().is_object()) {
+  if (!it->value.IsObject()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not an object.\n";
@@ -2422,13 +2432,13 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
   }
 
   ret->clear();
-  const json &dict = it.value();
+  const rapidjson::Value &dict = it->value;
 
-  json::const_iterator dictIt(dict.begin());
-  json::const_iterator dictItEnd(dict.end());
+  auto dictIt(dict.MemberBegin());
+  auto dictItEnd(dict.MemberEnd());
 
   for (; dictIt != dictItEnd; ++dictIt) {
-    if (!dictIt.value().is_number()) {
+    if (!dictIt->value.IsNumber()) {
       if (required) {
         if (err) {
           (*err) += "'" + property + "' value is not an int.\n";
@@ -2438,16 +2448,16 @@ static bool ParseStringIntProperty(std::map<std::string, int> *ret,
     }
 
     // Insert into the list.
-    (*ret)[dictIt.key()] = static_cast<int>(dictIt.value());
+    (*ret)[dictIt->name.GetString()] = dictIt->value.GetInt();
   }
   return true;
 }
 
 static bool ParseJSONProperty(std::map<std::string, double> *ret,
-                              std::string *err, const json &o,
+                              std::string *err, const rapidjson::Value &o,
                               const std::string &property, bool required) {
-  json::const_iterator it = o.find(property);
-  if (it == o.end()) {
+  auto it = o.FindMember(property.c_str());
+  if (it == o.MemberEnd()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is missing. \n'";
@@ -2456,7 +2466,7 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
     return false;
   }
 
-  if (!it.value().is_object()) {
+  if (!it->value.IsObject()) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a JSON object.\n";
@@ -2466,20 +2476,21 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
   }
 
   ret->clear();
-  const json &obj = it.value();
-  json::const_iterator it2(obj.begin());
-  json::const_iterator itEnd(obj.end());
+  const rapidjson::Value &obj = it->value;
+  auto it2(obj.MemberBegin());
+  auto itEnd(obj.MemberEnd());
   for (; it2 != itEnd; it2++) {
-    if (it2.value().is_number())
-      ret->insert(std::pair<std::string, double>(it2.key(), it2.value()));
+    if (it2->value.IsNumber())
+      ret->insert(std::pair<std::string, double>(it2->name.GetString(),
+                                                 it2->value.GetDouble()));
   }
 
   return true;
 }
 
 static bool ParseParameterProperty(Parameter *param, std::string *err,
-                                   const json &o, const std::string &prop,
-                                   bool required) {
+                                   const rapidjson::Value &o,
+                                   const std::string &prop, bool required) {
   // A parameter value can either be a string or an array of either a boolean or
   // a number. Booleans of any kind aren't supported here. Granted, it
   // complicates the Parameter structure and breaks it semantically in the sense
@@ -2510,25 +2521,26 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
 }
 
 static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
-                                    const json &o) {
+                                    const rapidjson::Value &o) {
   (void)err;
 
-  json::const_iterator it = o.find("extensions");
-  if (it == o.end()) {
+  auto it = o.FindMember("extensions");
+  if (it == o.MemberEnd()) {
     return false;
   }
-  if (!it.value().is_object()) {
+  if (!it->value.IsObject()) {
     return false;
   }
   ExtensionMap extensions;
-  json::const_iterator extIt = it.value().begin();
-  for (; extIt != it.value().end(); extIt++) {
-    if (!extIt.value().is_object()) continue;
-    if (!ParseJsonAsValue(&extensions[extIt.key()], extIt.value())) {
-      if (!extIt.key().empty()) {
+  auto extIt = it->value.MemberBegin();
+  for (; extIt != it->value.MemberEnd(); extIt++) {
+    if (!extIt->value.IsObject()) continue;
+    std::string ext_name = extIt->name.GetString();
+    if (!ParseJsonAsValue(&extensions[ext_name], extIt->value)) {
+      if (!ext_name.empty()) {
         // create empty object so that an extension object is still of type
         // object
-        extensions[extIt.key()] = Value{Value::Object{}};
+        extensions[ext_name] = Value{Value::Object{}};
       }
     }
   }
@@ -2538,7 +2550,8 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
   return true;
 }
 
-static bool ParseAsset(Asset *asset, std::string *err, const json &o) {
+static bool ParseAsset(Asset *asset, std::string *err,
+                       const rapidjson::Value &o) {
   ParseStringProperty(&asset->version, err, o, "version", true, "Asset");
   ParseStringProperty(&asset->generator, err, o, "generator", false, "Asset");
   ParseStringProperty(&asset->minVersion, err, o, "minVersion", false, "Asset");
@@ -2552,7 +2565,7 @@ static bool ParseAsset(Asset *asset, std::string *err, const json &o) {
 }
 
 static bool ParseImage(Image *image, const int image_idx, std::string *err,
-                       std::string *warn, const json &o,
+                       std::string *warn, const rapidjson::Value &o,
                        const std::string &basedir, FsCallbacks *fs,
                        LoadImageDataFunction *LoadImageData = nullptr,
                        void *load_image_user_data = nullptr) {
@@ -2560,8 +2573,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
 
   // schema says oneOf [`bufferView`, `uri`]
   // TODO(syoyo): Check the type of each parameters.
-  bool hasBufferView = (o.find("bufferView") != o.end());
-  bool hasURI = (o.find("uri") != o.end());
+  bool hasBufferView = (o.FindMember("bufferView") != o.MemberEnd());
+  bool hasURI = (o.FindMember("uri") != o.MemberEnd());
 
   ParseStringProperty(&image->name, err, o, "name", false);
 
@@ -2678,7 +2691,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
                           static_cast<int>(img.size()), load_image_user_data);
 }
 
-static bool ParseTexture(Texture *texture, std::string *err, const json &o,
+static bool ParseTexture(Texture *texture, std::string *err,
+                         const rapidjson::Value &o,
                          const std::string &basedir) {
   (void)basedir;
   double sampler = -1.0;
@@ -2698,9 +2712,9 @@ static bool ParseTexture(Texture *texture, std::string *err, const json &o,
   return true;
 }
 
-static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
-                        FsCallbacks *fs, const std::string &basedir,
-                        bool is_binary = false,
+static bool ParseBuffer(Buffer *buffer, std::string *err,
+                        const rapidjson::Value &o, FsCallbacks *fs,
+                        const std::string &basedir, bool is_binary = false,
                         const unsigned char *bin_data = nullptr,
                         size_t bin_size = 0) {
   double byteLength;
@@ -2719,10 +2733,10 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
     }
   }
 
-  json::const_iterator type = o.find("type");
-  if (type != o.end()) {
-    if (type.value().is_string()) {
-      const std::string &ty = type.value();
+  auto type = o.FindMember("type");
+  if (type != o.MemberEnd()) {
+    if (type->value.IsString()) {
+      const std::string &ty = type->value.GetString();
       if (ty.compare("arraybuffer") == 0) {
         // buffer.type = "arraybuffer";
       }
@@ -2801,7 +2815,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
 }
 
 static bool ParseBufferView(BufferView *bufferView, std::string *err,
-                            const json &o) {
+                            const rapidjson::Value &o) {
   double buffer = -1.0;
   if (!ParseNumberProperty(&buffer, err, o, "buffer", true, "BufferView")) {
     return false;
@@ -2862,38 +2876,41 @@ static bool ParseBufferView(BufferView *bufferView, std::string *err,
 }
 
 static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
-                                const json &o) {
+                                const rapidjson::Value &o) {
   accessor->sparse.isSparse = true;
 
   double count = 0.0;
   ParseNumberProperty(&count, err, o, "count", true);
 
-  const auto indices_iterator = o.find("indices");
-  const auto values_iterator = o.find("values");
-  if (indices_iterator == o.end()) {
+  const auto indices_iterator = o.FindMember("indices");
+  const auto values_iterator = o.FindMember("values");
+  if (indices_iterator == o.MemberEnd()) {
     (*err) = "the sparse object of this accessor doesn't have indices";
     return false;
   }
 
-  if (values_iterator == o.end()) {
+  if (values_iterator == o.MemberEnd()) {
     (*err) = "the sparse object ob ths accessor doesn't have values";
     return false;
   }
 
-  const json &indices_obj = *indices_iterator;
-  const json &values_obj = *values_iterator;
+  const auto &indices_obj = *indices_iterator;
+  const auto &values_obj = *values_iterator;
 
   double indices_buffer_view = 0.0, indices_byte_offset = 0.0,
          component_type = 0.0;
-  ParseNumberProperty(&indices_buffer_view, err, indices_obj, "bufferView",
+  ParseNumberProperty(&indices_buffer_view, err, indices_obj.value,
+                      "bufferView", true);
+  ParseNumberProperty(&indices_byte_offset, err, indices_obj.value,
+                      "byteOffset", true);
+  ParseNumberProperty(&component_type, err, indices_obj.value, "componentType",
                       true);
-  ParseNumberProperty(&indices_byte_offset, err, indices_obj, "byteOffset",
-                      true);
-  ParseNumberProperty(&component_type, err, indices_obj, "componentType", true);
 
   double values_buffer_view = 0.0, values_byte_offset = 0.0;
-  ParseNumberProperty(&values_buffer_view, err, values_obj, "bufferView", true);
-  ParseNumberProperty(&values_byte_offset, err, values_obj, "byteOffset", true);
+  ParseNumberProperty(&values_buffer_view, err, values_obj.value, "bufferView",
+                      true);
+  ParseNumberProperty(&values_byte_offset, err, values_obj.value, "byteOffset",
+                      true);
 
   accessor->sparse.count = static_cast<int>(count);
   accessor->sparse.indices.bufferView = static_cast<int>(indices_buffer_view);
@@ -2907,7 +2924,8 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   return true;
 }
 
-static bool ParseAccessor(Accessor *accessor, std::string *err, const json &o) {
+static bool ParseAccessor(Accessor *accessor, std::string *err,
+                          const rapidjson::Value &o) {
   double bufferView = -1.0;
   ParseNumberProperty(&bufferView, err, o, "bufferView", false, "Accessor");
 
@@ -2989,10 +3007,10 @@ static bool ParseAccessor(Accessor *accessor, std::string *err, const json &o) {
   ParseExtrasProperty(&(accessor->extras), o);
 
   // check if accessor has a "sparse" object:
-  const auto iterator = o.find("sparse");
-  if (iterator != o.end()) {
+  const auto itr = o.FindMember("sparse");
+  if (itr != o.MemberEnd()) {
     // here this accessor has a "sparse" subobject
-    return ParseSparseAccessor(accessor, err, *iterator);
+    return ParseSparseAccessor(accessor, err, itr->value);
   }
 
   return true;
@@ -3191,7 +3209,7 @@ static bool ParseDracoExtension(Primitive *primitive, Model *model,
 #endif
 
 static bool ParsePrimitive(Primitive *primitive, Model *model, std::string *err,
-                           const json &o) {
+                           const rapidjson::Value &o) {
   double material = -1.0;
   ParseNumberProperty(&material, err, o, "material", false);
   primitive->material = static_cast<int>(material);
@@ -3211,18 +3229,18 @@ static bool ParsePrimitive(Primitive *primitive, Model *model, std::string *err,
   }
 
   // Look for morph targets
-  json::const_iterator targetsObject = o.find("targets");
-  if ((targetsObject != o.end()) && targetsObject.value().is_array()) {
-    for (json::const_iterator i = targetsObject.value().begin();
-         i != targetsObject.value().end(); i++) {
+  auto targetsObject = o.FindMember("targets");
+  if ((targetsObject != o.MemberEnd()) && targetsObject->value.IsArray()) {
+    for (auto i = targetsObject->value.Begin(); i != targetsObject->value.End();
+         i++) {
       std::map<std::string, int> targetAttribues;
 
-      const json &dict = i.value();
-      json::const_iterator dictIt(dict.begin());
-      json::const_iterator dictItEnd(dict.end());
+      const rapidjson::Value &dict = *i;
+      auto dictIt(dict.MemberBegin());
+      auto dictItEnd(dict.MemberEnd());
 
       for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt.key()] = static_cast<int>(dictIt.value());
+        targetAttribues[dictIt->name.GetString()] = dictIt->value.GetInt();
       }
       primitive->targets.push_back(targetAttribues);
     }
@@ -3246,16 +3264,16 @@ static bool ParsePrimitive(Primitive *primitive, Model *model, std::string *err,
 }
 
 static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
-                      const json &o) {
+                      const rapidjson::Value &o) {
   ParseStringProperty(&mesh->name, err, o, "name", false);
 
   mesh->primitives.clear();
-  json::const_iterator primObject = o.find("primitives");
-  if ((primObject != o.end()) && primObject.value().is_array()) {
-    for (json::const_iterator i = primObject.value().begin();
-         i != primObject.value().end(); i++) {
+  auto primObject = o.FindMember("primitives");
+  if ((primObject != o.MemberEnd()) && primObject->value.IsArray()) {
+    for (auto i = primObject->value.Begin(); i != primObject->value.End();
+         i++) {
       Primitive primitive;
-      if (ParsePrimitive(&primitive, model, err, i.value())) {
+      if (ParsePrimitive(&primitive, model, err, *i)) {
         // Only add the primitive if the parsing succeeds.
         mesh->primitives.push_back(primitive);
       }
@@ -3263,18 +3281,18 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
   }
 
   // Look for morph targets
-  json::const_iterator targetsObject = o.find("targets");
-  if ((targetsObject != o.end()) && targetsObject.value().is_array()) {
-    for (json::const_iterator i = targetsObject.value().begin();
-         i != targetsObject.value().end(); i++) {
+  auto targetsObject = o.FindMember("targets");
+  if ((targetsObject != o.MemberEnd()) && targetsObject->value.IsArray()) {
+    for (auto i = targetsObject->value.Begin(); i != targetsObject->value.End();
+         i++) {
       std::map<std::string, int> targetAttribues;
 
-      const json &dict = i.value();
-      json::const_iterator dictIt(dict.begin());
-      json::const_iterator dictItEnd(dict.end());
+      const rapidjson::Value &dict = *i;
+      auto dictIt(dict.MemberBegin());
+      auto dictItEnd(dict.MemberEnd());
 
       for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt.key()] = static_cast<int>(dictIt.value());
+        targetAttribues[dictIt->name.GetString()] = dictIt->value.GetInt();
       }
       mesh->targets.push_back(targetAttribues);
     }
@@ -3289,14 +3307,15 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
   return true;
 }
 
-static bool ParseLight(Light *light, std::string *err, const json &o) {
+static bool ParseLight(Light *light, std::string *err,
+                       const rapidjson::Value &o) {
   ParseStringProperty(&light->name, err, o, "name", false);
   ParseNumberArrayProperty(&light->color, err, o, "color", false);
   ParseStringProperty(&light->type, err, o, "type", false);
   return true;
 }
 
-static bool ParseNode(Node *node, std::string *err, const json &o) {
+static bool ParseNode(Node *node, std::string *err, const rapidjson::Value &o) {
   ParseStringProperty(&node->name, err, o, "name", false);
 
   double skin = -1.0;
@@ -3319,17 +3338,17 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
   node->mesh = int(mesh);
 
   node->children.clear();
-  json::const_iterator childrenObject = o.find("children");
-  if ((childrenObject != o.end()) && childrenObject.value().is_array()) {
-    for (json::const_iterator i = childrenObject.value().begin();
-         i != childrenObject.value().end(); i++) {
-      if (!i.value().is_number()) {
+  auto childrenObject = o.FindMember("children");
+  if ((childrenObject != o.MemberEnd()) && childrenObject->value.IsArray()) {
+    for (auto i = childrenObject->value.Begin();
+         i != childrenObject->value.End(); i++) {
+      if (!i->IsNumber()) {
         if (err) {
           (*err) += "Invalid `children` array.\n";
         }
         return false;
       }
-      const int &childrenNode = static_cast<int>(i.value());
+      const int &childrenNode = i->GetInt();
       node->children.push_back(childrenNode);
     }
   }
@@ -3340,37 +3359,40 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
   return true;
 }
 
-static bool ParseMaterial(Material *material, std::string *err, const json &o) {
+static bool ParseMaterial(Material *material, std::string *err,
+                          const rapidjson::Value &o) {
   material->values.clear();
   material->extensions.clear();
   material->additionalValues.clear();
 
-  json::const_iterator it(o.begin());
-  json::const_iterator itEnd(o.end());
+  auto it(o.MemberBegin());
+  auto itEnd(o.MemberEnd());
 
   for (; it != itEnd; it++) {
-    if (it.key() == "pbrMetallicRoughness") {
-      if (it.value().is_object()) {
-        const json &values_object = it.value();
+    std::string key = it->name.GetString();
+    if (key.compare("pbrMetallicRoughness") == 0) {
+      if (it->value.IsObject()) {
+        const rapidjson::Value &values_object = it->value;
 
-        json::const_iterator itVal(values_object.begin());
-        json::const_iterator itValEnd(values_object.end());
+        auto itVal(values_object.MemberBegin());
+        auto itValEnd(values_object.MemberEnd());
 
         for (; itVal != itValEnd; itVal++) {
           Parameter param;
-          if (ParseParameterProperty(&param, err, values_object, itVal.key(),
-                                     false)) {
-            material->values[itVal.key()] = param;
+          std::string name = itVal->name.GetString();
+          if (ParseParameterProperty(&param, err, values_object, name, false)) {
+            material->values[name] = param;
           }
         }
       }
-    } else if (it.key() == "extensions" || it.key() == "extras") {
+    } else if ((key.compare("extensions") == 0) ||
+               (key.compare("extras") == 0)) {
       // done later, skip, otherwise poorly parsed contents will be saved in the
       // parametermap and serialized again later
     } else {
       Parameter param;
-      if (ParseParameterProperty(&param, err, o, it.key(), false)) {
-        material->additionalValues[it.key()] = param;
+      if (ParseParameterProperty(&param, err, o, key, false)) {
+        material->additionalValues[key] = param;
       }
     }
   }
@@ -3382,7 +3404,7 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
 }
 
 static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
-                                  const json &o) {
+                                  const rapidjson::Value &o) {
   double samplerIndex = -1.0;
   double targetIndex = -1.0;
   if (!ParseNumberProperty(&samplerIndex, err, o, "sampler", true,
@@ -3393,9 +3415,9 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
     return false;
   }
 
-  json::const_iterator targetIt = o.find("target");
-  if ((targetIt != o.end()) && targetIt.value().is_object()) {
-    const json &target_object = targetIt.value();
+  auto targetIt = o.FindMember("target");
+  if ((targetIt != o.MemberEnd()) && targetIt->value.IsObject()) {
+    const rapidjson::Value &target_object = targetIt->value;
 
     if (!ParseNumberProperty(&targetIndex, err, target_object, "node", true)) {
       if (err) {
@@ -3422,14 +3444,14 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
 }
 
 static bool ParseAnimation(Animation *animation, std::string *err,
-                           const json &o) {
+                           const rapidjson::Value &o) {
   {
-    json::const_iterator channelsIt = o.find("channels");
-    if ((channelsIt != o.end()) && channelsIt.value().is_array()) {
-      for (json::const_iterator i = channelsIt.value().begin();
-           i != channelsIt.value().end(); i++) {
+    auto channelsIt = o.FindMember("channels");
+    if ((channelsIt != o.MemberEnd()) && channelsIt->value.IsArray()) {
+      for (auto i = channelsIt->value.Begin(); i != channelsIt->value.End();
+           i++) {
         AnimationChannel channel;
-        if (ParseAnimationChannel(&channel, err, i.value())) {
+        if (ParseAnimationChannel(&channel, err, *i)) {
           // Only add the channel if the parsing succeeds.
           animation->channels.push_back(channel);
         }
@@ -3438,15 +3460,15 @@ static bool ParseAnimation(Animation *animation, std::string *err,
   }
 
   {
-    json::const_iterator samplerIt = o.find("samplers");
-    if ((samplerIt != o.end()) && samplerIt.value().is_array()) {
-      const json &sampler_array = samplerIt.value();
+    auto samplerIt = o.FindMember("samplers");
+    if ((samplerIt != o.MemberEnd()) && samplerIt->value.IsArray()) {
+      const rapidjson::Value &sampler_array = samplerIt->value;
 
-      json::const_iterator it = sampler_array.begin();
-      json::const_iterator itEnd = sampler_array.end();
+      auto it = sampler_array.Begin();
+      auto itEnd = sampler_array.End();
 
       for (; it != itEnd; it++) {
-        const json &s = it->get<json>();
+        const rapidjson::Value &s = *it;
 
         AnimationSampler sampler;
         double inputIndex = -1.0;
@@ -3480,7 +3502,8 @@ static bool ParseAnimation(Animation *animation, std::string *err,
   return true;
 }
 
-static bool ParseSampler(Sampler *sampler, std::string *err, const json &o) {
+static bool ParseSampler(Sampler *sampler, std::string *err,
+                         const rapidjson::Value &o) {
   ParseStringProperty(&sampler->name, err, o, "name", false);
 
   double minFilter =
@@ -3503,7 +3526,7 @@ static bool ParseSampler(Sampler *sampler, std::string *err, const json &o) {
   return true;
 }
 
-static bool ParseSkin(Skin *skin, std::string *err, const json &o) {
+static bool ParseSkin(Skin *skin, std::string *err, const rapidjson::Value &o) {
   ParseStringProperty(&skin->name, err, o, "name", false, "Skin");
 
   std::vector<double> joints;
@@ -3528,7 +3551,7 @@ static bool ParseSkin(Skin *skin, std::string *err, const json &o) {
 }
 
 static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
-                                   const json &o) {
+                                   const rapidjson::Value &o) {
   double yfov = 0.0;
   if (!ParseNumberProperty(&yfov, err, o, "yfov", true, "OrthographicCamera")) {
     return false;
@@ -3561,7 +3584,8 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
 }
 
 static bool ParseOrthographicCamera(OrthographicCamera *camera,
-                                    std::string *err, const json &o) {
+                                    std::string *err,
+                                    const rapidjson::Value &o) {
   double xmag = 0.0;
   if (!ParseNumberProperty(&xmag, err, o, "xmag", true, "OrthographicCamera")) {
     return false;
@@ -3596,13 +3620,15 @@ static bool ParseOrthographicCamera(OrthographicCamera *camera,
   return true;
 }
 
-static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
+static bool ParseCamera(Camera *camera, std::string *err,
+                        const rapidjson::Value &o) {
   if (!ParseStringProperty(&camera->type, err, o, "type", true, "Camera")) {
     return false;
   }
 
   if (camera->type.compare("orthographic") == 0) {
-    if (o.find("orthographic") == o.end()) {
+    const auto ortho_itr = o.FindMember("orthographic");
+    if (ortho_itr == o.MemberEnd()) {
       if (err) {
         std::stringstream ss;
         ss << "Orhographic camera description not found." << std::endl;
@@ -3611,8 +3637,8 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
       return false;
     }
 
-    const json &v = o.find("orthographic").value();
-    if (!v.is_object()) {
+    const rapidjson::Value &v = ortho_itr->value;
+    if (!v.IsObject()) {
       if (err) {
         std::stringstream ss;
         ss << "\"orthographic\" is not a JSON object." << std::endl;
@@ -3621,11 +3647,12 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
       return false;
     }
 
-    if (!ParseOrthographicCamera(&camera->orthographic, err, v.get<json>())) {
+    if (!ParseOrthographicCamera(&camera->orthographic, err, v)) {
       return false;
     }
   } else if (camera->type.compare("perspective") == 0) {
-    if (o.find("perspective") == o.end()) {
+    const auto perspective_itr = o.FindMember("perspective");
+    if (perspective_itr == o.MemberEnd()) {
       if (err) {
         std::stringstream ss;
         ss << "Perspective camera description not found." << std::endl;
@@ -3634,8 +3661,8 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
       return false;
     }
 
-    const json &v = o.find("perspective").value();
-    if (!v.is_object()) {
+    const rapidjson::Value &v = perspective_itr->value;
+    if (!v.IsObject()) {
       if (err) {
         std::stringstream ss;
         ss << "\"perspective\" is not a JSON object." << std::endl;
@@ -3644,7 +3671,7 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
       return false;
     }
 
-    if (!ParsePerspectiveCamera(&camera->perspective, err, v.get<json>())) {
+    if (!ParsePerspectiveCamera(&camera->perspective, err, v)) {
       return false;
     }
   } else {
@@ -3676,13 +3703,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     return false;
   }
 
-  json v;
+  rapidjson::Document v;
 
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || \
      defined(_CPPUNWIND)) &&                               \
     not defined(TINYGLTF_NOEXCEPTION)
   try {
-    v = json::parse(str, str + length);
+    v.Parse(str);
 
   } catch (const std::exception &e) {
     if (err) {
@@ -3690,21 +3717,22 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
     return false;
   }
+
+  if (v.HasParseError()) {
+    // TODO(syoyo): Report error
+    return false;
+  }
 #else
   {
-    v = json::parse(str, str + length, nullptr, /* exception */ false);
-
-    if (!v.is_object()) {
-      // Assume parsing was failed.
-      if (err) {
-        (*err) = "Failed to parse JSON object\n";
-      }
+    v.Parse(str);
+    if (v.HasParseError()) {
+      // TODO(syoyo): Report error
       return false;
     }
   }
 #endif
 
-  if (!v.is_object()) {
+  if (!v.IsObject()) {
     // root is not an object.
     if (err) {
       (*err) = "Root element is not a JSON object\n";
@@ -3716,8 +3744,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   // FIXME Maybe a better way to handle it than removing the code
 
   {
-    json::const_iterator it = v.find("scenes");
-    if ((it != v.end()) && it.value().is_array()) {
+    auto it = v.FindMember("scenes");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
       // OK
     } else if (check_sections & REQUIRE_SCENES) {
       if (err) {
@@ -3728,8 +3756,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   {
-    json::const_iterator it = v.find("nodes");
-    if ((it != v.end()) && it.value().is_array()) {
+    auto it = v.FindMember("nodes");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
       // OK
     } else if (check_sections & REQUIRE_NODES) {
       if (err) {
@@ -3740,8 +3768,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   {
-    json::const_iterator it = v.find("accessors");
-    if ((it != v.end()) && it.value().is_array()) {
+    auto it = v.FindMember("accessors");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
       // OK
     } else if (check_sections & REQUIRE_ACCESSORS) {
       if (err) {
@@ -3752,8 +3780,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   {
-    json::const_iterator it = v.find("buffers");
-    if ((it != v.end()) && it.value().is_array()) {
+    auto it = v.FindMember("buffers");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
       // OK
     } else if (check_sections & REQUIRE_BUFFERS) {
       if (err) {
@@ -3764,8 +3792,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   {
-    json::const_iterator it = v.find("bufferViews");
-    if ((it != v.end()) && it.value().is_array()) {
+    auto it = v.FindMember("bufferViews");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
       // OK
     } else if (check_sections & REQUIRE_BUFFER_VIEWS) {
       if (err) {
@@ -3788,9 +3816,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 1. Parse Asset
   {
-    json::const_iterator it = v.find("asset");
-    if ((it != v.end()) && it.value().is_object()) {
-      const json &root = it.value();
+    auto it = v.FindMember("asset");
+    if ((it != v.MemberEnd()) && it->value.IsObject()) {
+      const rapidjson::Value &root = it->value;
 
       ParseAsset(&model->asset, err, root);
     }
@@ -3798,43 +3826,43 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 2. Parse extensionUsed
   {
-    json::const_iterator it = v.find("extensionsUsed");
-    if ((it != v.end()) && it.value().is_array()) {
-      const json &root = it.value();
-      for (unsigned int i = 0; i < root.size(); ++i) {
-        model->extensionsUsed.push_back(root[i].get<std::string>());
+    auto it = v.FindMember("extensionsUsed");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
+      const rapidjson::Value &root = it->value;
+      for (unsigned int i = 0; i < root.Size(); ++i) {
+        model->extensionsUsed.push_back(root[i].GetString());
       }
     }
   }
 
   {
-    json::const_iterator it = v.find("extensionsRequired");
-    if ((it != v.end()) && it.value().is_array()) {
-      const json &root = it.value();
-      for (unsigned int i = 0; i < root.size(); ++i) {
-        model->extensionsRequired.push_back(root[i].get<std::string>());
+    auto it = v.FindMember("extensionsRequired");
+    if ((it != v.MemberEnd()) && it->value.IsArray()) {
+      const rapidjson::Value &root = it->value;
+      for (unsigned int i = 0; i < root.Size(); ++i) {
+        model->extensionsRequired.push_back(root[i].GetString());
       }
     }
   }
 
   // 3. Parse Buffer
   {
-    json::const_iterator rootIt = v.find("buffers");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("buffers");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`buffers' does not contain an JSON object.";
           }
           return false;
         }
         Buffer buffer;
-        if (!ParseBuffer(&buffer, err, it->get<json>(), &fs, base_dir,
-                         is_binary_, bin_data_, bin_size_)) {
+        if (!ParseBuffer(&buffer, err, *it, &fs, base_dir, is_binary_,
+                         bin_data_, bin_size_)) {
           return false;
         }
 
@@ -3845,21 +3873,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 4. Parse BufferView
   {
-    json::const_iterator rootIt = v.find("bufferViews");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("bufferViews");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`bufferViews' does not contain an JSON object.";
           }
           return false;
         }
         BufferView bufferView;
-        if (!ParseBufferView(&bufferView, err, it->get<json>())) {
+        if (!ParseBufferView(&bufferView, err, *it)) {
           return false;
         }
 
@@ -3870,21 +3898,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 5. Parse Accessor
   {
-    json::const_iterator rootIt = v.find("accessors");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("accessors");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`accessors' does not contain an JSON object.";
           }
           return false;
         }
         Accessor accessor;
-        if (!ParseAccessor(&accessor, err, it->get<json>())) {
+        if (!ParseAccessor(&accessor, err, *it)) {
           return false;
         }
 
@@ -3895,21 +3923,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 6. Parse Mesh
   {
-    json::const_iterator rootIt = v.find("meshes");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("meshes");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`meshes' does not contain an JSON object.";
           }
           return false;
         }
         Mesh mesh;
-        if (!ParseMesh(&mesh, model, err, it->get<json>())) {
+        if (!ParseMesh(&mesh, model, err, *it)) {
           return false;
         }
 
@@ -3944,21 +3972,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 7. Parse Node
   {
-    json::const_iterator rootIt = v.find("nodes");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("nodes");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`nodes' does not contain an JSON object.";
           }
           return false;
         }
         Node node;
-        if (!ParseNode(&node, err, it->get<json>())) {
+        if (!ParseNode(&node, err, *it)) {
           return false;
         }
 
@@ -3969,20 +3997,20 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 8. Parse scenes.
   {
-    json::const_iterator rootIt = v.find("scenes");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("scenes");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!(it.value().is_object())) {
+        if (!(it->IsObject())) {
           if (err) {
             (*err) += "`scenes' does not contain an JSON object.";
           }
           return false;
         }
-        const json &o = it->get<json>();
+        const rapidjson::Value &o = *it;
         std::vector<double> nodes;
         if (!ParseNumberArrayProperty(&nodes, err, o, "nodes", false)) {
           return false;
@@ -4006,30 +4034,30 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 9. Parse default scenes.
   {
-    json::const_iterator rootIt = v.find("scene");
-    if ((rootIt != v.end()) && rootIt.value().is_number()) {
-      const int defaultScene = rootIt.value();
+    auto rootIt = v.FindMember("scene");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsNumber()) {
+      const int defaultScene = rootIt->value.GetInt();
 
-      model->defaultScene = static_cast<int>(defaultScene);
+      model->defaultScene = defaultScene;
     }
   }
 
   // 10. Parse Material
   {
-    json::const_iterator rootIt = v.find("materials");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("materials");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`materials' does not contain an JSON object.";
           }
           return false;
         }
-        json jsonMaterial = it->get<json>();
+        const auto &jsonMaterial = *it;
 
         Material material;
         ParseStringProperty(&material.name, err, jsonMaterial, "name", false);
@@ -4045,15 +4073,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 11. Parse Image
   {
-    json::const_iterator rootIt = v.find("images");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("images");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       int idx = 0;
       for (; it != itEnd; it++, idx++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) +=
                 "image[" + std::to_string(idx) + "] is not a JSON object.";
@@ -4061,7 +4089,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
         Image image;
-        if (!ParseImage(&image, idx, err, warn, it.value(), base_dir, &fs,
+        if (!ParseImage(&image, idx, err, warn, *it, base_dir, &fs,
                         &this->LoadImageData, load_image_user_data_)) {
           return false;
         }
@@ -4104,21 +4132,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 12. Parse Texture
   {
-    json::const_iterator rootIt = v.find("textures");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("textures");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; it++) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`textures' does not contain an JSON object.";
           }
           return false;
         }
         Texture texture;
-        if (!ParseTexture(&texture, err, it->get<json>(), base_dir)) {
+        if (!ParseTexture(&texture, err, *it, base_dir)) {
           return false;
         }
 
@@ -4129,21 +4157,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 13. Parse Animation
   {
-    json::const_iterator rootIt = v.find("animations");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("animations");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; ++it) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`animations' does not contain an JSON object.";
           }
           return false;
         }
         Animation animation;
-        if (!ParseAnimation(&animation, err, it->get<json>())) {
+        if (!ParseAnimation(&animation, err, *it)) {
           return false;
         }
 
@@ -4154,21 +4182,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 14. Parse Skin
   {
-    json::const_iterator rootIt = v.find("skins");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("skins");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; ++it) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`skins' does not contain an JSON object.";
           }
           return false;
         }
         Skin skin;
-        if (!ParseSkin(&skin, err, it->get<json>())) {
+        if (!ParseSkin(&skin, err, *it)) {
           return false;
         }
 
@@ -4179,21 +4207,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 15. Parse Sampler
   {
-    json::const_iterator rootIt = v.find("samplers");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("samplers");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; ++it) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`samplers' does not contain an JSON object.";
           }
           return false;
         }
         Sampler sampler;
-        if (!ParseSampler(&sampler, err, it->get<json>())) {
+        if (!ParseSampler(&sampler, err, *it)) {
           return false;
         }
 
@@ -4204,21 +4232,21 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 16. Parse Camera
   {
-    json::const_iterator rootIt = v.find("cameras");
-    if ((rootIt != v.end()) && rootIt.value().is_array()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("cameras");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsArray()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.Begin());
+      auto itEnd(root.End());
       for (; it != itEnd; ++it) {
-        if (!it.value().is_object()) {
+        if (!it->IsObject()) {
           if (err) {
             (*err) += "`cameras' does not contain an JSON object.";
           }
           return false;
         }
         Camera camera;
-        if (!ParseCamera(&camera, err, it->get<json>())) {
+        if (!ParseCamera(&camera, err, *it)) {
           return false;
         }
 
@@ -4232,33 +4260,33 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 18. Specific extension implementations
   {
-    json::const_iterator rootIt = v.find("extensions");
-    if ((rootIt != v.end()) && rootIt.value().is_object()) {
-      const json &root = rootIt.value();
+    auto rootIt = v.FindMember("extensions");
+    if ((rootIt != v.MemberEnd()) && rootIt->value.IsObject()) {
+      const rapidjson::Value &root = rootIt->value;
 
-      json::const_iterator it(root.begin());
-      json::const_iterator itEnd(root.end());
+      auto it(root.MemberBegin());
+      auto itEnd(root.MemberEnd());
       for (; it != itEnd; ++it) {
         // parse KHR_lights_cmn extension
-        if ((it.key().compare("KHR_lights_cmn") == 0) &&
-            it.value().is_object()) {
-          const json &object = it.value();
-          json::const_iterator itLight(object.find("lights"));
-          json::const_iterator itLightEnd(object.end());
+        const std::string key = it->name.GetString();
+        if ((key.compare("KHR_lights_cmn") == 0) && it->value.IsObject()) {
+          const rapidjson::Value &object = it->value;
+          auto itLight(object.FindMember("lights"));
+          auto itLightEnd(object.MemberEnd());
           if (itLight == itLightEnd) {
             continue;
           }
 
-          if (!itLight.value().is_array()) {
+          if (!itLight->value.IsArray()) {
             continue;
           }
 
-          const json &lights = itLight.value();
-          json::const_iterator arrayIt(lights.begin());
-          json::const_iterator arrayItEnd(lights.end());
+          const rapidjson::Value &lights = itLight->value;
+          auto arrayIt(lights.Begin());
+          auto arrayItEnd(lights.End());
           for (; arrayIt != arrayItEnd; ++arrayIt) {
             Light light;
-            if (!ParseLight(&light, err, arrayIt.value())) {
+            if (!ParseLight(&light, err, *arrayIt)) {
               return false;
             }
             model->lights.push_back(light);
@@ -4438,6 +4466,8 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 ///////////////////////
 // GLTF Serialization
 ///////////////////////
+
+#if 0  // TODO(syoyo): Implement
 
 // typedef std::pair<std::string, json> json_object_pair;
 
@@ -5291,6 +5321,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
 
   return true;
 }
+#endif
 
 }  // namespace tinygltf
 
