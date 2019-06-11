@@ -31,8 +31,6 @@ class RefResolver:
                 if key == "$ref":
                     ref_frag = urlparse(value)
                     ref_file = ref_frag.netloc + ref_frag.path
-                    print(ref_file)
-                    print(self.url_fragments.scheme)
                     json_dump = {}
                     if ref_file in cache:
                         json_dump = cache[ref_file]
@@ -52,7 +50,6 @@ class RefResolver:
                         #elif self.url_fragments.scheme == 'file':
                         else:
                             if isfile(ref_file):
-                                print(ref_file)
                                 # if the ref is another file -> go there and get it
                                 json_dump = json.load(open(ref_file))
                                 ref_id = None
