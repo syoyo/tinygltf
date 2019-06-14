@@ -949,6 +949,19 @@ class TinyGLTF {
                            const std::string &base_dir,
                            unsigned int check_sections = REQUIRE_ALL);
 
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+
+  bool LoadASCIIFromFileWithValidation(
+      Model *model, std::string *err, std::string *warn,
+      const std::string &filename, unsigned int check_sections = REQUIRE_ALL);
+
+  bool LoadASCIIFromStringWithValidation(
+      Model *model, std::string *err, std::string *warn, const char *str,
+      const unsigned int length, const std::string &base_dir,
+      unsigned int check_sections = REQUIRE_ALL);
+
+#endif
+
   ///
   /// Loads glTF binary asset from a file.
   /// Set warning message to `warn` for example it fails to load asserts.
@@ -1184,6 +1197,11 @@ class TinyGLTF {
 #endif
 
 namespace tinygltf {
+
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+// Include glTF Schema as embedded C string
+#include "glTF.schema.resolved.inc"
+#endif
 
 // Equals function for Value, for recursivity
 static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
@@ -3708,7 +3726,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || \
      defined(_CPPUNWIND)) &&                               \
-    not defined(TINYGLTF_NOEXCEPTION)
+    !defined(TINYGLTF_NOEXCEPTION)
   try {
     v.Parse(str);
 
@@ -4469,36 +4487,37 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 ///////////////////////
 
 template <typename T>
-static void SerializeNumberProperty(const std::string &key, T number,
-                                    rapidjson::Document::AllocatorType &allocator,
-                                    rapidjson::Value &obj) {
-  rapidjson::Value name(key.c_str(), key.size(), allocator);
+static void SerializeNumberProperty(
+    const std::string &key, T number,
+    rapidjson::Document::AllocatorType &allocator, rapidjson::Value &obj) {
+  rapidjson::Value name(key.c_str(), rapidjson::SizeType(key.size()),
+                        allocator);
   obj.AddMember(name, rapidjson::Value(number), allocator);
 }
 
 template <typename T>
-static void SerializeNumberArrayProperty(const std::string &key,
-                                         const std::vector<T> &value,
-                                         rapidjson::Document::AllocatorType &allocator,
-                                         rapidjson::Value &obj) {
+static void SerializeNumberArrayProperty(
+    const std::string &key, const std::vector<T> &value,
+    rapidjson::Document::AllocatorType &allocator, rapidjson::Value &obj) {
   rapidjson::Value vals(rapidjson::kArrayType);
 
   for (unsigned int i = 0; i < value.size(); ++i) {
     vals.PushBack(static_cast<T>(value[i]), allocator);
   }
   if (!vals.IsNull()) {
-    rapidjson::Value name(key.c_str(), key.size(), allocator);
+    rapidjson::Value name(key.c_str(), rapidjson::SizeType(key.size()),
+                          allocator);
     obj.AddMember(name, vals, allocator);
   }
 }
 
-static void SerializeStringProperty(const std::string &key,
-                                    const std::string &value,
-                                    rapidjson::Document::AllocatorType &allocator,
-                                    rapidjson::Value &obj) {
-
-  rapidjson::Value name(key.c_str(), key.size(), allocator);
-  rapidjson::Value v(value.c_str(), value.size(), allocator);
+static void SerializeStringProperty(
+    const std::string &key, const std::string &value,
+    rapidjson::Document::AllocatorType &allocator, rapidjson::Value &obj) {
+  rapidjson::Value name(key.c_str(), rapidjson::SizeType(key.size()),
+                        allocator);
+  rapidjson::Value v(value.c_str(), rapidjson::SizeType(value.size()),
+                     allocator);
   obj.AddMember(name, v, allocator);
 }
 
@@ -4509,11 +4528,13 @@ static void SerializeStringArrayProperty(
 
   for (unsigned int i = 0; i < value.size(); ++i) {
     rapidjson::Value str;
-    str.SetString(value[i].c_str(), value[i].size(), allocator);
+    str.SetString(value[i].c_str(), rapidjson::SizeType(value[i].size()),
+                  allocator);
     vals.PushBack(str, allocator);
   }
 
-  rapidjson::Value name(key.c_str(), key.size(), allocator);
+  rapidjson::Value name(key.c_str(), rapidjson::SizeType(key.size()),
+                        allocator);
   obj.AddMember(name, vals, allocator);
 }
 
@@ -4533,7 +4554,7 @@ static bool ValueToJson(const Value &value,
       break;
     case STRING_TYPE: {
       std::string str = value.Get<std::string>();
-      obj.SetString(str.c_str(), str.size(), allocator);
+      obj.SetString(str.c_str(), rapidjson::SizeType(str.size()), allocator);
     } break;
     case ARRAY_TYPE: {
       for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
@@ -4572,15 +4593,16 @@ static void SerializeValue(const std::string &key, const Value &value,
                            rapidjson::Value &obj) {
   rapidjson::Value ret;
   if (ValueToJson(value, allocator, &ret)) {
-    //obj[key.c_str()] = ret;
-    rapidjson::Value name(key.c_str(), key.size(), allocator);
+    // obj[key.c_str()] = ret;
+    rapidjson::Value name(key.c_str(), rapidjson::SizeType(key.size()),
+                          allocator);
     obj.AddMember(name, ret, allocator);
   }
 }
 
-static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
-                                    rapidjson::Document::AllocatorType &allocator,
-                                    rapidjson::Value &o) {
+static void SerializeGltfBufferData(
+    const std::vector<unsigned char> &data,
+    rapidjson::Document::AllocatorType &allocator, rapidjson::Value &o) {
   std::string header = "data:application/octet-stream;base64,";
   std::string encodedData =
       base64_encode(&data[0], static_cast<unsigned int>(data.size()));
@@ -4597,36 +4619,45 @@ static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
   return true;
 }
 
-static void SerializeParameterMap(ParameterMap &param, rapidjson::Document::AllocatorType &allocator, rapidjson::Value &o) {
+static void SerializeParameterMap(ParameterMap &param,
+                                  rapidjson::Document::AllocatorType &allocator,
+                                  rapidjson::Value &o) {
   for (ParameterMap::iterator paramIt = param.begin(); paramIt != param.end();
        ++paramIt) {
     if (paramIt->second.number_array.size()) {
-      SerializeNumberArrayProperty<double>(paramIt->first,
-                                           paramIt->second.number_array, allocator, o);
+      SerializeNumberArrayProperty<double>(
+          paramIt->first, paramIt->second.number_array, allocator, o);
     } else if (paramIt->second.json_double_value.size()) {
       rapidjson::Value json_double_value(rapidjson::kObjectType);
       for (std::map<std::string, double>::iterator it =
                paramIt->second.json_double_value.begin();
            it != paramIt->second.json_double_value.end(); ++it) {
-
-        rapidjson::Value name(it->first.c_str(), it->first.size(), allocator);
+        rapidjson::Value name(it->first.c_str(),
+                              rapidjson::SizeType(it->first.size()), allocator);
         if (it->first == "index") {
-
-          json_double_value.AddMember(name, paramIt->second.TextureIndex(), allocator);
+          json_double_value.AddMember(name, paramIt->second.TextureIndex(),
+                                      allocator);
         } else {
           json_double_value.AddMember(name, it->second, allocator);
         }
       }
 
-      rapidjson::Value pname(paramIt->first.c_str(), paramIt->first.size(), allocator);
+      rapidjson::Value pname(paramIt->first.c_str(),
+                             rapidjson::SizeType(paramIt->first.size()),
+                             allocator);
       o.AddMember(pname, json_double_value, allocator);
     } else if (!paramIt->second.string_value.empty()) {
-      SerializeStringProperty(paramIt->first, paramIt->second.string_value, allocator, o);
+      SerializeStringProperty(paramIt->first, paramIt->second.string_value,
+                              allocator, o);
     } else if (paramIt->second.has_number_value) {
-      rapidjson::Value pname(paramIt->first.c_str(), paramIt->first.size(), allocator);
+      rapidjson::Value pname(paramIt->first.c_str(),
+                             rapidjson::SizeType(paramIt->first.size()),
+                             allocator);
       o.AddMember(pname, paramIt->second.number_value, allocator);
     } else {
-      rapidjson::Value pname(paramIt->first.c_str(), paramIt->first.size(), allocator);
+      rapidjson::Value pname(paramIt->first.c_str(),
+                             rapidjson::SizeType(paramIt->first.size()),
+                             allocator);
       o.AddMember(pname, paramIt->second.bool_value, allocator);
     }
   }
@@ -4640,8 +4671,8 @@ static void SerializeExtensionMap(ExtensionMap &extensions,
   rapidjson::Value extMap(rapidjson::kObjectType);
   for (ExtensionMap::iterator extIt = extensions.begin();
        extIt != extensions.end(); ++extIt) {
-
-    rapidjson::Value name(extIt->first.c_str(), extIt->first.size(), allocator);
+    rapidjson::Value name(extIt->first.c_str(),
+                          rapidjson::SizeType(extIt->first.size()), allocator);
 
     // Allow an empty object for extension(#97)
     rapidjson::Value ret;
@@ -4665,10 +4696,12 @@ static void SerializeGltfAccessor(Accessor &accessor,
   SerializeNumberProperty<int>("bufferView", accessor.bufferView, allocator, o);
 
   if (accessor.byteOffset != 0.0) {
-    SerializeNumberProperty<int>("byteOffset", int(accessor.byteOffset), allocator, o);
+    SerializeNumberProperty<int>("byteOffset", int(accessor.byteOffset),
+                                 allocator, o);
   }
 
-  SerializeNumberProperty<int>("componentType", accessor.componentType, allocator, o);
+  SerializeNumberProperty<int>("componentType", accessor.componentType,
+                               allocator, o);
   SerializeNumberProperty<size_t>("count", accessor.count, allocator, o);
   SerializeNumberArrayProperty<double>("min", accessor.minValues, allocator, o);
   SerializeNumberArrayProperty<double>("max", accessor.maxValues, allocator, o);
@@ -4699,7 +4732,8 @@ static void SerializeGltfAccessor(Accessor &accessor,
   }
 
   SerializeStringProperty("type", type, allocator, o);
-  if (!accessor.name.empty()) SerializeStringProperty("name", accessor.name, allocator, o);
+  if (!accessor.name.empty())
+    SerializeStringProperty("name", accessor.name, allocator, o);
 
   if (accessor.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", accessor.extras, allocator, o);
@@ -4819,15 +4853,18 @@ static void SerializeGltfBufferView(
     BufferView &bufferView, rapidjson::Document::AllocatorType &allocator,
     rapidjson::Value &o) {
   SerializeNumberProperty("buffer", bufferView.buffer, allocator, o);
-  SerializeNumberProperty<size_t>("byteLength", bufferView.byteLength, allocator, o);
+  SerializeNumberProperty<size_t>("byteLength", bufferView.byteLength,
+                                  allocator, o);
 
   // byteStride is optional, minimum allowed is 4
   if (bufferView.byteStride >= 4) {
-    SerializeNumberProperty<size_t>("byteStride", bufferView.byteStride, allocator, o);
+    SerializeNumberProperty<size_t>("byteStride", bufferView.byteStride,
+                                    allocator, o);
   }
   // byteOffset is optional, default is 0
   if (bufferView.byteOffset > 0) {
-    SerializeNumberProperty<size_t>("byteOffset", bufferView.byteOffset, allocator, o);
+    SerializeNumberProperty<size_t>("byteOffset", bufferView.byteOffset,
+                                    allocator, o);
   }
   // Target is optional, check if it contains a valid value
   if (bufferView.target == TINYGLTF_TARGET_ARRAY_BUFFER ||
@@ -4862,7 +4899,6 @@ static void SerializeGltfImage(Image &image,
 static void SerializeGltfMaterial(Material &material,
                                   rapidjson::Document::AllocatorType &allocator,
                                   rapidjson::Value &o) {
-
   if (material.extras.Size()) {
     SerializeValue("extras", material.extras, allocator, o);
   }
@@ -4897,21 +4933,24 @@ static void SerializeGltfMesh(Mesh &mesh,
     for (std::map<std::string, int>::iterator attrIt =
              gltfPrimitive.attributes.begin();
          attrIt != gltfPrimitive.attributes.end(); ++attrIt) {
-      SerializeNumberProperty<int>(attrIt->first, attrIt->second, allocator, attributes);
+      SerializeNumberProperty<int>(attrIt->first, attrIt->second, allocator,
+                                   attributes);
     }
 
     primitive.AddMember("attributes", attributes, allocator);
 
     // Indicies is optional
     if (gltfPrimitive.indices > -1) {
-      SerializeNumberProperty<int>("indices", gltfPrimitive.indices, allocator, primitive);
+      SerializeNumberProperty<int>("indices", gltfPrimitive.indices, allocator,
+                                   primitive);
     }
     // Material is optional
     if (gltfPrimitive.material > -1) {
-      SerializeNumberProperty<int>("material", gltfPrimitive.material, allocator,
-                                   primitive);
+      SerializeNumberProperty<int>("material", gltfPrimitive.material,
+                                   allocator, primitive);
     }
-    SerializeNumberProperty<int>("mode", gltfPrimitive.mode, allocator, primitive);
+    SerializeNumberProperty<int>("mode", gltfPrimitive.mode, allocator,
+                                 primitive);
 
     // Morph targets
     if (gltfPrimitive.targets.size()) {
@@ -4921,8 +4960,8 @@ static void SerializeGltfMesh(Mesh &mesh,
         std::map<std::string, int> targetData = gltfPrimitive.targets[k];
         for (std::map<std::string, int>::iterator attrIt = targetData.begin();
              attrIt != targetData.end(); ++attrIt) {
-          SerializeNumberProperty<int>(attrIt->first, attrIt->second,
-                                       allocator, targetAttributes);
+          SerializeNumberProperty<int>(attrIt->first, attrIt->second, allocator,
+                                       targetAttributes);
         }
 
         targets.PushBack(targetAttributes, allocator);
@@ -4951,7 +4990,9 @@ static void SerializeGltfMesh(Mesh &mesh,
   }
 }
 
-static void SerializeGltfLight(Light &light, rapidjson::Document::AllocatorType &allocator, rapidjson::Value &o) {
+static void SerializeGltfLight(Light &light,
+                               rapidjson::Document::AllocatorType &allocator,
+                               rapidjson::Value &o) {
   if (!light.name.empty()) {
     SerializeStringProperty("name", light.name, allocator, o);
   }
@@ -4963,10 +5004,12 @@ static void SerializeGltfNode(Node &node,
                               rapidjson::Document::AllocatorType &allocator,
                               rapidjson::Value &o) {
   if (node.translation.size() > 0) {
-    SerializeNumberArrayProperty<double>("translation", node.translation, allocator, o);
+    SerializeNumberArrayProperty<double>("translation", node.translation,
+                                         allocator, o);
   }
   if (node.rotation.size() > 0) {
-    SerializeNumberArrayProperty<double>("rotation", node.rotation, allocator, o);
+    SerializeNumberArrayProperty<double>("rotation", node.rotation, allocator,
+                                         o);
   }
   if (node.scale.size() > 0) {
     SerializeNumberArrayProperty<double>("scale", node.scale, allocator, o);
@@ -5078,9 +5121,12 @@ static void SerializeGltfScene(Scene &scene,
   SerializeExtensionMap(scene.extensions, allocator, o);
 }
 
-static void SerializeGltfSkin(Skin &skin, rapidjson::Document::AllocatorType &allocator, rapidjson::Value &o) {
+static void SerializeGltfSkin(Skin &skin,
+                              rapidjson::Document::AllocatorType &allocator,
+                              rapidjson::Value &o) {
   if (skin.inverseBindMatrices != -1)
-    SerializeNumberProperty("inverseBindMatrices", skin.inverseBindMatrices, allocator, o);
+    SerializeNumberProperty("inverseBindMatrices", skin.inverseBindMatrices,
+                            allocator, o);
 
   SerializeNumberArrayProperty<int>("joints", skin.joints, allocator, o);
   SerializeNumberProperty("skeleton", skin.skeleton, allocator, o);
@@ -5149,7 +5195,6 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
                                     bool embedBuffers = false,
                                     bool prettyPrint = true,
                                     bool writeBinary = false) {
-
   // Default template parameter uses UTF8 and MemoryPoolAllocator.
   rapidjson::Document output(rapidjson::kObjectType);
 
@@ -5158,7 +5203,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   // ACCESSORS
   rapidjson::Value accessors(rapidjson::kArrayType);
   for (unsigned int i = 0; i < model->accessors.size(); ++i) {
-    rapidjson::Value accessor(rapidjson::kObjectType); // explicitly use object type.
+    rapidjson::Value accessor(
+        rapidjson::kObjectType);  // explicitly use object type.
     SerializeGltfAccessor(model->accessors[i], allocator, accessor);
     accessors.PushBack(accessor, allocator);
   }
@@ -5303,7 +5349,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
 
   // SCENE
   if (model->defaultScene > -1) {
-    SerializeNumberProperty<int>("scene", model->defaultScene, allocator, output);
+    SerializeNumberProperty<int>("scene", model->defaultScene, allocator,
+                                 output);
   }
 
   // SCENES
@@ -5391,9 +5438,15 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   rapidjson::StringBuffer sb;
-  rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(sb);
+  rapidjson::Writer<rapidjson::StringBuffer> *writer;
 
-  output.Accept(writer);
+  if (prettyPrint) {
+    writer = new rapidjson::PrettyWriter<rapidjson::StringBuffer>(sb);
+  } else {
+    writer = new rapidjson::Writer<rapidjson::StringBuffer>(sb);
+  }
+
+  output.Accept(*writer);
 
   std::string content = sb.GetString();
 
@@ -5401,7 +5454,6 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     WriteBinaryGltfFile(filename, content);
   } else {
     WriteGltfFile(filename, content);
-    //WriteGltfFile(filename, output.dump(prettyPrint ? 2 : -1));
   }
 
   return true;
