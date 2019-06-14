@@ -2,6 +2,7 @@
 // TODO(syoyo): Print extensions and extras for each glTF object.
 //
 #define TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_ENABLE_SCHEMA_VALIDATOR
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
@@ -640,8 +641,13 @@ int main(int argc, char **argv) {
   } else {
     std::cout << "Reading ASCII glTF" << std::endl;
     // assume ascii glTF.
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+    ret =
+        gltf_ctx.LoadASCIIFromFileWithValidation(&model, &err, &warn, input_filename.c_str());
+#else
     ret =
         gltf_ctx.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+#endif
   }
 
   if (!warn.empty()) {

@@ -1581,7 +1581,7 @@ RAPIDJSON_NAMESPACE_END
 // End file:allocators.h
 
 
-// Begin file: document.h
+// Begin file: error/en.h
 // Tencent is pleased to support the open source community by making RapidJSON available.
 // 
 // Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
@@ -1596,13 +1596,240 @@ RAPIDJSON_NAMESPACE_END
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the 
 // specific language governing permissions and limitations under the License.
 
-#ifndef RAPIDJSON_DOCUMENT_H_
-#define RAPIDJSON_DOCUMENT_H_
-
-/*! \file document.h */
+#ifndef RAPIDJSON_ERROR_EN_H_
+#define RAPIDJSON_ERROR_EN_H_
 
 
-// Begin file: reader.h
+// Begin file: error.h
+// Tencent is pleased to support the open source community by making RapidJSON available.
+// 
+// Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
+//
+// Licensed under the MIT License (the "License"); you may not use this file except
+// in compliance with the License. You may obtain a copy of the License at
+//
+// http://opensource.org/licenses/MIT
+//
+// Unless required by applicable law or agreed to in writing, software distributed 
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR 
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the 
+// specific language governing permissions and limitations under the License.
+
+#ifndef RAPIDJSON_ERROR_ERROR_H_
+#define RAPIDJSON_ERROR_ERROR_H_
+
+
+// Begin file: ../rapidjson.h
+// already included
+// End file:../rapidjson.h
+
+
+#ifdef __clang__
+RAPIDJSON_DIAG_PUSH
+RAPIDJSON_DIAG_OFF(padded)
+#endif
+
+/*! \file error.h */
+
+/*! \defgroup RAPIDJSON_ERRORS RapidJSON error handling */
+
+///////////////////////////////////////////////////////////////////////////////
+// RAPIDJSON_ERROR_CHARTYPE
+
+//! Character type of error messages.
+/*! \ingroup RAPIDJSON_ERRORS
+    The default character type is \c char.
+    On Windows, user can define this macro as \c TCHAR for supporting both
+    unicode/non-unicode settings.
+*/
+#ifndef RAPIDJSON_ERROR_CHARTYPE
+#define RAPIDJSON_ERROR_CHARTYPE char
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+// RAPIDJSON_ERROR_STRING
+
+//! Macro for converting string literial to \ref RAPIDJSON_ERROR_CHARTYPE[].
+/*! \ingroup RAPIDJSON_ERRORS
+    By default this conversion macro does nothing.
+    On Windows, user can define this macro as \c _T(x) for supporting both
+    unicode/non-unicode settings.
+*/
+#ifndef RAPIDJSON_ERROR_STRING
+#define RAPIDJSON_ERROR_STRING(x) x
+#endif
+
+RAPIDJSON_NAMESPACE_BEGIN
+
+///////////////////////////////////////////////////////////////////////////////
+// ParseErrorCode
+
+//! Error code of parsing.
+/*! \ingroup RAPIDJSON_ERRORS
+    \see GenericReader::Parse, GenericReader::GetParseErrorCode
+*/
+enum ParseErrorCode {
+    kParseErrorNone = 0,                        //!< No error.
+
+    kParseErrorDocumentEmpty,                   //!< The document is empty.
+    kParseErrorDocumentRootNotSingular,         //!< The document root must not follow by other values.
+
+    kParseErrorValueInvalid,                    //!< Invalid value.
+
+    kParseErrorObjectMissName,                  //!< Missing a name for object member.
+    kParseErrorObjectMissColon,                 //!< Missing a colon after a name of object member.
+    kParseErrorObjectMissCommaOrCurlyBracket,   //!< Missing a comma or '}' after an object member.
+
+    kParseErrorArrayMissCommaOrSquareBracket,   //!< Missing a comma or ']' after an array element.
+
+    kParseErrorStringUnicodeEscapeInvalidHex,   //!< Incorrect hex digit after \\u escape in string.
+    kParseErrorStringUnicodeSurrogateInvalid,   //!< The surrogate pair in string is invalid.
+    kParseErrorStringEscapeInvalid,             //!< Invalid escape character in string.
+    kParseErrorStringMissQuotationMark,         //!< Missing a closing quotation mark in string.
+    kParseErrorStringInvalidEncoding,           //!< Invalid encoding in string.
+
+    kParseErrorNumberTooBig,                    //!< Number too big to be stored in double.
+    kParseErrorNumberMissFraction,              //!< Miss fraction part in number.
+    kParseErrorNumberMissExponent,              //!< Miss exponent in number.
+
+    kParseErrorTermination,                     //!< Parsing was terminated.
+    kParseErrorUnspecificSyntaxError            //!< Unspecific syntax error.
+};
+
+//! Result of parsing (wraps ParseErrorCode)
+/*!
+    \ingroup RAPIDJSON_ERRORS
+    \code
+        Document doc;
+        ParseResult ok = doc.Parse("[42]");
+        if (!ok) {
+            fprintf(stderr, "JSON parse error: %s (%u)",
+                    GetParseError_En(ok.Code()), ok.Offset());
+            exit(EXIT_FAILURE);
+        }
+    \endcode
+    \see GenericReader::Parse, GenericDocument::Parse
+*/
+struct ParseResult {
+    //!! Unspecified boolean type
+    typedef bool (ParseResult::*BooleanType)() const;
+public:
+    //! Default constructor, no error.
+    ParseResult() : code_(kParseErrorNone), offset_(0) {}
+    //! Constructor to set an error.
+    ParseResult(ParseErrorCode code, size_t offset) : code_(code), offset_(offset) {}
+
+    //! Get the error code.
+    ParseErrorCode Code() const { return code_; }
+    //! Get the error offset, if \ref IsError(), 0 otherwise.
+    size_t Offset() const { return offset_; }
+
+    //! Explicit conversion to \c bool, returns \c true, iff !\ref IsError().
+    operator BooleanType() const { return !IsError() ? &ParseResult::IsError : NULL; }
+    //! Whether the result is an error.
+    bool IsError() const { return code_ != kParseErrorNone; }
+
+    bool operator==(const ParseResult& that) const { return code_ == that.code_; }
+    bool operator==(ParseErrorCode code) const { return code_ == code; }
+    friend bool operator==(ParseErrorCode code, const ParseResult & err) { return code == err.code_; }
+
+    bool operator!=(const ParseResult& that) const { return !(*this == that); }
+    bool operator!=(ParseErrorCode code) const { return !(*this == code); }
+    friend bool operator!=(ParseErrorCode code, const ParseResult & err) { return err != code; }
+
+    //! Reset error code.
+    void Clear() { Set(kParseErrorNone); }
+    //! Update error code and offset.
+    void Set(ParseErrorCode code, size_t offset = 0) { code_ = code; offset_ = offset; }
+
+private:
+    ParseErrorCode code_;
+    size_t offset_;
+};
+
+//! Function pointer type of GetParseError().
+/*! \ingroup RAPIDJSON_ERRORS
+
+    This is the prototype for \c GetParseError_X(), where \c X is a locale.
+    User can dynamically change locale in runtime, e.g.:
+\code
+    GetParseErrorFunc GetParseError = GetParseError_En; // or whatever
+    const RAPIDJSON_ERROR_CHARTYPE* s = GetParseError(document.GetParseErrorCode());
+\endcode
+*/
+typedef const RAPIDJSON_ERROR_CHARTYPE* (*GetParseErrorFunc)(ParseErrorCode);
+
+RAPIDJSON_NAMESPACE_END
+
+#ifdef __clang__
+RAPIDJSON_DIAG_POP
+#endif
+
+#endif // RAPIDJSON_ERROR_ERROR_H_
+
+// End file:error.h
+
+
+#ifdef __clang__
+RAPIDJSON_DIAG_PUSH
+RAPIDJSON_DIAG_OFF(switch-enum)
+RAPIDJSON_DIAG_OFF(covered-switch-default)
+#endif
+
+RAPIDJSON_NAMESPACE_BEGIN
+
+//! Maps error code of parsing into error message.
+/*!
+    \ingroup RAPIDJSON_ERRORS
+    \param parseErrorCode Error code obtained in parsing.
+    \return the error message.
+    \note User can make a copy of this function for localization.
+        Using switch-case is safer for future modification of error codes.
+*/
+inline const RAPIDJSON_ERROR_CHARTYPE* GetParseError_En(ParseErrorCode parseErrorCode) {
+    switch (parseErrorCode) {
+        case kParseErrorNone:                           return RAPIDJSON_ERROR_STRING("No error.");
+
+        case kParseErrorDocumentEmpty:                  return RAPIDJSON_ERROR_STRING("The document is empty.");
+        case kParseErrorDocumentRootNotSingular:        return RAPIDJSON_ERROR_STRING("The document root must not be followed by other values.");
+    
+        case kParseErrorValueInvalid:                   return RAPIDJSON_ERROR_STRING("Invalid value.");
+    
+        case kParseErrorObjectMissName:                 return RAPIDJSON_ERROR_STRING("Missing a name for object member.");
+        case kParseErrorObjectMissColon:                return RAPIDJSON_ERROR_STRING("Missing a colon after a name of object member.");
+        case kParseErrorObjectMissCommaOrCurlyBracket:  return RAPIDJSON_ERROR_STRING("Missing a comma or '}' after an object member.");
+    
+        case kParseErrorArrayMissCommaOrSquareBracket:  return RAPIDJSON_ERROR_STRING("Missing a comma or ']' after an array element.");
+
+        case kParseErrorStringUnicodeEscapeInvalidHex:  return RAPIDJSON_ERROR_STRING("Incorrect hex digit after \\u escape in string.");
+        case kParseErrorStringUnicodeSurrogateInvalid:  return RAPIDJSON_ERROR_STRING("The surrogate pair in string is invalid.");
+        case kParseErrorStringEscapeInvalid:            return RAPIDJSON_ERROR_STRING("Invalid escape character in string.");
+        case kParseErrorStringMissQuotationMark:        return RAPIDJSON_ERROR_STRING("Missing a closing quotation mark in string.");
+        case kParseErrorStringInvalidEncoding:          return RAPIDJSON_ERROR_STRING("Invalid encoding in string.");
+
+        case kParseErrorNumberTooBig:                   return RAPIDJSON_ERROR_STRING("Number too big to be stored in double.");
+        case kParseErrorNumberMissFraction:             return RAPIDJSON_ERROR_STRING("Miss fraction part in number.");
+        case kParseErrorNumberMissExponent:             return RAPIDJSON_ERROR_STRING("Miss exponent in number.");
+
+        case kParseErrorTermination:                    return RAPIDJSON_ERROR_STRING("Terminate parsing due to Handler error.");
+        case kParseErrorUnspecificSyntaxError:          return RAPIDJSON_ERROR_STRING("Unspecific syntax error.");
+
+        default:                                        return RAPIDJSON_ERROR_STRING("Unknown error.");
+    }
+}
+
+RAPIDJSON_NAMESPACE_END
+
+#ifdef __clang__
+RAPIDJSON_DIAG_POP
+#endif
+
+#endif // RAPIDJSON_ERROR_EN_H_
+
+// End file:error/en.h
+
+
+// Begin file: cursorstreamwrapper.h
 // Tencent is pleased to support the open source community by making RapidJSON available.
 //
 // Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
@@ -1617,15 +1844,8 @@ RAPIDJSON_NAMESPACE_END
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-#ifndef RAPIDJSON_READER_H_
-#define RAPIDJSON_READER_H_
-
-/*! \file reader.h */
-
-
-// Begin file: allocators.h
-// already included
-// End file:allocators.h
+#ifndef RAPIDJSON_CURSORSTREAMWRAPPER_H_
+#define RAPIDJSON_CURSORSTREAMWRAPPER_H_
 
 
 // Begin file: stream.h
@@ -2581,6 +2801,121 @@ RAPIDJSON_NAMESPACE_END
 
 #endif // RAPIDJSON_STREAM_H_
 
+// End file:stream.h
+
+
+#if defined(__GNUC__)
+RAPIDJSON_DIAG_PUSH
+RAPIDJSON_DIAG_OFF(effc++)
+#endif
+
+#if defined(_MSC_VER) && _MSC_VER <= 1800
+RAPIDJSON_DIAG_PUSH
+RAPIDJSON_DIAG_OFF(4702)  // unreachable code
+RAPIDJSON_DIAG_OFF(4512)  // assignment operator could not be generated
+#endif
+
+RAPIDJSON_NAMESPACE_BEGIN
+
+
+//! Cursor stream wrapper for counting line and column number if error exists.
+/*!
+    \tparam InputStream     Any stream that implements Stream Concept
+*/
+template <typename InputStream, typename Encoding = UTF8<> >
+class CursorStreamWrapper : public GenericStreamWrapper<InputStream, Encoding> {
+public:
+    typedef typename Encoding::Ch Ch;
+
+    CursorStreamWrapper(InputStream& is):
+        GenericStreamWrapper<InputStream, Encoding>(is), line_(1), col_(0) {}
+
+    // counting line and column number
+    Ch Take() {
+        Ch ch = this->is_.Take();
+        if(ch == '\n') {
+            line_ ++;
+            col_ = 0;
+        } else {
+            col_ ++;
+        }
+        return ch;
+    }
+
+    //! Get the error line number, if error exists.
+    size_t GetLine() const { return line_; }
+    //! Get the error column number, if error exists.
+    size_t GetColumn() const { return col_; }
+
+private:
+    size_t line_;   //!< Current Line
+    size_t col_;    //!< Current Column
+};
+
+#if defined(_MSC_VER) && _MSC_VER <= 1800
+RAPIDJSON_DIAG_POP
+#endif
+
+#if defined(__GNUC__)
+RAPIDJSON_DIAG_POP
+#endif
+
+RAPIDJSON_NAMESPACE_END
+
+#endif // RAPIDJSON_CURSORSTREAMWRAPPER_H_
+
+// End file:cursorstreamwrapper.h
+
+
+// Begin file: document.h
+// Tencent is pleased to support the open source community by making RapidJSON available.
+// 
+// Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
+//
+// Licensed under the MIT License (the "License"); you may not use this file except
+// in compliance with the License. You may obtain a copy of the License at
+//
+// http://opensource.org/licenses/MIT
+//
+// Unless required by applicable law or agreed to in writing, software distributed 
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR 
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the 
+// specific language governing permissions and limitations under the License.
+
+#ifndef RAPIDJSON_DOCUMENT_H_
+#define RAPIDJSON_DOCUMENT_H_
+
+/*! \file document.h */
+
+
+// Begin file: reader.h
+// Tencent is pleased to support the open source community by making RapidJSON available.
+//
+// Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
+//
+// Licensed under the MIT License (the "License"); you may not use this file except
+// in compliance with the License. You may obtain a copy of the License at
+//
+// http://opensource.org/licenses/MIT
+//
+// Unless required by applicable law or agreed to in writing, software distributed
+// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+// CONDITIONS OF ANY KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations under the License.
+
+#ifndef RAPIDJSON_READER_H_
+#define RAPIDJSON_READER_H_
+
+/*! \file reader.h */
+
+
+// Begin file: allocators.h
+// already included
+// End file:allocators.h
+
+
+// Begin file: stream.h
+// already included
 // End file:stream.h
 
 
@@ -4582,172 +4917,7 @@ RAPIDJSON_DIAG_OFF(effc++)
 
 
 // Begin file: error/error.h
-// Tencent is pleased to support the open source community by making RapidJSON available.
-// 
-// Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved.
-//
-// Licensed under the MIT License (the "License"); you may not use this file except
-// in compliance with the License. You may obtain a copy of the License at
-//
-// http://opensource.org/licenses/MIT
-//
-// Unless required by applicable law or agreed to in writing, software distributed 
-// under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR 
-// CONDITIONS OF ANY KIND, either express or implied. See the License for the 
-// specific language governing permissions and limitations under the License.
-
-#ifndef RAPIDJSON_ERROR_ERROR_H_
-#define RAPIDJSON_ERROR_ERROR_H_
-
-
-// Begin file: ../rapidjson.h
 // already included
-// End file:../rapidjson.h
-
-
-#ifdef __clang__
-RAPIDJSON_DIAG_PUSH
-RAPIDJSON_DIAG_OFF(padded)
-#endif
-
-/*! \file error.h */
-
-/*! \defgroup RAPIDJSON_ERRORS RapidJSON error handling */
-
-///////////////////////////////////////////////////////////////////////////////
-// RAPIDJSON_ERROR_CHARTYPE
-
-//! Character type of error messages.
-/*! \ingroup RAPIDJSON_ERRORS
-    The default character type is \c char.
-    On Windows, user can define this macro as \c TCHAR for supporting both
-    unicode/non-unicode settings.
-*/
-#ifndef RAPIDJSON_ERROR_CHARTYPE
-#define RAPIDJSON_ERROR_CHARTYPE char
-#endif
-
-///////////////////////////////////////////////////////////////////////////////
-// RAPIDJSON_ERROR_STRING
-
-//! Macro for converting string literial to \ref RAPIDJSON_ERROR_CHARTYPE[].
-/*! \ingroup RAPIDJSON_ERRORS
-    By default this conversion macro does nothing.
-    On Windows, user can define this macro as \c _T(x) for supporting both
-    unicode/non-unicode settings.
-*/
-#ifndef RAPIDJSON_ERROR_STRING
-#define RAPIDJSON_ERROR_STRING(x) x
-#endif
-
-RAPIDJSON_NAMESPACE_BEGIN
-
-///////////////////////////////////////////////////////////////////////////////
-// ParseErrorCode
-
-//! Error code of parsing.
-/*! \ingroup RAPIDJSON_ERRORS
-    \see GenericReader::Parse, GenericReader::GetParseErrorCode
-*/
-enum ParseErrorCode {
-    kParseErrorNone = 0,                        //!< No error.
-
-    kParseErrorDocumentEmpty,                   //!< The document is empty.
-    kParseErrorDocumentRootNotSingular,         //!< The document root must not follow by other values.
-
-    kParseErrorValueInvalid,                    //!< Invalid value.
-
-    kParseErrorObjectMissName,                  //!< Missing a name for object member.
-    kParseErrorObjectMissColon,                 //!< Missing a colon after a name of object member.
-    kParseErrorObjectMissCommaOrCurlyBracket,   //!< Missing a comma or '}' after an object member.
-
-    kParseErrorArrayMissCommaOrSquareBracket,   //!< Missing a comma or ']' after an array element.
-
-    kParseErrorStringUnicodeEscapeInvalidHex,   //!< Incorrect hex digit after \\u escape in string.
-    kParseErrorStringUnicodeSurrogateInvalid,   //!< The surrogate pair in string is invalid.
-    kParseErrorStringEscapeInvalid,             //!< Invalid escape character in string.
-    kParseErrorStringMissQuotationMark,         //!< Missing a closing quotation mark in string.
-    kParseErrorStringInvalidEncoding,           //!< Invalid encoding in string.
-
-    kParseErrorNumberTooBig,                    //!< Number too big to be stored in double.
-    kParseErrorNumberMissFraction,              //!< Miss fraction part in number.
-    kParseErrorNumberMissExponent,              //!< Miss exponent in number.
-
-    kParseErrorTermination,                     //!< Parsing was terminated.
-    kParseErrorUnspecificSyntaxError            //!< Unspecific syntax error.
-};
-
-//! Result of parsing (wraps ParseErrorCode)
-/*!
-    \ingroup RAPIDJSON_ERRORS
-    \code
-        Document doc;
-        ParseResult ok = doc.Parse("[42]");
-        if (!ok) {
-            fprintf(stderr, "JSON parse error: %s (%u)",
-                    GetParseError_En(ok.Code()), ok.Offset());
-            exit(EXIT_FAILURE);
-        }
-    \endcode
-    \see GenericReader::Parse, GenericDocument::Parse
-*/
-struct ParseResult {
-    //!! Unspecified boolean type
-    typedef bool (ParseResult::*BooleanType)() const;
-public:
-    //! Default constructor, no error.
-    ParseResult() : code_(kParseErrorNone), offset_(0) {}
-    //! Constructor to set an error.
-    ParseResult(ParseErrorCode code, size_t offset) : code_(code), offset_(offset) {}
-
-    //! Get the error code.
-    ParseErrorCode Code() const { return code_; }
-    //! Get the error offset, if \ref IsError(), 0 otherwise.
-    size_t Offset() const { return offset_; }
-
-    //! Explicit conversion to \c bool, returns \c true, iff !\ref IsError().
-    operator BooleanType() const { return !IsError() ? &ParseResult::IsError : NULL; }
-    //! Whether the result is an error.
-    bool IsError() const { return code_ != kParseErrorNone; }
-
-    bool operator==(const ParseResult& that) const { return code_ == that.code_; }
-    bool operator==(ParseErrorCode code) const { return code_ == code; }
-    friend bool operator==(ParseErrorCode code, const ParseResult & err) { return code == err.code_; }
-
-    bool operator!=(const ParseResult& that) const { return !(*this == that); }
-    bool operator!=(ParseErrorCode code) const { return !(*this == code); }
-    friend bool operator!=(ParseErrorCode code, const ParseResult & err) { return err != code; }
-
-    //! Reset error code.
-    void Clear() { Set(kParseErrorNone); }
-    //! Update error code and offset.
-    void Set(ParseErrorCode code, size_t offset = 0) { code_ = code; offset_ = offset; }
-
-private:
-    ParseErrorCode code_;
-    size_t offset_;
-};
-
-//! Function pointer type of GetParseError().
-/*! \ingroup RAPIDJSON_ERRORS
-
-    This is the prototype for \c GetParseError_X(), where \c X is a locale.
-    User can dynamically change locale in runtime, e.g.:
-\code
-    GetParseErrorFunc GetParseError = GetParseError_En; // or whatever
-    const RAPIDJSON_ERROR_CHARTYPE* s = GetParseError(document.GetParseErrorCode());
-\endcode
-*/
-typedef const RAPIDJSON_ERROR_CHARTYPE* (*GetParseErrorFunc)(ParseErrorCode);
-
-RAPIDJSON_NAMESPACE_END
-
-#ifdef __clang__
-RAPIDJSON_DIAG_POP
-#endif
-
-#endif // RAPIDJSON_ERROR_ERROR_H_
-
 // End file:error/error.h
 
 
@@ -16733,3 +16903,4 @@ RAPIDJSON_DIAG_POP
 // Begin file: writer.h
 // already included
 // End file:writer.h
+

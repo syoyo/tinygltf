@@ -70,6 +70,7 @@
 ## For developer
 
 Generate single rapidjson file using this node.js script: https://github.com/Tencent/rapidjson/issues/863
+Add `cursorstreamwrapper.h` and `error/en.h` inclusion in `rapidjson-all.h` before running merge script.
 
 ## TODOs
 

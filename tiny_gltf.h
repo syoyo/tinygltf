@@ -921,13 +921,13 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wc++98-compat"
 #endif
 
-  TinyGLTF() : bin_data_(nullptr), bin_size_(0), is_binary_(false) {}
+  TinyGLTF();
 
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
 
-  ~TinyGLTF() {}
+  ~TinyGLTF();
 
   ///
   /// Loads glTF ASCII asset from a file.
@@ -1048,7 +1048,11 @@ class TinyGLTF {
       nullptr;
 #endif
   void *write_image_user_data_ = reinterpret_cast<void *>(&fs);
+
+  class PImpl;
+  PImpl *pimpl_;
 };
+
 
 #ifdef __clang__
 #pragma clang diagnostic pop  // -Wpadded
@@ -1200,7 +1204,7 @@ namespace tinygltf {
 
 #if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
 // Include glTF Schema as embedded C string
-#include "glTF.schema.resolved.inc"
+#include "gltf.schema.resolved.inc"
 #endif
 
 // Equals function for Value, for recursivity
@@ -1616,6 +1620,55 @@ std::string base64_decode(std::string const &encoded_string) {
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
+
+class TinyGLTF::PImpl
+{
+  public:
+
+  PImpl() {
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+    validator_ = nullptr;
+#endif
+  }
+
+  ~PImpl()
+  {
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+    if (schema_doc_) {
+      delete schema_doc_;
+    }
+
+    if (schema_) {
+      delete schema_;
+    }
+
+    if (validator_) {
+      delete validator_;
+    }
+
+#endif
+  }
+
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+
+  std::string schema_json_string_;
+  rapidjson::Document *schema_doc_;
+  rapidjson::SchemaDocument *schema_;
+  rapidjson::SchemaValidator *validator_;
+#endif
+};
+
+
+TinyGLTF::TinyGLTF() : bin_data_(nullptr), bin_size_(0), is_binary_(false) {
+  pimpl_ = new TinyGLTF::PImpl();
+}
+
+TinyGLTF::~TinyGLTF()
+{
+  if (pimpl_) {
+    delete pimpl_;
+  }
+}
 
 static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
                              std::string *warn, const std::string &filename,
@@ -3722,13 +3775,25 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     return false;
   }
 
+  // To enable error report with lines and columns,
+  // We'll use CursorStreamWrapper.
+  // https://github.com/Tencent/rapidjson/pull/1070
+  // It looks StringStream does not have a constrcutor with (str, len),
+  // so create a temporary string and ensure it ends with NULL character.
+  // although this is a bit redundant...
+  std::string in_str(str, length);
+
+  rapidjson::StringStream sis(in_str.c_str());
+
+  rapidjson::CursorStreamWrapper<rapidjson::StringStream> csw(sis);
+
   rapidjson::Document v;
 
 #if (defined(__cpp_exceptions) || defined(__EXCEPTIONS) || \
      defined(_CPPUNWIND)) &&                               \
     !defined(TINYGLTF_NOEXCEPTION)
   try {
-    v.Parse(str);
+    v.ParseStream(csw);
 
   } catch (const std::exception &e) {
     if (err) {
@@ -3738,14 +3803,49 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   if (v.HasParseError()) {
-    // TODO(syoyo): Report error
+    if (err) {
+      std::stringstream ss;
+      ss << "JSON parse error: (byte offset " << v.GetErrorOffset()
+         << ", line " << csw.GetLine()
+         << ", column " << csw.GetColumn()
+         << "): " << rapidjson::GetParseError_En(v.GetParseError());
+      (*err) = ss.str();
+    }
     return false;
   }
 #else
   {
-    v.Parse(str);
+    v.ParseStream(csw);
     if (v.HasParseError()) {
-      // TODO(syoyo): Report error
+      if (err) {
+        std::stringstream ss;
+        ss << "JSON parse error: (byte offset " << v.GetErrorOffset()
+           << ", line " << csw.GetLine()
+           << ", column " << csw.GetColumn()
+           << "): " << rapidjson::GetParseError_En(v.GetParseError());
+        (*err) = ss.str();
+      }
+      return false;
+    }
+  }
+#endif
+
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+  if (pimpl_->validator_) {
+    if (!v.Accept(*(pimpl_->validator_))) {
+      // Input JSON is invalid according to the schema
+      // Output diagnostic information
+      rapidjson::StringBuffer sb;
+      pimpl_->validator_->GetInvalidSchemaPointer().StringifyUriFragment(sb);
+
+      std::stringstream ss;
+      printf("Invalid schema: %s\n", sb.GetString());
+      ss << "glTF schema validation error. Invalid keyword: " << pimpl_->validator_->GetInvalidSchemaKeyword();
+      sb.Clear();
+
+      if (err) {
+        (*err) = ss.str();
+      }
       return false;
     }
   }
@@ -4334,6 +4434,53 @@ bool TinyGLTF::LoadASCIIFromString(Model *model, std::string *err,
                         check_sections);
 }
 
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+bool TinyGLTF::LoadASCIIFromStringWithValidation(Model *model, std::string *err,
+                                   std::string *warn, const char *str,
+                                   unsigned int length,
+                                   const std::string &base_dir,
+                                   unsigned int check_sections) {
+  is_binary_ = false;
+  bin_data_ = nullptr;
+  bin_size_ = 0;
+
+  if (!pimpl_->validator_) {
+
+    pimpl_->schema_json_string_ = std::string();
+
+    // Construct glTF JSON schema string.
+    const size_t num_str = sizeof(kglTFSchemaStrings)/sizeof(kglTFSchemaStrings[0]);
+    for (size_t i = 0; i < num_str; i++) {
+      pimpl_->schema_json_string_ += std::string(kglTFSchemaStrings[i]);
+    }
+
+    // Validate input glTF string
+    if (pimpl_->schema_doc_) {
+      delete pimpl_->schema_doc_;
+    }
+    pimpl_->schema_doc_ = new rapidjson::Document();
+    pimpl_->schema_doc_->Parse(pimpl_->schema_json_string_.c_str(), pimpl_->schema_json_string_.size());
+
+    if (pimpl_->schema_doc_->HasParseError()) {
+      if(err) {
+        (*err) += "Internal error. Failed to parse glTF schema JSON.";
+      }
+      return false;
+    }
+
+    if (pimpl_->schema_) {
+      delete pimpl_->schema_;
+    }
+    pimpl_->schema_ = new rapidjson::SchemaDocument(*pimpl_->schema_doc_);
+
+    pimpl_->validator_ = new rapidjson::SchemaValidator(*pimpl_->schema_);
+  }
+
+  return LoadFromString(model, err, warn, str, length, base_dir,
+                        check_sections);
+}
+#endif
+
 bool TinyGLTF::LoadASCIIFromFile(Model *model, std::string *err,
                                  std::string *warn, const std::string &filename,
                                  unsigned int check_sections) {
@@ -4376,6 +4523,51 @@ bool TinyGLTF::LoadASCIIFromFile(Model *model, std::string *err,
 
   return ret;
 }
+
+#if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+bool TinyGLTF::LoadASCIIFromFileWithValidation(Model *model, std::string *err,
+                                 std::string *warn, const std::string &filename,
+                                 unsigned int check_sections) {
+  std::stringstream ss;
+
+  if (fs.ReadWholeFile == nullptr) {
+    // Programmer error, assert() ?
+    ss << "Failed to read file: " << filename
+       << ": one or more FS callback not set" << std::endl;
+    if (err) {
+      (*err) = ss.str();
+    }
+    return false;
+  }
+
+  std::vector<unsigned char> data;
+  std::string fileerr;
+  bool fileread = fs.ReadWholeFile(&data, &fileerr, filename, fs.user_data);
+  if (!fileread) {
+    ss << "Failed to read file: " << filename << ": " << fileerr << std::endl;
+    if (err) {
+      (*err) = ss.str();
+    }
+    return false;
+  }
+
+  size_t sz = data.size();
+  if (sz == 0) {
+    if (err) {
+      (*err) = "Empty file.";
+    }
+    return false;
+  }
+
+  std::string basedir = GetBaseDir(filename);
+
+  bool ret = LoadASCIIFromStringWithValidation(
+      model, err, warn, reinterpret_cast<const char *>(&data.at(0)),
+      static_cast<unsigned int>(data.size()), basedir, check_sections);
+
+  return ret;
+}
+#endif
 
 bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
                                     std::string *warn,
