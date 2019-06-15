@@ -3094,7 +3094,7 @@ static bool ParseAccessor(Accessor *accessor, std::string *err, const json &o) {
     if (componentType >= TINYGLTF_COMPONENT_TYPE_BYTE &&
         componentType <= TINYGLTF_COMPONENT_TYPE_DOUBLE) {
       // OK
-      accessor->componentType = componentType;
+      accessor->componentType = int(componentType);
     } else {
       std::stringstream ss;
       ss << "Invalid `componentType` in accessor. Got " << componentType
