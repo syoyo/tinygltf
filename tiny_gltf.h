@@ -1627,6 +1627,8 @@ class TinyGLTF::PImpl
 
   PImpl() {
 #if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+    schema_doc_ = nullptr;
+    schema_ = nullptr;
     validator_ = nullptr;
 #endif
   }
@@ -1652,9 +1654,9 @@ class TinyGLTF::PImpl
 #if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
 
   std::string schema_json_string_;
-  rapidjson::Document *schema_doc_;
-  rapidjson::SchemaDocument *schema_;
-  rapidjson::SchemaValidator *validator_;
+  rapidjson::Document *schema_doc_ = nullptr;
+  rapidjson::SchemaDocument *schema_ = nullptr;
+  rapidjson::SchemaValidator *validator_ = nullptr;
 #endif
 };
 
