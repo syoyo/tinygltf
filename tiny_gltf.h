@@ -3457,7 +3457,9 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
     } else {
       Parameter param;
       if (ParseParameterProperty(&param, err, o, it.key(), false)) {
-        material->additionalValues[it.key()] = param;
+        // names of materials have already been parsed. Putting it in this map
+        // doesn't correctly reflext the glTF specification
+        if (it.key() != "name") material->additionalValues[it.key()] = param;
       }
     }
   }
