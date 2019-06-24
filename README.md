@@ -6,6 +6,7 @@
 
 ## Status
 
+ - v2.3.0 release(Support built-in schema validation)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
  - v2.1.0 release(Draco support)
  - v2.0.0 release(22 Aug, 2018)!
@@ -33,6 +34,7 @@
   * [x] ASCII glTF
   * [x] Binary glTF(GLB)
   * [x] PBR material description
+  * [x] Validate inpit glTF JSON with schema
 * Buffers
   * [x] Parse BASE64 encoded embedded buffer data(DataURI).
   * [x] Load `.bin` file.
@@ -108,6 +110,7 @@ Copy `stb_image.h`, `stb_image_write.h`, `rapidjson-amalgamation.h` and `tiny_gl
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+// #define TINYGLTF_ENABLE_SCHEMA_VALIDATOR // optional. enable schema validation API.
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
@@ -120,6 +123,10 @@ std::string warn;
 
 bool ret = loader.LoadASCIIFromFile(&model, &err, &warn, argv[1]);
 //bool ret = loader.LoadBinaryFromFile(&model, &err, &warn, argv[1]); // for binary glTF(.glb)
+// Validate with glTF Schema
+// #if defined(TINYGLTF_ENABLE_SCHEMA_VALIDATOR)
+// bool ret = loader.LoadASCIIFromFileWithValidation(&model, &err, &warn, argv[1]);
+// #endif
 
 if (!warn.empty()) {
   printf("Warn: %s\n", warn.c_str());
@@ -137,6 +144,7 @@ if (!ret) {
 
 ## Compile options
 
+* `TINYGLTF_ENABLE_SCHEMA_VALIDATOR` : Enable API with schema validation. glTF Schema JSON(`gltf.schema.resolved.inc`) are embeded into application binary, thus no need to read glTF Schema file at a runtime.
 * `TINYGLTF_NOEXCEPTION` : Disable C++ exception in JSON parsing. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` and `TINYGLTF_NOEXCEPTION`  to fully remove C++ exception codes when compiling TinyGLTF.
 * `TINYGLTF_NO_STB_IMAGE` : Do not load images with stb_image. Instead use `TinyGLTF::SetImageLoader(LoadimageDataFunction LoadImageData, void *user_data)` to set a callback for loading images.
 * `TINYGLTF_NO_STB_IMAGE_WRITE` : Do not write images with stb_image_write. Instead use `TinyGLTF::SetImageWriter(WriteimageDataFunction WriteImageData, void *user_data)` to set a callback for writing images.
