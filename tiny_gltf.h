@@ -717,6 +717,7 @@ class Node {
  public:
   Node() : camera(-1), skin(-1), mesh(-1) {}
 
+  // TODO(syoyo): Could use `default`
   Node(const Node &rhs) {
     camera = rhs.camera;
 
@@ -734,6 +735,9 @@ class Node {
     extras = rhs.extras;
   }
   ~Node() {}
+
+  Node &operator=(const Node &rhs) = default;
+
   bool operator==(const Node &) const;
 
   int camera;  // the index of the camera referenced by this node
@@ -794,7 +798,12 @@ struct Light {
 class Model {
  public:
   Model() {}
+
+  Model(const Model &) = default;
+  Model &operator=(const Model &) = default;
+
   ~Model() {}
+
   bool operator==(const Model &) const;
 
   std::vector<Accessor> accessors;
