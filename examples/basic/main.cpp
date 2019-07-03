@@ -1,4 +1,4 @@
-﻿#include <fstream>
+#include <fstream>
 #include <iostream>
 
 #include <GL/glew.h>
@@ -8,14 +8,31 @@
 #include "shaders.h"
 #include "window.h"
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
+// Inlude tinyktx.h before tiny_gltf.h
+#define TINYKTX_IMPLEMENTATION
+#include "../../tinyktx.h"
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYGLTF_NOEXCEPTION
 #define JSON_NOEXCEPTION
+#define TINYGLTF_ENABLE_KTX
+#define TINYGLTF_NO_INCLUDE_TINY_KTX
 #include "../../tiny_gltf.h"
 
-#define BUFFER_OFFSET(i) ((char *)NULL + (i))
+//#define BUFFER_OFFSET(i) ((char *)nullptr + (i))
+#define BUFFER_OFFSET(i) \
+  (reinterpret_cast<void *>(i))  // TODO(syoyo): Is this right way?
 
 bool loadModel(tinygltf::Model &model, const char *filename) {
   tinygltf::TinyGLTF loader;
@@ -51,8 +68,8 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
                    https://github.com/KhronosGroup/glTF/tree/master/specification/2.0
                             ... drawArrays function should be used with a count equal to
                    the count            property of any of the accessors referenced by the
-                   attributes            property            (they are all equal for a given
-                   primitive).
+                   attributes            property            (they are all equal for a
+                   given            primitive).
                  */
     }
 
@@ -325,14 +342,20 @@ int main(int argc, char **argv) {
 
   if (!glfwInit()) return -1;
 
-  // Force create OpenGL 3.3
-  // NOTE(syoyo): Linux + NVIDIA driver segfaults for some reason? commenting out glfwWindowHint will work.
+    // NOTE(syoyo): For some reason, Linux + NVIDIA driver + apt-installed
+    // glew(1.13) cannot initialize some ARB functions when CONTEXT_VERSION are
+    // explicitly given. Proably we need to compile app with recent glfw and
+    // glew(or use glad) package
+#if !defined(__linux__)
+  // Try to create OpenGL 3.3 context on Windows and macOS
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-#ifdef __APPLE__
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
+
+  // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+#ifdef __APPLE__
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
   Window window = Window(800, 600, "TinyGLTF basic example");
@@ -343,9 +366,18 @@ int main(int argc, char **argv) {
   glewExperimental = GL_TRUE;
 #endif
 
-  glewInit();
+  if (glewInit() != GLEW_OK) {
+    std::cerr << "Failed to initialie glew." << std::endl;
+    return EXIT_FAILURE;
+  }
+
   std::cout << glGetString(GL_RENDERER) << ", " << glGetString(GL_VERSION)
             << std::endl;
+
+  if (!GLEW_ARB_vertex_array_object) {
+    std::cerr << "GLEW_ARB_vertex_array_object was not available." << std::endl;
+    return EXIT_FAILURE;
+  }
 
   if (!GLEW_VERSION_3_3) {
     std::cerr << "OpenGL 3.3 is required to execute this app." << std::endl;

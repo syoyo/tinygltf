@@ -7,6 +7,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 ## Status
 
+ - v2.3.0 release(Support loading KTX image through tiny_ktx)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
  - v2.1.0 release(Draco support)
  - v2.0.0 release(22 Aug, 2018)!
@@ -52,7 +53,8 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [x] Image load
   * [x] Image save
 * Extensions
-  * [x] Draco mesh decoding
+  * [x] Draco mesh decoding(`TINYGLTF_ENABLE_DRACO` required)
+  * [x] KTX image support(`TINYGLTF_ENABLE_KTX` required)
 
 ## Examples
 
@@ -143,6 +145,7 @@ if (!ret) {
 * `TINYGLTF_NO_INCLUDE_JSON `: Disable including `json.hpp` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 * `TINYGLTF_NO_INCLUDE_STB_IMAGE `: Disable including `stb_image.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 * `TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE `: Disable including `stb_image_write.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
+* `TINYGLTF_ENABLE_KTX` : Enable loading KTX images( https://www.khronos.org/opengles/sdk/tools/KTX/ ) using `tiny_ktx.h`. Supported MIME is `image/ktx` ( https://github.com/KhronosGroup/glTF/issues/835 ). See `models/Cube-KTX` for details. Application also defined `TINYKTX_IMPLEMENTATION` in **one** .cc file.
 
 
 ### Saving gltTF 2.0 model
@@ -186,3 +189,4 @@ $ ./tester_noexcept
 * json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
 * stb_image : Public domain.
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
+* tiny_ktx : Copyright (c) 2019, DeanoC. Licensed under 2 clause BSD license.
