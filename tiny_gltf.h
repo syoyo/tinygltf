@@ -390,6 +390,7 @@ struct Parameter {
     if (it != std::end(json_double_value)) {
       return int(it->second);
     }
+    // As per the spec, if texCoord is ommited, this parameter is 0
     return 0;
   }
 
@@ -401,7 +402,20 @@ struct Parameter {
     if (it != std::end(json_double_value)) {
       return it->second;
     }
-    return -1;
+    // As per the spec, if scale is ommited, this paramter is 1
+    return 1;
+  }
+  
+  /// Return the strength of a texture if this Parameter is a an occlusion map.
+  /// Returned value is only valid if the parameter represent an occlusion map
+  /// from a material
+  double TextureStrength() const {
+    const auto it = json_double_value.find("strength");
+    if (it != std::end(json_double_value)) {
+      return it->second;
+    }
+    // As per the spec, if strenghth is ommited, this parameter is 1
+    return 1;
   }
 
   /// Material factor, like the roughness or metalness of a material
