@@ -405,7 +405,7 @@ struct Parameter {
     // As per the spec, if scale is ommited, this paramter is 1
     return 1;
   }
-  
+
   /// Return the strength of a texture if this Parameter is a an occlusion map.
   /// Returned value is only valid if the parameter represent an occlusion map
   /// from a material
@@ -462,7 +462,8 @@ struct AnimationChannel {
 struct AnimationSampler {
   int input;                  // required
   int output;                 // required
-  std::string interpolation;  // "LINEAR", "STEP","CUBICSPLINE" or user defined string. default "LINEAR"
+  std::string interpolation;  // "LINEAR", "STEP","CUBICSPLINE" or user defined
+                              // string. default "LINEAR"
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
