@@ -393,6 +393,17 @@ struct Parameter {
     return 0;
   }
 
+  /// Return the scale of a texture if this Parameter is a normal texture map.
+  /// Returned value is only valid if the parameter represent a normal texture
+  /// from a material
+  double TextureScale() const {
+    const auto it = json_double_value.find("scale");
+    if (it != std::end(json_double_value)) {
+      return it->second;
+    }
+    return -1;
+  }
+
   /// Material factor, like the roughness or metalness of a material
   /// Returned value is only valid if the parameter represent a texture from a
   /// material
@@ -4838,6 +4849,10 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
     SerializeStringProperty("generator", asset.generator, o);
   }
 
+  if (!asset.copyright.empty()) {
+    SerializeStringProperty("copyright", asset.copyright, o);
+  }
+
   if (!asset.version.empty()) {
     SerializeStringProperty("version", asset.version, o);
   }
@@ -5134,6 +5149,9 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   }
   if (texture.source > -1) {
     SerializeNumberProperty("source", texture.source, o);
+  }
+  if (texture.name.size()) {
+    SerializeStringProperty("name", texture.name, o);
   }
   if (texture.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", texture.extras, o);
