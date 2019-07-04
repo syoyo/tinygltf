@@ -54,7 +54,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [x] Image save
 * Extensions
   * [x] Draco mesh decoding(`TINYGLTF_ENABLE_DRACO` required)
-  * [x] KTX image support(`TINYGLTF_ENABLE_KTX` required)
+  * [x] KTX image support(no mipmap. `TINYGLTF_ENABLE_KTX` required)
 
 ## Examples
 
@@ -83,6 +83,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [ ] OpenEXR extension through TinyEXR.
 * [ ] 16bit PNG support in Serialization
 * [ ] Write example and tests for `animation` and `skin`
+* [ ] mipmap support for KTX image.
 
 ## Licenses
 
@@ -94,11 +95,14 @@ TinyGLTF uses the following third party libraries.
 * base64 : Copyright (C) 2004-2008 René Nyffenegger
 * stb_image.h : v2.08 - public domain image loader - [Github link](https://github.com/nothings/stb/blob/master/stb_image.h)
 * stb_image_write.h : v1.09 - public domain image writer - [Github link](https://github.com/nothings/stb/blob/master/stb_image_write.h)
+* tinyktx.h : Copyright (c) 2019, DeanoC. Licensed under 2 clause BSD license.
 
 
 ## Build and example
 
 Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your project.
+
+If you enable KTX support(`TINYGLTF_ENABLE_KTX`), Copy `tinyktx.h` to your project.
 
 ### Loading glTF 2.0 model
 
@@ -146,6 +150,7 @@ if (!ret) {
 * `TINYGLTF_NO_INCLUDE_STB_IMAGE `: Disable including `stb_image.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 * `TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE `: Disable including `stb_image_write.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 * `TINYGLTF_ENABLE_KTX` : Enable loading KTX images( https://www.khronos.org/opengles/sdk/tools/KTX/ ) using `tiny_ktx.h`. Supported MIME is `image/ktx` ( https://github.com/KhronosGroup/glTF/issues/835 ). See `models/Cube-KTX` for details. Application also defined `TINYKTX_IMPLEMENTATION` in **one** .cc file.
+  * `TINYGLTF_NO_INCLUDE_TINYKTX` : Disable including `tinyktx.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 
 
 ### Saving gltTF 2.0 model
@@ -184,9 +189,6 @@ $ ./tester
 $ ./tester_noexcept
 ```
 
-## Third party licenses
+## Third party licenses used in unit tests
 
-* json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
-* stb_image : Public domain.
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
-* tiny_ktx : Copyright (c) 2019, DeanoC. Licensed under 2 clause BSD license.

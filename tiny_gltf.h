@@ -492,14 +492,19 @@ struct Image {
   std::string name;
   int width;
   int height;
-  int component;
+
+  //
+  // For KTX image, component, bits and pixel_type will be set to `0`, and KTX attributes are stored in `extras`.
+  // FIXME(syoyo): Find more proper way to handle KTX and non-KTX image by keeping backward-compatibility as much as possible.
+  //
+  int component;   // The number of channel components in the image.
   int bits;        // bit depth per channel. 8(byte), 16 or 32.
   int pixel_type;  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
                    // UBYTE(bits = 8) or USHORT(bits = 16)
   std::vector<unsigned char> image;
   int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png",
-                         // "image/bmp", "image/gif"]
+                         // "image/bmp", "image/gif", etc]
   std::string uri;       // (required if no mimeType)
   Value extras;
   ExtensionMap extensions;
@@ -1124,6 +1129,12 @@ class TinyGLTF {
 #include "draco/core/decoder_buffer.h"
 #endif
 
+#ifdef TINYGLTF_ENABLE_KTX
+#ifndef TINYGLTF_NO_INCLUDE_TINY_KTX
+#include "tiny_ktx.h"
+#endif
+#endif
+
 #ifndef TINYGLTF_NO_STB_IMAGE
 #ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE
 #include "stb_image.h"
@@ -1679,8 +1690,8 @@ void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
   load_image_user_data_ = user_data;
 }
 
-#ifndef TINYGLTF_NO_STB_IMAGE
-bool LoadImageData(Image *image, const int image_idx, std::string *err,
+#if !defined(TINYGLTF_NO_STB_IMAGE)
+bool LoadImageDataSTB(Image *image, const int image_idx, std::string *err,
                    std::string *warn, int req_width, int req_height,
                    const unsigned char *bytes, int size, void *user_data) {
   (void)user_data;
@@ -1777,6 +1788,207 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
 }
 #endif
 
+#if defined(TINYGLTF_ENABLE_KTX)
+
+struct SimpleVFile {
+  std::string *err = nullptr;
+  const uint8_t *data = nullptr;
+  size_t pos = 0;
+  size_t len = 0;
+};
+
+static void tinyktxCallbackError(void *user, char const *msg) {
+  SimpleVFile *ss = reinterpret_cast<SimpleVFile *>(user);
+
+  if (ss->err) {
+    (*ss->err) += "Tiny_Ktx ERROR: " + std::string(msg) + "\n";
+  }
+}
+
+
+static void *tinyktxCallbackAlloc(void *user, size_t size) {
+  (void)user;
+  return malloc(size);
+};
+
+static void tinyktxCallbackFree(void *user, void *data) {
+  (void)user;
+  free(data);
+};
+
+static size_t tinyktxCallbackRead(void *user, void* data, size_t size) {
+  SimpleVFile *ss = reinterpret_cast<SimpleVFile *>(user);
+
+  if ((ss->pos + size) >= ss->len) {
+    if (ss->err) {
+      std::stringstream msg;
+      msg << "KTX read: Invalid data length. pos = " << ss->pos << ", len = " << ss->len << ", requested size to read = " << size << "\n";
+      (*ss->err) += msg.str();
+    }
+    return size_t(0);
+  }
+
+  memcpy(data, ss->data + ss->pos, size);
+
+  return size;
+};
+
+static bool tinyktxCallbackSeek(void *user, int64_t offset) {
+
+  SimpleVFile *ss = reinterpret_cast<SimpleVFile *>(user);
+
+  if ((offset < 0) || (size_t(offset) >= ss->len)) {
+    if (ss->err) {
+      std::stringstream msg;
+      msg << "KTX read: Invalid data offset. len = " << ss->len << ", requested offset = " << offset << "\n";
+      (*ss->err) += msg.str();
+    }
+
+    return false;
+  }
+
+  ss->pos = offset;
+  return true;
+
+}
+
+static int64_t tinyktxCallbackTell(void *user) {
+  SimpleVFile *ss = reinterpret_cast<SimpleVFile *>(user);
+
+  return int64_t(ss->pos);
+};
+
+
+bool LoadImageDataKTX(Image *image, const int image_idx, std::string *err,
+                   std::string *warn, int req_width, int req_height,
+                   const unsigned char *bytes, int size, void *user_data) {
+  (void)user_data;
+  (void)warn;
+  (void)req_width;
+  (void)req_height;
+
+  TinyKtx_Callbacks callbacks {
+                  &tinyktxCallbackError,
+                  &tinyktxCallbackAlloc,
+                  &tinyktxCallbackFree,
+                  tinyktxCallbackRead,
+                  &tinyktxCallbackSeek,
+                  &tinyktxCallbackTell
+  };
+
+  SimpleVFile vfile;
+  vfile.err = err;
+  vfile.pos = 0;
+  vfile.data = bytes;
+  vfile.len = size;
+
+  auto ctx =  TinyKtx_CreateContext( &callbacks, reinterpret_cast<void *>(&vfile) );
+  TinyKtx_ReadHeader(ctx);
+  uint32_t w = TinyKtx_Width(ctx);
+  uint32_t h = TinyKtx_Height(ctx);
+  uint32_t d = TinyKtx_Depth(ctx);
+
+  TinyKtx_Format fmt = TinyKtx_GetFormat(ctx);
+
+  if(fmt == TKTX_UNDEFINED) {
+      TinyKtx_DestroyContext(ctx);
+      return false;
+  }
+
+  int num_mipmaps = TinyKtx_NumberOfMipmaps(ctx);
+  if (num_mipmaps < 1) {
+    // ???
+    if (err) {
+      (*err) += "Number of mipmaps are zero for KTX image[" + std::to_string(image_idx) + ".\n";
+    }
+    TinyKtx_DestroyContext(ctx);
+    return false;
+  }
+
+  {
+    // TODO(syoyo): Support mipmap.
+    int miplevel = 0;
+
+    size_t byte_count = TinyKtx_ImageSize(ctx, miplevel);
+    if (byte_count == 0) {
+      // ???
+      if (err) {
+        (*err) += "KTX image [" + std::to_string(image_idx) + "] has zero bytes.\n";
+      }
+
+      TinyKtx_DestroyContext(ctx);
+      return false;
+    }
+
+    image->image.resize(byte_count);
+    memcpy(image->image.data(), TinyKtx_ImageRawData(ctx, miplevel), byte_count);
+
+    TinyKtx_DestroyContext(ctx);
+
+    // Set to 0 for KTX image.
+    image->pixel_type = 0;
+    image->bits = 0;
+    image->component = 0;
+
+    // extras for KTX
+    Value::Object extras;
+    extras["ktx_format"] = Value(int(fmt)); // TODO(syoyo): Store OpenGL format
+    extras["depth"] = Value(int(d));
+    extras["byteCount"] = Value(int(byte_count)); // Assume image size is < 2GB
+    image->extras = Value(extras);
+    // TODO(syoyo): Store more KTX attributes.
+  }
+
+  image->width = w;
+  image->height = h;
+
+  return true;
+}
+#endif
+
+bool LoadImageData(Image *image, const int image_idx, std::string *err,
+                   std::string *warn, int req_width, int req_height,
+                   const unsigned char *bytes, int size, void *user_data) {
+
+  bool ret = false;
+
+#if defined(TINYGLTF_ENABLE_KTX)
+  // Try KTX image
+
+  ret = tinygltf::LoadImageDataKTX(image, image_idx, err, warn, req_width, req_height,
+                   bytes, size, user_data);
+
+  if (ret) {
+    return true;
+  }
+
+#endif
+
+#if defined(TINYGLTF_NO_STB_IMAGE)
+  // Try to load images using stb_image(png, gif, bmp, tga, ...)
+
+  ret = tinygltf::LoadImageDataSTB(image, image_idx, err, warn, req_width, req_height,
+                   bytes, size, user_data);
+
+  if (ret) {
+    return true;
+  }
+
+#endif
+
+  (void)image;
+  (void)image_idx;
+  (void)err;
+  (void)warn;
+  (void)req_width;
+  (void)req_height;
+  (void)bytes;
+  (void)size;
+  (void)user_data;
+
+  return false;
+}
+
 void TinyGLTF::SetImageWriter(WriteImageDataFunction func, void *user_data) {
   WriteImageData = func;
   write_image_user_data_ = user_data;
@@ -1799,6 +2011,8 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   // Write image to temporary buffer
   std::string header;
   std::vector<unsigned char> data;
+
+  // TODO(LTE): Support ktx
 
   if (ext == "png") {
     if ((image->bits != 8) ||
@@ -2047,6 +2261,10 @@ static std::string MimeToExt(const std::string &mimeType) {
     return "bmp";
   } else if (mimeType == "image/gif") {
     return "gif";
+#if defined(TINYGLTF_ENABLE_KTX)
+  } else if (mimeType == "image/ktx") {
+    return "ktx";
+#endif
   }
 
   return "";
@@ -2107,6 +2325,13 @@ bool IsDataURI(const std::string &in) {
     return true;
   }
 
+#if defined(TINYGLTF_ENABLE_KTX)
+  header = "data:image/ktx;base64,";
+  if (in.find(header) == 0) {
+    return true;
+  }
+#endif
+
   header = "data:text/plain;base64,";
   if (in.find(header) == 0) {
     return true;
@@ -2159,6 +2384,16 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
       data = base64_decode(in.substr(header.size()));  // cut mime string.
     }
   }
+
+#if defined(TINYGLTF_ENABLE_KTX)
+  if (data.empty()) {
+    header = "data:image/ktx;base64,";
+    if (in.find(header) == 0) {
+      mime_type = "image/ktx";
+      data = base64_decode(in.substr(header.size()));  // cut mime string.
+    }
+  }
+#endif
 
   if (data.empty()) {
     header = "data:text/plain;base64,";
