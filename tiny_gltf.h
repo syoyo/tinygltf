@@ -1808,6 +1808,7 @@ static void tinyktxCallbackError(void *user, char const *msg) {
 
 static void *tinyktxCallbackAlloc(void *user, size_t size) {
   (void)user;
+  //std::cerr << "Alloc : " << std::to_string(size) << "\n";
   return malloc(size);
 };
 
@@ -1819,7 +1820,7 @@ static void tinyktxCallbackFree(void *user, void *data) {
 static size_t tinyktxCallbackRead(void *user, void* data, size_t size) {
   SimpleVFile *ss = reinterpret_cast<SimpleVFile *>(user);
 
-  if ((ss->pos + size) >= ss->len) {
+  if ((ss->pos + size) > ss->len) {
     if (ss->err) {
       std::stringstream msg;
       msg << "KTX read: Invalid data length. pos = " << ss->pos << ", len = " << ss->len << ", requested size to read = " << size << "\n";
@@ -1829,6 +1830,9 @@ static size_t tinyktxCallbackRead(void *user, void* data, size_t size) {
   }
 
   memcpy(data, ss->data + ss->pos, size);
+
+  // Advance pos
+  ss->pos += size;
 
   return size;
 };
@@ -1871,7 +1875,7 @@ bool LoadImageDataKTX(Image *image, const int image_idx, std::string *err,
                   &tinyktxCallbackError,
                   &tinyktxCallbackAlloc,
                   &tinyktxCallbackFree,
-                  tinyktxCallbackRead,
+                  &tinyktxCallbackRead,
                   &tinyktxCallbackSeek,
                   &tinyktxCallbackTell
   };
@@ -1920,6 +1924,12 @@ bool LoadImageDataKTX(Image *image, const int image_idx, std::string *err,
       return false;
     }
 
+    const void *src_ptr = TinyKtx_ImageRawData(ctx, miplevel);
+    if (src_ptr == nullptr) {
+      TinyKtx_DestroyContext(ctx);
+      return false;
+    }
+
     image->image.resize(byte_count);
     memcpy(image->image.data(), TinyKtx_ImageRawData(ctx, miplevel), byte_count);
 
@@ -1952,34 +1962,49 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
 
   bool ret = false;
 
+  std::string stb_err;
+  std::string stb_warn;
+
+#if !defined(TINYGLTF_NO_STB_IMAGE)
+  // Try to load images using stb_image(png, gif, bmp, tga, ...)
+
+  ret = tinygltf::LoadImageDataSTB(image, image_idx, &stb_err, &stb_warn, req_width, req_height,
+                   bytes, size, user_data);
+
+  if (ret) {
+    return true;
+  }
+
+#endif
+
+  std::string ktx_err;
+  std::string ktx_warn;
+
 #if defined(TINYGLTF_ENABLE_KTX)
   // Try KTX image
 
-  ret = tinygltf::LoadImageDataKTX(image, image_idx, err, warn, req_width, req_height,
+  ret = tinygltf::LoadImageDataKTX(image, image_idx, &ktx_err, &ktx_warn, req_width, req_height,
                    bytes, size, user_data);
 
   if (ret) {
+    if (warn) {
+      (*warn) = ktx_warn;
+    }
     return true;
   }
 
 #endif
 
-#if defined(TINYGLTF_NO_STB_IMAGE)
-  // Try to load images using stb_image(png, gif, bmp, tga, ...)
-
-  ret = tinygltf::LoadImageDataSTB(image, image_idx, err, warn, req_width, req_height,
-                   bytes, size, user_data);
-
-  if (ret) {
-    return true;
+  if (err) {
+    (*err) = stb_err + ktx_err;
   }
 
-#endif
+  if (warn) {
+    (*warn) = stb_warn + ktx_warn;
+  }
 
   (void)image;
   (void)image_idx;
-  (void)err;
-  (void)warn;
   (void)req_width;
   (void)req_height;
   (void)bytes;

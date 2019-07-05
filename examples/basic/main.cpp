@@ -14,6 +14,7 @@
 #endif
 
 // Inlude tinyktx.h before tiny_gltf.h
+// to get TKTX_*** definitions
 #define TINYKTX_IMPLEMENTATION
 #include "../../tinyktx.h"
 
@@ -27,6 +28,8 @@
 #define TINYGLTF_NOEXCEPTION
 #define JSON_NOEXCEPTION
 #define TINYGLTF_ENABLE_KTX
+// tinyktx.h is already included above,
+// so let tiny_gltf.h know do not include tinyktx.h anymore
 #define TINYGLTF_NO_INCLUDE_TINY_KTX
 #include "../../tiny_gltf.h"
 
@@ -54,6 +57,30 @@ bool loadModel(tinygltf::Model &model, const char *filename) {
     std::cout << "Loaded glTF: " << filename << std::endl;
 
   return res;
+}
+
+static bool GetOpenGLFormatFromKTX(int ktx_fmt, GLint *internal_format, GLenum *format, GLenum *type) {
+#if defined(TINYGLTF_ENABLE_KTX)
+    bool ret = true;
+
+    std::cout << "fmt = " << ktx_fmt << ", rgb8 fmt = " << TKTX_R8G8B8_UNORM << "\n";
+
+    if (ktx_fmt == TKTX_R8G8B8_UNORM) {
+      (*internal_format) = GL_RGB;
+      (*format) = GL_RGB;
+      (*type) = GL_UNSIGNED_BYTE;
+    } else {
+      // TODO(syoyo): Support more KTX formats.
+      ret = false;
+    }
+
+    return ret;
+#else
+    (void)fmt;
+    (void)internal_format;
+    (void)internal_format;
+    return false;
+#endif
 }
 
 std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
@@ -114,7 +141,7 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
                               accessor.normalized ? GL_TRUE : GL_FALSE,
                               byteStride, BUFFER_OFFSET(accessor.byteOffset));
       } else
-        std::cout << "vaa missing: " << attrib.first << std::endl;
+        std::cout << "Unsupported vertex attribute: " << attrib.first << std::endl;
     }
 
     GLuint texid;
@@ -130,29 +157,52 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
+    GLint internal_format = GL_RGBA;
     GLenum format = GL_RGBA;
-
-    if (image.component == 1) {
-      format = GL_RED;
-    } else if (image.component == 2) {
-      format = GL_RG;
-    } else if (image.component == 3) {
-      format = GL_RGB;
-    } else {
-      // ???
-    }
-
     GLenum type = GL_UNSIGNED_BYTE;
-    if (image.bits == 8) {
-      // ok
-    } else if (image.bits == 16) {
-      type = GL_UNSIGNED_SHORT;
+
+    bool valid = false;
+
+    // KTX extension
+    if (image.extras.Has("ktx_format")) {
+
+      valid = GetOpenGLFormatFromKTX(image.extras.Get("ktx_format").Get<int>(), &internal_format, &format, &type);
+
+      if (valid) {
+
+        std::cout << "ktx_format: " << image.extras.Get("ktx_format").Get<int>() << std::endl;
+        std::cout << "ktx image size: " << image.width << ", " << image.height << std::endl;
+      }
+
     } else {
-      // ???
+
+      if (image.component == 1) {
+        format = GL_RED;
+      } else if (image.component == 2) {
+        format = GL_RG;
+      } else if (image.component == 3) {
+        format = GL_RGB;
+      } else if (image.component == 4) {
+        format = GL_RGBA;
+      } else {
+        valid = false;
+      }
+
+      if (image.bits == 8) {
+        // ok
+      } else if (image.bits == 16) {
+        type = GL_UNSIGNED_SHORT;
+      } else {
+        valid = false;
+      }
+
     }
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width, image.height, 0,
-                 format, type, &image.image.at(0));
+    if (valid) {
+
+      glTexImage2D(GL_TEXTURE_2D, 0, internal_format, image.width, image.height, 0,
+                   format, type, &image.image.at(0));
+    }
   }
 
   return vbos;
