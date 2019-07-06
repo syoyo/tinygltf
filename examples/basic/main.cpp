@@ -176,6 +176,8 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
 
     } else {
 
+      valid = true;
+
       if (image.component == 1) {
         format = GL_RED;
       } else if (image.component == 2) {
@@ -189,7 +191,7 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
       }
 
       if (image.bits == 8) {
-        // ok
+        type = GL_UNSIGNED_BYTE;
       } else if (image.bits == 16) {
         type = GL_UNSIGNED_SHORT;
       } else {
@@ -381,6 +383,14 @@ static void error_callback(int error, const char *description) {
   fprintf(stderr, "Error: %s\n", description);
 }
 
+static void drop_callback(GLFWwindow *window, int num, const char **paths) {
+  (void)window;
+  printf("dropCB %d\n", num);
+  for (int i = 0; i < num; i++) {
+      printf("%s\n", paths[i]);
+  }
+}
+
 int main(int argc, char **argv) {
   std::string filename = "../../models/Cube/Cube.gltf";
 
@@ -409,6 +419,9 @@ int main(int argc, char **argv) {
 #endif
 
   Window window = Window(800, 600, "TinyGLTF basic example");
+
+  glfwSetDropCallback(window.window, drop_callback);
+
   glfwMakeContextCurrent(window.window);
 
 #ifdef __APPLE__
