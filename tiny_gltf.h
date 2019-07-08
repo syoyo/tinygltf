@@ -390,7 +390,32 @@ struct Parameter {
     if (it != std::end(json_double_value)) {
       return int(it->second);
     }
+    // As per the spec, if texCoord is ommited, this parameter is 0
     return 0;
+  }
+
+  /// Return the scale of a texture if this Parameter is a normal texture map.
+  /// Returned value is only valid if the parameter represent a normal texture
+  /// from a material
+  double TextureScale() const {
+    const auto it = json_double_value.find("scale");
+    if (it != std::end(json_double_value)) {
+      return it->second;
+    }
+    // As per the spec, if scale is ommited, this paramter is 1
+    return 1;
+  }
+
+  /// Return the strength of a texture if this Parameter is a an occlusion map.
+  /// Returned value is only valid if the parameter represent an occlusion map
+  /// from a material
+  double TextureStrength() const {
+    const auto it = json_double_value.find("strength");
+    if (it != std::end(json_double_value)) {
+      return it->second;
+    }
+    // As per the spec, if strenghth is ommited, this parameter is 1
+    return 1;
   }
 
   /// Material factor, like the roughness or metalness of a material
@@ -437,8 +462,8 @@ struct AnimationChannel {
 struct AnimationSampler {
   int input;                  // required
   int output;                 // required
-  std::string interpolation;  // in ["LINEAR", "STEP", "CATMULLROMSPLINE",
-                              // "CUBICSPLINE"], default "LINEAR"
+  std::string interpolation;  // "LINEAR", "STEP","CUBICSPLINE" or user defined
+                              // string. default "LINEAR"
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
@@ -708,7 +733,6 @@ struct Mesh {
   std::string name;
   std::vector<Primitive> primitives;
   std::vector<double> weights;  // weights to be applied to the Morph Targets
-  std::vector<std::map<std::string, int> > targets;
   ExtensionMap extensions;
   Value extras;
 
@@ -719,6 +743,7 @@ class Node {
  public:
   Node() : camera(-1), skin(-1), mesh(-1) {}
 
+  // TODO(syoyo): Could use `default`
   Node(const Node &rhs) {
     camera = rhs.camera;
 
@@ -736,6 +761,9 @@ class Node {
     extras = rhs.extras;
   }
   ~Node() {}
+
+  Node &operator=(const Node &rhs) = default;
+
   bool operator==(const Node &) const;
 
   int camera;  // the index of the camera referenced by this node
@@ -796,7 +824,12 @@ struct Light {
 class Model {
  public:
   Model() {}
+
+  Model(const Model &) = default;
+  Model &operator=(const Model &) = default;
+
   ~Model() {}
+
   bool operator==(const Model &) const;
 
   std::vector<Accessor> accessors;
@@ -1304,8 +1337,7 @@ bool Material::operator==(const Material &other) const {
 }
 bool Mesh::operator==(const Mesh &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
-         this->name == other.name && this->primitives == other.primitives &&
-         this->targets == other.targets && Equals(this->weights, other.weights);
+         this->name == other.name && this->primitives == other.primitives;
 }
 bool Model::operator==(const Model &other) const {
   return this->accessors == other.accessors &&
@@ -3097,7 +3129,7 @@ static bool ParseAccessor(Accessor *accessor, std::string *err, const json &o) {
     if (componentType >= TINYGLTF_COMPONENT_TYPE_BYTE &&
         componentType <= TINYGLTF_COMPONENT_TYPE_DOUBLE) {
       // OK
-      accessor->componentType = componentType;
+      accessor->componentType = int(componentType);
     } else {
       std::stringstream ss;
       ss << "Invalid `componentType` in accessor. Got " << componentType
@@ -3383,24 +3415,6 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
     }
   }
 
-  // Look for morph targets
-  json::const_iterator targetsObject = o.find("targets");
-  if ((targetsObject != o.end()) && targetsObject.value().is_array()) {
-    for (json::const_iterator i = targetsObject.value().begin();
-         i != targetsObject.value().end(); i++) {
-      std::map<std::string, int> targetAttribues;
-
-      const json &dict = i.value();
-      json::const_iterator dictIt(dict.begin());
-      json::const_iterator dictItEnd(dict.end());
-
-      for (; dictIt != dictItEnd; ++dictIt) {
-        targetAttribues[dictIt.key()] = static_cast<int>(dictIt.value());
-      }
-      mesh->targets.push_back(targetAttribues);
-    }
-  }
-
   // Should probably check if has targets and if dimensions fit
   ParseNumberArrayProperty(&mesh->weights, err, o, "weights", false);
 
@@ -3478,7 +3492,9 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
     } else {
       Parameter param;
       if (ParseParameterProperty(&param, err, o, it.key(), false)) {
-        material->additionalValues[it.key()] = param;
+        // names of materials have already been parsed. Putting it in this map
+        // doesn't correctly reflext the glTF specification
+        if (it.key() != "name") material->additionalValues[it.key()] = param;
       }
     }
   }
@@ -4848,6 +4864,10 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
     SerializeStringProperty("generator", asset.generator, o);
   }
 
+  if (!asset.copyright.empty()) {
+    SerializeStringProperty("copyright", asset.copyright, o);
+  }
+
   if (!asset.version.empty()) {
     SerializeStringProperty("version", asset.version, o);
   }
@@ -4912,14 +4932,13 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
 }
 
 static void SerializeGltfImage(Image &image, json &o) {
- 	// if uri empty, the mimeType and bufferview should be set
+  // if uri empty, the mimeType and bufferview should be set
   if (image.uri.empty()) {
-		SerializeStringProperty("mimeType", image.mimeType, o);
-		SerializeNumberProperty<int>("bufferView", image.bufferView, o);
-	}
-  else {
-		SerializeStringProperty("uri", image.uri, o);
-	}
+    SerializeStringProperty("mimeType", image.mimeType, o);
+    SerializeNumberProperty<int>("bufferView", image.bufferView, o);
+  } else {
+    SerializeStringProperty("uri", image.uri, o);
+  }
 
   if (image.name.size()) {
     SerializeStringProperty("name", image.name, o);
@@ -5145,6 +5164,9 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   }
   if (texture.source > -1) {
     SerializeNumberProperty("source", texture.source, o);
+  }
+  if (texture.name.size()) {
+    SerializeStringProperty("name", texture.name, o);
   }
   if (texture.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", texture.extras, o);
