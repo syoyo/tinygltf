@@ -5105,10 +5105,23 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
   }
 }
 
+static void SerializeSpotLight(SpotLight &spot, json &o) {
+    SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
+    SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
+    SerializeExtensionMap(spot.extensions, o);
+}
+
 static void SerializeGltfLight(Light &light, json &o) {
   if (!light.name.empty()) SerializeStringProperty("name", light.name, o);
+  SerializeNumberProperty("intensity", light.intensity, o);
+  SerializeNumberProperty("range", light.range, o);
   SerializeNumberArrayProperty("color", light.color, o);
   SerializeStringProperty("type", light.type, o);
+  if (light.type == "spot") {
+    json spot;
+    SerializeSpotLight(light.spot, spot);
+    o["spot"] = spot;
+  }
 }
 
 static void SerializeGltfNode(Node &node, json &o) {
@@ -5516,7 +5529,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       ext_j = output["extensions"];
     }
 
-    ext_j["KHR_lights_cmn"] = khr_lights_cmn;
+    ext_j["KHR_lights_punctual"] = khr_lights_cmn;
 
     output["extensions"] = ext_j;
   }
