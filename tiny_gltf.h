@@ -3699,21 +3699,11 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
 
 static bool ParseSpotLight(SpotLight *light,
                            std::string *err, const json &o) {
-    double innerConeAngle = 0.0;
-    if (!ParseNumberProperty(&innerConeAngle, err, o, "innerConeAngle", true, "SpotLight")) {
-        return false;
-    }
-
-    double outerConeAngle = 0.0;
-    if (!ParseNumberProperty(&outerConeAngle, err, o, "outerConeAngle", true, "SpotLight")) {
-        return false;
-    }
+    ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
+    ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
 
     ParseExtensionsProperty(&light->extensions, err, o);
     ParseExtrasProperty(&light->extras, o);
-
-    light->innerConeAngle = innerConeAngle;
-    light->outerConeAngle = outerConeAngle;
 
     // TODO(syoyo): Validate parameter values.
 
@@ -3826,7 +3816,11 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
 }
 
 static bool ParseLight(Light *light, std::string *err, const json &o) {
-    if (light->type.compare("spot") == 0) {
+    if (!ParseStringProperty(&light->type, err, o, "type", true)) {
+        return false;
+    }
+
+    if (light->type == "spot") {
         if (o.find("spot") == o.end()) {
             if (err) {
                 std::stringstream ss;
@@ -3853,7 +3847,6 @@ static bool ParseLight(Light *light, std::string *err, const json &o) {
 
     ParseStringProperty(&light->name, err, o, "name", false);
     ParseNumberArrayProperty(&light->color, err, o, "color", false);
-    ParseStringProperty(&light->type, err, o, "type", true);
     ParseNumberProperty(&light->range, err, o, "range", false);
     ParseNumberProperty(&light->intensity, err, o, "intensity", false);
     ParseExtensionsProperty(&light->extensions, err, o);
