@@ -813,12 +813,32 @@ struct Scene {
   bool operator==(const Scene &) const;
 };
 
+struct SpotLight {
+  double innerConeAngle;
+  double outerConeAngle;
+
+  SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) { }
+
+  bool operator==(const SpotLight &) const;
+
+  ExtensionMap extensions;
+  Value extras;
+};
+
 struct Light {
   std::string name;
   std::vector<double> color;
+  double intensity;
   std::string type;
+  double range;
+  SpotLight spot;
+
+  Light() : intensity(1.0), range(0.0) {}
 
   bool operator==(const Light &) const;
+
+  ExtensionMap extensions;
+  Value extras;
 };
 
 class Model {
@@ -1363,6 +1383,11 @@ bool Node::operator==(const Node &other) const {
          Equals(this->scale, other.scale) && this->skin == other.skin &&
          Equals(this->translation, other.translation) &&
          Equals(this->weights, other.weights);
+}
+bool SpotLight::operator==(const SpotLight &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         TINYGLTF_DOUBLE_EQUAL(this->innerConeAngle, other.innerConeAngle) &&
+         TINYGLTF_DOUBLE_EQUAL(this->outerConeAngle, other.outerConeAngle);
 }
 bool OrthographicCamera::operator==(const OrthographicCamera &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
@@ -3424,13 +3449,6 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
   return true;
 }
 
-static bool ParseLight(Light *light, std::string *err, const json &o) {
-  ParseStringProperty(&light->name, err, o, "name", false);
-  ParseNumberArrayProperty(&light->color, err, o, "color", false);
-  ParseStringProperty(&light->type, err, o, "type", false);
-  return true;
-}
-
 static bool ParseNode(Node *node, std::string *err, const json &o) {
   ParseStringProperty(&node->name, err, o, "name", false);
 
@@ -3679,6 +3697,19 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
   return true;
 }
 
+static bool ParseSpotLight(SpotLight *light,
+                           std::string *err, const json &o) {
+    ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
+    ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
+
+    ParseExtensionsProperty(&light->extensions, err, o);
+    ParseExtrasProperty(&light->extras, o);
+
+    // TODO(syoyo): Validate parameter values.
+
+    return true;
+}
+
 static bool ParseOrthographicCamera(OrthographicCamera *camera,
                                     std::string *err, const json &o) {
   double xmag = 0.0;
@@ -3782,6 +3813,45 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
   ParseExtrasProperty(&(camera->extras), o);
 
   return true;
+}
+
+static bool ParseLight(Light *light, std::string *err, const json &o) {
+    if (!ParseStringProperty(&light->type, err, o, "type", true)) {
+        return false;
+    }
+
+    if (light->type == "spot") {
+        if (o.find("spot") == o.end()) {
+            if (err) {
+                std::stringstream ss;
+                ss << "Spot light description not found." << std::endl;
+                (*err) += ss.str();
+            }
+            return false;
+        }
+
+        const json &v = o.find("spot").value();
+        if (!v.is_object()) {
+            if (err) {
+                std::stringstream ss;
+                ss << "\"spot\" is not a JSON object." << std::endl;
+                (*err) += ss.str();
+            }
+            return false;
+        }
+
+        if (!ParseSpotLight(&light->spot, err, v.get<json>())) {
+            return false;
+        }
+    }
+
+    ParseStringProperty(&light->name, err, o, "name", false);
+    ParseNumberArrayProperty(&light->color, err, o, "color", false);
+    ParseNumberProperty(&light->range, err, o, "range", false);
+    ParseNumberProperty(&light->intensity, err, o, "intensity", false);
+    ParseExtensionsProperty(&light->extensions, err, o);
+    ParseExtrasProperty(&(light->extras), o);
+    return true;
 }
 
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
@@ -4399,8 +4469,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       json::const_iterator it(root.begin());
       json::const_iterator itEnd(root.end());
       for (; it != itEnd; ++it) {
-        // parse KHR_lights_cmn extension
-        if ((it.key().compare("KHR_lights_cmn") == 0) &&
+        // parse KHR_lights_punctual extension
+        if ((it.key().compare("KHR_lights_punctual") == 0) &&
             it.value().is_object()) {
           const json &object = it.value();
           json::const_iterator itLight(object.find("lights"));
@@ -5035,10 +5105,23 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
   }
 }
 
+static void SerializeSpotLight(SpotLight &spot, json &o) {
+    SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
+    SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
+    SerializeExtensionMap(spot.extensions, o);
+}
+
 static void SerializeGltfLight(Light &light, json &o) {
   if (!light.name.empty()) SerializeStringProperty("name", light.name, o);
+  SerializeNumberProperty("intensity", light.intensity, o);
+  SerializeNumberProperty("range", light.range, o);
   SerializeNumberArrayProperty("color", light.color, o);
   SerializeStringProperty("type", light.type, o);
+  if (light.type == "spot") {
+    json spot;
+    SerializeSpotLight(light.spot, spot);
+    o["spot"] = spot;
+  }
 }
 
 static void SerializeGltfNode(Node &node, json &o) {
@@ -5446,7 +5529,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       ext_j = output["extensions"];
     }
 
-    ext_j["KHR_lights_cmn"] = khr_lights_cmn;
+    ext_j["KHR_lights_punctual"] = khr_lights_cmn;
 
     output["extensions"] = ext_j;
   }
