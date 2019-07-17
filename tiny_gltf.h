@@ -817,7 +817,7 @@ struct SpotLight {
   double innerConeAngle;
   double outerConeAngle;
 
-  SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) { }
+  SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
 
   bool operator==(const SpotLight &) const;
 
@@ -1060,7 +1060,6 @@ class TinyGLTF {
   bool LoadFromString(Model *model, std::string *err, std::string *warn,
                       const char *str, const unsigned int length,
                       const std::string &base_dir, unsigned int check_sections);
-
 
   const unsigned char *bin_data_;
   size_t bin_size_;
@@ -3704,17 +3703,16 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
   return true;
 }
 
-static bool ParseSpotLight(SpotLight *light,
-                           std::string *err, const json &o) {
-    ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
-    ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
+static bool ParseSpotLight(SpotLight *light, std::string *err, const json &o) {
+  ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
+  ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
 
-    ParseExtensionsProperty(&light->extensions, err, o);
-    ParseExtrasProperty(&light->extras, o);
+  ParseExtensionsProperty(&light->extensions, err, o);
+  ParseExtrasProperty(&light->extras, o);
 
-    // TODO(syoyo): Validate parameter values.
+  // TODO(syoyo): Validate parameter values.
 
-    return true;
+  return true;
 }
 
 static bool ParseOrthographicCamera(OrthographicCamera *camera,
@@ -3823,42 +3821,42 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
 }
 
 static bool ParseLight(Light *light, std::string *err, const json &o) {
-    if (!ParseStringProperty(&light->type, err, o, "type", true)) {
-        return false;
+  if (!ParseStringProperty(&light->type, err, o, "type", true)) {
+    return false;
+  }
+
+  if (light->type == "spot") {
+    if (o.find("spot") == o.end()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "Spot light description not found." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
     }
 
-    if (light->type == "spot") {
-        if (o.find("spot") == o.end()) {
-            if (err) {
-                std::stringstream ss;
-                ss << "Spot light description not found." << std::endl;
-                (*err) += ss.str();
-            }
-            return false;
-        }
-
-        const json &v = o.find("spot").value();
-        if (!v.is_object()) {
-            if (err) {
-                std::stringstream ss;
-                ss << "\"spot\" is not a JSON object." << std::endl;
-                (*err) += ss.str();
-            }
-            return false;
-        }
-
-        if (!ParseSpotLight(&light->spot, err, v.get<json>())) {
-            return false;
-        }
+    const json &v = o.find("spot").value();
+    if (!v.is_object()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "\"spot\" is not a JSON object." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
     }
 
-    ParseStringProperty(&light->name, err, o, "name", false);
-    ParseNumberArrayProperty(&light->color, err, o, "color", false);
-    ParseNumberProperty(&light->range, err, o, "range", false);
-    ParseNumberProperty(&light->intensity, err, o, "intensity", false);
-    ParseExtensionsProperty(&light->extensions, err, o);
-    ParseExtrasProperty(&(light->extras), o);
-    return true;
+    if (!ParseSpotLight(&light->spot, err, v.get<json>())) {
+      return false;
+    }
+  }
+
+  ParseStringProperty(&light->name, err, o, "name", false);
+  ParseNumberArrayProperty(&light->color, err, o, "color", false);
+  ParseNumberProperty(&light->range, err, o, "range", false);
+  ParseNumberProperty(&light->intensity, err, o, "intensity", false);
+  ParseExtensionsProperty(&light->extensions, err, o);
+  ParseExtrasProperty(&(light->extras), o);
+  return true;
 }
 
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
@@ -5113,9 +5111,9 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
 }
 
 static void SerializeSpotLight(SpotLight &spot, json &o) {
-    SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
-    SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
-    SerializeExtensionMap(spot.extensions, o);
+  SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
+  SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
+  SerializeExtensionMap(spot.extensions, o);
 }
 
 static void SerializeGltfLight(Light &light, json &o) {
@@ -5268,7 +5266,6 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
 /// Serialize all properties except buffers and images.
 ///
 static void SerializeGltfModel(Model *model, json &o) {
-
   // ACCESSORS
   json accessors;
   for (unsigned int i = 0; i < model->accessors.size(); ++i) {
@@ -5296,7 +5293,6 @@ static void SerializeGltfModel(Model *model, json &o) {
   SerializeGltfAsset(model->asset, asset);
   o["asset"] = asset;
 
-
   // BUFFERVIEWS
   json bufferViews;
   for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
@@ -5308,8 +5304,7 @@ static void SerializeGltfModel(Model *model, json &o) {
 
   // Extensions used
   if (model->extensionsUsed.size()) {
-    SerializeStringArrayProperty("extensionsUsed", model->extensionsUsed,
-                                 o);
+    SerializeStringArrayProperty("extensionsUsed", model->extensionsUsed, o);
   }
 
   // Extensions required
@@ -5441,8 +5436,7 @@ static void SerializeGltfModel(Model *model, json &o) {
   }
 }
 
-static bool WriteGltfStream(std::ostream &stream,
-                            const std::string &content) {
+static bool WriteGltfStream(std::ostream &stream, const std::string &content) {
   stream << content << std::endl;
   return true;
 }
@@ -5455,8 +5449,7 @@ static bool WriteGltfFile(const std::string &output,
 }
 
 static void WriteBinaryGltfStream(std::ostream &stream,
-                          const std::string &content) {
-
+                                  const std::string &content) {
   const std::string header = "glTF";
   const int version = 2;
   const int padding_size = content.size() % 4;
@@ -5473,9 +5466,9 @@ static void WriteBinaryGltfStream(std::ostream &stream,
   const int model_length = int(content.size()) + padding_size;
   const int model_format = 0x4E4F534A;
   stream.write(reinterpret_cast<const char *>(&model_length),
-                 sizeof(model_length));
+               sizeof(model_length));
   stream.write(reinterpret_cast<const char *>(&model_format),
-                 sizeof(model_format));
+               sizeof(model_format));
   stream.write(content.c_str(), content.size());
 
   // Chunk must be multiplies of 4, so pad with spaces
@@ -5492,8 +5485,8 @@ static void WriteBinaryGltfFile(const std::string &output,
 }
 
 bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
-                                    bool prettyPrint = true,
-                                    bool writeBinary = false) {
+                                      bool prettyPrint = true,
+                                      bool writeBinary = false) {
   json output;
 
   /// Serialize all properties except buffers and images.
@@ -5516,8 +5509,9 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
       json image;
 
       std::string dummystring = "";
-      // UpdateImageObject need baseDir but only uses it if embededImages is enable,
-      // since we won't write separte images when writing to a stream we use a dummystring
+      // UpdateImageObject need baseDir but only uses it if embededImages is
+      // enable, since we won't write separte images when writing to a stream we
+      // use a dummystring
       UpdateImageObject(model->images[i], dummystring, int(i), false,
                         &this->WriteImageData, this->write_image_user_data_);
       SerializeGltfImage(model->images[i], image);
@@ -5553,8 +5547,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   if (baseDir.empty()) {
     baseDir = "./";
   }
- /// Serialize all properties except buffers and images.
- SerializeGltfModel(model, output);
+  /// Serialize all properties except buffers and images.
+  SerializeGltfModel(model, output);
 
   // BUFFERS
   std::vector<std::string> usedUris;
