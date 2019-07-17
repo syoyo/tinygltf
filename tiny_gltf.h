@@ -817,7 +817,7 @@ struct SpotLight {
   double innerConeAngle;
   double outerConeAngle;
 
-  SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) { }
+  SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
 
   bool operator==(const SpotLight &) const;
 
@@ -1021,6 +1021,12 @@ class TinyGLTF {
                             const unsigned int length,
                             const std::string &base_dir = "",
                             unsigned int check_sections = REQUIRE_VERSION);
+
+  ///
+  /// Write glTF to stream, buffers and images will be embeded
+  ///
+  bool WriteGltfSceneToStream(Model *model, std::ostream &stream,
+                              bool prettyPrint, bool writeBinary);
 
   ///
   /// Write glTF to file.
@@ -3697,17 +3703,16 @@ static bool ParsePerspectiveCamera(PerspectiveCamera *camera, std::string *err,
   return true;
 }
 
-static bool ParseSpotLight(SpotLight *light,
-                           std::string *err, const json &o) {
-    ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
-    ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
+static bool ParseSpotLight(SpotLight *light, std::string *err, const json &o) {
+  ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
+  ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
 
-    ParseExtensionsProperty(&light->extensions, err, o);
-    ParseExtrasProperty(&light->extras, o);
+  ParseExtensionsProperty(&light->extensions, err, o);
+  ParseExtrasProperty(&light->extras, o);
 
-    // TODO(syoyo): Validate parameter values.
+  // TODO(syoyo): Validate parameter values.
 
-    return true;
+  return true;
 }
 
 static bool ParseOrthographicCamera(OrthographicCamera *camera,
@@ -3816,42 +3821,42 @@ static bool ParseCamera(Camera *camera, std::string *err, const json &o) {
 }
 
 static bool ParseLight(Light *light, std::string *err, const json &o) {
-    if (!ParseStringProperty(&light->type, err, o, "type", true)) {
-        return false;
+  if (!ParseStringProperty(&light->type, err, o, "type", true)) {
+    return false;
+  }
+
+  if (light->type == "spot") {
+    if (o.find("spot") == o.end()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "Spot light description not found." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
     }
 
-    if (light->type == "spot") {
-        if (o.find("spot") == o.end()) {
-            if (err) {
-                std::stringstream ss;
-                ss << "Spot light description not found." << std::endl;
-                (*err) += ss.str();
-            }
-            return false;
-        }
-
-        const json &v = o.find("spot").value();
-        if (!v.is_object()) {
-            if (err) {
-                std::stringstream ss;
-                ss << "\"spot\" is not a JSON object." << std::endl;
-                (*err) += ss.str();
-            }
-            return false;
-        }
-
-        if (!ParseSpotLight(&light->spot, err, v.get<json>())) {
-            return false;
-        }
+    const json &v = o.find("spot").value();
+    if (!v.is_object()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "\"spot\" is not a JSON object." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
     }
 
-    ParseStringProperty(&light->name, err, o, "name", false);
-    ParseNumberArrayProperty(&light->color, err, o, "color", false);
-    ParseNumberProperty(&light->range, err, o, "range", false);
-    ParseNumberProperty(&light->intensity, err, o, "intensity", false);
-    ParseExtensionsProperty(&light->extensions, err, o);
-    ParseExtrasProperty(&(light->extras), o);
-    return true;
+    if (!ParseSpotLight(&light->spot, err, v.get<json>())) {
+      return false;
+    }
+  }
+
+  ParseStringProperty(&light->name, err, o, "name", false);
+  ParseNumberArrayProperty(&light->color, err, o, "color", false);
+  ParseNumberProperty(&light->range, err, o, "range", false);
+  ParseNumberProperty(&light->intensity, err, o, "intensity", false);
+  ParseExtensionsProperty(&light->extensions, err, o);
+  ParseExtrasProperty(&(light->extras), o);
+  return true;
 }
 
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
@@ -5106,9 +5111,9 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
 }
 
 static void SerializeSpotLight(SpotLight &spot, json &o) {
-    SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
-    SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
-    SerializeExtensionMap(spot.extensions, o);
+  SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
+  SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
+  SerializeExtensionMap(spot.extensions, o);
 }
 
 static void SerializeGltfLight(Light &light, json &o) {
@@ -5257,53 +5262,10 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
   SerializeExtensionMap(texture.extensions, o);
 }
 
-static bool WriteGltfFile(const std::string &output,
-                          const std::string &content) {
-  std::ofstream gltfFile(output.c_str());
-  if (!gltfFile.is_open()) return false;
-  gltfFile << content << std::endl;
-  return true;
-}
-
-static void WriteBinaryGltfFile(const std::string &output,
-                                const std::string &content) {
-  std::ofstream gltfFile(output.c_str(), std::ios::binary);
-
-  const std::string header = "glTF";
-  const int version = 2;
-  const int padding_size = content.size() % 4;
-
-  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info,
-  // padding
-  const int length = 12 + 8 + int(content.size()) + padding_size;
-
-  gltfFile.write(header.c_str(), header.size());
-  gltfFile.write(reinterpret_cast<const char *>(&version), sizeof(version));
-  gltfFile.write(reinterpret_cast<const char *>(&length), sizeof(length));
-
-  // JSON chunk info, then JSON data
-  const int model_length = int(content.size()) + padding_size;
-  const int model_format = 0x4E4F534A;
-  gltfFile.write(reinterpret_cast<const char *>(&model_length),
-                 sizeof(model_length));
-  gltfFile.write(reinterpret_cast<const char *>(&model_format),
-                 sizeof(model_format));
-  gltfFile.write(content.c_str(), content.size());
-
-  // Chunk must be multiplies of 4, so pad with spaces
-  if (padding_size > 0) {
-    const std::string padding = std::string(padding_size, ' ');
-    gltfFile.write(padding.c_str(), padding.size());
-  }
-}
-
-bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
-                                    bool embedImages = false,
-                                    bool embedBuffers = false,
-                                    bool prettyPrint = true,
-                                    bool writeBinary = false) {
-  json output;
-
+///
+/// Serialize all properties except buffers and images.
+///
+static void SerializeGltfModel(Model *model, json &o) {
   // ACCESSORS
   json accessors;
   for (unsigned int i = 0; i < model->accessors.size(); ++i) {
@@ -5311,7 +5273,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     SerializeGltfAccessor(model->accessors[i], accessor);
     accessors.push_back(accessor);
   }
-  output["accessors"] = accessors;
+  o["accessors"] = accessors;
 
   // ANIMATIONS
   if (model->animations.size()) {
@@ -5323,14 +5285,256 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
         animations.push_back(animation);
       }
     }
-    output["animations"] = animations;
+    o["animations"] = animations;
   }
 
   // ASSET
   json asset;
   SerializeGltfAsset(model->asset, asset);
-  output["asset"] = asset;
+  o["asset"] = asset;
 
+  // BUFFERVIEWS
+  json bufferViews;
+  for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
+    json bufferView;
+    SerializeGltfBufferView(model->bufferViews[i], bufferView);
+    bufferViews.push_back(bufferView);
+  }
+  o["bufferViews"] = bufferViews;
+
+  // Extensions used
+  if (model->extensionsUsed.size()) {
+    SerializeStringArrayProperty("extensionsUsed", model->extensionsUsed, o);
+  }
+
+  // Extensions required
+  if (model->extensionsRequired.size()) {
+    SerializeStringArrayProperty("extensionsRequired",
+                                 model->extensionsRequired, o);
+  }
+
+  // MATERIALS
+  if (model->materials.size()) {
+    json materials;
+    for (unsigned int i = 0; i < model->materials.size(); ++i) {
+      json material;
+      SerializeGltfMaterial(model->materials[i], material);
+      materials.push_back(material);
+    }
+    o["materials"] = materials;
+  }
+
+  // MESHES
+  if (model->meshes.size()) {
+    json meshes;
+    for (unsigned int i = 0; i < model->meshes.size(); ++i) {
+      json mesh;
+      SerializeGltfMesh(model->meshes[i], mesh);
+      meshes.push_back(mesh);
+    }
+    o["meshes"] = meshes;
+  }
+
+  // NODES
+  if (model->nodes.size()) {
+    json nodes;
+    for (unsigned int i = 0; i < model->nodes.size(); ++i) {
+      json node;
+      SerializeGltfNode(model->nodes[i], node);
+      nodes.push_back(node);
+    }
+    o["nodes"] = nodes;
+  }
+
+  // SCENE
+  if (model->defaultScene > -1) {
+    SerializeNumberProperty<int>("scene", model->defaultScene, o);
+  }
+
+  // SCENES
+  if (model->scenes.size()) {
+    json scenes;
+    for (unsigned int i = 0; i < model->scenes.size(); ++i) {
+      json currentScene;
+      SerializeGltfScene(model->scenes[i], currentScene);
+      scenes.push_back(currentScene);
+    }
+    o["scenes"] = scenes;
+  }
+
+  // SKINS
+  if (model->skins.size()) {
+    json skins;
+    for (unsigned int i = 0; i < model->skins.size(); ++i) {
+      json skin;
+      SerializeGltfSkin(model->skins[i], skin);
+      skins.push_back(skin);
+    }
+    o["skins"] = skins;
+  }
+
+  // TEXTURES
+  if (model->textures.size()) {
+    json textures;
+    for (unsigned int i = 0; i < model->textures.size(); ++i) {
+      json texture;
+      SerializeGltfTexture(model->textures[i], texture);
+      textures.push_back(texture);
+    }
+    o["textures"] = textures;
+  }
+
+  // SAMPLERS
+  if (model->samplers.size()) {
+    json samplers;
+    for (unsigned int i = 0; i < model->samplers.size(); ++i) {
+      json sampler;
+      SerializeGltfSampler(model->samplers[i], sampler);
+      samplers.push_back(sampler);
+    }
+    o["samplers"] = samplers;
+  }
+
+  // CAMERAS
+  if (model->cameras.size()) {
+    json cameras;
+    for (unsigned int i = 0; i < model->cameras.size(); ++i) {
+      json camera;
+      SerializeGltfCamera(model->cameras[i], camera);
+      cameras.push_back(camera);
+    }
+    o["cameras"] = cameras;
+  }
+
+  // EXTENSIONS
+  SerializeExtensionMap(model->extensions, o);
+
+  // LIGHTS as KHR_lights_cmn
+  if (model->lights.size()) {
+    json lights;
+    for (unsigned int i = 0; i < model->lights.size(); ++i) {
+      json light;
+      SerializeGltfLight(model->lights[i], light);
+      lights.push_back(light);
+    }
+    json khr_lights_cmn;
+    khr_lights_cmn["lights"] = lights;
+    json ext_j;
+
+    if (o.find("extensions") != o.end()) {
+      ext_j = o["extensions"];
+    }
+
+    ext_j["KHR_lights_punctual"] = khr_lights_cmn;
+
+    o["extensions"] = ext_j;
+  }
+
+  // EXTRAS
+  if (model->extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", model->extras, o);
+  }
+}
+
+static bool WriteGltfStream(std::ostream &stream, const std::string &content) {
+  stream << content << std::endl;
+  return true;
+}
+
+static bool WriteGltfFile(const std::string &output,
+                          const std::string &content) {
+  std::ofstream gltfFile(output.c_str());
+  if (!gltfFile.is_open()) return false;
+  return WriteGltfStream(gltfFile, content);
+}
+
+static void WriteBinaryGltfStream(std::ostream &stream,
+                                  const std::string &content) {
+  const std::string header = "glTF";
+  const int version = 2;
+  const int padding_size = content.size() % 4;
+
+  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info,
+  // padding
+  const int length = 12 + 8 + int(content.size()) + padding_size;
+
+  stream.write(header.c_str(), header.size());
+  stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
+  stream.write(reinterpret_cast<const char *>(&length), sizeof(length));
+
+  // JSON chunk info, then JSON data
+  const int model_length = int(content.size()) + padding_size;
+  const int model_format = 0x4E4F534A;
+  stream.write(reinterpret_cast<const char *>(&model_length),
+               sizeof(model_length));
+  stream.write(reinterpret_cast<const char *>(&model_format),
+               sizeof(model_format));
+  stream.write(content.c_str(), content.size());
+
+  // Chunk must be multiplies of 4, so pad with spaces
+  if (padding_size > 0) {
+    const std::string padding = std::string(padding_size, ' ');
+    stream.write(padding.c_str(), padding.size());
+  }
+}
+
+static void WriteBinaryGltfFile(const std::string &output,
+                                const std::string &content) {
+  std::ofstream gltfFile(output.c_str(), std::ios::binary);
+  WriteBinaryGltfStream(gltfFile, content);
+}
+
+bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
+                                      bool prettyPrint = true,
+                                      bool writeBinary = false) {
+  json output;
+
+  /// Serialize all properties except buffers and images.
+  SerializeGltfModel(model, output);
+
+  // BUFFERS
+  std::vector<std::string> usedUris;
+  json buffers;
+  for (unsigned int i = 0; i < model->buffers.size(); ++i) {
+    json buffer;
+    SerializeGltfBuffer(model->buffers[i], buffer);
+    buffers.push_back(buffer);
+  }
+  output["buffers"] = buffers;
+
+  // IMAGES
+  if (model->images.size()) {
+    json images;
+    for (unsigned int i = 0; i < model->images.size(); ++i) {
+      json image;
+
+      std::string dummystring = "";
+      // UpdateImageObject need baseDir but only uses it if embededImages is
+      // enable, since we won't write separte images when writing to a stream we
+      // use a dummystring
+      UpdateImageObject(model->images[i], dummystring, int(i), false,
+                        &this->WriteImageData, this->write_image_user_data_);
+      SerializeGltfImage(model->images[i], image);
+      images.push_back(image);
+    }
+    output["images"] = images;
+  }
+
+  if (writeBinary) {
+    WriteBinaryGltfStream(stream, output.dump());
+  } else {
+    WriteGltfStream(stream, output.dump(prettyPrint ? 2 : -1));
+  }
+
+  return true;
+}
+
+bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
+                                    bool embedImages = false,
+                                    bool embedBuffers = false,
+                                    bool prettyPrint = true,
+                                    bool writeBinary = false) {
+  json output;
   std::string defaultBinFilename = GetBaseFilename(filename);
   std::string defaultBinFileExt = ".bin";
   std::string::size_type pos =
@@ -5343,6 +5547,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   if (baseDir.empty()) {
     baseDir = "./";
   }
+  /// Serialize all properties except buffers and images.
+  SerializeGltfModel(model, output);
 
   // BUFFERS
   std::vector<std::string> usedUris;
@@ -5382,27 +5588,6 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
   output["buffers"] = buffers;
 
-  // BUFFERVIEWS
-  json bufferViews;
-  for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
-    json bufferView;
-    SerializeGltfBufferView(model->bufferViews[i], bufferView);
-    bufferViews.push_back(bufferView);
-  }
-  output["bufferViews"] = bufferViews;
-
-  // Extensions used
-  if (model->extensionsUsed.size()) {
-    SerializeStringArrayProperty("extensionsUsed", model->extensionsUsed,
-                                 output);
-  }
-
-  // Extensions required
-  if (model->extensionsRequired.size()) {
-    SerializeStringArrayProperty("extensionsRequired",
-                                 model->extensionsRequired, output);
-  }
-
   // IMAGES
   if (model->images.size()) {
     json images;
@@ -5415,128 +5600,6 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
       images.push_back(image);
     }
     output["images"] = images;
-  }
-
-  // MATERIALS
-  if (model->materials.size()) {
-    json materials;
-    for (unsigned int i = 0; i < model->materials.size(); ++i) {
-      json material;
-      SerializeGltfMaterial(model->materials[i], material);
-      materials.push_back(material);
-    }
-    output["materials"] = materials;
-  }
-
-  // MESHES
-  if (model->meshes.size()) {
-    json meshes;
-    for (unsigned int i = 0; i < model->meshes.size(); ++i) {
-      json mesh;
-      SerializeGltfMesh(model->meshes[i], mesh);
-      meshes.push_back(mesh);
-    }
-    output["meshes"] = meshes;
-  }
-
-  // NODES
-  if (model->nodes.size()) {
-    json nodes;
-    for (unsigned int i = 0; i < model->nodes.size(); ++i) {
-      json node;
-      SerializeGltfNode(model->nodes[i], node);
-      nodes.push_back(node);
-    }
-    output["nodes"] = nodes;
-  }
-
-  // SCENE
-  if (model->defaultScene > -1) {
-    SerializeNumberProperty<int>("scene", model->defaultScene, output);
-  }
-
-  // SCENES
-  if (model->scenes.size()) {
-    json scenes;
-    for (unsigned int i = 0; i < model->scenes.size(); ++i) {
-      json currentScene;
-      SerializeGltfScene(model->scenes[i], currentScene);
-      scenes.push_back(currentScene);
-    }
-    output["scenes"] = scenes;
-  }
-
-  // SKINS
-  if (model->skins.size()) {
-    json skins;
-    for (unsigned int i = 0; i < model->skins.size(); ++i) {
-      json skin;
-      SerializeGltfSkin(model->skins[i], skin);
-      skins.push_back(skin);
-    }
-    output["skins"] = skins;
-  }
-
-  // TEXTURES
-  if (model->textures.size()) {
-    json textures;
-    for (unsigned int i = 0; i < model->textures.size(); ++i) {
-      json texture;
-      SerializeGltfTexture(model->textures[i], texture);
-      textures.push_back(texture);
-    }
-    output["textures"] = textures;
-  }
-
-  // SAMPLERS
-  if (model->samplers.size()) {
-    json samplers;
-    for (unsigned int i = 0; i < model->samplers.size(); ++i) {
-      json sampler;
-      SerializeGltfSampler(model->samplers[i], sampler);
-      samplers.push_back(sampler);
-    }
-    output["samplers"] = samplers;
-  }
-
-  // CAMERAS
-  if (model->cameras.size()) {
-    json cameras;
-    for (unsigned int i = 0; i < model->cameras.size(); ++i) {
-      json camera;
-      SerializeGltfCamera(model->cameras[i], camera);
-      cameras.push_back(camera);
-    }
-    output["cameras"] = cameras;
-  }
-
-  // EXTENSIONS
-  SerializeExtensionMap(model->extensions, output);
-
-  // LIGHTS as KHR_lights_cmn
-  if (model->lights.size()) {
-    json lights;
-    for (unsigned int i = 0; i < model->lights.size(); ++i) {
-      json light;
-      SerializeGltfLight(model->lights[i], light);
-      lights.push_back(light);
-    }
-    json khr_lights_cmn;
-    khr_lights_cmn["lights"] = lights;
-    json ext_j;
-
-    if (output.find("extensions") != output.end()) {
-      ext_j = output["extensions"];
-    }
-
-    ext_j["KHR_lights_punctual"] = khr_lights_cmn;
-
-    output["extensions"] = ext_j;
-  }
-
-  // EXTRAS
-  if (model->extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", model->extras, output);
   }
 
   if (writeBinary) {
