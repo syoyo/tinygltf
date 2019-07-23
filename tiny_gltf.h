@@ -559,17 +559,91 @@ struct Texture {
   bool operator==(const Texture &) const;
 };
 
+struct TextureInfo {
+  int index;     // required
+  int texCoord;  // The set index of texture's TEXCOORD attribute used for
+                 // texture coordinate mapping.
+
+  Value extras;
+  ExtensionMap extensions;
+
+  TextureInfo() : index(-1), texCoord(0) {}
+  bool operator==(const TextureInfo &) const;
+};
+
+struct NormalTextureInfo {
+  int index;     // required
+  int texCoord;  // The set index of texture's TEXCOORD attribute used for
+                 // texture coordinate mapping.
+  double scale;  // scaledNormal = normalize((<sampled normal texture value>
+                 // * 2.0 - 1.0) * vec3(<normal scale>, <normal scale>, 1.0))
+
+  Value extras;
+  ExtensionMap extensions;
+
+  NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
+  bool operator==(const NormalTextureInfo &) const;
+};
+
+struct OcclusionTextureInfo {
+  int index;        // required
+  int texCoord;     // The set index of texture's TEXCOORD attribute used for
+                    // texture coordinate mapping.
+  double strength;  // occludedColor = lerp(color, color * <sampled occlusion
+                    // texture value>, <occlusion strength>)
+
+  Value extras;
+  ExtensionMap extensions;
+
+  OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
+  bool operator==(const OcclusionTextureInfo &) const;
+};
+
+// pbrMetallicRoughness class defined in glTF 2.0 spec.
+struct PbrMetallicRoughness {
+  double baseColorFactor[4];  // default [1,1,1,1]
+  TextureInfo baseColorTexture;
+  double metallicFactor;   // default 1
+  double roughnessFactor;  // default 1
+  TextureInfo metallicRoughnessTexture;
+
+  Value extras;
+  ExtensionMap extensions;
+
+  PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {
+    baseColorFactor[0] = 1.0;
+    baseColorFactor[1] = 1.0;
+    baseColorFactor[2] = 1.0;
+    baseColorFactor[3] = 1.0;
+  }
+  bool operator==(const PbrMetallicRoughness &) const;
+};
+
 // Each extension should be stored in a ParameterMap.
 // members not in the values could be included in the ParameterMap
 // to keep a single material model
 struct Material {
   std::string name;
 
-  ParameterMap values;            // PBR metal/roughness workflow
-  ParameterMap additionalValues;  // normal/occlusion/emissive values
+  std::vector<double> emissiveFactor;  // length 3. default [0, 0, 0]
+  std::string alphaMode;     // default "OPAQUE"
+  double alphaCutoff;        // default 0.5
+  bool doubleSided;          // default false;
+
+  PbrMetallicRoughness pbrMetallicRoughness;
+
+  NormalTextureInfo normalTexture;
+  OcclusionTextureInfo occlusionTexture;
+  TextureInfo emissiveTexture;
+
+  // ParameterMap values;
+  // ParameterMap additionalValues;
 
   ExtensionMap extensions;
   Value extras;
+
+  Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {
+  }
 
   bool operator==(const Material &) const;
 };
@@ -1357,9 +1431,21 @@ bool Light::operator==(const Light &other) const {
          this->type == other.type;
 }
 bool Material::operator==(const Material &other) const {
-  return this->additionalValues == other.additionalValues &&
-         this->extensions == other.extensions && this->extras == other.extras &&
-         this->name == other.name && this->values == other.values;
+  return (this->pbrMetallicRoughness == other.pbrMetallicRoughness) &&
+         (this->normalTexture == other.normalTexture) &&
+         (this->occlusionTexture == other.occlusionTexture) &&
+         (this->emissiveTexture == other.emissiveTexture) &&
+         TINYGLTF_DOUBLE_EQUAL(this->emissiveFactor[0],
+                               other.emissiveFactor[0]) &&
+         TINYGLTF_DOUBLE_EQUAL(this->emissiveFactor[1],
+                               other.emissiveFactor[1]) &&
+         TINYGLTF_DOUBLE_EQUAL(this->emissiveFactor[2],
+                               other.emissiveFactor[2]) &&
+         (this->alphaMode == other.alphaMode) &&
+         (this->alphaCutoff == other.alphaCutoff) &&
+         (this->doubleSided == other.doubleSided) &&
+         (this->extensions == other.extensions) &&
+         (this->extras == other.extras) && this->name == other.name;
 }
 bool Mesh::operator==(const Mesh &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
@@ -1457,6 +1543,35 @@ bool Texture::operator==(const Texture &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
          this->name == other.name && this->sampler == other.sampler &&
          this->source == other.source;
+}
+bool TextureInfo::operator==(const TextureInfo &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         this->index == other.index && this->texCoord == other.texCoord;
+}
+bool NormalTextureInfo::operator==(const NormalTextureInfo &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         this->index == other.index && this->texCoord == other.texCoord &&
+         TINYGLTF_DOUBLE_EQUAL(this->scale, other.scale);
+}
+bool OcclusionTextureInfo::operator==(const OcclusionTextureInfo &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         this->index == other.index && this->texCoord == other.texCoord &&
+         TINYGLTF_DOUBLE_EQUAL(this->strength, other.strength);
+}
+bool PbrMetallicRoughness::operator==(const PbrMetallicRoughness &other) const {
+  return this->extensions == other.extensions && this->extras == other.extras &&
+         (this->baseColorTexture == other.baseColorTexture) &&
+         (this->metallicRoughnessTexture == other.metallicRoughnessTexture) &&
+         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[0],
+                               other.baseColorFactor[0]) &&
+         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[1],
+                               other.baseColorFactor[1]) &&
+         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[2],
+                               other.baseColorFactor[2]) &&
+         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[3],
+                               other.baseColorFactor[3]) &&
+         TINYGLTF_DOUBLE_EQUAL(this->metallicFactor, other.metallicFactor) &&
+         TINYGLTF_DOUBLE_EQUAL(this->roughnessFactor, other.roughnessFactor);
 }
 bool Value::operator==(const Value &other) const {
   return Equals(*this, other);
@@ -3487,13 +3602,22 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
 }
 
 static bool ParseMaterial(Material *material, std::string *err, const json &o) {
-  material->values.clear();
+  //material->values.clear();
+  //material->additionalValues.clear();
   material->extensions.clear();
-  material->additionalValues.clear();
 
   json::const_iterator it(o.begin());
   json::const_iterator itEnd(o.end());
 
+  ParseStringProperty(&material->name, err, o, "name", /* required */false);
+
+  ParseNumberArrayProperty(&material->emissiveFactor, err, o, "emissiveFactor", /* required */false);
+
+  ParseStringProperty(&material->alphaMode, err, o, "alphaMode", /* required */false);
+  ParseNumberProperty(&material->alphaCutoff, err, o, "alphaCutoff", /* required */false);
+  ParseBooleanProperty(&material->doubleSided, err, o, "doubleSided", /* required */false);
+
+#if 0
   for (; it != itEnd; it++) {
     if (it.key() == "pbrMetallicRoughness") {
       if (it.value().is_object()) {
@@ -3510,6 +3634,8 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
           }
         }
       }
+    } else if (it.key() == "normalTexture") {
+    } else if (it.key() == "occlusionTexture") {
     } else if (it.key() == "extensions" || it.key() == "extras") {
       // done later, skip, otherwise poorly parsed contents will be saved in the
       // parametermap and serialized again later
@@ -3522,6 +3648,7 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
       }
     }
   }
+#endif
 
   ParseExtensionsProperty(&material->extensions, err, o);
   ParseExtrasProperty(&(material->extras), o);
@@ -4833,7 +4960,9 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
       if (!(extIt->first.empty())) {  // name should not be empty, but for sure
         // create empty object so that an extension name is still included in
         // json.
-        extMap[extIt->first] = json(std::initializer_list<nlohmann::detail::json_ref<nlohmann::basic_json<>>>());
+        extMap[extIt->first] =
+            json(std::initializer_list<
+                 nlohmann::detail::json_ref<nlohmann::basic_json<> > >());
       }
     }
   }
