@@ -26,6 +26,8 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.3.0 Modified Material representation according to glTF 2.0 schema
+//           (and introduced TextureInfo class)
 //  - v2.2.0 Add loading 16bit PNG support. Add Sparse accessor support(Thanks
 //  to @Ybalrid)
 //  - v2.1.0 Add draco compression.
@@ -46,6 +48,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <string>
 #include <vector>
@@ -228,7 +231,11 @@ class Value {
   typedef std::vector<Value> Array;
   typedef std::map<std::string, Value> Object;
 
-  Value() : type_(NULL_TYPE) {}
+  Value()
+      : type_(NULL_TYPE),
+        int_value_(0),
+        number_value_(0.0),
+        boolean_value_(false) {}
 
   explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
   explicit Value(int i) : type_(INT_TYPE) { int_value_ = i; }
@@ -253,7 +260,13 @@ class Value {
 
   bool IsInt() const { return (type_ == INT_TYPE); }
 
+  // for backward compatibility, we use `IsNumber` for floating point value
+  // only.
   bool IsNumber() const { return (type_ == NUMBER_TYPE); }
+
+  bool IsNumberOrInt() const {
+    return (type_ == INT_TYPE) || (type_ == NUMBER_TYPE);
+  }
 
   bool IsString() const { return (type_ == STRING_TYPE); }
 
@@ -262,6 +275,17 @@ class Value {
   bool IsArray() const { return (type_ == ARRAY_TYPE); }
 
   bool IsObject() const { return (type_ == OBJECT_TYPE); }
+
+  double GetAsFloat() const {
+    if (type_ == INT_TYPE) {
+      return double(int_value_);
+    } else if (type_ == NUMBER_TYPE) {
+      return number_value_;
+    }
+
+    // TODO(syoyo): Raise error?
+    return std::numeric_limits<double>::quiet_NaN();
+  }
 
   // Accessor
   template <typename T>
@@ -317,15 +341,15 @@ class Value {
   bool operator==(const tinygltf::Value &other) const;
 
  protected:
-  int type_;
+  int type_ = NULL_TYPE;
 
-  int int_value_;
-  double number_value_;
+  int int_value_ = 0;
+  double number_value_ = 0.0;
   std::string string_value_;
   std::vector<unsigned char> binary_value_;
   Array array_value_;
   Object object_value_;
-  bool boolean_value_;
+  bool boolean_value_ = false;
 };
 
 #ifdef __clang__
@@ -359,6 +383,8 @@ TINYGLTF_VALUE_GET(Value::Object, object_value_)
 /// Agregate object for representing a color
 using ColorValue = std::array<double, 4>;
 
+// === legacy interface ====
+// TODO(syoyo): Deprecate `Parameter` class.
 struct Parameter {
   bool bool_value = false;
   bool has_number_value = false;
@@ -366,6 +392,7 @@ struct Parameter {
   std::vector<double> number_array;
   std::map<std::string, double> json_double_value;
   double number_value = 0.0;
+
   // context sensitive methods. depending the type of the Parameter you are
   // accessing, these are either valid or not
   // If this parameter represent a texture map in a material, will return the
@@ -560,9 +587,9 @@ struct Texture {
 };
 
 struct TextureInfo {
-  int index;     // required
-  int texCoord;  // The set index of texture's TEXCOORD attribute used for
-                 // texture coordinate mapping.
+  int index = -1;  // required.
+  int texCoord;    // The set index of texture's TEXCOORD attribute used for
+                   // texture coordinate mapping.
 
   Value extras;
   ExtensionMap extensions;
@@ -572,11 +599,11 @@ struct TextureInfo {
 };
 
 struct NormalTextureInfo {
-  int index;     // required
-  int texCoord;  // The set index of texture's TEXCOORD attribute used for
-                 // texture coordinate mapping.
-  double scale;  // scaledNormal = normalize((<sampled normal texture value>
-                 // * 2.0 - 1.0) * vec3(<normal scale>, <normal scale>, 1.0))
+  int index = -1;  // required
+  int texCoord;    // The set index of texture's TEXCOORD attribute used for
+                   // texture coordinate mapping.
+  double scale;    // scaledNormal = normalize((<sampled normal texture value>
+                   // * 2.0 - 1.0) * vec3(<normal scale>, <normal scale>, 1.0))
 
   Value extras;
   ExtensionMap extensions;
@@ -586,7 +613,7 @@ struct NormalTextureInfo {
 };
 
 struct OcclusionTextureInfo {
-  int index;        // required
+  int index = -1;   // required
   int texCoord;     // The set index of texture's TEXCOORD attribute used for
                     // texture coordinate mapping.
   double strength;  // occludedColor = lerp(color, color * <sampled occlusion
@@ -601,7 +628,7 @@ struct OcclusionTextureInfo {
 
 // pbrMetallicRoughness class defined in glTF 2.0 spec.
 struct PbrMetallicRoughness {
-  double baseColorFactor[4];  // default [1,1,1,1]
+  std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
   TextureInfo baseColorTexture;
   double metallicFactor;   // default 1
   double roughnessFactor;  // default 1
@@ -610,12 +637,7 @@ struct PbrMetallicRoughness {
   Value extras;
   ExtensionMap extensions;
 
-  PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {
-    baseColorFactor[0] = 1.0;
-    baseColorFactor[1] = 1.0;
-    baseColorFactor[2] = 1.0;
-    baseColorFactor[3] = 1.0;
-  }
+  PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {}
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
@@ -626,9 +648,9 @@ struct Material {
   std::string name;
 
   std::vector<double> emissiveFactor;  // length 3. default [0, 0, 0]
-  std::string alphaMode;     // default "OPAQUE"
-  double alphaCutoff;        // default 0.5
-  bool doubleSided;          // default false;
+  std::string alphaMode;               // default "OPAQUE"
+  double alphaCutoff;                  // default 0.5
+  bool doubleSided;                    // default false;
 
   PbrMetallicRoughness pbrMetallicRoughness;
 
@@ -636,14 +658,15 @@ struct Material {
   OcclusionTextureInfo occlusionTexture;
   TextureInfo emissiveTexture;
 
-  // ParameterMap values;
-  // ParameterMap additionalValues;
+  // For backward compatibility
+  // TODO(syoyo): Remove `values` and `additionalValues` in the next release.
+  ParameterMap values;
+  ParameterMap additionalValues;
 
   ExtensionMap extensions;
   Value extras;
 
-  Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {
-  }
+  Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
 
   bool operator==(const Material &) const;
 };
@@ -1435,17 +1458,14 @@ bool Material::operator==(const Material &other) const {
          (this->normalTexture == other.normalTexture) &&
          (this->occlusionTexture == other.occlusionTexture) &&
          (this->emissiveTexture == other.emissiveTexture) &&
-         TINYGLTF_DOUBLE_EQUAL(this->emissiveFactor[0],
-                               other.emissiveFactor[0]) &&
-         TINYGLTF_DOUBLE_EQUAL(this->emissiveFactor[1],
-                               other.emissiveFactor[1]) &&
-         TINYGLTF_DOUBLE_EQUAL(this->emissiveFactor[2],
-                               other.emissiveFactor[2]) &&
+         Equals(this->emissiveFactor, other.emissiveFactor) &&
          (this->alphaMode == other.alphaMode) &&
          (this->alphaCutoff == other.alphaCutoff) &&
          (this->doubleSided == other.doubleSided) &&
          (this->extensions == other.extensions) &&
-         (this->extras == other.extras) && this->name == other.name;
+         (this->extras == other.extras) && (this->values == other.values) &&
+         (this->additionalValues == other.additionalValues) &&
+         (this->name == other.name);
 }
 bool Mesh::operator==(const Mesh &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
@@ -1562,14 +1582,7 @@ bool PbrMetallicRoughness::operator==(const PbrMetallicRoughness &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
          (this->baseColorTexture == other.baseColorTexture) &&
          (this->metallicRoughnessTexture == other.metallicRoughnessTexture) &&
-         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[0],
-                               other.baseColorFactor[0]) &&
-         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[1],
-                               other.baseColorFactor[1]) &&
-         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[2],
-                               other.baseColorFactor[2]) &&
-         TINYGLTF_DOUBLE_EQUAL(this->baseColorFactor[3],
-                               other.baseColorFactor[3]) &&
+         Equals(this->baseColorFactor, other.baseColorFactor) &&
          TINYGLTF_DOUBLE_EQUAL(this->metallicFactor, other.metallicFactor) &&
          TINYGLTF_DOUBLE_EQUAL(this->roughnessFactor, other.roughnessFactor);
 }
@@ -2999,6 +3012,65 @@ static bool ParseTexture(Texture *texture, std::string *err, const json &o,
   return true;
 }
 
+static bool ParseTextureInfo(TextureInfo *texinfo, std::string *err,
+                             const json &o) {
+  if (texinfo == nullptr) {
+    return false;
+  }
+
+  if (!ParseIntegerProperty(&texinfo->index, err, o, "index",
+                            /* required */ true, "TextureInfo")) {
+    return false;
+  }
+
+  ParseIntegerProperty(&texinfo->texCoord, err, o, "texCoord", false);
+
+  ParseExtensionsProperty(&texinfo->extensions, err, o);
+  ParseExtrasProperty(&texinfo->extras, o);
+
+  return true;
+}
+
+static bool ParseNormalTextureInfo(NormalTextureInfo *texinfo, std::string *err,
+                                   const json &o) {
+  if (texinfo == nullptr) {
+    return false;
+  }
+
+  if (!ParseIntegerProperty(&texinfo->index, err, o, "index",
+                            /* required */ true, "NormalTextureInfo")) {
+    return false;
+  }
+
+  ParseIntegerProperty(&texinfo->texCoord, err, o, "texCoord", false);
+  ParseNumberProperty(&texinfo->scale, err, o, "scale", false);
+
+  ParseExtensionsProperty(&texinfo->extensions, err, o);
+  ParseExtrasProperty(&texinfo->extras, o);
+
+  return true;
+}
+
+static bool ParseOcclusionTextureInfo(OcclusionTextureInfo *texinfo,
+                                      std::string *err, const json &o) {
+  if (texinfo == nullptr) {
+    return false;
+  }
+
+  if (!ParseIntegerProperty(&texinfo->index, err, o, "index",
+                            /* required */ true, "NormalTextureInfo")) {
+    return false;
+  }
+
+  ParseIntegerProperty(&texinfo->texCoord, err, o, "texCoord", false);
+  ParseNumberProperty(&texinfo->strength, err, o, "strength", false);
+
+  ParseExtensionsProperty(&texinfo->extensions, err, o);
+  ParseExtrasProperty(&texinfo->extras, o);
+
+  return true;
+}
+
 static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
                         FsCallbacks *fs, const std::string &basedir,
                         bool is_binary = false,
@@ -3601,23 +3673,106 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
   return true;
 }
 
+static bool ParsePbrMetallicRoughness(PbrMetallicRoughness *pbr,
+                                      std::string *err, const json &o) {
+  if (pbr == nullptr) {
+    return false;
+  }
+
+  std::vector<double> baseColorFactor;
+  if (ParseNumberArrayProperty(&baseColorFactor, err, o, "baseColorFactor",
+                               /* required */ false)) {
+    if (baseColorFactor.size() != 4) {
+      if (err) {
+        (*err) +=
+            "Array length of `baseColorFactor` parameter in "
+            "pbrMetallicRoughness must be 4, but got " +
+            std::to_string(baseColorFactor.size()) + "\n";
+      }
+      return false;
+    }
+  } else {
+    // fill with default values
+    baseColorFactor = {1.0, 1.0, 1.0, 1.0};
+  }
+  pbr->baseColorFactor = baseColorFactor;
+
+  {
+    json::const_iterator it = o.find("baseColorTexture");
+    if (it != o.end()) {
+      ParseTextureInfo(&pbr->baseColorTexture, err, it.value());
+    }
+  }
+
+  {
+    json::const_iterator it = o.find("metallicRoughnessTexture");
+    if (it != o.end()) {
+      ParseTextureInfo(&pbr->metallicRoughnessTexture, err, it.value());
+    }
+  }
+
+  ParseNumberProperty(&pbr->metallicFactor, err, o, "metallicFactor", false);
+  ParseNumberProperty(&pbr->roughnessFactor, err, o, "roughnessFactor", false);
+
+  ParseExtensionsProperty(&pbr->extensions, err, o);
+  ParseExtrasProperty(&pbr->extras, o);
+
+  return true;
+}
+
 static bool ParseMaterial(Material *material, std::string *err, const json &o) {
-  //material->values.clear();
-  //material->additionalValues.clear();
-  material->extensions.clear();
+  ParseStringProperty(&material->name, err, o, "name", /* required */ false);
+
+  ParseNumberArrayProperty(&material->emissiveFactor, err, o, "emissiveFactor",
+                           /* required */ false);
+
+  ParseStringProperty(&material->alphaMode, err, o, "alphaMode",
+                      /* required */ false);
+  ParseNumberProperty(&material->alphaCutoff, err, o, "alphaCutoff",
+                      /* required */ false);
+  ParseBooleanProperty(&material->doubleSided, err, o, "doubleSided",
+                       /* required */ false);
+
+  {
+    json::const_iterator it = o.find("pbrMetallicRoughness");
+    if (it != o.end()) {
+      ParsePbrMetallicRoughness(&material->pbrMetallicRoughness, err,
+                                it.value());
+    }
+  }
+
+  {
+    json::const_iterator it = o.find("normalTexture");
+    if (it != o.end()) {
+      ParseNormalTextureInfo(&material->normalTexture, err, it.value());
+    }
+  }
+
+  {
+    json::const_iterator it = o.find("occlusionTexture");
+    if (it != o.end()) {
+      ParseOcclusionTextureInfo(&material->occlusionTexture, err, it.value());
+    }
+  }
+
+  {
+    json::const_iterator it = o.find("emissiveTexture");
+    if (it != o.end()) {
+      ParseTextureInfo(&material->emissiveTexture, err, it.value());
+    }
+  }
+
+  // Old code path. For backward compatibility, we still store material values
+  // as Parameter. This will create duplicated information for
+  // example(pbrMetallicRoughness), but should be neglible in terms of memory
+  // consumption.
+  // TODO(syoyo): Remove in the next major release.
+  material->values.clear();
+  material->additionalValues.clear();
 
   json::const_iterator it(o.begin());
   json::const_iterator itEnd(o.end());
 
-  ParseStringProperty(&material->name, err, o, "name", /* required */false);
-
-  ParseNumberArrayProperty(&material->emissiveFactor, err, o, "emissiveFactor", /* required */false);
-
-  ParseStringProperty(&material->alphaMode, err, o, "alphaMode", /* required */false);
-  ParseNumberProperty(&material->alphaCutoff, err, o, "alphaCutoff", /* required */false);
-  ParseBooleanProperty(&material->doubleSided, err, o, "doubleSided", /* required */false);
-
-#if 0
   for (; it != itEnd; it++) {
     if (it.key() == "pbrMetallicRoughness") {
       if (it.value().is_object()) {
@@ -3634,8 +3789,6 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
           }
         }
       }
-    } else if (it.key() == "normalTexture") {
-    } else if (it.key() == "occlusionTexture") {
     } else if (it.key() == "extensions" || it.key() == "extras") {
       // done later, skip, otherwise poorly parsed contents will be saved in the
       // parametermap and serialized again later
@@ -3648,8 +3801,8 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
       }
     }
   }
-#endif
 
+  material->extensions.clear();
   ParseExtensionsProperty(&material->extensions, err, o);
   ParseExtrasProperty(&(material->extras), o);
 
@@ -5155,10 +5308,146 @@ static void SerializeGltfImage(Image &image, json &o) {
   SerializeExtensionMap(image.extensions, o);
 }
 
-static void SerializeGltfMaterial(Material &material, json &o) {
-  if (material.extras.Size()) SerializeValue("extras", material.extras, o);
-  SerializeExtensionMap(material.extensions, o);
+static void SerializeGltfTextureInfo(TextureInfo &texinfo, json &o) {
+  SerializeNumberProperty("index", texinfo.index, o);
 
+  if (texinfo.texCoord != 0) {
+    SerializeNumberProperty("texCoord", texinfo.texCoord, o);
+  }
+
+  if (texinfo.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", texinfo.extras, o);
+  }
+
+  SerializeExtensionMap(texinfo.extensions, o);
+}
+
+static void SerializeGltfNormalTextureInfo(NormalTextureInfo &texinfo,
+                                           json &o) {
+  SerializeNumberProperty("index", texinfo.index, o);
+
+  if (texinfo.texCoord != 0) {
+    SerializeNumberProperty("texCoord", texinfo.texCoord, o);
+  }
+
+  if (!TINYGLTF_DOUBLE_EQUAL(texinfo.scale, 0.0)) {
+    SerializeNumberProperty("scale", texinfo.scale, o);
+  }
+
+  if (texinfo.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", texinfo.extras, o);
+  }
+
+  SerializeExtensionMap(texinfo.extensions, o);
+}
+
+static void SerializeGltfOcclusionTextureInfo(OcclusionTextureInfo &texinfo,
+                                              json &o) {
+  SerializeNumberProperty("index", texinfo.index, o);
+
+  if (texinfo.texCoord != 0) {
+    SerializeNumberProperty("texCoord", texinfo.texCoord, o);
+  }
+
+  if (!TINYGLTF_DOUBLE_EQUAL(texinfo.strength, 0.0)) {
+    SerializeNumberProperty("strength", texinfo.strength, o);
+  }
+
+  if (texinfo.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", texinfo.extras, o);
+  }
+
+  SerializeExtensionMap(texinfo.extensions, o);
+}
+
+static void SerializeGltfPbrMetallicRoughness(PbrMetallicRoughness &pbr,
+                                              json &o) {
+  std::vector<double> default_baseColorFactor = {1.0, 1.0, 1.0, 1.0};
+  if (!Equals(pbr.baseColorFactor, default_baseColorFactor)) {
+    SerializeNumberArrayProperty<double>("baseColorFactor", pbr.baseColorFactor,
+                                         o);
+  }
+
+  if (!TINYGLTF_DOUBLE_EQUAL(pbr.metallicFactor, 0.0)) {
+    SerializeNumberProperty("metallicFactor", pbr.metallicFactor, o);
+  }
+
+  if (!TINYGLTF_DOUBLE_EQUAL(pbr.roughnessFactor, 0.0)) {
+    SerializeNumberProperty("roughnessFactor", pbr.roughnessFactor, o);
+  }
+
+  if (pbr.baseColorTexture.index >= -1) {
+    json texinfo;
+    SerializeGltfTextureInfo(pbr.baseColorTexture, texinfo);
+    o["baseColorTexture"] = texinfo;
+  }
+
+  if (pbr.metallicRoughnessTexture.index >= -1) {
+    json texinfo;
+    SerializeGltfTextureInfo(pbr.metallicRoughnessTexture, texinfo);
+    o["metallicRoughnessTexture"] = texinfo;
+  }
+
+  SerializeExtensionMap(pbr.extensions, o);
+
+  if (pbr.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", pbr.extras, o);
+  }
+}
+
+static void SerializeGltfMaterial(Material &material, json &o) {
+  if (material.name.size()) {
+    SerializeStringProperty("name", material.name, o);
+  }
+
+  // QUESTION(syoyo): Write material parameters regardless of its default value?
+
+  if (!TINYGLTF_DOUBLE_EQUAL(material.alphaCutoff, 0.5)) {
+    SerializeNumberProperty("alphaCutoff", material.alphaCutoff, o);
+  }
+
+  if (material.alphaMode.compare("OPAQUE") == 0) {
+    SerializeStringProperty("alphaMode", material.alphaMode, o);
+  }
+
+  if (!TINYGLTF_DOUBLE_EQUAL(material.alphaCutoff, 0.5)) {
+    SerializeNumberProperty("alphaCutoff", material.alphaCutoff, o);
+  }
+
+  o["doubleSided"] = json(material.doubleSided);
+
+  if (material.normalTexture.index >= -1) {
+    json texinfo;
+    SerializeGltfNormalTextureInfo(material.normalTexture, texinfo);
+    o["normalTexture"] = texinfo;
+  }
+
+  if (material.occlusionTexture.index >= -1) {
+    json texinfo;
+    SerializeGltfOcclusionTextureInfo(material.occlusionTexture, texinfo);
+    o["occlusionTexture"] = texinfo;
+  }
+
+  if (material.emissiveTexture.index >= -1) {
+    json texinfo;
+    SerializeGltfTextureInfo(material.emissiveTexture, texinfo);
+    o["emissiveTexture"] = texinfo;
+  }
+
+  std::vector<double> default_emissiveFactor = {0.0, 0.0, 0.0};
+  if (!Equals(material.emissiveFactor, default_emissiveFactor)) {
+    SerializeNumberArrayProperty<double>("emissiveFactor",
+                                         material.emissiveFactor, o);
+  }
+
+  {
+    json pbrMetallicRoughness;
+    SerializeGltfPbrMetallicRoughness(material.pbrMetallicRoughness,
+                                      pbrMetallicRoughness);
+    o["pbrMetallicRoughness"] = pbrMetallicRoughness;
+  }
+
+#if 0  // legacy way. just for the record.
   if (material.values.size()) {
     json pbrMetallicRoughness;
     SerializeParameterMap(material.values, pbrMetallicRoughness);
@@ -5166,10 +5455,11 @@ static void SerializeGltfMaterial(Material &material, json &o) {
   }
 
   SerializeParameterMap(material.additionalValues, o);
+#else
 
-  if (material.name.size()) {
-    SerializeStringProperty("name", material.name, o);
-  }
+#endif
+
+  SerializeExtensionMap(material.extensions, o);
 
   if (material.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", material.extras, o);

@@ -175,7 +175,10 @@ static std::string PrintIntArray(const std::vector<int> &arr) {
   std::stringstream ss;
   ss << "[ ";
   for (size_t i = 0; i < arr.size(); i++) {
-    ss << arr[i] << ((i != arr.size() - 1) ? ", " : "");
+    ss << arr[i];
+    if (i != arr.size() - 1) {
+      ss << ", ";
+    }
   }
   ss << " ]";
 
@@ -190,7 +193,10 @@ static std::string PrintFloatArray(const std::vector<double> &arr) {
   std::stringstream ss;
   ss << "[ ";
   for (size_t i = 0; i < arr.size(); i++) {
-    ss << arr[i] << ((i != arr.size() - 1) ? ", " : "");
+    ss << arr[i];
+    if (i != arr.size() - 1) {
+      ss << ", ";
+    }
   }
   ss << " ]";
 
@@ -243,35 +249,36 @@ static std::string PrintValue(const std::string &name,
     if (tag) {
       ss << Indent(indent) << name << " : " << value.Get<std::string>();
     } else {
-      ss << " " << value.Get<std::string>() << " ";
+      ss << Indent(indent) << value.Get<std::string>() << " ";
     }
   } else if (value.IsBool()) {
     if (tag) {
       ss << Indent(indent) << name << " : " << value.Get<bool>();
     } else {
-      ss << " " << value.Get<bool>() << " ";
+      ss << Indent(indent) << value.Get<bool>() << " ";
     }
   } else if (value.IsNumber()) {
     if (tag) {
       ss << Indent(indent) << name << " : " << value.Get<double>();
     } else {
-      ss << " " << value.Get<double>() << " ";
+      ss << Indent(indent) << value.Get<double>() << " ";
     }
   } else if (value.IsInt()) {
     if (tag) {
       ss << Indent(indent) << name << " : " << value.Get<int>();
     } else {
-      ss << " " << value.Get<int>() << " ";
+      ss << Indent(indent) << value.Get<int>() << " ";
     }
   } else if (value.IsArray()) {
-    ss << Indent(indent) << name << " [ ";
+    // TODO(syoyo): Better pretty printing of array item
+    ss << Indent(indent) << name << " [ \n";
     for (size_t i = 0; i < value.Size(); i++) {
       ss << PrintValue("", value.Get(int(i)), indent + 1, /* tag */ false);
       if (i != (value.ArrayLen() - 1)) {
-        ss << ", ";
+        ss << ", \n";
       }
     }
-    ss << Indent(indent) << "] ";
+    ss << "\n" << Indent(indent) << "] ";
   }
 
   // @todo { binary }
@@ -337,6 +344,54 @@ static void DumpExtensions(const tinygltf::ExtensionMap &extension,
     std::cout << Indent(indent) << e.first << std::endl;
     std::cout << PrintValue("extensions", e.second, indent + 1) << std::endl;
   }
+}
+
+static void DumpTextureInfo(const tinygltf::TextureInfo &texinfo,
+                            const int indent) {
+  std::cout << Indent(indent) << "index     : " << texinfo.index << "\n";
+  std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texinfo.texCoord
+            << "\n";
+  DumpExtensions(texinfo.extensions, indent + 1);
+  std::cout << PrintValue("extras", texinfo.extras, indent + 1) << "\n";
+}
+
+static void DumpNormalTextureInfo(const tinygltf::NormalTextureInfo &texinfo,
+                                  const int indent) {
+  std::cout << Indent(indent) << "index     : " << texinfo.index << "\n";
+  std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texinfo.texCoord
+            << "\n";
+  std::cout << Indent(indent) << "scale     : " << texinfo.scale << "\n";
+  DumpExtensions(texinfo.extensions, indent + 1);
+  std::cout << PrintValue("extras", texinfo.extras, indent + 1) << "\n";
+}
+
+static void DumpOcclusionTextureInfo(
+    const tinygltf::OcclusionTextureInfo &texinfo, const int indent) {
+  std::cout << Indent(indent) << "index     : " << texinfo.index << "\n";
+  std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texinfo.texCoord
+            << "\n";
+  std::cout << Indent(indent) << "strength  : " << texinfo.strength << "\n";
+  DumpExtensions(texinfo.extensions, indent + 1);
+  std::cout << PrintValue("extras", texinfo.extras, indent + 1) << "\n";
+}
+
+static void DumpPbrMetallicRoughness(const tinygltf::PbrMetallicRoughness &pbr,
+                                     const int indent) {
+  std::cout << Indent(indent)
+            << "baseColorFactor   : " << PrintFloatArray(pbr.baseColorFactor)
+            << "\n";
+  std::cout << Indent(indent) << "baseColorTexture  :\n";
+  DumpTextureInfo(pbr.baseColorTexture, indent + 1);
+
+  std::cout << Indent(indent) << "metallicFactor    : " << pbr.metallicFactor
+            << "\n";
+  std::cout << Indent(indent) << "roughnessFactor   : " << pbr.roughnessFactor
+            << "\n";
+
+  std::cout << Indent(indent) << "metallicRoughnessTexture  :\n";
+  DumpTextureInfo(pbr.metallicRoughnessTexture, indent + 1);
+  DumpExtensions(pbr.extensions, indent + 1);
+  std::cout << PrintValue("extras", pbr.extras, indent + 1) << "\n";
 }
 
 static void Dump(const tinygltf::Model &model) {
@@ -509,16 +564,44 @@ static void Dump(const tinygltf::Model &model) {
               << std::endl;
     for (size_t i = 0; i < model.materials.size(); i++) {
       const tinygltf::Material &material = model.materials[i];
-      std::cout << Indent(1) << "name         : " << material.name << std::endl;
-      std::cout << Indent(1) << "values(items=" << material.values.size() << ")"
+      std::cout << Indent(1) << "name                 : " << material.name
                 << std::endl;
 
+      std::cout << Indent(1) << "alphaMode            : " << material.alphaMode
+                << std::endl;
+      std::cout << Indent(1)
+                << "alphaCutoff          : " << material.alphaCutoff
+                << std::endl;
+      std::cout << Indent(1) << "doubleSided          : "
+                << (material.doubleSided ? "true" : "false") << std::endl;
+      std::cout << Indent(1) << "emissiveFactor       : "
+                << PrintFloatArray(material.emissiveFactor) << std::endl;
+
+      std::cout << Indent(1) << "pbrMetallicRoughness :\n";
+      DumpPbrMetallicRoughness(material.pbrMetallicRoughness, 2);
+
+      std::cout << Indent(1) << "normalTexture        :\n";
+      DumpNormalTextureInfo(material.normalTexture, 2);
+
+      std::cout << Indent(1) << "occlusionTexture     :\n";
+      DumpOcclusionTextureInfo(material.occlusionTexture, 2);
+
+      std::cout << Indent(1) << "emissiveTexture      :\n";
+      DumpTextureInfo(material.emissiveTexture, 2);
+
+      std::cout << Indent(1) << "----  legacy material parameter  ----\n";
+      std::cout << Indent(1) << "values(items=" << material.values.size() << ")"
+                << std::endl;
       tinygltf::ParameterMap::const_iterator p(material.values.begin());
       tinygltf::ParameterMap::const_iterator pEnd(material.values.end());
       for (; p != pEnd; p++) {
         std::cout << Indent(2) << p->first << ": "
                   << PrintParameterValue(p->second) << std::endl;
       }
+      std::cout << Indent(1) << "-------------------------------------\n";
+
+      DumpExtensions(material.extensions, 1);
+      std::cout << PrintValue("extras", material.extras, 2) << std::endl;
     }
   }
 
