@@ -279,3 +279,37 @@ TEST_CASE("parse-integer-array", "[bounds-checking]") {
     REQUIRE_THAT(err, Catch::Contains("not an integer type"));
   }
 }
+
+TEST_CASE("pbr-khr-texture-transform", "[material]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  // Loading is expected to fail, but not crash.
+  bool ret = ctx.LoadASCIIFromFile(
+      &model, &err, &warn,
+      "../models/Cube-texture-ext/Cube-textransform.gltf");
+  REQUIRE(ret == true);
+
+  REQUIRE(model.materials.size() == 2);
+  REQUIRE(model.materials[0].emissiveTexture.extensions.count("KHR_texture_transform") == 1);
+  REQUIRE(model.materials[0].emissiveTexture.extensions["KHR_texture_transform"].IsObject());
+
+  tinygltf::Value::Object &texform = model.materials[0].emissiveTexture.extensions["KHR_texture_transform"].Get<tinygltf::Value::Object>();
+
+  REQUIRE(texform.count("scale"));
+
+  REQUIRE(texform["scale"].IsArray());
+  std::cout << "ty " << int(texform["scale"].Get(0).Type()) << "\n";
+  REQUIRE(texform["scale"].Get(0).IsNumberOrInt());
+  REQUIRE(texform["scale"].Get(1).IsNumberOrInt());
+
+  double scale[2];
+  scale[0] = texform["scale"].Get(0).GetAsFloat();
+  scale[1] = texform["scale"].Get(1).GetAsFloat();
+
+  REQUIRE(scale[0] == Approx(1.0));
+  REQUIRE(scale[1] == Approx(-1.0));
+
+}
