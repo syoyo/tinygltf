@@ -7,6 +7,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 ## Status
 
+ - v2.3.0 Modified Material representation according to glTF 2.0 schema(and introduced TextureInfo class)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
  - v2.1.0 release(Draco support)
  - v2.0.0 release(22 Aug, 2018)!
@@ -54,6 +55,12 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 * Extensions
   * [x] Draco mesh decoding
 
+## Note on extension property
+
+In extension(`ExtensionMap`), JSON number value is parsed as int or float(number) and stored as `tinygltf::Value` object. If you want a floating point value from `tinygltf::Value`, use `GetAsFloat()` method.
+
+`IsNumber()` only returns true if the underlying value is a floating point value. If you wan to check if the value is `number`(int or real, in the context of JSON), Plese use `IsNumberOrInt()` method.
+
 ## Examples
 
 * [glview](examples/glview) : Simple glTF geometry viewer.
@@ -76,7 +83,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [x] Load Draco compressed mesh
   * [ ] Save Draco compressed mesh
   * [ ] Open3DGC?
-* [ ] Support `extensions` and `extras` property
+* [x] Support `extensions` and `extras` property
 * [ ] HDR image?
   * [ ] OpenEXR extension through TinyEXR.
 * [ ] 16bit PNG support in Serialization
