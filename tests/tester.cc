@@ -301,7 +301,9 @@ TEST_CASE("pbr-khr-texture-transform", "[material]") {
   REQUIRE(texform.count("scale"));
 
   REQUIRE(texform["scale"].IsArray());
-  std::cout << "ty " << int(texform["scale"].Get(0).Type()) << "\n";
+
+  // It looks json.hpp parse integer JSON number as integer, not floating point.
+  // so we'll check if Value is number(floating point) or integer value.
   REQUIRE(texform["scale"].Get(0).IsNumberOrInt());
   REQUIRE(texform["scale"].Get(1).IsNumberOrInt());
 
