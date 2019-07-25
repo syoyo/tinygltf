@@ -28,6 +28,8 @@
 // Version:
 //  - v2.3.0 Modified Material representation according to glTF 2.0 schema
 //           (and introduced TextureInfo class)
+//           Change the behavior of `Value::IsNumber`. It return true either the
+//           value is int or real.
 //  - v2.2.0 Add loading 16bit PNG support. Add Sparse accessor support(Thanks
 //  to @Ybalrid)
 //  - v2.1.0 Add draco compression.
@@ -160,7 +162,7 @@ AAssetManager *asset_manager = nullptr;
 
 typedef enum {
   NULL_TYPE = 0,
-  NUMBER_TYPE = 1,
+  REAL_TYPE = 1,
   INT_TYPE = 2,
   BOOL_TYPE = 3,
   STRING_TYPE = 4,
@@ -213,6 +215,7 @@ static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
   }
 }
 
+// TODO(syoyo): Move these functions to TinyGLTF class
 bool IsDataURI(const std::string &in);
 bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
                    const std::string &in, size_t reqBytes, bool checkSize);
@@ -234,12 +237,12 @@ class Value {
   Value()
       : type_(NULL_TYPE),
         int_value_(0),
-        number_value_(0.0),
+        real_value_(0.0),
         boolean_value_(false) {}
 
   explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
   explicit Value(int i) : type_(INT_TYPE) { int_value_ = i; }
-  explicit Value(double n) : type_(NUMBER_TYPE) { number_value_ = n; }
+  explicit Value(double n) : type_(REAL_TYPE) { real_value_ = n; }
   explicit Value(const std::string &s) : type_(STRING_TYPE) {
     string_value_ = s;
   }
@@ -260,13 +263,9 @@ class Value {
 
   bool IsInt() const { return (type_ == INT_TYPE); }
 
-  // for backward compatibility, we use `IsNumber` for floating point value
-  // only.
-  bool IsNumber() const { return (type_ == NUMBER_TYPE); }
+  bool IsNumber() const { return (type_ == REAL_TYPE) || (type_ == INT_TYPE); }
 
-  bool IsNumberOrInt() const {
-    return (type_ == INT_TYPE) || (type_ == NUMBER_TYPE);
-  }
+  bool IsReal() const { return (type_ == REAL_TYPE); }
 
   bool IsString() const { return (type_ == STRING_TYPE); }
 
@@ -276,15 +275,22 @@ class Value {
 
   bool IsObject() const { return (type_ == OBJECT_TYPE); }
 
-  double GetAsFloat() const {
+  // Use this function if you want to have number value as double.
+  double GetNumberAsDouble() const {
     if (type_ == INT_TYPE) {
       return double(int_value_);
-    } else if (type_ == NUMBER_TYPE) {
-      return number_value_;
+    } else {
+      return real_value_;
     }
+  }
 
-    // TODO(syoyo): Raise error?
-    return std::numeric_limits<double>::quiet_NaN();
+  // Use this function if you want to have number value as int.
+  double GetNumberAsInt() const {
+    if (type_ == REAL_TYPE) {
+      return int(real_value_);
+    } else {
+      return int_value_;
+    }
   }
 
   // Accessor
@@ -344,7 +350,7 @@ class Value {
   int type_ = NULL_TYPE;
 
   int int_value_ = 0;
-  double number_value_ = 0.0;
+  double real_value_ = 0.0;
   std::string string_value_;
   std::vector<unsigned char> binary_value_;
   Array array_value_;
@@ -366,7 +372,7 @@ class Value {
     return var;                                   \
   }
 TINYGLTF_VALUE_GET(bool, boolean_value_)
-TINYGLTF_VALUE_GET(double, number_value_)
+TINYGLTF_VALUE_GET(double, real_value_)
 TINYGLTF_VALUE_GET(int, int_value_)
 TINYGLTF_VALUE_GET(std::string, string_value_)
 TINYGLTF_VALUE_GET(std::vector<unsigned char>, binary_value_)
@@ -1351,7 +1357,7 @@ static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
       return true;
     case BOOL_TYPE:
       return one.Get<bool>() == other.Get<bool>();
-    case NUMBER_TYPE:
+    case REAL_TYPE:
       return TINYGLTF_DOUBLE_EQUAL(one.Get<double>(), other.Get<double>());
     case INT_TYPE:
       return one.Get<int>() == other.Get<int>();
@@ -5001,7 +5007,7 @@ static void SerializeStringArrayProperty(const std::string &key,
 static bool ValueToJson(const Value &value, json *ret) {
   json obj;
   switch (value.Type()) {
-    case NUMBER_TYPE:
+    case REAL_TYPE:
       obj = json(value.Get<double>());
       break;
     case INT_TYPE:

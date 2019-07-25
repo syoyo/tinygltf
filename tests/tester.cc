@@ -302,14 +302,14 @@ TEST_CASE("pbr-khr-texture-transform", "[material]") {
 
   REQUIRE(texform["scale"].IsArray());
 
-  // It looks json.hpp parse integer JSON number as integer, not floating point.
-  // so we'll check if Value is number(floating point) or integer value.
-  REQUIRE(texform["scale"].Get(0).IsNumberOrInt());
-  REQUIRE(texform["scale"].Get(1).IsNumberOrInt());
+  // Note: It looks json.hpp parse integer JSON number as integer, not floating point.
+  // IsNumber return true either value is int or floating point.
+  REQUIRE(texform["scale"].Get(0).IsNumber());
+  REQUIRE(texform["scale"].Get(1).IsNumber());
 
   double scale[2];
-  scale[0] = texform["scale"].Get(0).GetAsFloat();
-  scale[1] = texform["scale"].Get(1).GetAsFloat();
+  scale[0] = texform["scale"].Get(0).GetNumberAsDouble();
+  scale[1] = texform["scale"].Get(1).GetNumberAsDouble();
 
   REQUIRE(scale[0] == Approx(1.0));
   REQUIRE(scale[1] == Approx(-1.0));
