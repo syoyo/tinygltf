@@ -5336,7 +5336,7 @@ static void SerializeGltfNormalTextureInfo(NormalTextureInfo &texinfo,
     SerializeNumberProperty("texCoord", texinfo.texCoord, o);
   }
 
-  if (!TINYGLTF_DOUBLE_EQUAL(texinfo.scale, 0.0)) {
+  if (!TINYGLTF_DOUBLE_EQUAL(texinfo.scale, 1.0)) {
     SerializeNumberProperty("scale", texinfo.scale, o);
   }
 
@@ -5355,7 +5355,7 @@ static void SerializeGltfOcclusionTextureInfo(OcclusionTextureInfo &texinfo,
     SerializeNumberProperty("texCoord", texinfo.texCoord, o);
   }
 
-  if (!TINYGLTF_DOUBLE_EQUAL(texinfo.strength, 0.0)) {
+  if (!TINYGLTF_DOUBLE_EQUAL(texinfo.strength, 1.0)) {
     SerializeNumberProperty("strength", texinfo.strength, o);
   }
 
@@ -5374,11 +5374,11 @@ static void SerializeGltfPbrMetallicRoughness(PbrMetallicRoughness &pbr,
                                          o);
   }
 
-  if (!TINYGLTF_DOUBLE_EQUAL(pbr.metallicFactor, 0.0)) {
+  if (!TINYGLTF_DOUBLE_EQUAL(pbr.metallicFactor, 1.0)) {
     SerializeNumberProperty("metallicFactor", pbr.metallicFactor, o);
   }
 
-  if (!TINYGLTF_DOUBLE_EQUAL(pbr.roughnessFactor, 0.0)) {
+  if (!TINYGLTF_DOUBLE_EQUAL(pbr.roughnessFactor, 1.0)) {
     SerializeNumberProperty("roughnessFactor", pbr.roughnessFactor, o);
   }
 
