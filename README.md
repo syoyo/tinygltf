@@ -57,9 +57,9 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 ## Note on extension property
 
-In extension(`ExtensionMap`), JSON number value is parsed as int or float(number) and stored as `tinygltf::Value` object. If you want a floating point value from `tinygltf::Value`, use `GetAsFloat()` method.
+In extension(`ExtensionMap`), JSON number value is parsed as int or float(number) and stored as `tinygltf::Value` object. If you want a floating point value from `tinygltf::Value`, use `GetNumberAsDouble()` method.
 
-`IsNumber()` only returns true if the underlying value is a floating point value. If you wan to check if the value is `number`(int or real, in the context of JSON), Plese use `IsNumberOrInt()` method.
+`IsNumber()` returns true if the underlying value is an int value or a floating point value.
 
 ## Examples
 
