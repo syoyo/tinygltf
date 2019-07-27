@@ -346,11 +346,35 @@ static void DumpExtensions(const tinygltf::ExtensionMap &extension,
   }
 }
 
+static void DumpKHRTextureTransform(const tinygltf::KHRTextureTransform &texform,
+                            const int indent) {
+  assert(texform.offset.size() == 2);
+
+  std::cout << Indent(indent) << "offset     : [" << texform.offset[0] << ", " << texform.offset[1] << "]\n";
+  std::cout << Indent(indent) << "rotation   : " << texform.rotation << "\n";
+  std::cout << Indent(indent) << "scale     : [" << texform.scale[0] << ", " << texform.scale[1] << "]\n";
+  if (texform.texCoord >= 0) {
+    std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texform.texCoord << "\n";
+  }
+
+  std::cout << Indent(indent) << "extensions(items=" << texform.extensions.size() << ")"
+            << std::endl;
+  DumpExtensions(texform.extensions, indent + 1);
+  std::cout << PrintValue("extras", texform.extras, indent + 1) << "\n";
+}
+
 static void DumpTextureInfo(const tinygltf::TextureInfo &texinfo,
                             const int indent) {
   std::cout << Indent(indent) << "index     : " << texinfo.index << "\n";
   std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texinfo.texCoord
             << "\n";
+  if (texinfo.KHR_textureTransform.enabled) {
+    std::cout << Indent(indent) << "KHR_texture_transform\n";
+    DumpKHRTextureTransform(texinfo.KHR_textureTransform, indent + 1);
+  }
+
+  std::cout << Indent(indent) << "extensions(items=" << texinfo.extensions.size() << ")"
+            << std::endl;
   DumpExtensions(texinfo.extensions, indent + 1);
   std::cout << PrintValue("extras", texinfo.extras, indent + 1) << "\n";
 }
@@ -361,6 +385,14 @@ static void DumpNormalTextureInfo(const tinygltf::NormalTextureInfo &texinfo,
   std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texinfo.texCoord
             << "\n";
   std::cout << Indent(indent) << "scale     : " << texinfo.scale << "\n";
+
+  if (texinfo.KHR_textureTransform.enabled) {
+    std::cout << Indent(indent) << "KHR_texture_transform\n";
+    DumpKHRTextureTransform(texinfo.KHR_textureTransform, indent + 1);
+  }
+
+  std::cout << Indent(indent) << "extensions(items=" << texinfo.extensions.size() << ")"
+            << std::endl;
   DumpExtensions(texinfo.extensions, indent + 1);
   std::cout << PrintValue("extras", texinfo.extras, indent + 1) << "\n";
 }
@@ -371,6 +403,9 @@ static void DumpOcclusionTextureInfo(
   std::cout << Indent(indent) << "texCoord  : TEXCOORD_" << texinfo.texCoord
             << "\n";
   std::cout << Indent(indent) << "strength  : " << texinfo.strength << "\n";
+
+  std::cout << Indent(indent) << "extensions(items=" << texinfo.extensions.size() << ")"
+            << std::endl;
   DumpExtensions(texinfo.extensions, indent + 1);
   std::cout << PrintValue("extras", texinfo.extras, indent + 1) << "\n";
 }
@@ -390,9 +425,34 @@ static void DumpPbrMetallicRoughness(const tinygltf::PbrMetallicRoughness &pbr,
 
   std::cout << Indent(indent) << "metallicRoughnessTexture  :\n";
   DumpTextureInfo(pbr.metallicRoughnessTexture, indent + 1);
+
+  std::cout << Indent(indent) << "extensions(items=" << pbr.extensions.size() << ")"
+            << std::endl;
   DumpExtensions(pbr.extensions, indent + 1);
   std::cout << PrintValue("extras", pbr.extras, indent + 1) << "\n";
 }
+
+static void DumpKHRPbrMetallicRoughness(const tinygltf::KHRPbrSpecularGlossiness &pbr,
+                                     const int indent) {
+  std::cout << Indent(indent)
+            << "diffuseFactor   : " << PrintFloatArray(pbr.diffuseFactor)
+            << "\n";
+  std::cout << Indent(indent) << "diffuseTexture  :\n";
+  DumpTextureInfo(pbr.diffuseTexture, indent + 1);
+
+  std::cout << Indent(indent) << "specularFactor    : " << PrintFloatArray(pbr.specularFactor) << "\n";
+  std::cout << Indent(indent) << "glossinessFactor   : " << pbr.glossinessFactor
+            << "\n";
+
+  std::cout << Indent(indent) << "specularGlossinessTexture  :\n";
+  DumpTextureInfo(pbr.specularGlossinessTexture, indent + 1);
+
+  std::cout << Indent(indent) << "extensions(items=" << pbr.extensions.size() << ")"
+            << std::endl;
+  DumpExtensions(pbr.extensions, indent + 1);
+  std::cout << PrintValue("extras", pbr.extras, indent + 1) << "\n";
+}
+
 
 static void Dump(const tinygltf::Model &model) {
   std::cout << "=== Dump glTF ===" << std::endl;
@@ -414,6 +474,9 @@ static void Dump(const tinygltf::Model &model) {
     for (size_t i = 0; i < model.scenes.size(); i++) {
       std::cout << Indent(1) << "scene[" << i
                 << "] name  : " << model.scenes[i].name << std::endl;
+
+      std::cout << Indent(1) << "extensions(items=" << model.scenes[i].extensions.size() << ")"
+                << std::endl;
       DumpExtensions(model.scenes[i].extensions, 1);
     }
   }
@@ -589,6 +652,15 @@ static void Dump(const tinygltf::Model &model) {
       std::cout << Indent(1) << "emissiveTexture      :\n";
       DumpTextureInfo(material.emissiveTexture, 2);
 
+      if (material.KHR_materials_unlit) {
+        std::cout << Indent(1) << "KHR_materials_unlit  : true\n";
+      }
+
+      if (material.KHR_pbrSpecularGlossiness.enabled) {
+        std::cout << Indent(1) << "KHR_materials_pbrSpecularGlossinesst\n";
+        DumpKHRPbrMetallicRoughness(material.KHR_pbrSpecularGlossiness, 2);
+      }
+
       std::cout << Indent(1) << "----  legacy material parameter  ----\n";
       std::cout << Indent(1) << "values(items=" << material.values.size() << ")"
                 << std::endl;
@@ -600,7 +672,9 @@ static void Dump(const tinygltf::Model &model) {
       }
       std::cout << Indent(1) << "-------------------------------------\n";
 
-      DumpExtensions(material.extensions, 1);
+      std::cout << Indent(1) << "extensions(items=" << material.extensions.size() << ")"
+                << std::endl;
+      DumpExtensions(material.extensions, 2);
       std::cout << PrintValue("extras", material.extras, 2) << std::endl;
     }
   }
@@ -624,6 +698,9 @@ static void Dump(const tinygltf::Model &model) {
       std::cout << Indent(2) << "width     : " << image.width << std::endl;
       std::cout << Indent(2) << "height    : " << image.height << std::endl;
       std::cout << Indent(2) << "component : " << image.component << std::endl;
+
+      std::cout << Indent(1) << "extensions(items=" << image.extensions.size() << ")"
+                << std::endl;
       DumpExtensions(image.extensions, 1);
     }
   }
@@ -636,7 +713,11 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
       std::cout << Indent(1) << "source         : " << texture.source
                 << std::endl;
+
+      std::cout << Indent(1) << "extensions(items=" << texture.extensions.size() << ")"
+                << std::endl;
       DumpExtensions(texture.extensions, 1);
+      std::cout << "\n";
     }
   }
 
