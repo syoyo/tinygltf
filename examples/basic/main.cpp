@@ -333,7 +333,6 @@ int main(int argc, char **argv) {
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
-#endif
 
   Window window = Window(800, 600, "TinyGLTF basic example");
   glfwMakeContextCurrent(window.window);
