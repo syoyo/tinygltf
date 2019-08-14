@@ -5412,12 +5412,8 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     SerializeNumberProperty("alphaCutoff", material.alphaCutoff, o);
   }
 
-  if (material.alphaMode.compare("OPAQUE") == 0) {
+  if (material.alphaMode.compare("OPAQUE") != 0) {
     SerializeStringProperty("alphaMode", material.alphaMode, o);
-  }
-
-  if (!TINYGLTF_DOUBLE_EQUAL(material.alphaCutoff, 0.5)) {
-    SerializeNumberProperty("alphaCutoff", material.alphaCutoff, o);
   }
 
   o["doubleSided"] = json(material.doubleSided);
