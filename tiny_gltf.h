@@ -5382,13 +5382,13 @@ static void SerializeGltfPbrMetallicRoughness(PbrMetallicRoughness &pbr,
     SerializeNumberProperty("roughnessFactor", pbr.roughnessFactor, o);
   }
 
-  if (pbr.baseColorTexture.index >= -1) {
+  if (pbr.baseColorTexture.index > -1) {
     json texinfo;
     SerializeGltfTextureInfo(pbr.baseColorTexture, texinfo);
     o["baseColorTexture"] = texinfo;
   }
 
-  if (pbr.metallicRoughnessTexture.index >= -1) {
+  if (pbr.metallicRoughnessTexture.index > -1) {
     json texinfo;
     SerializeGltfTextureInfo(pbr.metallicRoughnessTexture, texinfo);
     o["metallicRoughnessTexture"] = texinfo;
@@ -5418,19 +5418,19 @@ static void SerializeGltfMaterial(Material &material, json &o) {
 
   o["doubleSided"] = json(material.doubleSided);
 
-  if (material.normalTexture.index >= -1) {
+  if (material.normalTexture.index > -1) {
     json texinfo;
     SerializeGltfNormalTextureInfo(material.normalTexture, texinfo);
     o["normalTexture"] = texinfo;
   }
 
-  if (material.occlusionTexture.index >= -1) {
+  if (material.occlusionTexture.index > -1) {
     json texinfo;
     SerializeGltfOcclusionTextureInfo(material.occlusionTexture, texinfo);
     o["occlusionTexture"] = texinfo;
   }
 
-  if (material.emissiveTexture.index >= -1) {
+  if (material.emissiveTexture.index > -1) {
     json texinfo;
     SerializeGltfTextureInfo(material.emissiveTexture, texinfo);
     o["emissiveTexture"] = texinfo;
