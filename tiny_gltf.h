@@ -3680,6 +3680,8 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
   node->children.clear();
   ParseIntegerArrayProperty(&node->children, err, o, "children", false);
 
+  ParseNumberArrayProperty(&node->weights, err, o, "weights", false);
+
   ParseExtensionsProperty(&node->extensions, err, o);
   ParseExtrasProperty(&(node->extras), o);
 
@@ -5586,6 +5588,10 @@ static void SerializeGltfNode(Node &node, json &o) {
 
   if (node.camera != -1) {
     SerializeNumberProperty<int>("camera", node.camera, o);
+  }
+
+  if (node.weights.size() > 0) {
+    SerializeNumberArrayProperty<double>("weights", node.weights, o);
   }
 
   if (node.extras.Type() != NULL_TYPE) {
