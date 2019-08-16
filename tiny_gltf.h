@@ -5590,6 +5590,10 @@ static void SerializeGltfNode(Node &node, json &o) {
     SerializeNumberProperty<int>("camera", node.camera, o);
   }
 
+  if (node.weights.size() > 0) {
+    SerializeNumberArrayProperty<double>("weights", node.weights, o);
+  }
+
   if (node.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", node.extras, o);
   }
