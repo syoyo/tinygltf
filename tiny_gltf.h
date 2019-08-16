@@ -487,6 +487,7 @@ struct AnimationChannel {
   std::string target_path;  // required in ["translation", "rotation", "scale",
                             // "weights"]
   Value extras;
+  ExtensionMap extensions;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
   bool operator==(const AnimationChannel &) const;
@@ -508,6 +509,7 @@ struct Animation {
   std::vector<AnimationChannel> channels;
   std::vector<AnimationSampler> samplers;
   Value extras;
+  ExtensionMap extensions;
 
   bool operator==(const Animation &) const;
 };
@@ -1411,11 +1413,14 @@ bool Accessor::operator==(const Accessor &other) const {
          this->normalized == other.normalized && this->type == other.type;
 }
 bool Animation::operator==(const Animation &other) const {
-  return this->channels == other.channels && this->extras == other.extras &&
+  return this->channels == other.channels && 
+         this->extensions == other.extensions &&
+         this->extras == other.extras &&
          this->name == other.name && this->samplers == other.samplers;
 }
 bool AnimationChannel::operator==(const AnimationChannel &other) const {
-  return this->extras == other.extras &&
+  return this->extensions == other.extensions &&
+         this->extras == other.extras &&
          this->target_node == other.target_node &&
          this->target_path == other.target_path &&
          this->sampler == other.sampler;
@@ -3850,6 +3855,7 @@ static bool ParseAnimationChannel(AnimationChannel *channel, std::string *err,
   channel->sampler = samplerIndex;
   channel->target_node = targetIndex;
 
+  ParseExtensionsProperty(&channel->extensions, err, o);
   ParseExtrasProperty(&(channel->extras), o);
 
   return true;
@@ -3909,6 +3915,7 @@ static bool ParseAnimation(Animation *animation, std::string *err,
 
   ParseStringProperty(&animation->name, err, o, "name", false);
 
+  ParseExtensionsProperty(&animation->extensions, err, o);
   ParseExtrasProperty(&(animation->extras), o);
 
   return true;
@@ -5183,6 +5190,8 @@ static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
   if (channel.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", channel.extras, o);
   }
+  
+  SerializeExtensionMap(channel.extensions, o);
 }
 
 static void SerializeGltfAnimationSampler(AnimationSampler &sampler, json &o) {
@@ -5220,6 +5229,8 @@ static void SerializeGltfAnimation(Animation &animation, json &o) {
   if (animation.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", animation.extras, o);
   }
+  
+  SerializeExtensionMap(animation.extensions, o);
 }
 
 static void SerializeGltfAsset(Asset &asset, json &o) {
