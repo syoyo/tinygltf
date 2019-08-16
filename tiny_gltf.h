@@ -3680,6 +3680,8 @@ static bool ParseNode(Node *node, std::string *err, const json &o) {
   node->children.clear();
   ParseIntegerArrayProperty(&node->children, err, o, "children", false);
 
+  ParseNumberArrayProperty(&node->weights, err, o, "weights", false);
+
   ParseExtensionsProperty(&node->extensions, err, o);
   ParseExtrasProperty(&(node->extras), o);
 
