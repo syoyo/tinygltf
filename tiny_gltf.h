@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.3.1 Set default value of minFilter and magFilter in Sampler to -1.
 //  - v2.3.0 Modified Material representation according to glTF 2.0 schema
 //           (and introduced TextureInfo class)
 //           Change the behavior of `Value::IsNumber`. It return true either the
@@ -529,20 +530,26 @@ struct Skin {
 
 struct Sampler {
   std::string name;
-  int minFilter;  // ["NEAREST", "LINEAR", "NEAREST_MIPMAP_LINEAR",
-                  // "LINEAR_MIPMAP_NEAREST", "NEAREST_MIPMAP_LINEAR",
-                  // "LINEAR_MIPMAP_LINEAR"]
-  int magFilter;  // ["NEAREST", "LINEAR"]
-  int wrapS;      // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default
-                  // "REPEAT"
-  int wrapT;      // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT", "REPEAT"], default
-                  // "REPEAT"
-  int wrapR;      // TinyGLTF extension
+  // glTF 2.0 spec does not define default value for `minFilter` and
+  // `magFilter`. Set -1 in TinyGLTF(issue #186)
+  int minFilter =
+      -1;  // optional. -1 = no filter defined. ["NEAREST", "LINEAR",
+           // "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_NEAREST",
+           // "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_LINEAR"]
+  int magFilter =
+      -1;  // optional. -1 = no filter defined. ["NEAREST", "LINEAR"]
+  int wrapS =
+      TINYGLTF_TEXTURE_WRAP_REPEAT;  // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT",
+                                     // "REPEAT"], default "REPEAT"
+  int wrapT =
+      TINYGLTF_TEXTURE_WRAP_REPEAT;  // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT",
+                                     // "REPEAT"], default "REPEAT"
+  int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;  // TinyGLTF extension
   Value extras;
 
   Sampler()
-      : minFilter(TINYGLTF_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR),
-        magFilter(TINYGLTF_TEXTURE_FILTER_LINEAR),
+      : minFilter(-1),
+        magFilter(-1),
         wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
@@ -3924,19 +3931,25 @@ static bool ParseAnimation(Animation *animation, std::string *err,
 static bool ParseSampler(Sampler *sampler, std::string *err, const json &o) {
   ParseStringProperty(&sampler->name, err, o, "name", false);
 
-  int minFilter = TINYGLTF_TEXTURE_FILTER_NEAREST_MIPMAP_LINEAR;
-  int magFilter = TINYGLTF_TEXTURE_FILTER_LINEAR;
+  int minFilter = -1;
+  int magFilter = -1;
   int wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
   int wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
+  int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;
   ParseIntegerProperty(&minFilter, err, o, "minFilter", false);
   ParseIntegerProperty(&magFilter, err, o, "magFilter", false);
   ParseIntegerProperty(&wrapS, err, o, "wrapS", false);
   ParseIntegerProperty(&wrapT, err, o, "wrapT", false);
+  ParseIntegerProperty(&wrapR, err, o, "wrapR", false);  // tinygltf extension
+
+  // TODO(syoyo): Check the value is alloed one.
+  // (e.g. we allow 9728(NEAREST), but don't allow 9727)
 
   sampler->minFilter = minFilter;
   sampler->magFilter = magFilter;
   sampler->wrapS = wrapS;
   sampler->wrapT = wrapT;
+  sampler->wrapR = wrapR;
 
   ParseExtrasProperty(&(sampler->extras), o);
 
@@ -5393,13 +5406,13 @@ static void SerializeGltfPbrMetallicRoughness(PbrMetallicRoughness &pbr,
     SerializeNumberProperty("roughnessFactor", pbr.roughnessFactor, o);
   }
 
-  if (pbr.baseColorTexture.index >= -1) {
+  if (pbr.baseColorTexture.index > -1) {
     json texinfo;
     SerializeGltfTextureInfo(pbr.baseColorTexture, texinfo);
     o["baseColorTexture"] = texinfo;
   }
 
-  if (pbr.metallicRoughnessTexture.index >= -1) {
+  if (pbr.metallicRoughnessTexture.index > -1) {
     json texinfo;
     SerializeGltfTextureInfo(pbr.metallicRoughnessTexture, texinfo);
     o["metallicRoughnessTexture"] = texinfo;
@@ -5423,29 +5436,25 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     SerializeNumberProperty("alphaCutoff", material.alphaCutoff, o);
   }
 
-  if (material.alphaMode.compare("OPAQUE") == 0) {
+  if (material.alphaMode.compare("OPAQUE") != 0) {
     SerializeStringProperty("alphaMode", material.alphaMode, o);
-  }
-
-  if (!TINYGLTF_DOUBLE_EQUAL(material.alphaCutoff, 0.5)) {
-    SerializeNumberProperty("alphaCutoff", material.alphaCutoff, o);
   }
 
   o["doubleSided"] = json(material.doubleSided);
 
-  if (material.normalTexture.index >= -1) {
+  if (material.normalTexture.index > -1) {
     json texinfo;
     SerializeGltfNormalTextureInfo(material.normalTexture, texinfo);
     o["normalTexture"] = texinfo;
   }
 
-  if (material.occlusionTexture.index >= -1) {
+  if (material.occlusionTexture.index > -1) {
     json texinfo;
     SerializeGltfOcclusionTextureInfo(material.occlusionTexture, texinfo);
     o["occlusionTexture"] = texinfo;
   }
 
-  if (material.emissiveTexture.index >= -1) {
+  if (material.emissiveTexture.index > -1) {
     json texinfo;
     SerializeGltfTextureInfo(material.emissiveTexture, texinfo);
     o["emissiveTexture"] = texinfo;
@@ -5600,8 +5609,12 @@ static void SerializeGltfNode(Node &node, json &o) {
 }
 
 static void SerializeGltfSampler(Sampler &sampler, json &o) {
-  SerializeNumberProperty("magFilter", sampler.magFilter, o);
-  SerializeNumberProperty("minFilter", sampler.minFilter, o);
+  if (sampler.magFilter != -1) {
+    SerializeNumberProperty("magFilter", sampler.magFilter, o);
+  }
+  if (sampler.minFilter != -1) {
+    SerializeNumberProperty("minFilter", sampler.minFilter, o);
+  }
   SerializeNumberProperty("wrapR", sampler.wrapR, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
