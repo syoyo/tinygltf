@@ -3757,7 +3757,7 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
   }
    else {
     // fill with default values
-    material->emissiveFactor = {1.0, 1.0, 1.0};
+    material->emissiveFactor = {0.0, 0.0, 0.0};
   }
 
   ParseStringProperty(&material->alphaMode, err, o, "alphaMode",
