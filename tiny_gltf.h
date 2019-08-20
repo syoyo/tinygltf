@@ -242,7 +242,7 @@ class Value {
         boolean_value_(false) {}
 
   explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
-  explicit Value(int i) : type_(INT_TYPE) { int_value_ = i; }
+  explicit Value(int i) : type_(INT_TYPE) { int_value_ = i; real_value_ = i; }
   explicit Value(double n) : type_(REAL_TYPE) { real_value_ = n; }
   explicit Value(const std::string &s) : type_(STRING_TYPE) {
     string_value_ = s;
