@@ -1271,6 +1271,9 @@ class TinyGLTF {
 #if __has_warning("-Wmismatched-tags")
 #pragma clang diagnostic ignored "-Wmismatched-tags"
 #endif
+#if __has_warning("-Wextra-semi-stmt")
+#pragma clang diagnostic ignored "-Wextra-semi-stmt"
+#endif
 #endif
 
 // Disable GCC warnigs
@@ -1420,14 +1423,12 @@ bool Accessor::operator==(const Accessor &other) const {
          this->normalized == other.normalized && this->type == other.type;
 }
 bool Animation::operator==(const Animation &other) const {
-  return this->channels == other.channels && 
-         this->extensions == other.extensions &&
-         this->extras == other.extras &&
+  return this->channels == other.channels &&
+         this->extensions == other.extensions && this->extras == other.extras &&
          this->name == other.name && this->samplers == other.samplers;
 }
 bool AnimationChannel::operator==(const AnimationChannel &other) const {
-  return this->extensions == other.extensions &&
-         this->extras == other.extras &&
+  return this->extensions == other.extensions && this->extras == other.extras &&
          this->target_node == other.target_node &&
          this->target_path == other.target_path &&
          this->sampler == other.sampler;
@@ -1478,7 +1479,7 @@ bool Material::operator==(const Material &other) const {
          (this->emissiveTexture == other.emissiveTexture) &&
          Equals(this->emissiveFactor, other.emissiveFactor) &&
          (this->alphaMode == other.alphaMode) &&
-         (this->alphaCutoff == other.alphaCutoff) &&
+         TINYGLTF_DOUBLE_EQUAL(this->alphaCutoff, other.alphaCutoff) &&
          (this->doubleSided == other.doubleSided) &&
          (this->extensions == other.extensions) &&
          (this->extras == other.extras) && (this->values == other.values) &&
@@ -1570,7 +1571,6 @@ bool Sampler::operator==(const Sampler &other) const {
 bool Scene::operator==(const Scene &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
          this->name == other.name && this->nodes == other.nodes;
-  ;
 }
 bool Skin::operator==(const Skin &other) const {
   return this->inverseBindMatrices == other.inverseBindMatrices &&
@@ -1889,7 +1889,7 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
   (void)user_data;
   (void)warn;
 
-  int w, h, comp, req_comp;
+  int w = 0, h = 0, comp = 0, req_comp = 0;
 
   unsigned char *data = nullptr;
 
@@ -1906,8 +1906,8 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
   // the Image metadata to signal that this image uses 2 bytes (16bits) per
   // channel:
   if (stbi_is_16_bit_from_memory(bytes, size)) {
-    data = (unsigned char *)stbi_load_16_from_memory(bytes, size, &w, &h, &comp,
-                                                     req_comp);
+    data = reinterpret_cast<unsigned char *>(
+        stbi_load_16_from_memory(bytes, size, &w, &h, &comp, req_comp));
     if (data) {
       bits = 16;
       pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
@@ -1934,7 +1934,7 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
     return false;
   }
 
-  if (w < 1 || h < 1) {
+  if ((w < 1) || (h < 1)) {
     stbi_image_free(data);
     if (err) {
       (*err) += "Invalid image data for image[" + std::to_string(image_idx) +
@@ -1972,7 +1972,7 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
   image->component = req_comp;
   image->bits = bits;
   image->pixel_type = pixel_type;
-  image->image.resize(static_cast<size_t>(w * h * req_comp) * (bits / 8));
+  image->image.resize(static_cast<size_t>(w * h * req_comp) * size_t(bits / 8));
   std::copy(data, data + w * h * req_comp * (bits / 8), image->image.begin());
   stbi_image_free(data);
 
@@ -4454,7 +4454,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        auto bufferView = model->accessors[primitive.indices].bufferView;
+        auto bufferView =
+            model->accessors[size_t(primitive.indices)].bufferView;
         if (bufferView < 0 || size_t(bufferView) >= model->bufferViews.size()) {
           if (err) {
             (*err) += "accessor[" + std::to_string(primitive.indices) +
@@ -4463,7 +4464,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->bufferViews[bufferView].target =
+        model->bufferViews[size_t(bufferView)].target =
             TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
         // we could optionally check if acessors' bufferView type is Scalar, as
         // it should be
@@ -5095,6 +5096,7 @@ static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
   return true;
 }
 
+#if 0  // FIXME(syoyo): not used. will be removed in the future release.
 static void SerializeParameterMap(ParameterMap &param, json &o) {
   for (ParameterMap::iterator paramIt = param.begin(); paramIt != param.end();
        ++paramIt) {
@@ -5123,6 +5125,7 @@ static void SerializeParameterMap(ParameterMap &param, json &o) {
     }
   }
 }
+#endif
 
 static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
   if (!extensions.size()) return;
@@ -5205,7 +5208,7 @@ static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
   if (channel.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", channel.extras, o);
   }
-  
+
   SerializeExtensionMap(channel.extensions, o);
 }
 
@@ -5244,7 +5247,7 @@ static void SerializeGltfAnimation(Animation &animation, json &o) {
   if (animation.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", animation.extras, o);
   }
-  
+
   SerializeExtensionMap(animation.extensions, o);
 }
 
@@ -5913,7 +5916,7 @@ static void WriteBinaryGltfStream(std::ostream &stream,
   // padding
   const int length = 12 + 8 + int(content.size()) + padding_size;
 
-  stream.write(header.c_str(), header.size());
+  stream.write(header.c_str(), std::streamsize(header.size()));
   stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
   stream.write(reinterpret_cast<const char *>(&length), sizeof(length));
 
@@ -5924,12 +5927,12 @@ static void WriteBinaryGltfStream(std::ostream &stream,
                sizeof(model_length));
   stream.write(reinterpret_cast<const char *>(&model_format),
                sizeof(model_format));
-  stream.write(content.c_str(), content.size());
+  stream.write(content.c_str(), std::streamsize(content.size()));
 
   // Chunk must be multiplies of 4, so pad with spaces
   if (padding_size > 0) {
-    const std::string padding = std::string(padding_size, ' ');
-    stream.write(padding.c_str(), padding.size());
+    const std::string padding = std::string(size_t(padding_size), ' ');
+    stream.write(padding.c_str(), std::streamsize(padding.size()));
   }
 }
 
