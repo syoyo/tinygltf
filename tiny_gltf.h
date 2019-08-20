@@ -3743,8 +3743,22 @@ static bool ParsePbrMetallicRoughness(PbrMetallicRoughness *pbr,
 static bool ParseMaterial(Material *material, std::string *err, const json &o) {
   ParseStringProperty(&material->name, err, o, "name", /* required */ false);
 
-  ParseNumberArrayProperty(&material->emissiveFactor, err, o, "emissiveFactor",
-                           /* required */ false);
+  if(ParseNumberArrayProperty(&material->emissiveFactor, err, o, "emissiveFactor",
+                           /* required */ false)) {
+    if (material->emissiveFactor.size() != 3) {
+      if (err) {
+        (*err) +=
+            "Array length of `emissiveFactor` parameter in "
+            "material must be 3, but got " +
+            std::to_string(material->emissiveFactor.size()) + "\n";
+      }
+      return false;
+    }
+  }
+   else {
+    // fill with default values
+    material->emissiveFactor = {0.0, 0.0, 0.0};
+  }
 
   ParseStringProperty(&material->alphaMode, err, o, "alphaMode",
                       /* required */ false);
