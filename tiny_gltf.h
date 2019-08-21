@@ -1078,6 +1078,9 @@ bool WriteWholeFile(std::string *err, const std::string &filepath,
                     const std::vector<unsigned char> &contents, void *);
 #endif
 
+///
+/// glTF Parser/Serialier context.
+///
 class TinyGLTF {
  public:
 #ifdef __clang__
@@ -1162,6 +1165,22 @@ class TinyGLTF {
   ///
   void SetFsCallbacks(FsCallbacks callbacks);
 
+
+  ///
+  /// Set serializing default values(default = false).
+  /// When true, default values are force serialized to .glTF.
+  /// This may be helpfull if you want to serialize a full description of glTF data.
+  ///
+  /// TODO(LTE): Supply parsing option as function arguments to `LoadASCIIFromFile()` and others, not by a class method
+  ///
+  void SetSerializeDefaultValues(const bool enabled) {
+    serialize_default_values_ = enabled;
+  }
+
+  bool GetSerializeDefaultValues() const {
+    return serialize_default_values_;
+  }
+
  private:
   ///
   /// Loads glTF asset from string(memory).
@@ -1173,9 +1192,11 @@ class TinyGLTF {
                       const char *str, const unsigned int length,
                       const std::string &base_dir, unsigned int check_sections);
 
-  const unsigned char *bin_data_;
-  size_t bin_size_;
-  bool is_binary_;
+  const unsigned char *bin_data_ = nullptr;
+  size_t bin_size_ = 0;
+  bool is_binary_ = false;
+
+  bool serialize_default_values_ = false; ///< Serialize default values?
 
   FsCallbacks fs = {
 #ifndef TINYGLTF_NO_FS
