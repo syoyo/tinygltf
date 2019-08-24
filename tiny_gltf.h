@@ -242,7 +242,10 @@ class Value {
         boolean_value_(false) {}
 
   explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
-  explicit Value(int i) : type_(INT_TYPE) { int_value_ = i; real_value_ = i; }
+  explicit Value(int i) : type_(INT_TYPE) {
+    int_value_ = i;
+    real_value_ = i;
+  }
   explicit Value(double n) : type_(REAL_TYPE) { real_value_ = n; }
   explicit Value(const std::string &s) : type_(STRING_TYPE) {
     string_value_ = s;
@@ -1165,21 +1168,20 @@ class TinyGLTF {
   ///
   void SetFsCallbacks(FsCallbacks callbacks);
 
-
   ///
   /// Set serializing default values(default = false).
   /// When true, default values are force serialized to .glTF.
-  /// This may be helpfull if you want to serialize a full description of glTF data.
+  /// This may be helpfull if you want to serialize a full description of glTF
+  /// data.
   ///
-  /// TODO(LTE): Supply parsing option as function arguments to `LoadASCIIFromFile()` and others, not by a class method
+  /// TODO(LTE): Supply parsing option as function arguments to
+  /// `LoadASCIIFromFile()` and others, not by a class method
   ///
   void SetSerializeDefaultValues(const bool enabled) {
     serialize_default_values_ = enabled;
   }
 
-  bool GetSerializeDefaultValues() const {
-    return serialize_default_values_;
-  }
+  bool GetSerializeDefaultValues() const { return serialize_default_values_; }
 
  private:
   ///
@@ -1196,7 +1198,7 @@ class TinyGLTF {
   size_t bin_size_ = 0;
   bool is_binary_ = false;
 
-  bool serialize_default_values_ = false; ///< Serialize default values?
+  bool serialize_default_values_ = false;  ///< Serialize default values?
 
   FsCallbacks fs = {
 #ifndef TINYGLTF_NO_FS
@@ -1727,15 +1729,9 @@ std::string base64_decode(std::string const &s);
 
 #ifdef __clang__
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wexit-time-destructors"
-#pragma clang diagnostic ignored "-Wglobal-constructors"
 #pragma clang diagnostic ignored "-Wsign-conversion"
 #pragma clang diagnostic ignored "-Wconversion"
 #endif
-static const std::string base64_chars =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    "abcdefghijklmnopqrstuvwxyz"
-    "0123456789+/";
 
 static inline bool is_base64(unsigned char c) {
   return (isalnum(c) || (c == '+') || (c == '/'));
@@ -1748,6 +1744,11 @@ std::string base64_encode(unsigned char const *bytes_to_encode,
   int j = 0;
   unsigned char char_array_3[3];
   unsigned char char_array_4[4];
+
+  const char *base64_chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      "abcdefghijklmnopqrstuvwxyz"
+      "0123456789+/";
 
   while (in_len--) {
     char_array_3[i++] = *(bytes_to_encode++);
@@ -1788,6 +1789,11 @@ std::string base64_decode(std::string const &encoded_string) {
   int in_ = 0;
   unsigned char char_array_4[4], char_array_3[3];
   std::string ret;
+
+  const std::string base64_chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      "abcdefghijklmnopqrstuvwxyz"
+      "0123456789+/";
 
   while (in_len-- && (encoded_string[in_] != '=') &&
          is_base64(encoded_string[in_])) {
@@ -3764,8 +3770,9 @@ static bool ParsePbrMetallicRoughness(PbrMetallicRoughness *pbr,
 static bool ParseMaterial(Material *material, std::string *err, const json &o) {
   ParseStringProperty(&material->name, err, o, "name", /* required */ false);
 
-  if(ParseNumberArrayProperty(&material->emissiveFactor, err, o, "emissiveFactor",
-                           /* required */ false)) {
+  if (ParseNumberArrayProperty(&material->emissiveFactor, err, o,
+                               "emissiveFactor",
+                               /* required */ false)) {
     if (material->emissiveFactor.size() != 3) {
       if (err) {
         (*err) +=
@@ -3775,8 +3782,7 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
       }
       return false;
     }
-  }
-   else {
+  } else {
     // fill with default values
     material->emissiveFactor = {0.0, 0.0, 0.0};
   }
