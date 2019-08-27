@@ -254,12 +254,28 @@ class Value {
     binary_value_.resize(n);
     memcpy(binary_value_.data(), p, n);
   }
+  explicit Value(std::vector<unsigned char>&& v) noexcept : type_(BINARY_TYPE), binary_value_(std::move(v)) {}
   explicit Value(const Array &a) : type_(ARRAY_TYPE) {
-    array_value_ = Array(a);
+    array_value_ = a;
   }
+  explicit Value(Array &&a) noexcept : type_(ARRAY_TYPE), array_value_(std::move(a)) {}
+
   explicit Value(const Object &o) : type_(OBJECT_TYPE) {
-    object_value_ = Object(o);
+    object_value_ = o;
   }
+  explicit Value(Object &&o) noexcept : type_(OBJECT_TYPE), object_value_(std::move(o)) {}
+  Value(Value&& rhs) noexcept
+    : type_(rhs.type_)
+    , int_value_(rhs.int_value_)
+    , real_value_(rhs.real_value_)
+    , string_value_(std::move(rhs.string_value_))
+    , binary_value_(std::move(rhs.binary_value_))
+    , array_value_(std::move(rhs.array_value_))
+    , object_value_(std::move(rhs.object_value_))
+    , boolean_value_(rhs.boolean_value_)
+  {}
+  Value(const Value& rhs) = default;
+  Value& operator=(const Value& rhs) = default;
 
   char Type() const { return static_cast<const char>(type_); }
 
@@ -556,6 +572,15 @@ struct Sampler {
         wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
+  Sampler(const Sampler&) = default;
+  Sampler(Sampler&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , minFilter(rhs.minFilter)
+    , magFilter(rhs.magFilter)
+    , wrapS(rhs.wrapS)
+    , wrapT(rhs.wrapT)
+    , wrapR(rhs.wrapR)
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const Sampler &) const;
 };
 
@@ -589,6 +614,22 @@ struct Image {
     height = -1;
     component = -1;
   }
+  Image(const Image&) = default;
+  Image(Image&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , width(rhs.width)
+    , height(rhs.height)
+    , component(rhs.component)
+    , bits(rhs.bits)
+    , pixel_type(rhs.pixel_type)
+    , image(std::move(rhs.image))
+    , bufferView(rhs.bufferView)
+    , mimeType(std::move(rhs.mimeType))
+    , uri(std::move(rhs.uri))
+    , extras(std::move(rhs.extras))
+    , extensions(std::move(rhs.extensions))
+    , as_is(rhs.as_is) {}
+
   bool operator==(const Image &) const;
 };
 
@@ -601,6 +642,14 @@ struct Texture {
   ExtensionMap extensions;
 
   Texture() : sampler(-1), source(-1) {}
+  Texture(const Texture&) = default;
+  Texture(Texture&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , sampler(rhs.sampler)
+    , source(rhs.source)
+    , extras(std::move(rhs.extras))
+    , extensions(std::move(rhs.extensions)) {}
+
   bool operator==(const Texture &) const;
 };
 
@@ -613,6 +662,12 @@ struct TextureInfo {
   ExtensionMap extensions;
 
   TextureInfo() : index(-1), texCoord(0) {}
+  TextureInfo(const TextureInfo&) = default;
+  TextureInfo(TextureInfo&& rhs) noexcept
+    : index(rhs.index)
+    , texCoord(rhs.texCoord)
+    , extras(std::move(rhs.extras))
+    , extensions(std::move(rhs.extensions)) {}
   bool operator==(const TextureInfo &) const;
 };
 
@@ -627,6 +682,13 @@ struct NormalTextureInfo {
   ExtensionMap extensions;
 
   NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
+  NormalTextureInfo(const NormalTextureInfo&) = default;
+  NormalTextureInfo(NormalTextureInfo&& rhs) noexcept
+    : index(rhs.index)
+    , texCoord(rhs.texCoord)
+    , scale(rhs.scale)
+    , extras(std::move(rhs.extras))
+    , extensions(std::move(rhs.extensions)) {}
   bool operator==(const NormalTextureInfo &) const;
 };
 
@@ -641,6 +703,13 @@ struct OcclusionTextureInfo {
   ExtensionMap extensions;
 
   OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
+  OcclusionTextureInfo(const OcclusionTextureInfo&) = default;
+  OcclusionTextureInfo(OcclusionTextureInfo&& rhs) noexcept
+    : index(rhs.index)
+    , texCoord(rhs.texCoord)
+    , strength(rhs.strength)
+    , extras(std::move(rhs.extras))
+    , extensions(std::move(rhs.extensions)) {}
   bool operator==(const OcclusionTextureInfo &) const;
 };
 
@@ -656,6 +725,15 @@ struct PbrMetallicRoughness {
   ExtensionMap extensions;
 
   PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {}
+  PbrMetallicRoughness(const PbrMetallicRoughness&) = default;
+  PbrMetallicRoughness(PbrMetallicRoughness&& rhs) noexcept
+    : baseColorFactor(std::move(rhs.baseColorFactor))
+    , baseColorTexture(std::move(rhs.baseColorTexture))
+    , metallicFactor(rhs.metallicFactor)
+    , roughnessFactor(rhs.roughnessFactor)
+    , metallicRoughnessTexture(std::move(metallicRoughnessTexture))
+    , extras(std::move(rhs.extras))
+    , extensions(std::move(rhs.extensions)) {}
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
@@ -685,6 +763,21 @@ struct Material {
   Value extras;
 
   Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
+  Material(const Material&) = default;
+  Material(Material&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , emissiveFactor(std::move(rhs.emissiveFactor))
+    , alphaMode(std::move(rhs.alphaMode))
+    , alphaCutoff(rhs.alphaCutoff)
+    , doubleSided(rhs.doubleSided)
+    , pbrMetallicRoughness(std::move(rhs.pbrMetallicRoughness))
+    , normalTexture(std::move(rhs.normalTexture))
+    , occlusionTexture(std::move(rhs.occlusionTexture))
+    , emissiveTexture(std::move(rhs.emissiveTexture))
+    , values(std::move(rhs.values))
+    , additionalValues(std::move(rhs.additionalValues))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(extras)) {}
 
   bool operator==(const Material &) const;
 };
@@ -701,6 +794,16 @@ struct BufferView {
   bool dracoDecoded;  // Flag indicating this has been draco decoded
 
   BufferView() : byteOffset(0), byteStride(0), dracoDecoded(false) {}
+  BufferView(const BufferView&) = default;
+  BufferView(BufferView&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , buffer(rhs.buffer)
+    , byteOffset(rhs.byteOffset)
+    , byteLength(rhs.byteLength)
+    , byteStride(rhs.byteStride)
+    , target(rhs.target)
+    , extras(std::move(rhs.extras))
+    , dracoDecoded(rhs.dracoDecoded) {}
   bool operator==(const BufferView &) const;
 };
 
@@ -773,6 +876,19 @@ struct Accessor {
     bufferView = -1;
     sparse.isSparse = false;
   }
+  Accessor(const Accessor&) = default;
+  Accessor(Accessor&& rhs) noexcept
+    : bufferView(rhs.bufferView)
+    , name(std::move(rhs.name))
+    , byteOffset(rhs.byteOffset)
+    , normalized(rhs.normalized)
+    , componentType(rhs.componentType)
+    , count(rhs.count)
+    , type(rhs.type)
+    , extras(std::move(rhs.extras))
+    , minValues(std::move(rhs.minValues))
+    , maxValues(std::move(rhs.maxValues))
+    , sparse(rhs.sparse) {}
   bool operator==(const tinygltf::Accessor &) const;
 };
 
@@ -788,6 +904,14 @@ struct PerspectiveCamera {
         zfar(0.0)  // 0 = use infinite projecton matrix
         ,
         znear(0.0) {}
+  PerspectiveCamera(const PerspectiveCamera&) = default;
+  PerspectiveCamera(PerspectiveCamera&& rhs) noexcept
+    : aspectRatio(rhs.aspectRatio)
+    , yfov(rhs.yfov)
+    , zfar(rhs.zfar)
+    , znear(rhs.znear)
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const PerspectiveCamera &) const;
 
   ExtensionMap extensions;
@@ -801,6 +925,14 @@ struct OrthographicCamera {
   double znear;  // required
 
   OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
+  OrthographicCamera(const OrthographicCamera&) = default;
+  OrthographicCamera(OrthographicCamera&& rhs) noexcept
+    : xmag(rhs.xmag)
+    , ymag(rhs.ymag)
+    , zfar(rhs.zfar)
+    , znear(rhs.znear)
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const OrthographicCamera &) const;
 
   ExtensionMap extensions;
@@ -815,6 +947,14 @@ struct Camera {
   OrthographicCamera orthographic;
 
   Camera() {}
+  Camera(const Camera&) = default;
+  Camera(Camera&& rhs) noexcept
+    : type(std::move(rhs.type))
+    , name(std::move(rhs.name))
+    , perspective(std::move(rhs.perspective))
+    , orthographic(std::move(rhs.orthographic))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const Camera &) const;
 
   ExtensionMap extensions;
@@ -841,6 +981,16 @@ struct Primitive {
     material = -1;
     indices = -1;
   }
+  Primitive(const Primitive&) = default;
+  Primitive(Primitive&& rhs) noexcept
+    : attributes(std::move(rhs.attributes))
+    , material(rhs.material)
+    , indices(rhs.indices)
+    , mode(rhs.mode)
+    , targets(std::move(rhs.targets))
+    , extensions(std::move(extensions))
+    , extras(std::move(extras))
+  {}
   bool operator==(const Primitive &) const;
 };
 
@@ -851,6 +1001,14 @@ struct Mesh {
   ExtensionMap extensions;
   Value extras;
 
+  Mesh() = default;
+  Mesh(const Mesh&) = default;
+  Mesh(Mesh&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , primitives(std::move(rhs.primitives))
+    , weights(std::move(rhs.weights))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const Mesh &) const;
 };
 
@@ -875,6 +1033,19 @@ class Node {
     extensions = rhs.extensions;
     extras = rhs.extras;
   }
+  Node(Node&& rhs) noexcept
+    : camera(rhs.camera)
+    , name(std::move(rhs.name))
+    , skin(rhs.skin)
+    , mesh(rhs.mesh)
+    , children(std::move(rhs.children))
+    , rotation(std::move(rhs.rotation))
+    , scale(std::move(rhs.scale))
+    , translation(std::move(rhs.translation))
+    , matrix(std::move(rhs.matrix))
+    , weights(std::move(rhs.weights))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   ~Node() {}
 
   Node &operator=(const Node &rhs) = default;
@@ -898,6 +1069,13 @@ class Node {
 };
 
 struct Buffer {
+  Buffer() = default;
+  Buffer(Buffer&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , data(std::move(rhs.data))
+    , uri(std::move(rhs.uri))
+    , extras(std::move(rhs.extras))
+  {}
   std::string name;
   std::vector<unsigned char> data;
   std::string
@@ -915,6 +1093,15 @@ struct Asset {
   ExtensionMap extensions;
   Value extras;
 
+  Asset() = default;
+  Asset(const Asset&) = default;
+  Asset(Asset&& rhs) noexcept
+    : version(std::move(rhs.version))
+    , generator(std::move(rhs.generator))
+    , minVersion(std::move(rhs.minVersion))
+    , copyright(std::move(rhs.copyright))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const Asset &) const;
 };
 
@@ -925,6 +1112,13 @@ struct Scene {
   ExtensionMap extensions;
   Value extras;
 
+  Scene() = default;
+  Scene(const Scene&) = default;
+  Scene(Scene&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , nodes(std::move(rhs.nodes))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
   bool operator==(const Scene &) const;
 };
 
@@ -933,6 +1127,12 @@ struct SpotLight {
   double outerConeAngle;
 
   SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
+  SpotLight(const SpotLight&) = default;
+  SpotLight(SpotLight&& rhs) noexcept
+    : innerConeAngle(rhs.innerConeAngle)
+    , outerConeAngle(rhs.outerConeAngle)
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
 
   bool operator==(const SpotLight &) const;
 
@@ -949,6 +1149,16 @@ struct Light {
   SpotLight spot;
 
   Light() : intensity(1.0), range(0.0) {}
+  Light(const Light&) = default;
+  Light(Light&& rhs) noexcept
+    : name(std::move(rhs.name))
+    , color(std::move(rhs.color))
+    , intensity(rhs.intensity)
+    , type(std::move(rhs.type))
+    , range(rhs.range)
+    , spot(std::move(rhs.spot))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras)) {}
 
   bool operator==(const Light &) const;
 
@@ -962,6 +1172,27 @@ class Model {
 
   Model(const Model &) = default;
   Model &operator=(const Model &) = default;
+  Model(Model&& rhs) noexcept
+    : accessors(std::move(rhs.accessors))
+    , animations(std::move(rhs.animations))
+    , buffers(std::move(rhs.buffers))
+    , bufferViews(std::move(rhs.bufferViews))
+    , materials(std::move(rhs.materials))
+    , meshes(std::move(rhs.meshes))
+    , nodes(std::move(rhs.nodes))
+    , textures(std::move(rhs.textures))
+    , images(std::move(rhs.images))
+    , skins(std::move(rhs.skins))
+    , samplers(std::move(rhs.samplers))
+    , cameras(std::move(rhs.cameras))
+    , scenes(std::move(rhs.scenes))
+    , lights(std::move(rhs.lights))
+    , extensions(std::move(rhs.extensions))
+    , defaultScene(rhs.defaultScene)
+    , extensionsUsed(std::move(rhs.extensionsUsed))
+    , extensionsRequired(std::move(rhs.extensionsRequired))
+    , asset(std::move(rhs.asset))
+    , extras(std::move(rhs.extras)) {}
 
   ~Model() {}
 
@@ -3673,7 +3904,7 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err,
       Primitive primitive;
       if (ParsePrimitive(&primitive, model, err, i.value())) {
         // Only add the primitive if the parsing succeeds.
-        mesh->primitives.push_back(primitive);
+        mesh->primitives.emplace_back(std::move(primitive));
       }
     }
   }
@@ -4400,7 +4631,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->buffers.push_back(buffer);
+        model->buffers.emplace_back(std::move(buffer));
       }
     }
   }
@@ -4425,7 +4656,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->bufferViews.push_back(bufferView);
+        model->bufferViews.emplace_back(std::move(bufferView));
       }
     }
   }
@@ -4450,7 +4681,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->accessors.push_back(accessor);
+        model->accessors.emplace_back(std::move(accessor));
       }
     }
   }
@@ -4475,7 +4706,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->meshes.push_back(mesh);
+        model->meshes.emplace_back(std::move(mesh));
       }
     }
   }
@@ -4541,7 +4772,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->nodes.push_back(node);
+        model->nodes.emplace_back(std::move(node));
       }
     }
   }
@@ -4575,7 +4806,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         ParseExtensionsProperty(&scene.extensions, err, o);
         ParseExtrasProperty(&scene.extras, o);
 
-        model->scenes.push_back(scene);
+        model->scenes.emplace_back(std::move(scene));
       }
     }
   }
@@ -4614,7 +4845,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->materials.push_back(material);
+        model->materials.emplace_back(std::move(material));
       }
     }
   }
@@ -4682,7 +4913,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           }
         }
 
-        model->images.push_back(image);
+        model->images.emplace_back(std::move(image));
       }
     }
   }
@@ -4707,7 +4938,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->textures.push_back(texture);
+        model->textures.emplace_back(std::move(texture));
       }
     }
   }
@@ -4732,7 +4963,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->animations.push_back(animation);
+        model->animations.emplace_back(std::move(animation));
       }
     }
   }
@@ -4757,7 +4988,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->skins.push_back(skin);
+        model->skins.emplace_back(std::move(skin));
       }
     }
   }
@@ -4782,7 +5013,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->samplers.push_back(sampler);
+        model->samplers.emplace_back(std::move(sampler));
       }
     }
   }
@@ -4807,7 +5038,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        model->cameras.push_back(camera);
+        model->cameras.emplace_back(std::move(camera));
       }
     }
   }
@@ -4846,7 +5077,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
             if (!ParseLight(&light, err, arrayIt.value())) {
               return false;
             }
-            model->lights.push_back(light);
+            model->lights.emplace_back(std::move(light));
           }
         }
       }
