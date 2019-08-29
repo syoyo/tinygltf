@@ -195,7 +195,7 @@ static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
   }
 }
 
-static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
+static inline int32_t GetNumComponentsInType(uint32_t ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return 1;
   } else if (ty == TINYGLTF_TYPE_VEC2) {
@@ -745,7 +745,7 @@ struct Accessor {
         return -1;
       }
 
-      int typeSizeInBytes = GetTypeSizeInBytes(static_cast<uint32_t>(type));
+      int typeSizeInBytes = GetNumComponentsInType(static_cast<uint32_t>(type));
       if (typeSizeInBytes <= 0) {
         return -1;
       }
