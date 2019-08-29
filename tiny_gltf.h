@@ -2703,172 +2703,196 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
   return true;
 }
 
-static bool GetInt(const json&o, int& val)
+namespace
 {
-#ifdef TINYGLTF_USE_RAPIDJSON
-  if (!o.IsDouble())
+  bool GetInt(const json&o, int& val)
   {
-    if (o.IsInt())
+#ifdef TINYGLTF_USE_RAPIDJSON
+    if (!o.IsDouble())
     {
-      val = o.GetInt();
+      if (o.IsInt())
+      {
+        val = o.GetInt();
+        return true;
+      }
+      else if (o.IsUint())
+      {
+        val = static_cast<int>(o.GetUint());
+        return true;
+      }
+      else if (o.IsInt64())
+      {
+        val = static_cast<int>(o.GetInt64());
+        return true;
+      }
+      else if (o.IsUint64())
+      {
+        val = static_cast<int>(o.GetUint64());
+        return true;
+      }
+    }
+
+    return false;
+#else
+    auto type = o.type();
+
+    if ((type == json::value_t::number_integer) ||
+      (type == json::value_t::number_unsigned))
+    {
+      val = static_cast<int>(o.get<int64_t>());
       return true;
     }
-    else if (o.IsUint())
+
+    return false;
+#endif
+  }
+
+  bool GetDouble(const json&o, double& val)
+  {
+#ifdef TINYGLTF_USE_RAPIDJSON
+    if (o.IsDouble())
     {
-     val = static_cast<int>(o.GetUint());
-     return true;
-    }
-    else if (o.IsInt64())
-    {
-      val = static_cast<int>(o.GetInt64());
+      val = o.GetDouble();
       return true;
     }
-    else if (o.IsUint64())
+
+    return false;
+#else
+    if (o.type() == json::value_t::number_float)
     {
-      val = static_cast<int>(o.GetUint64());
+      val = static_cast<double>(o.get<double>());
       return true;
     }
-  }
-  
-  return false;
-#else
-  auto type = o.type();
 
-  if ((type == json::value_t::number_integer) ||
-    (type == json::value_t::number_unsigned))
+    return false;
+#endif
+  }
+
+  bool GetNumber(const json&o, double& val)
   {
-    val = static_cast<int>(o.get<int64_t>());
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    if (o.IsNumber())
+    {
+      val = o.GetDouble();
+      return true;
+    }
+
+    return false;
+#else
+    if (o.is_number())
+    {
+      val = o.get<double>();
+      return true;
+    }
+
+    return false;
+#endif
   }
 
-  return false;
-#endif
-}
-
-static bool GetDouble(const json&o, double& val)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  if (o.IsDouble())
+  bool GetString(const json&o, std::string& val)
   {
-    val = o.GetDouble();
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    if (o.IsString())
+    {
+      val = o.GetString();
+      return true;
+    }
+
+    return false;
+#else
+    if (o.type() == json::value_t::string)
+    {
+      val = o.get<std::string>();
+      return true;
+    }
+
+    return false;
+#endif
   }
 
-  return false;
-#else
-  if (o.type() == json::value_t::number_float)
+  bool IsArray(const json& o)
   {
-    val = static_cast<double>(o.get<double>());
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    return o.IsArray();
+#else
+    return o.is_array();
+#endif
   }
 
-  return false;
-#endif
-}
-
-static bool GetNumber(const json&o, double& val)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  if (o.IsNumber())
+  json_const_array_iterator ArrayBegin(const json& o)
   {
-    val = o.GetDouble();
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    return o.Begin();
+#else
+    return o.begin();
+#endif
   }
 
-  return false;
-#else
-  if (o.is_number())
+  json_const_array_iterator ArrayEnd(const json& o)
   {
-    val = o.get<double>();
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    return o.End();
+#else
+    return o.end();
+#endif
   }
 
-  return false;
-#endif
-}
-
-static bool GetString(const json&o, std::string& val)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  if (o.IsString())
+  bool IsObject(const json& o)
   {
-    val = o.GetString();
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    return o.IsObject();
+#else
+    return o.is_object();
+#endif
   }
 
-  return false;
-#else
-  if (o.type() == json::value_t::string)
+  json_const_iterator ObjectBegin(const json& o)
   {
-    val = o.get<std::string>();
-    return true;
+#ifdef TINYGLTF_USE_RAPIDJSON
+    return o.MemberBegin();
+#else
+    return o.begin();
+#endif
   }
 
-  return false;
-#endif
-}
-
-static bool IsArray(const json& o)
-{
+  json_const_iterator ObjectEnd(const json& o)
+  {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  return o.IsArray();
+    return o.MemberEnd();
 #else
-  return o.is_array();
+    return o.end();
 #endif
-}
+  }
 
-static json_const_array_iterator ArrayBegin(const json& o)
-{
+  const char* GetKey(json_const_iterator& it)
+  {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  return o.Begin();
+    return it->name.GetString();
 #else
-  return o.begin();
+    return it.key().c_str();
 #endif
-}
+  }
 
-static json_const_array_iterator ArrayEnd(const json& o)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  return o.End();
-#else
-  return o.end();
-#endif
-}
 
-static bool IsObject(const json& o)
-{
+ bool FindMember(const json& o, const char* member, json_const_iterator& it)
+  {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  return o.IsObject();
+    it = o.FindMember(member);
+    return it != o.MemberEnd();
 #else
-  return o.is_object();
+    it = o.find(member);
+    return it != o.end();
 #endif
-}
+  }
 
-static json_const_iterator ObjectBegin(const json& o)
-{
+  const json& GetValue(json_const_iterator& it)
+  {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  return o.MemberBegin();
+    return it->value;
 #else
-  return o.begin();
+    return it.value();
 #endif
-}
-
-static json_const_iterator ObjectEnd(const json& o)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  return o.MemberEnd();
-#else
-  return o.end();
-#endif
-}
-
-static const char* GetKey(json_const_iterator& it)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  return it->name.GetString();
-#else
-  return it.key().c_str();
-#endif
+  }
 }
 
 static bool ParseJsonAsValue(Value *ret, const json &o) {
@@ -2887,6 +2911,7 @@ static bool ParseJsonAsValue(Value *ret, const json &o) {
     } break;
     case Type::kArrayType: {
       Value::Array value_array;
+      value_array.reserve(o.Size());
       for (auto it = o.Begin(); it != o.End(); ++it) {
         Value entry;
         ParseJsonAsValue(&entry, *it);
@@ -2933,6 +2958,7 @@ static bool ParseJsonAsValue(Value *ret, const json &o) {
   } break;
   case json::value_t::array: {
     Value::Array value_array;
+    value_array.reserve(o.size());
     for (auto it = o.begin(); it != o.end(); it++) {
       Value entry;
       ParseJsonAsValue(&entry, it.value());
@@ -2962,26 +2988,6 @@ static bool ParseJsonAsValue(Value *ret, const json &o) {
   if (ret) *ret = std::move(val);
 
   return val.Type() != NULL_TYPE;
-}
-
-static bool FindMember(const json& o, const char* member, json_const_iterator& it)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  it = o.FindMember(member);
-  return it != o.MemberEnd();
-#else
-  it = o.find(member);
-  return it != o.end();
-#endif
-}
-
-const json& GetValue(json_const_iterator& it)
-{
-#ifdef TINYGLTF_USE_RAPIDJSON
-  return it->value;
-#else
-  return it.value();
-#endif
 }
 
 static bool ParseExtrasProperty(Value *ret, const json &o) {
