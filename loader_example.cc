@@ -743,7 +743,5 @@ int main(int argc, char **argv) {
 
   Dump(model);
 
-  gltf_ctx.WriteGltfSceneToFile(&model, "test.gltf");
-
   return 0;
 }
