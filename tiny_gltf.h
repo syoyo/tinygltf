@@ -3217,7 +3217,7 @@ static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
   for (auto i = ArrayBegin(GetValue(it)); i != end;
        ++i) {
     double numberValue;
-    const bool isNumber = GetDouble(*i, numberValue);
+    const bool isNumber = GetNumber(*i, numberValue);
     if (!isNumber) {
       if (required) {
         if (err) {
