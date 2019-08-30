@@ -745,12 +745,12 @@ struct Accessor {
         return -1;
       }
 
-      int typeSizeInBytes = GetNumComponentsInType(static_cast<uint32_t>(type));
-      if (typeSizeInBytes <= 0) {
+      int numComponents = GetNumComponentsInType(static_cast<uint32_t>(type));
+      if (numComponents <= 0) {
         return -1;
       }
 
-      return componentSizeInBytes * typeSizeInBytes;
+      return componentSizeInBytes * numComponents;
     } else {
       // Check if byteStride is a mulple of the size of the accessor's component
       // type.
