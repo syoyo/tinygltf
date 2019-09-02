@@ -4563,7 +4563,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         }
         const json &o = it->get<json>();
         std::vector<int> nodes;
-        ParseIntegerArrayProperty(&nodes, err, o, "nodes", false));
+        ParseIntegerArrayProperty(&nodes, err, o, "nodes", false);
 
         Scene scene;
         scene.nodes = std::move(nodes);
