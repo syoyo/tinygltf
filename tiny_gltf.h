@@ -5644,8 +5644,8 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 ///////////////////////
 // GLTF Serialization
 ///////////////////////
-//namespace
-//{
+namespace
+{
   json JsonFromString(const char* s)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -5735,7 +5735,7 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
     (void)(o);
     (void)(s);
   }
-//}
+}
 
 // typedef std::pair<std::string, json> json_object_pair;
 
