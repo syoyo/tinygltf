@@ -1637,9 +1637,20 @@ namespace
       assert(s_pActiveDocument == nullptr); //Code assumes only one document is active at a time
       s_pActiveDocument = this;
     }
-    ~JsonDocument() {
-      s_pActiveDocument = nullptr;
+    JsonDocument(const JsonDocument&) = delete;
+    JsonDocument(JsonDocument&& rhs) noexcept : rapidjson::Document(std::move(rhs))
+    {
+      s_pActiveDocument = this;
+      rhs.isNil = true;
     }
+    ~JsonDocument() {
+      if (!isNil)
+      {
+        s_pActiveDocument = nullptr;
+      }
+    }
+  private:
+    bool isNil = false;
   };
 #else
   using nlohmann::json;
@@ -1655,6 +1666,13 @@ namespace
 #else
     doc = json::parse(str, str + length, nullptr, throwExc);
 #endif
+  }
+
+  JsonDocument JsonConstruct(const char* str)
+  {
+    JsonDocument doc;
+    JsonParse(doc, str, strlen(str));
+    return doc;
   }
 }
 
@@ -2878,9 +2896,13 @@ namespace
   }
 
 
- bool FindMember(const json& o, const char* member, json_const_iterator& it)
+  bool FindMember(const json& o, const char* member, json_const_iterator& it)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
+    if (!o.IsObject())
+    {
+      return false;
+    }
     it = o.FindMember(member);
     return it != o.MemberEnd();
 #else
@@ -3476,7 +3498,7 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
     if (!IsObject(itObj)) continue;
     std::string key(GetKey(extIt));
     if (!ParseJsonAsValue(&extensions[key], itObj)) {
-      if (key.empty()) {
+      if (!key.empty()) {
         // create empty object so that an extension object is still of type
         // object
         extensions[key] = Value{Value::Object{}};
@@ -4436,18 +4458,33 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
 
   for (; it != itEnd; ++it) {
     std::string key(GetKey(it));
+    if (key == "pbrMetallicRoughness") {
+      if (IsObject(GetValue(it))) {
+        const json &values_object = GetValue(it);
 
-    if ((key == "pbrMetallicRoughness") ||
-      (key == "extensions") ||
-      (key == "extras")) {
-      continue; //Remove duplicating these in parameters
+        json_const_iterator itVal(ObjectBegin(values_object));
+        json_const_iterator itValEnd(ObjectEnd(values_object));
+
+        for (; itVal != itValEnd; ++itVal) {
+          Parameter param;
+          if (ParseParameterProperty(&param, err, values_object, GetKey(itVal),
+            false)) {
+            material->values.emplace(GetKey(itVal), std::move(param));
+          }
+        }
+      }
     }
-
-    Parameter param;
-    if (ParseParameterProperty(&param, err, o, key, false)) {
-      // names of materials have already been parsed. Putting it in this map
-      // doesn't correctly reflext the glTF specification
-      if (key != "name") material->additionalValues.emplace(std::move(key), std::move(param));
+    else if (key == "extensions" || key == "extras") {
+      // done later, skip, otherwise poorly parsed contents will be saved in the	
+      // parametermap and serialized again later	
+    }
+    else {
+      Parameter param;
+      if (ParseParameterProperty(&param, err, o, key, false)) {
+        // names of materials have already been parsed. Putting it in this map
+        // doesn't correctly reflext the glTF specification
+        if (key != "name") material->additionalValues.emplace(std::move(key), std::move(param));
+      }
     }
   }
 
@@ -5607,8 +5644,8 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 ///////////////////////
 // GLTF Serialization
 ///////////////////////
-namespace
-{
+//namespace
+//{
   json JsonFromString(const char* s)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -5680,6 +5717,15 @@ namespace
 #endif
   }
 
+  void JsonSetObject(json& o)
+  {
+#ifdef TINYGLTF_USE_RAPIDJSON
+    o.SetObject();
+#else
+    o = o.object({});
+#endif
+  }
+
   void JsonReserveArray(json& o, size_t s)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -5689,7 +5735,7 @@ namespace
     (void)(o);
     (void)(s);
   }
-}
+//}
 
 // typedef std::pair<std::string, json> json_object_pair;
 
@@ -5903,6 +5949,7 @@ static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
         // create empty object so that an extension name is still included in
         // json.
         json empty;
+        JsonSetObject(empty);
         JsonAddMember(extMap, extIt->first.c_str(), std::move(empty));
       }
     }
