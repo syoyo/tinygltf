@@ -199,7 +199,7 @@ static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
   }
 }
 
-static inline int32_t GetTypeSizeInBytes(uint32_t ty) {
+static inline int32_t GetNumComponentsInType(uint32_t ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return 1;
   } else if (ty == TINYGLTF_TYPE_VEC2) {
@@ -861,12 +861,12 @@ struct Accessor {
         return -1;
       }
 
-      int typeSizeInBytes = GetTypeSizeInBytes(static_cast<uint32_t>(type));
-      if (typeSizeInBytes <= 0) {
+      int numComponents = GetNumComponentsInType(static_cast<uint32_t>(type));
+      if (numComponents <= 0) {
         return -1;
       }
 
-      return componentSizeInBytes * typeSizeInBytes;
+      return componentSizeInBytes * numComponents;
     } else {
       // Check if byteStride is a mulple of the size of the accessor's component
       // type.
@@ -5154,9 +5154,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         return false;
       }
       std::vector<int> nodes;
-      if (!ParseIntegerArrayProperty(&nodes, err, o, "nodes", false)) {
-        return false;
-      }
+      ParseIntegerArrayProperty(&nodes, err, o, "nodes", false);
 
       Scene scene;
       scene.nodes = std::move(nodes);
