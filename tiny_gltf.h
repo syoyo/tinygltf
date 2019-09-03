@@ -56,6 +56,10 @@
 #include <string>
 #include <vector>
 
+#ifndef TINYGLTF_USE_CPP14
+#include <functional>
+#endif
+
 #ifdef __ANDROID__
 #ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
 #include <android/asset_manager.h>
@@ -4938,7 +4942,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
   }
 
+#ifdef TINYGLTF_USE_CPP14
   auto ForEachInArray = [](const json& v, const char* member, const auto& cb)->bool
+#else
+  //The std::function<> implementation can be less efficient because it will allocate heap when the size of
+  //the captured lambda is above 16 bytes with clang and gcc, but it does not require C++14.
+  auto ForEachInArray = [](const json& v, const char* member, const std::function<bool(const json&)>& cb)->bool
+#endif
   {
     json_const_iterator it;
     if (FindMember(v, member, it) && IsArray(GetValue(it))) {
