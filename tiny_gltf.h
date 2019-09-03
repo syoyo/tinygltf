@@ -744,7 +744,7 @@ struct PbrMetallicRoughness {
     , baseColorTexture(std::move(rhs.baseColorTexture))
     , metallicFactor(rhs.metallicFactor)
     , roughnessFactor(rhs.roughnessFactor)
-    , metallicRoughnessTexture(std::move(metallicRoughnessTexture))
+    , metallicRoughnessTexture(std::move(rhs.metallicRoughnessTexture))
     , extras(std::move(rhs.extras))
     , extensions(std::move(rhs.extensions)) {}
   bool operator==(const PbrMetallicRoughness &) const;
@@ -790,7 +790,7 @@ struct Material {
     , values(std::move(rhs.values))
     , additionalValues(std::move(rhs.additionalValues))
     , extensions(std::move(rhs.extensions))
-    , extras(std::move(extras)) {}
+    , extras(std::move(rhs.extras)) {}
 
   bool operator==(const Material &) const;
 };
@@ -1001,8 +1001,8 @@ struct Primitive {
     , indices(rhs.indices)
     , mode(rhs.mode)
     , targets(std::move(rhs.targets))
-    , extensions(std::move(extensions))
-    , extras(std::move(extras))
+    , extensions(std::move(rhs.extensions))
+    , extras(std::move(rhs.extras))
   {}
   bool operator==(const Primitive &) const;
 };
