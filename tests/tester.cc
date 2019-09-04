@@ -20,7 +20,7 @@ TEST_CASE("parse-error", "[parse]") {
   std::string err;
   std::string warn;
 
-  bool ret = ctx.LoadASCIIFromString(&model, &err, &warn, "bora", strlen("bora"), /* basedir*/ "");
+  bool ret = ctx.LoadASCIIFromString(&model, &err, &warn, "bora", static_cast<int>(strlen("bora")), /* basedir*/ "");
 
   REQUIRE(false == ret);
 
