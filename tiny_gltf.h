@@ -1650,52 +1650,33 @@ class TinyGLTF {
 namespace
 {
 #ifdef TINYGLTF_USE_RAPIDJSON
-
-#ifdef TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
-  // This uses the RapidJSON CRTAllocator.  It is thread safe and multiple
-  // documents may be active at once.
-  using json = rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::CrtAllocator>;
-  using json_const_iterator = json::ConstMemberIterator;
-  using json_const_array_iterator = json const *;
-  using JsonDocument =
-    rapidjson::GenericDocument<rapidjson::UTF8<>, rapidjson::CrtAllocator>;
-  rapidjson::CrtAllocator s_CrtAllocator; //stateless and thread safe
-  rapidjson::CrtAllocator &GetAllocator() { return s_CrtAllocator; }
-#else
-  // This uses the default RapidJSON MemoryPoolAllocator.  It is very fast, but
-  // not thread safe. Only a single JsonDocument may be active at any one time,
-  // meaning only a single gltf load/save can be active any one time.
   using json = rapidjson::Value;
   using json_const_iterator = json::ConstMemberIterator;
-  using json_const_array_iterator = json const *;
-  rapidjson::Document *s_pActiveDocument = nullptr;
-  rapidjson::Document::AllocatorType &GetAllocator() {
-    assert(s_pActiveDocument); //Root json node must be JsonDocument type
-    return s_pActiveDocument->GetAllocator();
-  }
-  struct JsonDocument : public rapidjson::Document {
+  using json_const_array_iterator = json const*;
+
+  rapidjson::Document* s_pActiveDocument = nullptr;
+
+  struct JsonDocument : public rapidjson::Document
+  {
     JsonDocument() {
-      assert(s_pActiveDocument ==
-        nullptr);  // When using default allocator, only one document can be active at a time, if you need
-                   // multiple active at once, define TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
+      assert(s_pActiveDocument == nullptr); //Code assumes only one document is active at a time
       s_pActiveDocument = this;
     }
-    JsonDocument(const JsonDocument &) = delete;
-    JsonDocument(JsonDocument &&rhs) noexcept
-      : rapidjson::Document(std::move(rhs)) {
+    JsonDocument(const JsonDocument&) = delete;
+    JsonDocument(JsonDocument&& rhs) noexcept : rapidjson::Document(std::move(rhs))
+    {
       s_pActiveDocument = this;
       rhs.isNil = true;
     }
     ~JsonDocument() {
-      if (!isNil) {
+      if (!isNil)
+      {
         s_pActiveDocument = nullptr;
       }
     }
-
   private:
     bool isNil = false;
   };
-#endif  // TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
 #else
   using nlohmann::json;
   using json_const_iterator = json::const_iterator;
@@ -5693,7 +5674,7 @@ namespace
   json JsonFromString(const char* s)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
-    return json(s, GetAllocator());
+    return json(s, s_pActiveDocument->GetAllocator());
 #else
     return json(s);
 #endif
@@ -5724,7 +5705,7 @@ namespace
   void JsonAssign(json& dest, const json& src)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
-    dest.CopyFrom(src, GetAllocator());
+    dest.CopyFrom(src, s_pActiveDocument->GetAllocator());
 #else
     dest = src;
 #endif
@@ -5737,7 +5718,7 @@ namespace
     {
       o.SetObject();
     }
-    o.AddMember(json(key, GetAllocator()), std::move(value), GetAllocator());
+    o.AddMember(json(key, s_pActiveDocument->GetAllocator()), std::move(value), s_pActiveDocument->GetAllocator());
 #else
     o[key] = std::move(value);
 #endif
@@ -5746,7 +5727,7 @@ namespace
   void JsonPushBack(json& o, json&& value)
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
-    o.PushBack(std::move(value), GetAllocator());
+    o.PushBack(std::move(value), s_pActiveDocument->GetAllocator());
 #else
     o.push_back(std::move(value));
 #endif
@@ -5774,7 +5755,7 @@ namespace
   {
 #ifdef TINYGLTF_USE_RAPIDJSON
     o.SetArray();
-    o.Reserve(static_cast<rapidjson::SizeType>(s), GetAllocator());
+    o.Reserve(static_cast<rapidjson::SizeType>(s), s_pActiveDocument->GetAllocator());
 #endif
     (void)(o);
     (void)(s);
@@ -5839,16 +5820,16 @@ static bool ValueToJson(const Value &value, json *ret) {
     obj.SetBool(value.Get<bool>());
     break;
   case STRING_TYPE:
-    obj.SetString(value.Get<std::string>().c_str(), GetAllocator());
+    obj.SetString(value.Get<std::string>().c_str(), s_pActiveDocument->GetAllocator());
     break;
   case ARRAY_TYPE: {
     obj.SetArray();
-    obj.Reserve(static_cast<rapidjson::SizeType>(value.ArrayLen()), GetAllocator());
+    obj.Reserve(static_cast<rapidjson::SizeType>(value.ArrayLen()), s_pActiveDocument->GetAllocator());
     for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
       Value elementValue = value.Get(int(i));
       json elementJson;
       if (ValueToJson(value.Get(int(i)), &elementJson))
-        obj.PushBack(std::move(elementJson), GetAllocator());
+        obj.PushBack(std::move(elementJson), s_pActiveDocument->GetAllocator());
     }
     break;
   }
@@ -5863,7 +5844,7 @@ static bool ValueToJson(const Value &value, json *ret) {
     for (auto &it : objMap) {
       json elementJson;
       if (ValueToJson(it.second, &elementJson)) {
-        obj.AddMember(json(it.first.c_str(), GetAllocator()), std::move(elementJson), GetAllocator());
+        obj.AddMember(json(it.first.c_str(), s_pActiveDocument->GetAllocator()), std::move(elementJson), s_pActiveDocument->GetAllocator());
       }
     }
     break;
