@@ -4,7 +4,6 @@
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-//#define TINYGLTF_USE_RAPIDJSON
 #include "tiny_gltf.h"
 
 #include <cstdio>
