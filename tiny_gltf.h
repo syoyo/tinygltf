@@ -882,7 +882,7 @@ struct Accessor {
       return static_cast<int>(bufferViewObject.byteStride);
     }
 
-    return 0;
+    //unreachable return 0;
   }
 
   Accessor() {
@@ -3090,7 +3090,7 @@ static bool ParseBooleanProperty(bool *ret, std::string *err, const json &o,
   auto& value = GetValue(it);
 
   bool isBoolean;
-  bool boolValue;
+  bool boolValue = false;
 #ifdef TINYGLTF_USE_RAPIDJSON
     isBoolean = value.IsBool();
     if (isBoolean)
@@ -3176,7 +3176,7 @@ static bool ParseUnsignedProperty(size_t *ret, std::string *err, const json &o,
 
   auto& value = GetValue(it);
 
-  size_t uValue;
+  size_t uValue = 0;
   bool isUValue;
 #ifdef TINYGLTF_USE_RAPIDJSON
   isUValue = false;
@@ -5031,9 +5031,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   auto ForEachInArray = [](const json& v, const char* member, const std::function<bool(const json&)>& cb)->bool
 #endif
   {
-    json_const_iterator it;
-    if (FindMember(v, member, it) && IsArray(GetValue(it))) {
-      const json &root = GetValue(it);
+    json_const_iterator itm;
+    if (FindMember(v, member, itm) && IsArray(GetValue(itm))) {
+      const json &root = GetValue(itm);
       auto it = ArrayBegin(root);
       auto end = ArrayEnd(root);
       for (; it != end; ++it) {
