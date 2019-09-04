@@ -1015,6 +1015,7 @@ struct Mesh {
   Value extras;
 
   Mesh() = default;
+  ~Mesh() = default;
   Mesh(const Mesh&) = default;
   Mesh(Mesh&& rhs) noexcept
     : name(std::move(rhs.name))
@@ -1022,6 +1023,14 @@ struct Mesh {
     , weights(std::move(rhs.weights))
     , extensions(std::move(rhs.extensions))
     , extras(std::move(rhs.extras)) {}
+  Mesh &operator=(const Mesh &) = default;
+  Mesh &operator=(Mesh &&rhs) {
+    if (&rhs != this) {
+      this->~Mesh();
+      new (reinterpret_cast<void *>(this)) Mesh(std::move(rhs));
+    }
+    return *this;
+  }
   bool operator==(const Mesh &) const;
 };
 
@@ -1062,6 +1071,13 @@ class Node {
   ~Node() {}
 
   Node &operator=(const Node &rhs) = default;
+  Node &operator=(Node &&rhs) {
+    if (&rhs != this) {
+      this->~Node();
+      new (reinterpret_cast<void *>(this)) Node(std::move(rhs));
+    }
+    return *this;
+  }
 
   bool operator==(const Node &) const;
 
@@ -1107,6 +1123,7 @@ struct Asset {
   Value extras;
 
   Asset() = default;
+  ~Asset() = default;
   Asset(const Asset&) = default;
   Asset(Asset&& rhs) noexcept
     : version(std::move(rhs.version))
@@ -1115,6 +1132,14 @@ struct Asset {
     , copyright(std::move(rhs.copyright))
     , extensions(std::move(rhs.extensions))
     , extras(std::move(rhs.extras)) {}
+  Asset &operator=(const Asset &) = default;
+  Asset &operator=(Asset &&rhs) {
+    if (&rhs != this) {
+      this->~Asset();
+      new (reinterpret_cast<void *>(this)) Asset(std::move(rhs));
+    }
+    return *this;
+  }
   bool operator==(const Asset &) const;
 };
 
