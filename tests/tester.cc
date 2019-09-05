@@ -13,6 +13,14 @@
 #include <sstream>
 #include <fstream>
 
+static JsonDocument JsonConstruct(const char* str)
+{
+  JsonDocument doc;
+  JsonParse(doc, str, strlen(str));
+  return doc;
+}
+
+
 TEST_CASE("parse-error", "[parse]") {
 
   tinygltf::Model model;

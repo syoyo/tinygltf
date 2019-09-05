@@ -7,6 +7,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 
 ## Status
 
+ - v2.4.0 Experimental RapidJSON support. Experimental C++14 support(C++14 may give better performance)
  - v2.3.0 Modified Material representation according to glTF 2.0 schema(and introduced TextureInfo class)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
  - v2.1.0 release(Draco support)
@@ -150,6 +151,8 @@ if (!ret) {
 * `TINYGLTF_NO_INCLUDE_JSON `: Disable including `json.hpp` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 * `TINYGLTF_NO_INCLUDE_STB_IMAGE `: Disable including `stb_image.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
 * `TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE `: Disable including `stb_image_write.h` from within `tiny_gltf.h` because it has been already included before or you want to include it using custom path before including `tiny_gltf.h`.
+* `TINYGLTF_USE_RAPIDJSON` : Use RapidJSON as a JSON parser/serializer. RapidJSON files are not included in TinyGLTF repo. Please set an include path to RapidJSON if you enable this featrure.
+* `TINYGLTF_USE_CPP14` : Use C++14 feature(requires C++14 compiler). This may give better performance than C++11.
 
 
 ### Saving gltTF 2.0 model
@@ -193,3 +196,4 @@ $ ./tester_noexcept
 * json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
 * stb_image : Public domain.
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
+* RapidJSON : Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved. http://rapidjson.org/
