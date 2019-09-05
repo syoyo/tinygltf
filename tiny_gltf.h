@@ -585,6 +585,7 @@ struct Sampler {
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
   Sampler(const Sampler &) = default;
+  Sampler &operator=(const Sampler &) = default;
   Sampler(Sampler &&rhs) noexcept : name(std::move(rhs.name)),
                                     minFilter(rhs.minFilter),
                                     magFilter(rhs.magFilter),
@@ -626,6 +627,7 @@ struct Image {
     component = -1;
   }
   Image(const Image &) = default;
+  Image &operator=(const Image &) = default;
   Image(Image &&rhs) noexcept : name(std::move(rhs.name)),
                                 width(rhs.width),
                                 height(rhs.height),
@@ -653,6 +655,7 @@ struct Texture {
 
   Texture() : sampler(-1), source(-1) {}
   Texture(const Texture &) = default;
+  Texture &operator=(const Texture &) = default;
   Texture(Texture &&rhs) noexcept : name(std::move(rhs.name)),
                                     sampler(rhs.sampler),
                                     source(rhs.source),
@@ -672,6 +675,7 @@ struct TextureInfo {
 
   TextureInfo() : index(-1), texCoord(0) {}
   TextureInfo(const TextureInfo &) = default;
+  TextureInfo &operator=(const TextureInfo &) = default;
   TextureInfo(TextureInfo &&rhs) noexcept
       : index(rhs.index),
         texCoord(rhs.texCoord),
@@ -692,6 +696,7 @@ struct NormalTextureInfo {
 
   NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
   NormalTextureInfo(const NormalTextureInfo &) = default;
+  NormalTextureInfo &operator=(const NormalTextureInfo &) = default;
   NormalTextureInfo(NormalTextureInfo &&rhs) noexcept
       : index(rhs.index),
         texCoord(rhs.texCoord),
@@ -713,6 +718,7 @@ struct OcclusionTextureInfo {
 
   OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
   OcclusionTextureInfo(const OcclusionTextureInfo &) = default;
+  OcclusionTextureInfo &operator=(const OcclusionTextureInfo &) = default;
   OcclusionTextureInfo(OcclusionTextureInfo &&rhs) noexcept
       : index(rhs.index),
         texCoord(rhs.texCoord),
@@ -735,6 +741,7 @@ struct PbrMetallicRoughness {
 
   PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {}
   PbrMetallicRoughness(const PbrMetallicRoughness &) = default;
+  PbrMetallicRoughness &operator=(const PbrMetallicRoughness &) = default;
   PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept
       : baseColorFactor(std::move(rhs.baseColorFactor)),
         baseColorTexture(std::move(rhs.baseColorTexture)),
@@ -773,6 +780,7 @@ struct Material {
 
   Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
   Material(const Material &) = default;
+  Material &operator=(const Material &) = default;
   Material(Material &&rhs) noexcept
       : name(std::move(rhs.name)),
         emissiveFactor(std::move(rhs.emissiveFactor)),
@@ -804,6 +812,7 @@ struct BufferView {
 
   BufferView() : byteOffset(0), byteStride(0), dracoDecoded(false) {}
   BufferView(const BufferView &) = default;
+  BufferView &operator=(const BufferView &) = default;
   BufferView(BufferView &&rhs) noexcept : name(std::move(rhs.name)),
                                           buffer(rhs.buffer),
                                           byteOffset(rhs.byteOffset),
@@ -885,6 +894,7 @@ struct Accessor {
     sparse.isSparse = false;
   }
   Accessor(const Accessor &) = default;
+  Accessor &operator=(const Accessor &) = default;
   Accessor(Accessor &&rhs) noexcept : bufferView(rhs.bufferView),
                                       name(std::move(rhs.name)),
                                       byteOffset(rhs.byteOffset),
@@ -912,6 +922,7 @@ struct PerspectiveCamera {
         ,
         znear(0.0) {}
   PerspectiveCamera(const PerspectiveCamera &) = default;
+  PerspectiveCamera &operator=(const PerspectiveCamera &) = default;
   PerspectiveCamera(PerspectiveCamera &&rhs) noexcept
       : aspectRatio(rhs.aspectRatio),
         yfov(rhs.yfov),
@@ -933,6 +944,7 @@ struct OrthographicCamera {
 
   OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
   OrthographicCamera(const OrthographicCamera &) = default;
+  OrthographicCamera &operator=(const OrthographicCamera &) = default;
   OrthographicCamera(OrthographicCamera &&rhs) noexcept
       : xmag(rhs.xmag),
         ymag(rhs.ymag),
@@ -955,6 +967,8 @@ struct Camera {
 
   Camera() {}
   Camera(const Camera &) = default;
+  Camera &operator=(const Camera &) = default;
+
   Camera(Camera &&rhs) noexcept : type(std::move(rhs.type)),
                                   name(std::move(rhs.name)),
                                   perspective(std::move(rhs.perspective)),
@@ -988,6 +1002,7 @@ struct Primitive {
     indices = -1;
   }
   Primitive(const Primitive &) = default;
+  Primitive &operator=(const Primitive &) = default;
   Primitive(Primitive &&rhs) noexcept : attributes(std::move(rhs.attributes)),
                                         material(rhs.material),
                                         indices(rhs.indices),
@@ -1088,6 +1103,8 @@ class Node {
 
 struct Buffer {
   Buffer() = default;
+  Buffer(const Buffer &) = default;
+  Buffer &operator=(const Buffer &) = default;
   Buffer(Buffer &&rhs) noexcept : name(std::move(rhs.name)),
                                   data(std::move(rhs.data)),
                                   uri(std::move(rhs.uri)),
@@ -1138,6 +1155,8 @@ struct Scene {
 
   Scene() = default;
   Scene(const Scene &) = default;
+  Scene &operator=(const Scene &) = default;
+
   Scene(Scene &&rhs) noexcept : name(std::move(rhs.name)),
                                 nodes(std::move(rhs.nodes)),
                                 extensions(std::move(rhs.extensions)),
@@ -1148,6 +1167,18 @@ struct Scene {
 struct SpotLight {
   double innerConeAngle;
   double outerConeAngle;
+
+  SpotLight &operator=(const SpotLight &) = default;
+
+  SpotLight &operator=(SpotLight &&rhs) {
+    innerConeAngle = rhs.innerConeAngle;
+    outerConeAngle = rhs.outerConeAngle;
+
+    extensions = std::move(rhs.extensions);
+    extras = std::move(rhs.extras);
+
+    return *this;
+  }
 
   SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
   SpotLight(const SpotLight &) = default;
@@ -1171,7 +1202,33 @@ struct Light {
   SpotLight spot;
 
   Light() : intensity(1.0), range(0.0) {}
-  Light(const Light &) = default;
+
+  Light &operator=(Light &&rhs) {
+    name = std::move(rhs.name);
+    color = std::move(rhs.color);
+    intensity = rhs.intensity;
+    type = std::move(rhs.type);
+    range = rhs.range;
+    spot = std::move(rhs.spot);
+    extensions = std::move(rhs.extensions);
+    extras = std::move(rhs.extras);
+
+    return *this;
+  }
+
+  Light &operator=(const Light &rhs) {
+    name = (rhs.name);
+    color = (rhs.color);
+    intensity = rhs.intensity;
+    type = (rhs.type);
+    range = rhs.range;
+    spot = (rhs.spot);
+    extensions = (rhs.extensions);
+    extras = (rhs.extras);
+
+    return *this;
+  }
+
   Light(Light &&rhs) noexcept : name(std::move(rhs.name)),
                                 color(std::move(rhs.color)),
                                 intensity(rhs.intensity),
@@ -1180,6 +1237,16 @@ struct Light {
                                 spot(std::move(rhs.spot)),
                                 extensions(std::move(rhs.extensions)),
                                 extras(std::move(rhs.extras)) {}
+
+  Light(const Light &rhs)
+      : name(rhs.name),
+        color(rhs.color),
+        intensity(rhs.intensity),
+        type(rhs.type),
+        range(rhs.range),
+        spot(rhs.spot),
+        extensions(rhs.extensions),
+        extras(rhs.extras) {}
 
   bool operator==(const Light &) const;
 
