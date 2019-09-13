@@ -6314,7 +6314,15 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     json pbrMetallicRoughness;
     SerializeGltfPbrMetallicRoughness(material.pbrMetallicRoughness,
                                       pbrMetallicRoughness);
-    JsonAddMember(o, "pbrMetallicRoughness", std::move(pbrMetallicRoughness));
+    // Issue 204
+    // Do not serialize `pbrMetallicRoughness` if pbrMetallicRoughness has all
+    // default values(json is null). Otherwise it will serialize to
+    // `pbrMetallicRoughness : null`, which cannot be read by other glTF
+    // importers(and validators).
+    //
+    if (!JsonIsNull(pbrMetallicRoughness)) {
+      JsonAddMember(o, "pbrMetallicRoughness", std::move(pbrMetallicRoughness));
+    }
   }
 
 #if 0  // legacy way. just for the record.
