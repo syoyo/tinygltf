@@ -739,7 +739,7 @@ struct PbrMetallicRoughness {
   Value extras;
   ExtensionMap extensions;
 
-  PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {}
+  PbrMetallicRoughness() : baseColorFactor(std::vector<double>{ 1.0,1.0,1.0,1.0 }), metallicFactor(1.0), roughnessFactor(1.0) {}
   PbrMetallicRoughness(const PbrMetallicRoughness &) = default;
   PbrMetallicRoughness &operator=(const PbrMetallicRoughness &) = default;
   PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept
@@ -4412,11 +4412,8 @@ static bool ParsePbrMetallicRoughness(PbrMetallicRoughness *pbr,
       }
       return false;
     }
-  } else {
-    // fill with default values
-    baseColorFactor = {1.0, 1.0, 1.0, 1.0};
+    pbr->baseColorFactor = baseColorFactor;
   }
-  pbr->baseColorFactor = baseColorFactor;
 
   {
     json_const_iterator it;
