@@ -739,7 +739,7 @@ struct PbrMetallicRoughness {
   Value extras;
   ExtensionMap extensions;
 
-  PbrMetallicRoughness() : metallicFactor(1.0), roughnessFactor(1.0) {}
+  PbrMetallicRoughness() : baseColorFactor(std::vector<double>{ 1.0,1.0,1.0,1.0 }), metallicFactor(1.0), roughnessFactor(1.0) {}
   PbrMetallicRoughness(const PbrMetallicRoughness &) = default;
   PbrMetallicRoughness &operator=(const PbrMetallicRoughness &) = default;
   PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept
@@ -1903,7 +1903,8 @@ bool Material::operator==(const Material &other) const {
 }
 bool Mesh::operator==(const Mesh &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
-         this->name == other.name && this->primitives == other.primitives;
+         this->name == other.name && Equals(this->weights, other.weights) &&
+         this->primitives == other.primitives;
 }
 bool Model::operator==(const Model &other) const {
   return this->accessors == other.accessors &&
@@ -4411,11 +4412,8 @@ static bool ParsePbrMetallicRoughness(PbrMetallicRoughness *pbr,
       }
       return false;
     }
-  } else {
-    // fill with default values
-    baseColorFactor = {1.0, 1.0, 1.0, 1.0};
+    pbr->baseColorFactor = baseColorFactor;
   }
-  pbr->baseColorFactor = baseColorFactor;
 
   {
     json_const_iterator it;
@@ -5958,11 +5956,11 @@ static void SerializeParameterMap(ParameterMap &param, json &o) {
 }
 #endif
 
-static void SerializeExtensionMap(ExtensionMap &extensions, json &o) {
+static void SerializeExtensionMap(const ExtensionMap &extensions, json &o) {
   if (!extensions.size()) return;
 
   json extMap;
-  for (ExtensionMap::iterator extIt = extensions.begin();
+  for (ExtensionMap::const_iterator extIt = extensions.begin();
        extIt != extensions.end(); ++extIt) {
     // Allow an empty object for extension(#97)
     json ret;
@@ -6388,6 +6386,8 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
       JsonAddMember(primitive, "targets", std::move(targets));
     }
 
+    SerializeExtensionMap(gltfPrimitive.extensions, o);
+
     if (gltfPrimitive.extras.Type() != NULL_TYPE) {
       SerializeValue("extras", gltfPrimitive.extras, primitive);
     }
@@ -6405,6 +6405,7 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
     SerializeStringProperty("name", mesh.name, o);
   }
 
+  SerializeExtensionMap(mesh.extensions, o);
   if (mesh.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", mesh.extras, o);
   }
@@ -6414,6 +6415,9 @@ static void SerializeSpotLight(SpotLight &spot, json &o) {
   SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
   SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
   SerializeExtensionMap(spot.extensions, o);
+  if (spot.extras.Type() != NULL_TYPE) {
+	  SerializeValue("extras", spot.extras, o);
+  }
 }
 
 static void SerializeGltfLight(Light &light, json &o) {
@@ -6426,6 +6430,10 @@ static void SerializeGltfLight(Light &light, json &o) {
     json spot;
     SerializeSpotLight(light.spot, spot);
     JsonAddMember(o, "spot", std::move(spot));
+  }
+  SerializeExtensionMap(light.extensions, o);
+  if (light.extras.Type() != NULL_TYPE) {
+	  SerializeValue("extras", light.extras, o);
   }
 }
 
