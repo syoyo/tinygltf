@@ -720,15 +720,9 @@ struct PbrMetallicRoughness {
 
   PbrMetallicRoughness() : baseColorFactor(std::vector<double>{ 1.0,1.0,1.0,1.0 }), metallicFactor(1.0), roughnessFactor(1.0) {}
   PbrMetallicRoughness(const PbrMetallicRoughness &) = default;
+  PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept = default;
   PbrMetallicRoughness &operator=(const PbrMetallicRoughness &) = default;
-  PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept
-      : baseColorFactor(std::move(rhs.baseColorFactor)),
-        baseColorTexture(std::move(rhs.baseColorTexture)),
-        metallicFactor(rhs.metallicFactor),
-        roughnessFactor(rhs.roughnessFactor),
-        metallicRoughnessTexture(std::move(rhs.metallicRoughnessTexture)),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  PbrMetallicRoughness &operator=(PbrMetallicRoughness &&) noexcept = default;
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
