@@ -271,23 +271,10 @@ class Value {
   explicit Value(const Object &o) : type_(OBJECT_TYPE) { object_value_ = o; }
   explicit Value(Object &&o) noexcept : type_(OBJECT_TYPE),
                                         object_value_(std::move(o)) {}
-  Value(Value &&rhs) noexcept : type_(rhs.type_),
-                                int_value_(rhs.int_value_),
-                                real_value_(rhs.real_value_),
-                                string_value_(std::move(rhs.string_value_)),
-                                binary_value_(std::move(rhs.binary_value_)),
-                                array_value_(std::move(rhs.array_value_)),
-                                object_value_(std::move(rhs.object_value_)),
-                                boolean_value_(rhs.boolean_value_) {}
-  Value(const Value &rhs) = default;
-  Value &operator=(const Value &rhs) = default;
-  Value &operator=(Value &&rhs) {
-    if (this != &rhs) {
-      this->~Value();
-      new (reinterpret_cast<void *>(this)) Value(std::move(rhs));
-    }
-    return *this;
-  }
+  Value(const Value &) = default;
+  Value(Value &&) noexcept = default;
+  Value &operator=(const Value &) = default;
+  Value &operator=(Value &&) noexcept = default;
 
   char Type() const { return static_cast<const char>(type_); }
 
@@ -498,6 +485,11 @@ struct Parameter {
          (number_array.size() > 3 ? number_array[3] : 1.0)}};
   }
 
+  Parameter() = default;
+  Parameter(const Parameter &) = default;
+  Parameter(Parameter &&) noexcept = default;
+  Parameter &operator=(const Parameter &) = default;
+  Parameter &operator=(Parameter &&) noexcept = default;
   bool operator==(const Parameter &) const;
 };
 
@@ -522,6 +514,10 @@ struct AnimationChannel {
   ExtensionMap extensions;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
+  AnimationChannel(const AnimationChannel &) = default;
+  AnimationChannel(AnimationChannel &&) noexcept = default;
+  AnimationChannel &operator=(const AnimationChannel &) = default;
+  AnimationChannel &operator=(AnimationChannel &&) noexcept = default;
   bool operator==(const AnimationChannel &) const;
 };
 
@@ -533,6 +529,10 @@ struct AnimationSampler {
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
+  AnimationSampler(const AnimationSampler &) = default;
+  AnimationSampler(AnimationSampler &&) noexcept = default;
+  AnimationSampler &operator=(const AnimationSampler &) = default;
+  AnimationSampler &operator=(AnimationSampler &&) noexcept = default;
   bool operator==(const AnimationSampler &) const;
 };
 
@@ -543,6 +543,11 @@ struct Animation {
   Value extras;
   ExtensionMap extensions;
 
+  Animation() = default;
+  Animation(const Animation &) = default;
+  Animation(Animation &&) noexcept = default;
+  Animation &operator=(const Animation &) = default;
+  Animation &operator=(Animation &&) noexcept = default;
   bool operator==(const Animation &) const;
 };
 
@@ -556,6 +561,10 @@ struct Skin {
     inverseBindMatrices = -1;
     skeleton = -1;
   }
+  Skin(const Skin &) = default;
+  Skin(Skin &&) noexcept = default;
+  Skin &operator=(const Skin &) = default;
+  Skin &operator=(Skin &&) noexcept = default;
   bool operator==(const Skin &) const;
 };
 
@@ -585,14 +594,9 @@ struct Sampler {
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
   Sampler(const Sampler &) = default;
+  Sampler(Sampler &&) noexcept = default;
   Sampler &operator=(const Sampler &) = default;
-  Sampler(Sampler &&rhs) noexcept : name(std::move(rhs.name)),
-                                    minFilter(rhs.minFilter),
-                                    magFilter(rhs.magFilter),
-                                    wrapS(rhs.wrapS),
-                                    wrapT(rhs.wrapT),
-                                    wrapR(rhs.wrapR),
-                                    extras(std::move(rhs.extras)) {}
+  Sampler &operator=(Sampler &&) noexcept = default;
   bool operator==(const Sampler &) const;
 };
 
@@ -627,20 +631,9 @@ struct Image {
     component = -1;
   }
   Image(const Image &) = default;
+  Image(Image &&) noexcept = default;
   Image &operator=(const Image &) = default;
-  Image(Image &&rhs) noexcept : name(std::move(rhs.name)),
-                                width(rhs.width),
-                                height(rhs.height),
-                                component(rhs.component),
-                                bits(rhs.bits),
-                                pixel_type(rhs.pixel_type),
-                                image(std::move(rhs.image)),
-                                bufferView(rhs.bufferView),
-                                mimeType(std::move(rhs.mimeType)),
-                                uri(std::move(rhs.uri)),
-                                extras(std::move(rhs.extras)),
-                                extensions(std::move(rhs.extensions)),
-                                as_is(rhs.as_is) {}
+  Image &operator=(Image &&) noexcept = default;
 
   bool operator==(const Image &) const;
 };
@@ -655,12 +648,9 @@ struct Texture {
 
   Texture() : sampler(-1), source(-1) {}
   Texture(const Texture &) = default;
+  Texture(Texture &&) noexcept = default;
   Texture &operator=(const Texture &) = default;
-  Texture(Texture &&rhs) noexcept : name(std::move(rhs.name)),
-                                    sampler(rhs.sampler),
-                                    source(rhs.source),
-                                    extras(std::move(rhs.extras)),
-                                    extensions(std::move(rhs.extensions)) {}
+  Texture &operator=(Texture &&) noexcept = default;
 
   bool operator==(const Texture &) const;
 };
@@ -675,12 +665,9 @@ struct TextureInfo {
 
   TextureInfo() : index(-1), texCoord(0) {}
   TextureInfo(const TextureInfo &) = default;
+  TextureInfo(TextureInfo &&) noexcept = default;
   TextureInfo &operator=(const TextureInfo &) = default;
-  TextureInfo(TextureInfo &&rhs) noexcept
-      : index(rhs.index),
-        texCoord(rhs.texCoord),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  TextureInfo &operator=(TextureInfo &&) noexcept = default;
   bool operator==(const TextureInfo &) const;
 };
 
@@ -696,13 +683,9 @@ struct NormalTextureInfo {
 
   NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
   NormalTextureInfo(const NormalTextureInfo &) = default;
+  NormalTextureInfo(NormalTextureInfo &&) noexcept = default;
   NormalTextureInfo &operator=(const NormalTextureInfo &) = default;
-  NormalTextureInfo(NormalTextureInfo &&rhs) noexcept
-      : index(rhs.index),
-        texCoord(rhs.texCoord),
-        scale(rhs.scale),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  NormalTextureInfo &operator=(NormalTextureInfo &&) noexcept = default;
   bool operator==(const NormalTextureInfo &) const;
 };
 
@@ -718,13 +701,9 @@ struct OcclusionTextureInfo {
 
   OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
   OcclusionTextureInfo(const OcclusionTextureInfo &) = default;
+  OcclusionTextureInfo(OcclusionTextureInfo &&) noexcept = default;
   OcclusionTextureInfo &operator=(const OcclusionTextureInfo &) = default;
-  OcclusionTextureInfo(OcclusionTextureInfo &&rhs) noexcept
-      : index(rhs.index),
-        texCoord(rhs.texCoord),
-        strength(rhs.strength),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  OcclusionTextureInfo &operator=(OcclusionTextureInfo &&) noexcept = default;
   bool operator==(const OcclusionTextureInfo &) const;
 };
 
@@ -780,21 +759,9 @@ struct Material {
 
   Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
   Material(const Material &) = default;
+  Material(Material &&rhs) noexcept = default;
   Material &operator=(const Material &) = default;
-  Material(Material &&rhs) noexcept
-      : name(std::move(rhs.name)),
-        emissiveFactor(std::move(rhs.emissiveFactor)),
-        alphaMode(std::move(rhs.alphaMode)),
-        alphaCutoff(rhs.alphaCutoff),
-        doubleSided(rhs.doubleSided),
-        pbrMetallicRoughness(std::move(rhs.pbrMetallicRoughness)),
-        normalTexture(std::move(rhs.normalTexture)),
-        occlusionTexture(std::move(rhs.occlusionTexture)),
-        emissiveTexture(std::move(rhs.emissiveTexture)),
-        values(std::move(rhs.values)),
-        additionalValues(std::move(rhs.additionalValues)),
-        extensions(std::move(rhs.extensions)),
-        extras(std::move(rhs.extras)) {}
+  Material &operator=(Material &&) noexcept = default;
 
   bool operator==(const Material &) const;
 };
@@ -812,15 +779,9 @@ struct BufferView {
 
   BufferView() : byteOffset(0), byteStride(0), dracoDecoded(false) {}
   BufferView(const BufferView &) = default;
+  BufferView(BufferView &&) noexcept = default;
   BufferView &operator=(const BufferView &) = default;
-  BufferView(BufferView &&rhs) noexcept : name(std::move(rhs.name)),
-                                          buffer(rhs.buffer),
-                                          byteOffset(rhs.byteOffset),
-                                          byteLength(rhs.byteLength),
-                                          byteStride(rhs.byteStride),
-                                          target(rhs.target),
-                                          extras(std::move(rhs.extras)),
-                                          dracoDecoded(rhs.dracoDecoded) {}
+  BufferView &operator=(BufferView &&) noexcept = default;
   bool operator==(const BufferView &) const;
 };
 
@@ -894,18 +855,9 @@ struct Accessor {
     sparse.isSparse = false;
   }
   Accessor(const Accessor &) = default;
+  Accessor(Accessor &&) noexcept = default;
   Accessor &operator=(const Accessor &) = default;
-  Accessor(Accessor &&rhs) noexcept : bufferView(rhs.bufferView),
-                                      name(std::move(rhs.name)),
-                                      byteOffset(rhs.byteOffset),
-                                      normalized(rhs.normalized),
-                                      componentType(rhs.componentType),
-                                      count(rhs.count),
-                                      type(rhs.type),
-                                      extras(std::move(rhs.extras)),
-                                      minValues(std::move(rhs.minValues)),
-                                      maxValues(std::move(rhs.maxValues)),
-                                      sparse(rhs.sparse) {}
+  Accessor &operator=(Accessor &&) noexcept = default;
   bool operator==(const tinygltf::Accessor &) const;
 };
 
@@ -922,14 +874,9 @@ struct PerspectiveCamera {
         ,
         znear(0.0) {}
   PerspectiveCamera(const PerspectiveCamera &) = default;
+  PerspectiveCamera(PerspectiveCamera &&) noexcept = default;
   PerspectiveCamera &operator=(const PerspectiveCamera &) = default;
-  PerspectiveCamera(PerspectiveCamera &&rhs) noexcept
-      : aspectRatio(rhs.aspectRatio),
-        yfov(rhs.yfov),
-        zfar(rhs.zfar),
-        znear(rhs.znear),
-        extensions(std::move(rhs.extensions)),
-        extras(std::move(rhs.extras)) {}
+  PerspectiveCamera &operator=(PerspectiveCamera &&) noexcept = default;
   bool operator==(const PerspectiveCamera &) const;
 
   ExtensionMap extensions;
@@ -944,14 +891,9 @@ struct OrthographicCamera {
 
   OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
   OrthographicCamera(const OrthographicCamera &) = default;
+  OrthographicCamera(OrthographicCamera &&) noexcept = default;
   OrthographicCamera &operator=(const OrthographicCamera &) = default;
-  OrthographicCamera(OrthographicCamera &&rhs) noexcept
-      : xmag(rhs.xmag),
-        ymag(rhs.ymag),
-        zfar(rhs.zfar),
-        znear(rhs.znear),
-        extensions(std::move(rhs.extensions)),
-        extras(std::move(rhs.extras)) {}
+  OrthographicCamera &operator=(OrthographicCamera &&) noexcept = default;
   bool operator==(const OrthographicCamera &) const;
 
   ExtensionMap extensions;
@@ -967,14 +909,9 @@ struct Camera {
 
   Camera() {}
   Camera(const Camera &) = default;
+  Camera(Camera &&) noexcept = default;
   Camera &operator=(const Camera &) = default;
-
-  Camera(Camera &&rhs) noexcept : type(std::move(rhs.type)),
-                                  name(std::move(rhs.name)),
-                                  perspective(std::move(rhs.perspective)),
-                                  orthographic(std::move(rhs.orthographic)),
-                                  extensions(std::move(rhs.extensions)),
-                                  extras(std::move(rhs.extras)) {}
+  Camera &operator=(Camera &&) noexcept = default;
   bool operator==(const Camera &) const;
 
   ExtensionMap extensions;
@@ -1002,14 +939,9 @@ struct Primitive {
     indices = -1;
   }
   Primitive(const Primitive &) = default;
+  Primitive(Primitive &&) noexcept = default;
   Primitive &operator=(const Primitive &) = default;
-  Primitive(Primitive &&rhs) noexcept : attributes(std::move(rhs.attributes)),
-                                        material(rhs.material),
-                                        indices(rhs.indices),
-                                        mode(rhs.mode),
-                                        targets(std::move(rhs.targets)),
-                                        extensions(std::move(rhs.extensions)),
-                                        extras(std::move(rhs.extras)) {}
+  Primitive &operator=(Primitive &&) noexcept = default;
   bool operator==(const Primitive &) const;
 };
 
@@ -1023,19 +955,9 @@ struct Mesh {
   Mesh() = default;
   ~Mesh() = default;
   Mesh(const Mesh &) = default;
-  Mesh(Mesh &&rhs) noexcept : name(std::move(rhs.name)),
-                              primitives(std::move(rhs.primitives)),
-                              weights(std::move(rhs.weights)),
-                              extensions(std::move(rhs.extensions)),
-                              extras(std::move(rhs.extras)) {}
+  Mesh(Mesh &&) noexcept = default;
   Mesh &operator=(const Mesh &) = default;
-  Mesh &operator=(Mesh &&rhs) {
-    if (&rhs != this) {
-      this->~Mesh();
-      new (reinterpret_cast<void *>(this)) Mesh(std::move(rhs));
-    }
-    return *this;
-  }
+  Mesh &operator=(Mesh &&) noexcept = default;
   bool operator==(const Mesh &) const;
 };
 
@@ -1043,45 +965,10 @@ class Node {
  public:
   Node() : camera(-1), skin(-1), mesh(-1) {}
 
-  // TODO(syoyo): Could use `default`
-  Node(const Node &rhs) {
-    camera = rhs.camera;
-
-    name = rhs.name;
-    skin = rhs.skin;
-    mesh = rhs.mesh;
-    children = rhs.children;
-    rotation = rhs.rotation;
-    scale = rhs.scale;
-    translation = rhs.translation;
-    matrix = rhs.matrix;
-    weights = rhs.weights;
-
-    extensions = rhs.extensions;
-    extras = rhs.extras;
-  }
-  Node(Node &&rhs) noexcept : camera(rhs.camera),
-                              name(std::move(rhs.name)),
-                              skin(rhs.skin),
-                              mesh(rhs.mesh),
-                              children(std::move(rhs.children)),
-                              rotation(std::move(rhs.rotation)),
-                              scale(std::move(rhs.scale)),
-                              translation(std::move(rhs.translation)),
-                              matrix(std::move(rhs.matrix)),
-                              weights(std::move(rhs.weights)),
-                              extensions(std::move(rhs.extensions)),
-                              extras(std::move(rhs.extras)) {}
-  ~Node() {}
-
-  Node &operator=(const Node &rhs) = default;
-  Node &operator=(Node &&rhs) {
-    if (&rhs != this) {
-      this->~Node();
-      new (reinterpret_cast<void *>(this)) Node(std::move(rhs));
-    }
-    return *this;
-  }
+  Node(const Node &) = default;
+  Node(Node &&) noexcept = default;
+  Node &operator=(const Node &) = default;
+  Node &operator=(Node &&) noexcept = default;
 
   bool operator==(const Node &) const;
 
@@ -1104,11 +991,9 @@ class Node {
 struct Buffer {
   Buffer() = default;
   Buffer(const Buffer &) = default;
+  Buffer(Buffer &&) noexcept = default;
   Buffer &operator=(const Buffer &) = default;
-  Buffer(Buffer &&rhs) noexcept : name(std::move(rhs.name)),
-                                  data(std::move(rhs.data)),
-                                  uri(std::move(rhs.uri)),
-                                  extras(std::move(rhs.extras)) {}
+  Buffer &operator=(Buffer &&) noexcept = default;
   std::string name;
   std::vector<unsigned char> data;
   std::string
@@ -1129,20 +1014,9 @@ struct Asset {
   Asset() = default;
   ~Asset() = default;
   Asset(const Asset &) = default;
-  Asset(Asset &&rhs) noexcept : version(std::move(rhs.version)),
-                                generator(std::move(rhs.generator)),
-                                minVersion(std::move(rhs.minVersion)),
-                                copyright(std::move(rhs.copyright)),
-                                extensions(std::move(rhs.extensions)),
-                                extras(std::move(rhs.extras)) {}
+  Asset(Asset &&) noexcept = default;
   Asset &operator=(const Asset &) = default;
-  Asset &operator=(Asset &&rhs) {
-    if (&rhs != this) {
-      this->~Asset();
-      new (reinterpret_cast<void *>(this)) Asset(std::move(rhs));
-    }
-    return *this;
-  }
+  Asset &operator=(Asset &&) noexcept = default;
   bool operator==(const Asset &) const;
 };
 
@@ -1155,12 +1029,9 @@ struct Scene {
 
   Scene() = default;
   Scene(const Scene &) = default;
+  Scene(Scene &&) noexcept = default;
   Scene &operator=(const Scene &) = default;
-
-  Scene(Scene &&rhs) noexcept : name(std::move(rhs.name)),
-                                nodes(std::move(rhs.nodes)),
-                                extensions(std::move(rhs.extensions)),
-                                extras(std::move(rhs.extras)) {}
+  Scene &operator=(Scene &&) noexcept = default;
   bool operator==(const Scene &) const;
 };
 
@@ -1168,25 +1039,11 @@ struct SpotLight {
   double innerConeAngle;
   double outerConeAngle;
 
-  SpotLight &operator=(const SpotLight &) = default;
-
-  SpotLight &operator=(SpotLight &&rhs) {
-    innerConeAngle = rhs.innerConeAngle;
-    outerConeAngle = rhs.outerConeAngle;
-
-    extensions = std::move(rhs.extensions);
-    extras = std::move(rhs.extras);
-
-    return *this;
-  }
-
   SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
   SpotLight(const SpotLight &) = default;
-  SpotLight(SpotLight &&rhs) noexcept : innerConeAngle(rhs.innerConeAngle),
-                                        outerConeAngle(rhs.outerConeAngle),
-                                        extensions(std::move(rhs.extensions)),
-                                        extras(std::move(rhs.extras)) {}
-
+  SpotLight(SpotLight &&) noexcept = default;
+  SpotLight &operator=(const SpotLight &) = default;
+  SpotLight &operator=(SpotLight &&) noexcept = default;
   bool operator==(const SpotLight &) const;
 
   ExtensionMap extensions;
@@ -1202,51 +1059,10 @@ struct Light {
   SpotLight spot;
 
   Light() : intensity(1.0), range(0.0) {}
-
-  Light &operator=(Light &&rhs) {
-    name = std::move(rhs.name);
-    color = std::move(rhs.color);
-    intensity = rhs.intensity;
-    type = std::move(rhs.type);
-    range = rhs.range;
-    spot = std::move(rhs.spot);
-    extensions = std::move(rhs.extensions);
-    extras = std::move(rhs.extras);
-
-    return *this;
-  }
-
-  Light &operator=(const Light &rhs) {
-    name = (rhs.name);
-    color = (rhs.color);
-    intensity = rhs.intensity;
-    type = (rhs.type);
-    range = rhs.range;
-    spot = (rhs.spot);
-    extensions = (rhs.extensions);
-    extras = (rhs.extras);
-
-    return *this;
-  }
-
-  Light(Light &&rhs) noexcept : name(std::move(rhs.name)),
-                                color(std::move(rhs.color)),
-                                intensity(rhs.intensity),
-                                type(std::move(rhs.type)),
-                                range(rhs.range),
-                                spot(std::move(rhs.spot)),
-                                extensions(std::move(rhs.extensions)),
-                                extras(std::move(rhs.extras)) {}
-
-  Light(const Light &rhs)
-      : name(rhs.name),
-        color(rhs.color),
-        intensity(rhs.intensity),
-        type(rhs.type),
-        range(rhs.range),
-        spot(rhs.spot),
-        extensions(rhs.extensions),
-        extras(rhs.extras) {}
+  Light(const Light &) = default;
+  Light(Light &&) noexcept = default;
+  Light &operator=(const Light &) = default;
+  Light &operator=(Light &&) noexcept = default;
 
   bool operator==(const Light &) const;
 
@@ -1256,33 +1072,11 @@ struct Light {
 
 class Model {
  public:
-  Model() {}
-
+  Model() = default;
   Model(const Model &) = default;
+  Model(Model &&) noexcept = default;
   Model &operator=(const Model &) = default;
-  Model(Model &&rhs) noexcept
-      : accessors(std::move(rhs.accessors)),
-        animations(std::move(rhs.animations)),
-        buffers(std::move(rhs.buffers)),
-        bufferViews(std::move(rhs.bufferViews)),
-        materials(std::move(rhs.materials)),
-        meshes(std::move(rhs.meshes)),
-        nodes(std::move(rhs.nodes)),
-        textures(std::move(rhs.textures)),
-        images(std::move(rhs.images)),
-        skins(std::move(rhs.skins)),
-        samplers(std::move(rhs.samplers)),
-        cameras(std::move(rhs.cameras)),
-        scenes(std::move(rhs.scenes)),
-        lights(std::move(rhs.lights)),
-        extensions(std::move(rhs.extensions)),
-        defaultScene(rhs.defaultScene),
-        extensionsUsed(std::move(rhs.extensionsUsed)),
-        extensionsRequired(std::move(rhs.extensionsRequired)),
-        asset(std::move(rhs.asset)),
-        extras(std::move(rhs.extras)) {}
-
-  ~Model() {}
+  Model &operator=(Model &&) noexcept = default;
 
   bool operator==(const Model &) const;
 
