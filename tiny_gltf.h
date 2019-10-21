@@ -2408,7 +2408,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   size_t sz = static_cast<size_t>(f.tellg());
   f.seekg(0, f.beg);
 
-  if (int(sz) < 0) {
+  if (int64_t(sz) < 0) {
     if (err) {
       (*err) += "Invalid file size : " + filepath +
                 " (does the path point to a directory?)";
