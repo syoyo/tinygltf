@@ -43,6 +43,7 @@ script:
   - ${CXX} ${EXTRA_CXXFLAGS} -std=c++11 -Wall -g -o loader_example loader_example.cc
   - ./loader_example ./models/Cube/Cube.gltf
   - cd tests
+  - clang++ -v
   - make
   - ./tester
   - ./tester_noexcept
