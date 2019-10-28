@@ -5618,6 +5618,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   // JSON contents,
   // so use "greater than" operator.
   if ((20 + model_length > size) || (model_length < 1) || (length > size) ||
+      (20 + model_length > length) ||
       (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
