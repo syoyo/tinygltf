@@ -67,11 +67,16 @@
 #endif
 #endif
 
-#if TINYGLTF_USE_NOEXECEPT
-#define TINYGLTF_NOEXCEPT noexcept
-#else
+#ifdef __GNUC__
+#if (__GNUC__ < 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ <= 8))
 #define TINYGLTF_NOEXCEPT
+#else
+#define TINYGLTF_NOEXCEPT noexcept
 #endif
+#else
+#define TINYGLTF_NOEXCEPT noexcept
+#endif
+
 #define DEFAULT_METHODS(x)								\
 	~x() = default;										\
 	x(const x&) = default;								\
@@ -4209,6 +4214,7 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
     }
   }
 
+  /* ASOBO_MOD:: do not read these values, because they are not serialized and will make Material::operator==() return false after serialize/parse/compare
   // Old code path. For backward compatibility, we still store material values
   // as Parameter. This will create duplicated information for
   // example(pbrMetallicRoughness), but should be neglible in terms of memory
@@ -4250,6 +4256,7 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
       }
     }
   }
+  */ //::ASOBO_MOD
 
   material->extensions.clear();
   ParseExtensionsProperty(&material->extensions, err, o);
