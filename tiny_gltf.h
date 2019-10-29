@@ -4214,7 +4214,6 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
     }
   }
 
-  /* ASOBO_MOD:: do not read these values, because they are not serialized and will make Material::operator==() return false after serialize/parse/compare
   // Old code path. For backward compatibility, we still store material values
   // as Parameter. This will create duplicated information for
   // example(pbrMetallicRoughness), but should be neglible in terms of memory
@@ -4256,7 +4255,6 @@ static bool ParseMaterial(Material *material, std::string *err, const json &o) {
       }
     }
   }
-  */ //::ASOBO_MOD
 
   material->extensions.clear();
   ParseExtensionsProperty(&material->extensions, err, o);
