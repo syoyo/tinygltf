@@ -67,6 +67,18 @@
 #endif
 #endif
 
+#if TINYGLTF_USE_NOEXECEPT
+#define TINYGLTF_NOEXCEPT noexcept
+#else
+#define TINYGLTF_NOEXCEPT
+#endif
+#define DEFAULT_METHODS(x)								\
+	~x() = default;										\
+	x(const x&) = default;								\
+	x(x&&) TINYGLTF_NOEXCEPT = default;					\
+	x& operator=(const x&) = default;					\
+	x& operator=(x&&) TINYGLTF_NOEXCEPT = default;
+
 namespace tinygltf {
 
 #define TINYGLTF_MODE_POINTS (0)
@@ -271,10 +283,8 @@ class Value {
   explicit Value(const Object &o) : type_(OBJECT_TYPE) { object_value_ = o; }
   explicit Value(Object &&o) noexcept : type_(OBJECT_TYPE),
                                         object_value_(std::move(o)) {}
-  Value(const Value &) = default;
-  Value(Value &&) noexcept = default;
-  Value &operator=(const Value &) = default;
-  Value &operator=(Value &&) noexcept = default;
+
+  DEFAULT_METHODS(Value)
 
   char Type() const { return static_cast<const char>(type_); }
 
@@ -486,10 +496,7 @@ struct Parameter {
   }
 
   Parameter() = default;
-  Parameter(const Parameter &) = default;
-  Parameter(Parameter &&) noexcept = default;
-  Parameter &operator=(const Parameter &) = default;
-  Parameter &operator=(Parameter &&) noexcept = default;
+  DEFAULT_METHODS(Parameter)
   bool operator==(const Parameter &) const;
 };
 
@@ -514,10 +521,7 @@ struct AnimationChannel {
   ExtensionMap extensions;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
-  AnimationChannel(const AnimationChannel &) = default;
-  AnimationChannel(AnimationChannel &&) noexcept = default;
-  AnimationChannel &operator=(const AnimationChannel &) = default;
-  AnimationChannel &operator=(AnimationChannel &&) noexcept = default;
+  DEFAULT_METHODS(AnimationChannel)
   bool operator==(const AnimationChannel &) const;
 };
 
@@ -529,10 +533,7 @@ struct AnimationSampler {
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
-  AnimationSampler(const AnimationSampler &) = default;
-  AnimationSampler(AnimationSampler &&) noexcept = default;
-  AnimationSampler &operator=(const AnimationSampler &) = default;
-  AnimationSampler &operator=(AnimationSampler &&) noexcept = default;
+  DEFAULT_METHODS(AnimationSampler)
   bool operator==(const AnimationSampler &) const;
 };
 
@@ -544,10 +545,7 @@ struct Animation {
   ExtensionMap extensions;
 
   Animation() = default;
-  Animation(const Animation &) = default;
-  Animation(Animation &&) noexcept = default;
-  Animation &operator=(const Animation &) = default;
-  Animation &operator=(Animation &&) noexcept = default;
+  DEFAULT_METHODS(Animation)
   bool operator==(const Animation &) const;
 };
 
@@ -561,10 +559,7 @@ struct Skin {
     inverseBindMatrices = -1;
     skeleton = -1;
   }
-  Skin(const Skin &) = default;
-  Skin(Skin &&) noexcept = default;
-  Skin &operator=(const Skin &) = default;
-  Skin &operator=(Skin &&) noexcept = default;
+  DEFAULT_METHODS(Skin)
   bool operator==(const Skin &) const;
 };
 
@@ -593,10 +588,7 @@ struct Sampler {
         wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
-  Sampler(const Sampler &) = default;
-  Sampler(Sampler &&) noexcept = default;
-  Sampler &operator=(const Sampler &) = default;
-  Sampler &operator=(Sampler &&) noexcept = default;
+  DEFAULT_METHODS(Sampler)
   bool operator==(const Sampler &) const;
 };
 
@@ -630,10 +622,7 @@ struct Image {
     height = -1;
     component = -1;
   }
-  Image(const Image &) = default;
-  Image(Image &&) noexcept = default;
-  Image &operator=(const Image &) = default;
-  Image &operator=(Image &&) noexcept = default;
+  DEFAULT_METHODS(Image)
 
   bool operator==(const Image &) const;
 };
@@ -647,10 +636,7 @@ struct Texture {
   ExtensionMap extensions;
 
   Texture() : sampler(-1), source(-1) {}
-  Texture(const Texture &) = default;
-  Texture(Texture &&) noexcept = default;
-  Texture &operator=(const Texture &) = default;
-  Texture &operator=(Texture &&) noexcept = default;
+  DEFAULT_METHODS(Texture)
 
   bool operator==(const Texture &) const;
 };
@@ -664,10 +650,7 @@ struct TextureInfo {
   ExtensionMap extensions;
 
   TextureInfo() : index(-1), texCoord(0) {}
-  TextureInfo(const TextureInfo &) = default;
-  TextureInfo(TextureInfo &&) noexcept = default;
-  TextureInfo &operator=(const TextureInfo &) = default;
-  TextureInfo &operator=(TextureInfo &&) noexcept = default;
+  DEFAULT_METHODS(TextureInfo)
   bool operator==(const TextureInfo &) const;
 };
 
@@ -682,10 +665,7 @@ struct NormalTextureInfo {
   ExtensionMap extensions;
 
   NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
-  NormalTextureInfo(const NormalTextureInfo &) = default;
-  NormalTextureInfo(NormalTextureInfo &&) noexcept = default;
-  NormalTextureInfo &operator=(const NormalTextureInfo &) = default;
-  NormalTextureInfo &operator=(NormalTextureInfo &&) noexcept = default;
+  DEFAULT_METHODS(NormalTextureInfo)
   bool operator==(const NormalTextureInfo &) const;
 };
 
@@ -700,10 +680,7 @@ struct OcclusionTextureInfo {
   ExtensionMap extensions;
 
   OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
-  OcclusionTextureInfo(const OcclusionTextureInfo &) = default;
-  OcclusionTextureInfo(OcclusionTextureInfo &&) noexcept = default;
-  OcclusionTextureInfo &operator=(const OcclusionTextureInfo &) = default;
-  OcclusionTextureInfo &operator=(OcclusionTextureInfo &&) noexcept = default;
+  DEFAULT_METHODS(OcclusionTextureInfo)
   bool operator==(const OcclusionTextureInfo &) const;
 };
 
@@ -719,10 +696,7 @@ struct PbrMetallicRoughness {
   ExtensionMap extensions;
 
   PbrMetallicRoughness() : baseColorFactor(std::vector<double>{ 1.0,1.0,1.0,1.0 }), metallicFactor(1.0), roughnessFactor(1.0) {}
-  PbrMetallicRoughness(const PbrMetallicRoughness &) = default;
-  PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept = default;
-  PbrMetallicRoughness &operator=(const PbrMetallicRoughness &) = default;
-  PbrMetallicRoughness &operator=(PbrMetallicRoughness &&) noexcept = default;
+  DEFAULT_METHODS(PbrMetallicRoughness)
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
@@ -752,10 +726,7 @@ struct Material {
   Value extras;
 
   Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
-  Material(const Material &) = default;
-  Material(Material &&rhs) noexcept = default;
-  Material &operator=(const Material &) = default;
-  Material &operator=(Material &&) noexcept = default;
+  DEFAULT_METHODS(Material)
 
   bool operator==(const Material &) const;
 };
@@ -772,10 +743,7 @@ struct BufferView {
   bool dracoDecoded;  // Flag indicating this has been draco decoded
 
   BufferView() : byteOffset(0), byteStride(0), dracoDecoded(false) {}
-  BufferView(const BufferView &) = default;
-  BufferView(BufferView &&) noexcept = default;
-  BufferView &operator=(const BufferView &) = default;
-  BufferView &operator=(BufferView &&) noexcept = default;
+  DEFAULT_METHODS(BufferView)
   bool operator==(const BufferView &) const;
 };
 
@@ -848,10 +816,7 @@ struct Accessor {
     bufferView = -1;
     sparse.isSparse = false;
   }
-  Accessor(const Accessor &) = default;
-  Accessor(Accessor &&) noexcept = default;
-  Accessor &operator=(const Accessor &) = default;
-  Accessor &operator=(Accessor &&) noexcept = default;
+  DEFAULT_METHODS(Accessor)
   bool operator==(const tinygltf::Accessor &) const;
 };
 
@@ -867,10 +832,7 @@ struct PerspectiveCamera {
         zfar(0.0)  // 0 = use infinite projecton matrix
         ,
         znear(0.0) {}
-  PerspectiveCamera(const PerspectiveCamera &) = default;
-  PerspectiveCamera(PerspectiveCamera &&) noexcept = default;
-  PerspectiveCamera &operator=(const PerspectiveCamera &) = default;
-  PerspectiveCamera &operator=(PerspectiveCamera &&) noexcept = default;
+  DEFAULT_METHODS(PerspectiveCamera)
   bool operator==(const PerspectiveCamera &) const;
 
   ExtensionMap extensions;
@@ -884,10 +846,7 @@ struct OrthographicCamera {
   double znear;  // required
 
   OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
-  OrthographicCamera(const OrthographicCamera &) = default;
-  OrthographicCamera(OrthographicCamera &&) noexcept = default;
-  OrthographicCamera &operator=(const OrthographicCamera &) = default;
-  OrthographicCamera &operator=(OrthographicCamera &&) noexcept = default;
+  DEFAULT_METHODS(OrthographicCamera)
   bool operator==(const OrthographicCamera &) const;
 
   ExtensionMap extensions;
@@ -902,10 +861,7 @@ struct Camera {
   OrthographicCamera orthographic;
 
   Camera() {}
-  Camera(const Camera &) = default;
-  Camera(Camera &&) noexcept = default;
-  Camera &operator=(const Camera &) = default;
-  Camera &operator=(Camera &&) noexcept = default;
+  DEFAULT_METHODS(Camera)
   bool operator==(const Camera &) const;
 
   ExtensionMap extensions;
@@ -932,10 +888,7 @@ struct Primitive {
     material = -1;
     indices = -1;
   }
-  Primitive(const Primitive &) = default;
-  Primitive(Primitive &&) noexcept = default;
-  Primitive &operator=(const Primitive &) = default;
-  Primitive &operator=(Primitive &&) noexcept = default;
+  DEFAULT_METHODS(Primitive)
   bool operator==(const Primitive &) const;
 };
 
@@ -947,11 +900,7 @@ struct Mesh {
   Value extras;
 
   Mesh() = default;
-  ~Mesh() = default;
-  Mesh(const Mesh &) = default;
-  Mesh(Mesh &&) noexcept = default;
-  Mesh &operator=(const Mesh &) = default;
-  Mesh &operator=(Mesh &&) noexcept = default;
+  DEFAULT_METHODS(Mesh)
   bool operator==(const Mesh &) const;
 };
 
@@ -959,10 +908,7 @@ class Node {
  public:
   Node() : camera(-1), skin(-1), mesh(-1) {}
 
-  Node(const Node &) = default;
-  Node(Node &&) noexcept = default;
-  Node &operator=(const Node &) = default;
-  Node &operator=(Node &&) noexcept = default;
+  DEFAULT_METHODS(Node)
 
   bool operator==(const Node &) const;
 
@@ -983,17 +929,14 @@ class Node {
 };
 
 struct Buffer {
-  Buffer() = default;
-  Buffer(const Buffer &) = default;
-  Buffer(Buffer &&) noexcept = default;
-  Buffer &operator=(const Buffer &) = default;
-  Buffer &operator=(Buffer &&) noexcept = default;
   std::string name;
   std::vector<unsigned char> data;
   std::string
       uri;  // considered as required here but not in the spec (need to clarify)
   Value extras;
 
+  Buffer() = default;
+  DEFAULT_METHODS(Buffer)
   bool operator==(const Buffer &) const;
 };
 
@@ -1006,11 +949,7 @@ struct Asset {
   Value extras;
 
   Asset() = default;
-  ~Asset() = default;
-  Asset(const Asset &) = default;
-  Asset(Asset &&) noexcept = default;
-  Asset &operator=(const Asset &) = default;
-  Asset &operator=(Asset &&) noexcept = default;
+  DEFAULT_METHODS(Asset)
   bool operator==(const Asset &) const;
 };
 
@@ -1022,10 +961,7 @@ struct Scene {
   Value extras;
 
   Scene() = default;
-  Scene(const Scene &) = default;
-  Scene(Scene &&) noexcept = default;
-  Scene &operator=(const Scene &) = default;
-  Scene &operator=(Scene &&) noexcept = default;
+  DEFAULT_METHODS(Scene)
   bool operator==(const Scene &) const;
 };
 
@@ -1034,10 +970,7 @@ struct SpotLight {
   double outerConeAngle;
 
   SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
-  SpotLight(const SpotLight &) = default;
-  SpotLight(SpotLight &&) noexcept = default;
-  SpotLight &operator=(const SpotLight &) = default;
-  SpotLight &operator=(SpotLight &&) noexcept = default;
+  DEFAULT_METHODS(SpotLight)
   bool operator==(const SpotLight &) const;
 
   ExtensionMap extensions;
@@ -1053,10 +986,7 @@ struct Light {
   SpotLight spot;
 
   Light() : intensity(1.0), range(0.0) {}
-  Light(const Light &) = default;
-  Light(Light &&) noexcept = default;
-  Light &operator=(const Light &) = default;
-  Light &operator=(Light &&) noexcept = default;
+  DEFAULT_METHODS(Light)
 
   bool operator==(const Light &) const;
 
@@ -1067,10 +997,7 @@ struct Light {
 class Model {
  public:
   Model() = default;
-  Model(const Model &) = default;
-  Model(Model &&) noexcept = default;
-  Model &operator=(const Model &) = default;
-  Model &operator=(Model &&) noexcept = default;
+  DEFAULT_METHODS(Model)
 
   bool operator==(const Model &) const;
 
