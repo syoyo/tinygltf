@@ -2211,7 +2211,7 @@ void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) { fs = callbacks; }
 static inline std::wstring UTF8ToWchar(const std::string &str) {
   int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
   std::wstring wstr(wstr_size, 0);
-  MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), wstr.data(), (int)wstr.size());
+  MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0], (int)wstr.size());
   return wstr;
 }
 #endif
