@@ -4,14 +4,21 @@ PROJECT (tinygltf)
 
 SET(CMAKE_CXX_STANDARD 11)
 
-ADD_EXECUTABLE ( loader_example
-  loader_example.cc
-  )
+option(TINYGLTF_BUILD_EXAMPLES "Build examples" ON)
 
-ADD_SUBDIRECTORY ( examples/gltfutil )
-ADD_SUBDIRECTORY ( examples/glview )
-ADD_SUBDIRECTORY ( examples/validator )
+if (TINYGLTF_BUILD_EXAMPLES)
+  ADD_EXECUTABLE ( loader_example
+    loader_example.cc
+    )
 
+  ADD_SUBDIRECTORY ( examples/gltfutil )
+  ADD_SUBDIRECTORY ( examples/glview )
+  ADD_SUBDIRECTORY ( examples/validator )
+endif (TINYGLTF_BUILD_EXAMPLES)
+
+#
+# TinuGLTF is a header-only library, so no library build. just install header files.
+#
 INSTALL ( FILES
   json.hpp
   stb_image.h
