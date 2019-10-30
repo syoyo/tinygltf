@@ -2207,6 +2207,15 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
 
 void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) { fs = callbacks; }
 
+#ifdef _WIN32
+static inline std::wstring UTF8ToWchar(const std::string &str) {
+  int wstr_size = MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
+  std::wstring wstr(wstr_size, 0);
+  MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), wstr.data(), (int)wstr.size());
+  return wstr;
+}
+#endif
+
 #ifndef TINYGLTF_NO_FS
 // Default implementations of filesystem functions
 
@@ -2227,10 +2236,7 @@ bool FileExists(const std::string &abs_filename, void *) {
 #else
 #ifdef _WIN32
   FILE *fp;
-  int wchar_size = MultiByteToWideChar(CP_UTF8, 0, abs_filename.data(), (int)abs_filename.size(), nullptr, 0);
-  std::wstring wstr(wchar_size, 0);
-  MultiByteToWideChar(CP_UTF8, 0, abs_filename.data(), (int)abs_filename.size(), wstr.data(), (int)wstr.size());
-  errno_t err = _wfopen_s(&fp, wstr.c_str(), L"rb");
+  errno_t err = _wfopen_s(&fp, UTF8ToWchar(abs_filename).c_str(), L"rb");
   if (err != 0) {
     return false;
   }
@@ -2326,10 +2332,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   }
 #else
 #ifdef _WIN32
-  int wchar_size = MultiByteToWideChar(CP_UTF8, 0, filepath.data(), (int)filepath.size(), nullptr, 0);
-  std::wstring wstr(wchar_size, 0);
-  MultiByteToWideChar(CP_UTF8, 0, filepath.data(), (int)filepath.size(), wstr.data(), (int)wstr.size());
-  std::ifstream f(wstr.c_str(), std::ifstream::binary);
+  std::ifstream f(UTF8ToWchar(filepath).c_str(), std::ifstream::binary);
 #else
   std::ifstream f(filepath.c_str(), std::ifstream::binary);
 #endif
@@ -2368,7 +2371,11 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
 
 bool WriteWholeFile(std::string *err, const std::string &filepath,
                     const std::vector<unsigned char> &contents, void *) {
+#ifdef _WIN32
+  std::ofstream f(UTF8ToWchar(filepath).c_str(), std::ofstream::binary);
+#else
   std::ofstream f(filepath.c_str(), std::ofstream::binary);
+#endif
   if (!f) {
     if (err) {
       (*err) += "File open error for writing : " + filepath + "\n";
@@ -5641,7 +5648,11 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
 
 static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     const std::string &binFilename) {
+#ifdef _WIN32
+  std::ofstream output(UTF8ToWchar(binFilename).c_str(), std::ofstream::binary);
+#else
   std::ofstream output(binFilename.c_str(), std::ofstream::binary);
+#endif
   if (!output.is_open()) return false;
   output.write(reinterpret_cast<const char *>(&data[0]),
                std::streamsize(data.size()));
@@ -6499,7 +6510,11 @@ static bool WriteGltfStream(std::ostream &stream, const std::string &content) {
 
 static bool WriteGltfFile(const std::string &output,
                           const std::string &content) {
+#ifdef _WIN32
+  std::ofstream gltfFile(UTF8ToWchar(output).c_str());
+#else
   std::ofstream gltfFile(output.c_str());
+#endif
   if (!gltfFile.is_open()) return false;
   return WriteGltfStream(gltfFile, content);
 }
@@ -6536,7 +6551,11 @@ static void WriteBinaryGltfStream(std::ostream &stream,
 
 static void WriteBinaryGltfFile(const std::string &output,
                                 const std::string &content) {
+#ifdef _WIN32
+  std::ofstream gltfFile(UTF8ToWchar(output).c_str(), std::ios::binary);
+#else
   std::ofstream gltfFile(output.c_str(), std::ios::binary);
+#endif
   WriteBinaryGltfStream(gltfFile, content);
 }
 
