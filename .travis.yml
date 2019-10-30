@@ -31,6 +31,17 @@ matrix:
   - addons: *1
     compiler: clang
     env: COMPILER_VERSION=3.9 BUILD_TYPE=Debug CFLAGS="-O0" CXXFLAGS="-O0"
+  - addons: &3
+      apt:
+        sources:
+        - ubuntu-toolchain-r-test
+        packages:
+        - g++-4.8
+    compiler: gcc
+    env: COMPILER_VERSION=4.8 BUILD_TYPE=Debug
+  - addons: *1
+    compiler: gcc
+    env: COMPILER_VERSION=4.8 BUILD_TYPE=Release
 
 before_install:
   - ./.travis-before-install.sh
