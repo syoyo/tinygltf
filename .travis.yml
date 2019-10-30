@@ -39,7 +39,7 @@ matrix:
         - g++-4.8
     compiler: gcc
     env: COMPILER_VERSION=4.8 BUILD_TYPE=Debug
-  - addons: *1
+  - addons: *3
     compiler: gcc
     env: COMPILER_VERSION=4.8 BUILD_TYPE=Release
 
