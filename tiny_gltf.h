@@ -67,6 +67,23 @@
 #endif
 #endif
 
+#ifdef __GNUC__
+#if (__GNUC__ < 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ <= 8))
+#define TINYGLTF_NOEXCEPT
+#else
+#define TINYGLTF_NOEXCEPT noexcept
+#endif
+#else
+#define TINYGLTF_NOEXCEPT noexcept
+#endif
+
+#define DEFAULT_METHODS(x)								\
+	~x() = default;										\
+	x(const x&) = default;								\
+	x(x&&) TINYGLTF_NOEXCEPT = default;					\
+	x& operator=(const x&) = default;					\
+	x& operator=(x&&) TINYGLTF_NOEXCEPT = default;
+
 namespace tinygltf {
 
 #define TINYGLTF_MODE_POINTS (0)
@@ -271,23 +288,8 @@ class Value {
   explicit Value(const Object &o) : type_(OBJECT_TYPE) { object_value_ = o; }
   explicit Value(Object &&o) noexcept : type_(OBJECT_TYPE),
                                         object_value_(std::move(o)) {}
-  Value(Value &&rhs) noexcept : type_(rhs.type_),
-                                int_value_(rhs.int_value_),
-                                real_value_(rhs.real_value_),
-                                string_value_(std::move(rhs.string_value_)),
-                                binary_value_(std::move(rhs.binary_value_)),
-                                array_value_(std::move(rhs.array_value_)),
-                                object_value_(std::move(rhs.object_value_)),
-                                boolean_value_(rhs.boolean_value_) {}
-  Value(const Value &rhs) = default;
-  Value &operator=(const Value &rhs) = default;
-  Value &operator=(Value &&rhs) {
-    if (this != &rhs) {
-      this->~Value();
-      new (reinterpret_cast<void *>(this)) Value(std::move(rhs));
-    }
-    return *this;
-  }
+
+  DEFAULT_METHODS(Value)
 
   char Type() const { return static_cast<const char>(type_); }
 
@@ -498,6 +500,8 @@ struct Parameter {
          (number_array.size() > 3 ? number_array[3] : 1.0)}};
   }
 
+  Parameter() = default;
+  DEFAULT_METHODS(Parameter)
   bool operator==(const Parameter &) const;
 };
 
@@ -522,6 +526,7 @@ struct AnimationChannel {
   ExtensionMap extensions;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
+  DEFAULT_METHODS(AnimationChannel)
   bool operator==(const AnimationChannel &) const;
 };
 
@@ -533,6 +538,7 @@ struct AnimationSampler {
   Value extras;
 
   AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
+  DEFAULT_METHODS(AnimationSampler)
   bool operator==(const AnimationSampler &) const;
 };
 
@@ -543,6 +549,8 @@ struct Animation {
   Value extras;
   ExtensionMap extensions;
 
+  Animation() = default;
+  DEFAULT_METHODS(Animation)
   bool operator==(const Animation &) const;
 };
 
@@ -556,6 +564,7 @@ struct Skin {
     inverseBindMatrices = -1;
     skeleton = -1;
   }
+  DEFAULT_METHODS(Skin)
   bool operator==(const Skin &) const;
 };
 
@@ -584,15 +593,7 @@ struct Sampler {
         wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
         wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
-  Sampler(const Sampler &) = default;
-  Sampler &operator=(const Sampler &) = default;
-  Sampler(Sampler &&rhs) noexcept : name(std::move(rhs.name)),
-                                    minFilter(rhs.minFilter),
-                                    magFilter(rhs.magFilter),
-                                    wrapS(rhs.wrapS),
-                                    wrapT(rhs.wrapT),
-                                    wrapR(rhs.wrapR),
-                                    extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(Sampler)
   bool operator==(const Sampler &) const;
 };
 
@@ -626,21 +627,7 @@ struct Image {
     height = -1;
     component = -1;
   }
-  Image(const Image &) = default;
-  Image &operator=(const Image &) = default;
-  Image(Image &&rhs) noexcept : name(std::move(rhs.name)),
-                                width(rhs.width),
-                                height(rhs.height),
-                                component(rhs.component),
-                                bits(rhs.bits),
-                                pixel_type(rhs.pixel_type),
-                                image(std::move(rhs.image)),
-                                bufferView(rhs.bufferView),
-                                mimeType(std::move(rhs.mimeType)),
-                                uri(std::move(rhs.uri)),
-                                extras(std::move(rhs.extras)),
-                                extensions(std::move(rhs.extensions)),
-                                as_is(rhs.as_is) {}
+  DEFAULT_METHODS(Image)
 
   bool operator==(const Image &) const;
 };
@@ -654,13 +641,7 @@ struct Texture {
   ExtensionMap extensions;
 
   Texture() : sampler(-1), source(-1) {}
-  Texture(const Texture &) = default;
-  Texture &operator=(const Texture &) = default;
-  Texture(Texture &&rhs) noexcept : name(std::move(rhs.name)),
-                                    sampler(rhs.sampler),
-                                    source(rhs.source),
-                                    extras(std::move(rhs.extras)),
-                                    extensions(std::move(rhs.extensions)) {}
+  DEFAULT_METHODS(Texture)
 
   bool operator==(const Texture &) const;
 };
@@ -674,13 +655,7 @@ struct TextureInfo {
   ExtensionMap extensions;
 
   TextureInfo() : index(-1), texCoord(0) {}
-  TextureInfo(const TextureInfo &) = default;
-  TextureInfo &operator=(const TextureInfo &) = default;
-  TextureInfo(TextureInfo &&rhs) noexcept
-      : index(rhs.index),
-        texCoord(rhs.texCoord),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  DEFAULT_METHODS(TextureInfo)
   bool operator==(const TextureInfo &) const;
 };
 
@@ -695,14 +670,7 @@ struct NormalTextureInfo {
   ExtensionMap extensions;
 
   NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
-  NormalTextureInfo(const NormalTextureInfo &) = default;
-  NormalTextureInfo &operator=(const NormalTextureInfo &) = default;
-  NormalTextureInfo(NormalTextureInfo &&rhs) noexcept
-      : index(rhs.index),
-        texCoord(rhs.texCoord),
-        scale(rhs.scale),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  DEFAULT_METHODS(NormalTextureInfo)
   bool operator==(const NormalTextureInfo &) const;
 };
 
@@ -717,14 +685,7 @@ struct OcclusionTextureInfo {
   ExtensionMap extensions;
 
   OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
-  OcclusionTextureInfo(const OcclusionTextureInfo &) = default;
-  OcclusionTextureInfo &operator=(const OcclusionTextureInfo &) = default;
-  OcclusionTextureInfo(OcclusionTextureInfo &&rhs) noexcept
-      : index(rhs.index),
-        texCoord(rhs.texCoord),
-        strength(rhs.strength),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  DEFAULT_METHODS(OcclusionTextureInfo)
   bool operator==(const OcclusionTextureInfo &) const;
 };
 
@@ -740,16 +701,7 @@ struct PbrMetallicRoughness {
   ExtensionMap extensions;
 
   PbrMetallicRoughness() : baseColorFactor(std::vector<double>{ 1.0,1.0,1.0,1.0 }), metallicFactor(1.0), roughnessFactor(1.0) {}
-  PbrMetallicRoughness(const PbrMetallicRoughness &) = default;
-  PbrMetallicRoughness &operator=(const PbrMetallicRoughness &) = default;
-  PbrMetallicRoughness(PbrMetallicRoughness &&rhs) noexcept
-      : baseColorFactor(std::move(rhs.baseColorFactor)),
-        baseColorTexture(std::move(rhs.baseColorTexture)),
-        metallicFactor(rhs.metallicFactor),
-        roughnessFactor(rhs.roughnessFactor),
-        metallicRoughnessTexture(std::move(rhs.metallicRoughnessTexture)),
-        extras(std::move(rhs.extras)),
-        extensions(std::move(rhs.extensions)) {}
+  DEFAULT_METHODS(PbrMetallicRoughness)
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
@@ -779,22 +731,7 @@ struct Material {
   Value extras;
 
   Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
-  Material(const Material &) = default;
-  Material &operator=(const Material &) = default;
-  Material(Material &&rhs) noexcept
-      : name(std::move(rhs.name)),
-        emissiveFactor(std::move(rhs.emissiveFactor)),
-        alphaMode(std::move(rhs.alphaMode)),
-        alphaCutoff(rhs.alphaCutoff),
-        doubleSided(rhs.doubleSided),
-        pbrMetallicRoughness(std::move(rhs.pbrMetallicRoughness)),
-        normalTexture(std::move(rhs.normalTexture)),
-        occlusionTexture(std::move(rhs.occlusionTexture)),
-        emissiveTexture(std::move(rhs.emissiveTexture)),
-        values(std::move(rhs.values)),
-        additionalValues(std::move(rhs.additionalValues)),
-        extensions(std::move(rhs.extensions)),
-        extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(Material)
 
   bool operator==(const Material &) const;
 };
@@ -811,16 +748,7 @@ struct BufferView {
   bool dracoDecoded;  // Flag indicating this has been draco decoded
 
   BufferView() : byteOffset(0), byteStride(0), dracoDecoded(false) {}
-  BufferView(const BufferView &) = default;
-  BufferView &operator=(const BufferView &) = default;
-  BufferView(BufferView &&rhs) noexcept : name(std::move(rhs.name)),
-                                          buffer(rhs.buffer),
-                                          byteOffset(rhs.byteOffset),
-                                          byteLength(rhs.byteLength),
-                                          byteStride(rhs.byteStride),
-                                          target(rhs.target),
-                                          extras(std::move(rhs.extras)),
-                                          dracoDecoded(rhs.dracoDecoded) {}
+  DEFAULT_METHODS(BufferView)
   bool operator==(const BufferView &) const;
 };
 
@@ -893,19 +821,7 @@ struct Accessor {
     bufferView = -1;
     sparse.isSparse = false;
   }
-  Accessor(const Accessor &) = default;
-  Accessor &operator=(const Accessor &) = default;
-  Accessor(Accessor &&rhs) noexcept : bufferView(rhs.bufferView),
-                                      name(std::move(rhs.name)),
-                                      byteOffset(rhs.byteOffset),
-                                      normalized(rhs.normalized),
-                                      componentType(rhs.componentType),
-                                      count(rhs.count),
-                                      type(rhs.type),
-                                      extras(std::move(rhs.extras)),
-                                      minValues(std::move(rhs.minValues)),
-                                      maxValues(std::move(rhs.maxValues)),
-                                      sparse(rhs.sparse) {}
+  DEFAULT_METHODS(Accessor)
   bool operator==(const tinygltf::Accessor &) const;
 };
 
@@ -921,15 +837,7 @@ struct PerspectiveCamera {
         zfar(0.0)  // 0 = use infinite projecton matrix
         ,
         znear(0.0) {}
-  PerspectiveCamera(const PerspectiveCamera &) = default;
-  PerspectiveCamera &operator=(const PerspectiveCamera &) = default;
-  PerspectiveCamera(PerspectiveCamera &&rhs) noexcept
-      : aspectRatio(rhs.aspectRatio),
-        yfov(rhs.yfov),
-        zfar(rhs.zfar),
-        znear(rhs.znear),
-        extensions(std::move(rhs.extensions)),
-        extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(PerspectiveCamera)
   bool operator==(const PerspectiveCamera &) const;
 
   ExtensionMap extensions;
@@ -943,15 +851,7 @@ struct OrthographicCamera {
   double znear;  // required
 
   OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
-  OrthographicCamera(const OrthographicCamera &) = default;
-  OrthographicCamera &operator=(const OrthographicCamera &) = default;
-  OrthographicCamera(OrthographicCamera &&rhs) noexcept
-      : xmag(rhs.xmag),
-        ymag(rhs.ymag),
-        zfar(rhs.zfar),
-        znear(rhs.znear),
-        extensions(std::move(rhs.extensions)),
-        extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(OrthographicCamera)
   bool operator==(const OrthographicCamera &) const;
 
   ExtensionMap extensions;
@@ -966,15 +866,7 @@ struct Camera {
   OrthographicCamera orthographic;
 
   Camera() {}
-  Camera(const Camera &) = default;
-  Camera &operator=(const Camera &) = default;
-
-  Camera(Camera &&rhs) noexcept : type(std::move(rhs.type)),
-                                  name(std::move(rhs.name)),
-                                  perspective(std::move(rhs.perspective)),
-                                  orthographic(std::move(rhs.orthographic)),
-                                  extensions(std::move(rhs.extensions)),
-                                  extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(Camera)
   bool operator==(const Camera &) const;
 
   ExtensionMap extensions;
@@ -1001,15 +893,7 @@ struct Primitive {
     material = -1;
     indices = -1;
   }
-  Primitive(const Primitive &) = default;
-  Primitive &operator=(const Primitive &) = default;
-  Primitive(Primitive &&rhs) noexcept : attributes(std::move(rhs.attributes)),
-                                        material(rhs.material),
-                                        indices(rhs.indices),
-                                        mode(rhs.mode),
-                                        targets(std::move(rhs.targets)),
-                                        extensions(std::move(rhs.extensions)),
-                                        extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(Primitive)
   bool operator==(const Primitive &) const;
 };
 
@@ -1021,21 +905,7 @@ struct Mesh {
   Value extras;
 
   Mesh() = default;
-  ~Mesh() = default;
-  Mesh(const Mesh &) = default;
-  Mesh(Mesh &&rhs) noexcept : name(std::move(rhs.name)),
-                              primitives(std::move(rhs.primitives)),
-                              weights(std::move(rhs.weights)),
-                              extensions(std::move(rhs.extensions)),
-                              extras(std::move(rhs.extras)) {}
-  Mesh &operator=(const Mesh &) = default;
-  Mesh &operator=(Mesh &&rhs) {
-    if (&rhs != this) {
-      this->~Mesh();
-      new (reinterpret_cast<void *>(this)) Mesh(std::move(rhs));
-    }
-    return *this;
-  }
+  DEFAULT_METHODS(Mesh)
   bool operator==(const Mesh &) const;
 };
 
@@ -1043,45 +913,7 @@ class Node {
  public:
   Node() : camera(-1), skin(-1), mesh(-1) {}
 
-  // TODO(syoyo): Could use `default`
-  Node(const Node &rhs) {
-    camera = rhs.camera;
-
-    name = rhs.name;
-    skin = rhs.skin;
-    mesh = rhs.mesh;
-    children = rhs.children;
-    rotation = rhs.rotation;
-    scale = rhs.scale;
-    translation = rhs.translation;
-    matrix = rhs.matrix;
-    weights = rhs.weights;
-
-    extensions = rhs.extensions;
-    extras = rhs.extras;
-  }
-  Node(Node &&rhs) noexcept : camera(rhs.camera),
-                              name(std::move(rhs.name)),
-                              skin(rhs.skin),
-                              mesh(rhs.mesh),
-                              children(std::move(rhs.children)),
-                              rotation(std::move(rhs.rotation)),
-                              scale(std::move(rhs.scale)),
-                              translation(std::move(rhs.translation)),
-                              matrix(std::move(rhs.matrix)),
-                              weights(std::move(rhs.weights)),
-                              extensions(std::move(rhs.extensions)),
-                              extras(std::move(rhs.extras)) {}
-  ~Node() {}
-
-  Node &operator=(const Node &rhs) = default;
-  Node &operator=(Node &&rhs) {
-    if (&rhs != this) {
-      this->~Node();
-      new (reinterpret_cast<void *>(this)) Node(std::move(rhs));
-    }
-    return *this;
-  }
+  DEFAULT_METHODS(Node)
 
   bool operator==(const Node &) const;
 
@@ -1102,19 +934,14 @@ class Node {
 };
 
 struct Buffer {
-  Buffer() = default;
-  Buffer(const Buffer &) = default;
-  Buffer &operator=(const Buffer &) = default;
-  Buffer(Buffer &&rhs) noexcept : name(std::move(rhs.name)),
-                                  data(std::move(rhs.data)),
-                                  uri(std::move(rhs.uri)),
-                                  extras(std::move(rhs.extras)) {}
   std::string name;
   std::vector<unsigned char> data;
   std::string
       uri;  // considered as required here but not in the spec (need to clarify)
   Value extras;
 
+  Buffer() = default;
+  DEFAULT_METHODS(Buffer)
   bool operator==(const Buffer &) const;
 };
 
@@ -1127,22 +954,7 @@ struct Asset {
   Value extras;
 
   Asset() = default;
-  ~Asset() = default;
-  Asset(const Asset &) = default;
-  Asset(Asset &&rhs) noexcept : version(std::move(rhs.version)),
-                                generator(std::move(rhs.generator)),
-                                minVersion(std::move(rhs.minVersion)),
-                                copyright(std::move(rhs.copyright)),
-                                extensions(std::move(rhs.extensions)),
-                                extras(std::move(rhs.extras)) {}
-  Asset &operator=(const Asset &) = default;
-  Asset &operator=(Asset &&rhs) {
-    if (&rhs != this) {
-      this->~Asset();
-      new (reinterpret_cast<void *>(this)) Asset(std::move(rhs));
-    }
-    return *this;
-  }
+  DEFAULT_METHODS(Asset)
   bool operator==(const Asset &) const;
 };
 
@@ -1154,13 +966,7 @@ struct Scene {
   Value extras;
 
   Scene() = default;
-  Scene(const Scene &) = default;
-  Scene &operator=(const Scene &) = default;
-
-  Scene(Scene &&rhs) noexcept : name(std::move(rhs.name)),
-                                nodes(std::move(rhs.nodes)),
-                                extensions(std::move(rhs.extensions)),
-                                extras(std::move(rhs.extras)) {}
+  DEFAULT_METHODS(Scene)
   bool operator==(const Scene &) const;
 };
 
@@ -1168,25 +974,8 @@ struct SpotLight {
   double innerConeAngle;
   double outerConeAngle;
 
-  SpotLight &operator=(const SpotLight &) = default;
-
-  SpotLight &operator=(SpotLight &&rhs) {
-    innerConeAngle = rhs.innerConeAngle;
-    outerConeAngle = rhs.outerConeAngle;
-
-    extensions = std::move(rhs.extensions);
-    extras = std::move(rhs.extras);
-
-    return *this;
-  }
-
   SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
-  SpotLight(const SpotLight &) = default;
-  SpotLight(SpotLight &&rhs) noexcept : innerConeAngle(rhs.innerConeAngle),
-                                        outerConeAngle(rhs.outerConeAngle),
-                                        extensions(std::move(rhs.extensions)),
-                                        extras(std::move(rhs.extras)) {}
-
+  DEFAULT_METHODS(SpotLight)
   bool operator==(const SpotLight &) const;
 
   ExtensionMap extensions;
@@ -1202,51 +991,7 @@ struct Light {
   SpotLight spot;
 
   Light() : intensity(1.0), range(0.0) {}
-
-  Light &operator=(Light &&rhs) {
-    name = std::move(rhs.name);
-    color = std::move(rhs.color);
-    intensity = rhs.intensity;
-    type = std::move(rhs.type);
-    range = rhs.range;
-    spot = std::move(rhs.spot);
-    extensions = std::move(rhs.extensions);
-    extras = std::move(rhs.extras);
-
-    return *this;
-  }
-
-  Light &operator=(const Light &rhs) {
-    name = (rhs.name);
-    color = (rhs.color);
-    intensity = rhs.intensity;
-    type = (rhs.type);
-    range = rhs.range;
-    spot = (rhs.spot);
-    extensions = (rhs.extensions);
-    extras = (rhs.extras);
-
-    return *this;
-  }
-
-  Light(Light &&rhs) noexcept : name(std::move(rhs.name)),
-                                color(std::move(rhs.color)),
-                                intensity(rhs.intensity),
-                                type(std::move(rhs.type)),
-                                range(rhs.range),
-                                spot(std::move(rhs.spot)),
-                                extensions(std::move(rhs.extensions)),
-                                extras(std::move(rhs.extras)) {}
-
-  Light(const Light &rhs)
-      : name(rhs.name),
-        color(rhs.color),
-        intensity(rhs.intensity),
-        type(rhs.type),
-        range(rhs.range),
-        spot(rhs.spot),
-        extensions(rhs.extensions),
-        extras(rhs.extras) {}
+  DEFAULT_METHODS(Light)
 
   bool operator==(const Light &) const;
 
@@ -1256,33 +1001,8 @@ struct Light {
 
 class Model {
  public:
-  Model() {}
-
-  Model(const Model &) = default;
-  Model &operator=(const Model &) = default;
-  Model(Model &&rhs) noexcept
-      : accessors(std::move(rhs.accessors)),
-        animations(std::move(rhs.animations)),
-        buffers(std::move(rhs.buffers)),
-        bufferViews(std::move(rhs.bufferViews)),
-        materials(std::move(rhs.materials)),
-        meshes(std::move(rhs.meshes)),
-        nodes(std::move(rhs.nodes)),
-        textures(std::move(rhs.textures)),
-        images(std::move(rhs.images)),
-        skins(std::move(rhs.skins)),
-        samplers(std::move(rhs.samplers)),
-        cameras(std::move(rhs.cameras)),
-        scenes(std::move(rhs.scenes)),
-        lights(std::move(rhs.lights)),
-        extensions(std::move(rhs.extensions)),
-        defaultScene(rhs.defaultScene),
-        extensionsUsed(std::move(rhs.extensionsUsed)),
-        extensionsRequired(std::move(rhs.extensionsRequired)),
-        asset(std::move(rhs.asset)),
-        extras(std::move(rhs.extras)) {}
-
-  ~Model() {}
+  Model() = default;
+  DEFAULT_METHODS(Model)
 
   bool operator==(const Model &) const;
 
