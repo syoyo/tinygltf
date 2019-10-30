@@ -2227,7 +2227,10 @@ bool FileExists(const std::string &abs_filename, void *) {
 #else
 #ifdef _WIN32
   FILE *fp;
-  errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
+  int wchar_size = MultiByteToWideChar(CP_UTF8, 0, abs_filename.data(), (int)abs_filename.size(), nullptr, 0);
+  std::wstring wstr(wchar_size, 0);
+  MultiByteToWideChar(CP_UTF8, 0, abs_filename.data(), (int)abs_filename.size(), wstr.data(), (int)wstr.size());
+  errno_t err = _wfopen_s(&fp, wstr.c_str(), L"rb");
   if (err != 0) {
     return false;
   }
@@ -2322,7 +2325,14 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
     return false;
   }
 #else
+#ifdef _WIN32
+  int wchar_size = MultiByteToWideChar(CP_UTF8, 0, filepath.data(), (int)filepath.size(), nullptr, 0);
+  std::wstring wstr(wchar_size, 0);
+  MultiByteToWideChar(CP_UTF8, 0, filepath.data(), (int)filepath.size(), wstr.data(), (int)wstr.size());
+  std::ifstream f(wstr.c_str(), std::ifstream::binary);
+#else
   std::ifstream f(filepath.c_str(), std::ifstream::binary);
+#endif
   if (!f) {
     if (err) {
       (*err) += "File open error : " + filepath + "\n";
