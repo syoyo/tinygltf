@@ -2567,23 +2567,16 @@ bool GetInt(const json &o, int &val) {
 #endif
 }
 
-bool GetDouble(const json &o, double &val) {
 #ifdef TINYGLTF_USE_RAPIDJSON
+bool GetDouble(const json &o, double &val) {
   if (o.IsDouble()) {
     val = o.GetDouble();
     return true;
   }
 
   return false;
-#else
-  if (o.type() == json::value_t::number_float) {
-    val = static_cast<double>(o.get<double>());
-    return true;
-  }
-
-  return false;
-#endif
 }
+#endif
 
 bool GetNumber(const json &o, double &val) {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -2961,10 +2954,10 @@ static bool ParseNumberProperty(double *ret, std::string *err, const json &o,
     return false;
   }
 
-  double doubleValue;
-  bool isDouble = GetDouble(GetValue(it), doubleValue);
+  double numberValue;
+  bool isNumber = GetNumber(GetValue(it), numberValue);
 
-  if (!isDouble) {
+  if (!isNumber) {
     if (required) {
       if (err) {
         (*err) += "'" + property + "' property is not a number type.\n";
@@ -2974,7 +2967,7 @@ static bool ParseNumberProperty(double *ret, std::string *err, const json &o,
   }
 
   if (ret) {
-    (*ret) = doubleValue;
+    (*ret) = numberValue;
   }
 
   return true;
