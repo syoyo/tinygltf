@@ -6618,7 +6618,8 @@ static void SerializeGltfMaterial(Material &material, json &o) {
     SerializeStringProperty("alphaMode", material.alphaMode, o);
   }
 
-  JsonAddMember(o, "doubleSided", json(material.doubleSided));
+  if(material.doubleSided != false)
+	JsonAddMember(o, "doubleSided", json(material.doubleSided));
 
   if (material.normalTexture.index > -1) {
     json texinfo;
