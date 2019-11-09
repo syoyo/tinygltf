@@ -1415,6 +1415,7 @@ class TinyGLTF {
 #include <algorithm>
 //#include <cassert>
 #ifndef TINYGLTF_NO_FS
+#include <cstdio>
 #include <fstream>
 #endif
 #include <sstream>
@@ -2414,11 +2415,7 @@ bool FileExists(const std::string &abs_filename, void *) {
 #endif
 
 #else
-  FILE *fp = nullptr;
-  errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
-  if (err != 0) {
-    return false;
-  }
+  FILE *fp = fopen(abs_filename.c_str(), "rb");
 #endif
   if (fp) {
     ret = true;
