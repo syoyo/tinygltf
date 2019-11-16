@@ -7124,11 +7124,25 @@ static void WriteBinaryGltfStream(std::ostream &stream,
                                   const std::string &content) {
   const std::string header = "glTF";
   const int version = 2;
-  const int padding_size = content.size() % 4;
 
-  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info,
-  // padding
-  const int length = 12 + 8 + int(content.size()) + padding_size;
+  // https://stackoverflow.com/questions/3407012/c-rounding-up-to-the-nearest-multiple-of-a-number
+  auto roundUp = [](uint32_t numToRound, uint32_t multiple)
+  {
+      if (multiple == 0)
+          return numToRound;
+
+      uint32_t remainder = numToRound % multiple;
+      if (remainder == 0)
+          return numToRound;
+
+      return numToRound + multiple - remainder;
+  };
+
+  const uint32_t padding_size = roundUp(content.size(), 4) - content.size();
+
+  // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info.
+  // Chunk data must be located at 4-byte boundary.
+  const int length = 12 + 8 + roundUp(content.size(), 4);
 
   stream.write(header.c_str(), std::streamsize(header.size()));
   stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
