@@ -6491,6 +6491,18 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
   SerializeExtensionMap(asset.extensions, o);
 }
 
+ static void SerializeGltfBufferBin(Buffer &buffer, json &o,
+				    std::vector<unsigned char> &binBuffer) {
+  SerializeNumberProperty("byteLength", buffer.data.size(), o);
+  binBuffer=buffer.data;
+
+  if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
+
+  if (buffer.extras.Type() != NULL_TYPE) {
+    SerializeValue("extras", buffer.extras, o);
+  }
+}
+
 static void SerializeGltfBuffer(Buffer &buffer, json &o) {
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
   SerializeGltfBufferData(buffer.data, o);
@@ -7179,7 +7191,8 @@ static bool WriteGltfFile(const std::string &output,
 }
 
 static void WriteBinaryGltfStream(std::ostream &stream,
-                                  const std::string &content) {
+                                  const std::string &content,
+                                  const std::vector<unsigned char> &binBuffer) {
   const std::string header = "glTF";
   const int version = 2;
 
@@ -7200,7 +7213,8 @@ static void WriteBinaryGltfStream(std::ostream &stream,
 
   // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info.
   // Chunk data must be located at 4-byte boundary.
-  const int length = 12 + 8 + roundUp(content.size(), 4);
+  const int length = 12 + 8 + roundUp(content.size(), 4)+
+      (binBuffer.size()?(8+roundUp(binBuffer.size(),4)) : 0);
 
   stream.write(header.c_str(), std::streamsize(header.size()));
   stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
@@ -7220,10 +7234,27 @@ static void WriteBinaryGltfStream(std::ostream &stream,
     const std::string padding = std::string(size_t(padding_size), ' ');
     stream.write(padding.c_str(), std::streamsize(padding.size()));
   }
+  if (binBuffer.size() > 0){
+    const uint32_t bin_padding_size = roundUp(binBuffer.size(), 4) - binBuffer.size();
+    // BIN chunk info, then BIN data
+    const int bin_length = int(binBuffer.size()) + bin_padding_size;
+    const int bin_format = 0x004e4942;
+    stream.write(reinterpret_cast<const char *>(&bin_length),
+		 sizeof(bin_length));
+    stream.write(reinterpret_cast<const char *>(&bin_format),
+		 sizeof(bin_format));
+    stream.write((const char *)binBuffer.data(), std::streamsize(binBuffer.size()));
+    // Chunksize must be multiplies of 4, so pad with zeroes
+    if (bin_padding_size > 0) {
+      const std::vector<unsigned char> padding = std::vector<unsigned char>(size_t(bin_padding_size), 0);
+      stream.write((const char *)padding.data(), std::streamsize(padding.size()));
+    }
+  }
 }
 
 static void WriteBinaryGltfFile(const std::string &output,
-                                const std::string &content) {
+                                const std::string &content,
+                                const std::vector<unsigned char> &binBuffer) {
 #ifdef _WIN32
 #if defined(_MSC_VER)
   std::ofstream gltfFile(UTF8ToWchar(output).c_str(), std::ios::binary);
@@ -7237,7 +7268,7 @@ static void WriteBinaryGltfFile(const std::string &output,
 #else
   std::ofstream gltfFile(output.c_str(), std::ios::binary);
 #endif
-  WriteBinaryGltfStream(gltfFile, content);
+  WriteBinaryGltfStream(gltfFile, content,binBuffer);
 }
 
 bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
@@ -7250,11 +7281,16 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
 
   // BUFFERS
   std::vector<std::string> usedUris;
+  std::vector<unsigned char> binBuffer;
   json buffers;
   JsonReserveArray(buffers, model->buffers.size());
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
-    SerializeGltfBuffer(model->buffers[i], buffer);
+    if (writeBinary && i==0 && model->buffers[i].uri.empty()){
+      SerializeGltfBufferBin(model->buffers[i], buffer,binBuffer);
+    } else {
+      SerializeGltfBuffer(model->buffers[i], buffer);
+    }
     JsonPushBack(buffers, std::move(buffer));
   }
   JsonAddMember(output, "buffers", std::move(buffers));
@@ -7279,7 +7315,7 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
   }
 
   if (writeBinary) {
-    WriteBinaryGltfStream(stream, JsonToString(output));
+    WriteBinaryGltfStream(stream, JsonToString(output),binBuffer);
   } else {
     WriteGltfStream(stream, JsonToString(output, prettyPrint ? 2 : -1));
   }
@@ -7310,11 +7346,14 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
 
   // BUFFERS
   std::vector<std::string> usedUris;
+  std::vector<unsigned char> binBuffer;
   json buffers;
   JsonReserveArray(buffers, model->buffers.size());
   for (unsigned int i = 0; i < model->buffers.size(); ++i) {
     json buffer;
-    if (embedBuffers) {
+    if (writeBinary && i==0 && model->buffers[i].uri.empty()){
+      SerializeGltfBufferBin(model->buffers[i], buffer,binBuffer);
+    } else if (embedBuffers) {
       SerializeGltfBuffer(model->buffers[i], buffer);
     } else {
       std::string binSavePath;
@@ -7363,7 +7402,7 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   if (writeBinary) {
-    WriteBinaryGltfFile(filename, JsonToString(output));
+    WriteBinaryGltfFile(filename, JsonToString(output),binBuffer);
   } else {
     WriteGltfFile(filename, JsonToString(output, (prettyPrint ? 2 : -1)));
   }
