@@ -887,8 +887,13 @@ struct Accessor {
     // unreachable return 0;
   }
 
-  Accessor() {
-    bufferView = -1;
+  Accessor() :
+    bufferView(-1),
+    byteOffset(0),
+    normalized(false),
+    componentType(-1),
+    count(0),
+    type(-1){
     sparse.isSparse = false;
   }
   DEFAULT_METHODS(Accessor)
