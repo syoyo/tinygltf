@@ -34,8 +34,11 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
 * Moderate parsing time and memory consumption.
 * glTF specification v2.0.0
   * [x] ASCII glTF
+    * [x] Load
+    * [x] Save
   * [x] Binary glTF(GLB)
-  * [x] PBR material description
+    * [x] Load
+    * [x] Save(.bin embedded .glb)
 * Buffers
   * [x] Parse BASE64 encoded embedded buffer data(DataURI).
   * [x] Load `.bin` file.
@@ -55,6 +58,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
   * [x] Image save
 * Extensions
   * [x] Draco mesh decoding
+  * [ ] Draco mesh encoding
 
 ## Note on extension property
 
@@ -160,14 +164,17 @@ if (!ret) {
 
 
 ### Saving gltTF 2.0 model
-* [ ] Buffers.
+
+* Buffers.
   * [x] To file
   * [x] Embedded
   * [ ] Draco compressed?
 * [x] Images
   * [x] To file
   * [x] Embedded
-* [ ] Binary(.glb)
+* Binary(.glb)
+  * [x] .bin embedded single .glb
+  * [ ] External .bin
 
 ## Running tests.
 
