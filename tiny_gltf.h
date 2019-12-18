@@ -6782,7 +6782,7 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
       JsonAddMember(primitive, "targets", std::move(targets));
     }
 
-    SerializeExtensionMap(gltfPrimitive.extensions, o);
+    SerializeExtensionMap(gltfPrimitive.extensions, primitive);
 
     if (gltfPrimitive.extras.Type() != NULL_TYPE) {
       SerializeValue("extras", gltfPrimitive.extras, primitive);
