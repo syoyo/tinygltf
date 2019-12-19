@@ -2728,6 +2728,7 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
     }
   }
 
+  // TODO(syoyo): Allow empty buffer? #229
   if (data.empty()) {
     return false;
   }
@@ -6278,9 +6279,15 @@ static void SerializeValue(const std::string &key, const Value &value,
 static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     json &o) {
   std::string header = "data:application/octet-stream;base64,";
-  std::string encodedData =
-      base64_encode(&data[0], static_cast<unsigned int>(data.size()));
-  SerializeStringProperty("uri", header + encodedData, o);
+  if (data.size() > 0) {
+    std::string encodedData =
+        base64_encode(&data[0], static_cast<unsigned int>(data.size()));
+    SerializeStringProperty("uri", header + encodedData, o);
+  } else {
+    // Issue #229
+    // size 0 is allowd. Just emit mime header.
+    SerializeStringProperty("uri", header, o);
+  }
 }
 
 static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
@@ -6302,8 +6309,14 @@ static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
   std::ofstream output(binFilename.c_str(), std::ofstream::binary);
   if (!output.is_open()) return false;
 #endif
-  output.write(reinterpret_cast<const char *>(&data[0]),
-               std::streamsize(data.size()));
+  if (data.size() > 0) {
+    output.write(reinterpret_cast<const char *>(&data[0]),
+                 std::streamsize(data.size()));
+  } else {
+    // Issue #229
+    // size 0 will be still valid buffer data.
+    // write empty file.
+  }
   return true;
 }
 
