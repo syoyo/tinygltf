@@ -5526,7 +5526,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // Assign missing bufferView target types
   // - Look for missing Mesh indices
-  // - Look for missing bufferView targets
+  // - Look for missing Mesh attributes
   for (auto &mesh : model->meshes) {
     for (auto &primitive : mesh.primitives) {
       if (primitive.indices >
@@ -5554,14 +5554,11 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         // we could optionally check if acessors' bufferView type is Scalar, as
         // it should be
       }
-    }
-  }
-  // find any missing targets, must be an array buffer type if not fulfilled
-  // from previous check
-  for (auto &bufferView : model->bufferViews) {
-    if (bufferView.target == 0)  // missing target type
-    {
-      bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+
+      for (auto &attribute : primitive.attributes) {
+        model->bufferViews[model->accessors[attribute.second].bufferView]
+            .target = TINYGLTF_TARGET_ARRAY_BUFFER;
+      }
     }
   }
 
