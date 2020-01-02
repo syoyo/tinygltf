@@ -797,12 +797,12 @@ struct Material {
 
 struct BufferView {
   std::string name;
-  int buffer;         // Required
-  size_t byteOffset;  // minimum 0, default 0
-  size_t byteLength;  // required, minimum 1
-  size_t byteStride;  // minimum 4, maximum 252 (multiple of 4), default 0 =
+  int buffer{-1};         // Required
+  size_t byteOffset{0};  // minimum 0, default 0
+  size_t byteLength{0};  // required, minimum 1. 0 = invalid
+  size_t byteStride{0};  // minimum 4, maximum 252 (multiple of 4), default 0 =
                       // understood to be tightly packed
-  int target;         // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"]
+  int target{0};         // ["ARRAY_BUFFER", "ELEMENT_ARRAY_BUFFER"] for vertex indices or atttribs. Could be 0 for other data
   Value extras;
   ExtensionMap extensions;
 
@@ -810,9 +810,9 @@ struct BufferView {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  bool dracoDecoded;  // Flag indicating this has been draco decoded
+  bool dracoDecoded{false};  // Flag indicating this has been draco decoded
 
-  BufferView() : byteOffset(0), byteStride(0), dracoDecoded(false) {}
+  BufferView() : buffer(-1), target(0), byteOffset(0), byteLength(0), byteStride(0), dracoDecoded(false) {}
   DEFAULT_METHODS(BufferView)
   bool operator==(const BufferView &) const;
 };
