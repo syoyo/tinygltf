@@ -6465,6 +6465,7 @@ static void SerializeGltfAnimation(Animation &animation, json &o) {
 
   {
     json samplers;
+    JsonReserveArray(samplers, animation.samplers.size());
     for (unsigned int i = 0; i < animation.samplers.size(); ++i) {
       json sampler;
       AnimationSampler gltfSampler = animation.samplers[i];
