@@ -812,7 +812,7 @@ struct BufferView {
 
   bool dracoDecoded{false};  // Flag indicating this has been draco decoded
 
-  BufferView() : buffer(-1), target(0), byteOffset(0), byteLength(0), byteStride(0), dracoDecoded(false) {}
+  BufferView() : buffer(-1), byteOffset(0), byteLength(0), byteStride(0), target(0), dracoDecoded(false) {}
   DEFAULT_METHODS(BufferView)
   bool operator==(const BufferView &) const;
 };
@@ -5556,7 +5556,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       }
 
       for (auto &attribute : primitive.attributes) {
-        model->bufferViews[model->accessors[attribute.second].bufferView]
+        model->bufferViews[size_t(model->accessors[size_t(attribute.second)].bufferView)]
             .target = TINYGLTF_TARGET_ARRAY_BUFFER;
       }
     }
@@ -7219,20 +7219,20 @@ static void WriteBinaryGltfStream(std::ostream &stream,
       return numToRound + multiple - remainder;
   };
 
-  const uint32_t padding_size = roundUp(content.size(), 4) - content.size();
+  const uint32_t padding_size = roundUp(uint32_t(content.size()), 4) - uint32_t(content.size());
 
   // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info.
   // Chunk data must be located at 4-byte boundary.
-  const int length = 12 + 8 + roundUp(content.size(), 4)+
-      (binBuffer.size()?(8+roundUp(binBuffer.size(),4)) : 0);
+  const uint32_t length = 12 + 8 + roundUp(uint32_t(content.size()), 4)+
+      (binBuffer.size()?(8+roundUp(uint32_t(binBuffer.size()),4)) : 0);
 
   stream.write(header.c_str(), std::streamsize(header.size()));
   stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
   stream.write(reinterpret_cast<const char *>(&length), sizeof(length));
 
   // JSON chunk info, then JSON data
-  const int model_length = int(content.size()) + padding_size;
-  const int model_format = 0x4E4F534A;
+  const uint32_t model_length = uint32_t(content.size()) + padding_size;
+  const uint32_t model_format = 0x4E4F534A;
   stream.write(reinterpret_cast<const char *>(&model_length),
                sizeof(model_length));
   stream.write(reinterpret_cast<const char *>(&model_format),
@@ -7245,19 +7245,19 @@ static void WriteBinaryGltfStream(std::ostream &stream,
     stream.write(padding.c_str(), std::streamsize(padding.size()));
   }
   if (binBuffer.size() > 0){
-    const uint32_t bin_padding_size = roundUp(binBuffer.size(), 4) - binBuffer.size();
+    const uint32_t bin_padding_size = roundUp(uint32_t(binBuffer.size()), 4) - uint32_t(binBuffer.size());
     // BIN chunk info, then BIN data
-    const int bin_length = int(binBuffer.size()) + bin_padding_size;
-    const int bin_format = 0x004e4942;
+    const uint32_t bin_length = uint32_t(binBuffer.size()) + bin_padding_size;
+    const uint32_t bin_format = 0x004e4942;
     stream.write(reinterpret_cast<const char *>(&bin_length),
 		 sizeof(bin_length));
     stream.write(reinterpret_cast<const char *>(&bin_format),
 		 sizeof(bin_format));
-    stream.write((const char *)binBuffer.data(), std::streamsize(binBuffer.size()));
+    stream.write(reinterpret_cast<const char *>(binBuffer.data()), std::streamsize(binBuffer.size()));
     // Chunksize must be multiplies of 4, so pad with zeroes
     if (bin_padding_size > 0) {
       const std::vector<unsigned char> padding = std::vector<unsigned char>(size_t(bin_padding_size), 0);
-      stream.write((const char *)padding.data(), std::streamsize(padding.size()));
+      stream.write(reinterpret_cast<const char *>(padding.data()), std::streamsize(padding.size()));
     }
   }
 }
