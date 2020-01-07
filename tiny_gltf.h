@@ -812,7 +812,7 @@ struct BufferView {
 
   bool dracoDecoded{false};  // Flag indicating this has been draco decoded
 
-  BufferView() : buffer(-1), target(0), byteOffset(0), byteLength(0), byteStride(0), dracoDecoded(false) {}
+  BufferView() : buffer(-1), byteOffset(0), byteLength(0), byteStride(0), target(0), dracoDecoded(false) {}
   DEFAULT_METHODS(BufferView)
   bool operator==(const BufferView &) const;
 };
