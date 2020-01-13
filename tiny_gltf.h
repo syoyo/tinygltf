@@ -2458,8 +2458,10 @@ std::string ExpandFilePath(const std::string &filepath, void *) {
     return "";
   }
 
+  // Quote the string to keep any spaces in filepath intact.
+  std::string quoted_path = "\"" + filepath + "\"";
   // char** w;
-  int ret = wordexp(filepath.c_str(), &p, 0);
+  int ret = wordexp(quoted_path.c_str(), &p, 0);
   if (ret) {
     // err
     s = filepath;
