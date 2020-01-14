@@ -333,3 +333,29 @@ TEST_CASE("pbr-khr-texture-transform", "[material]") {
   REQUIRE(scale[1] == Approx(-1.0));
 
 }
+
+TEST_CASE("image-uri-spaces", "[issue-236]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  // Test image file with single spaces.
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/CubeImageUriSpaces/CubeImageUriSpaces.gltf");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+
+  REQUIRE(true == ret);
+
+  // Test image file with a beginning space, trailing space, and greater than
+  // one consecutive spaces.
+  ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/CubeImageUriSpaces/CubeImageUriMultipleSpaces.gltf");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+
+  REQUIRE(true == ret);
+}
+
