@@ -1141,7 +1141,7 @@ class Model {
   std::vector<Scene> scenes;
   std::vector<Light> lights;
 
-  int defaultScene;
+  int defaultScene = -1;
   std::vector<std::string> extensionsUsed;
   std::vector<std::string> extensionsRequired;
 
