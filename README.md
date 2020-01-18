@@ -202,6 +202,10 @@ $ ./tester
 $ ./tester_noexcept
 ```
 
+### Fuzzing tests
+
+See `tests/fuzzer` for details.
+
 ## Third party licenses
 
 * json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
