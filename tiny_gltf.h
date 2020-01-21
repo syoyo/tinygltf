@@ -526,10 +526,12 @@ struct AnimationChannel {
                             // "weights"]
   Value extras;
   ExtensionMap extensions;
+  ExtensionMap target_extensions;
 
   // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
   std::string extras_json_string;
   std::string extensions_json_string;
+  std::string target_extensions_json_string;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
   DEFAULT_METHODS(AnimationChannel)
@@ -4715,6 +4717,13 @@ static bool ParseAnimationChannel(
       }
       return false;
     }
+	ParseExtensionsProperty(&channel->target_extensions, err, target_object);
+	if (store_original_json_for_extras_and_extensions) {
+      json_const_iterator it;
+      if (FindMember(target_object, "extensions", it)) {
+        channel->target_extensions_json_string = JsonToString(GetValue(it));
+      }
+	}
   }
 
   channel->sampler = samplerIndex;
@@ -6368,6 +6377,8 @@ static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
     json target;
     SerializeNumberProperty("node", channel.target_node, target);
     SerializeStringProperty("path", channel.target_path, target);
+
+	SerializeExtensionMap(channel.target_extensions, target);
 
     JsonAddMember(o, "target", std::move(target));
   }
