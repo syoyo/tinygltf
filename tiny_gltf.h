@@ -5570,6 +5570,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         model->bufferViews[size_t(model->accessors[size_t(attribute.second)].bufferView)]
             .target = TINYGLTF_TARGET_ARRAY_BUFFER;
       }
+
+      for(auto &target : primitive.targets) {
+        for(auto &attribute : target) {
+          model->bufferViews[size_t(model->accessors[size_t(attribute.second)].bufferView)]
+              .target = TINYGLTF_TARGET_ARRAY_BUFFER;
+        }
+      }
     }
   }
 
