@@ -7010,14 +7010,16 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
 ///
 static void SerializeGltfModel(Model *model, json &o) {
   // ACCESSORS
-  json accessors;
-  JsonReserveArray(accessors, model->accessors.size());
-  for (unsigned int i = 0; i < model->accessors.size(); ++i) {
-    json accessor;
-    SerializeGltfAccessor(model->accessors[i], accessor);
-    JsonPushBack(accessors, std::move(accessor));
+  if (model->accessors.size()) {
+    json accessors;
+    JsonReserveArray(accessors, model->accessors.size());
+    for (unsigned int i = 0; i < model->accessors.size(); ++i) {
+      json accessor;
+      SerializeGltfAccessor(model->accessors[i], accessor);
+      JsonPushBack(accessors, std::move(accessor));
+    }
+    JsonAddMember(o, "accessors", std::move(accessors));
   }
-  JsonAddMember(o, "accessors", std::move(accessors));
 
   // ANIMATIONS
   if (model->animations.size()) {
@@ -7040,14 +7042,16 @@ static void SerializeGltfModel(Model *model, json &o) {
   JsonAddMember(o, "asset", std::move(asset));
 
   // BUFFERVIEWS
-  json bufferViews;
-  JsonReserveArray(bufferViews, model->bufferViews.size());
-  for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
-    json bufferView;
-    SerializeGltfBufferView(model->bufferViews[i], bufferView);
-    JsonPushBack(bufferViews, std::move(bufferView));
+  if(model->bufferViews.size()) {
+    json bufferViews;
+    JsonReserveArray(bufferViews, model->bufferViews.size());
+    for (unsigned int i = 0; i < model->bufferViews.size(); ++i) {
+      json bufferView;
+      SerializeGltfBufferView(model->bufferViews[i], bufferView);
+      JsonPushBack(bufferViews, std::move(bufferView));
+    }
+    JsonAddMember(o, "bufferViews", std::move(bufferViews));
   }
-  JsonAddMember(o, "bufferViews", std::move(bufferViews));
 
   // Extensions used
   if (model->extensionsUsed.size()) {
@@ -7311,20 +7315,21 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
   SerializeGltfModel(model, output);
 
   // BUFFERS
-  std::vector<std::string> usedUris;
   std::vector<unsigned char> binBuffer;
-  json buffers;
-  JsonReserveArray(buffers, model->buffers.size());
-  for (unsigned int i = 0; i < model->buffers.size(); ++i) {
-    json buffer;
-    if (writeBinary && i==0 && model->buffers[i].uri.empty()){
-      SerializeGltfBufferBin(model->buffers[i], buffer,binBuffer);
-    } else {
-      SerializeGltfBuffer(model->buffers[i], buffer);
+  if(model->buffers.size()) {
+    json buffers;
+    JsonReserveArray(buffers, model->buffers.size());
+    for (unsigned int i = 0; i < model->buffers.size(); ++i) {
+      json buffer;
+      if (writeBinary && i==0 && model->buffers[i].uri.empty()){
+        SerializeGltfBufferBin(model->buffers[i], buffer,binBuffer);
+      } else {
+        SerializeGltfBuffer(model->buffers[i], buffer);
+      }
+      JsonPushBack(buffers, std::move(buffer));
     }
-    JsonPushBack(buffers, std::move(buffer));
+    JsonAddMember(output, "buffers", std::move(buffers));
   }
-  JsonAddMember(output, "buffers", std::move(buffers));
 
   // IMAGES
   if (model->images.size()) {
@@ -7378,44 +7383,46 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   // BUFFERS
   std::vector<std::string> usedUris;
   std::vector<unsigned char> binBuffer;
-  json buffers;
-  JsonReserveArray(buffers, model->buffers.size());
-  for (unsigned int i = 0; i < model->buffers.size(); ++i) {
-    json buffer;
-    if (writeBinary && i==0 && model->buffers[i].uri.empty()){
-      SerializeGltfBufferBin(model->buffers[i], buffer,binBuffer);
-    } else if (embedBuffers) {
-      SerializeGltfBuffer(model->buffers[i], buffer);
-    } else {
-      std::string binSavePath;
-      std::string binUri;
-      if (!model->buffers[i].uri.empty() && !IsDataURI(model->buffers[i].uri)) {
-        binUri = model->buffers[i].uri;
+  if (model->buffers.size()) {
+    json buffers;
+    JsonReserveArray(buffers, model->buffers.size());
+    for (unsigned int i = 0; i < model->buffers.size(); ++i) {
+      json buffer;
+      if (writeBinary && i==0 && model->buffers[i].uri.empty()){
+        SerializeGltfBufferBin(model->buffers[i], buffer,binBuffer);
+      } else if (embedBuffers) {
+        SerializeGltfBuffer(model->buffers[i], buffer);
       } else {
-        binUri = defaultBinFilename + defaultBinFileExt;
-        bool inUse = true;
-        int numUsed = 0;
-        while (inUse) {
-          inUse = false;
-          for (const std::string &usedName : usedUris) {
-            if (binUri.compare(usedName) != 0) continue;
-            inUse = true;
-            binUri = defaultBinFilename + std::to_string(numUsed++) +
-                     defaultBinFileExt;
-            break;
+        std::string binSavePath;
+        std::string binUri;
+        if (!model->buffers[i].uri.empty() && !IsDataURI(model->buffers[i].uri)) {
+          binUri = model->buffers[i].uri;
+        } else {
+          binUri = defaultBinFilename + defaultBinFileExt;
+          bool inUse = true;
+          int numUsed = 0;
+          while (inUse) {
+            inUse = false;
+            for (const std::string &usedName : usedUris) {
+              if (binUri.compare(usedName) != 0) continue;
+              inUse = true;
+              binUri = defaultBinFilename + std::to_string(numUsed++) +
+                       defaultBinFileExt;
+              break;
+            }
           }
         }
+        usedUris.push_back(binUri);
+        binSavePath = JoinPath(baseDir, binUri);
+        if (!SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
+                                 binUri)) {
+          return false;
+        }
       }
-      usedUris.push_back(binUri);
-      binSavePath = JoinPath(baseDir, binUri);
-      if (!SerializeGltfBuffer(model->buffers[i], buffer, binSavePath,
-                               binUri)) {
-        return false;
-      }
+      JsonPushBack(buffers, std::move(buffer));
     }
-    JsonPushBack(buffers, std::move(buffer));
-  }
   JsonAddMember(output, "buffers", std::move(buffers));
+  }
 
   // IMAGES
   if (model->images.size()) {
