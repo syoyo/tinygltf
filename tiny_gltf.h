@@ -2442,7 +2442,7 @@ void ExpandFilePath(std::string *filepath, void *) {
   s.reserve(len);
   ExpandEnvironmentStringsA(filepath->c_str(), s.data(), len);
 
-  *filepath = std:::move(s);
+  *filepath = std::move(s);
 
   return s;
 #else
