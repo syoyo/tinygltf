@@ -2437,10 +2437,10 @@ bool FileExists(const std::string &abs_filename, void *) {
 
 void ExpandFilePath(std::string *filepath, void *) {
 #ifdef _WIN32
-  DWORD len = ExpandEnvironmentStringsA(filepath.c_str(), NULL, 0);
+  DWORD len = ExpandEnvironmentStringsA(filepath->c_str(), NULL, 0);
   std::string s;
   s.reserve(len);
-  ExpandEnvironmentStringsA(filepath.c_str(), s.data(), len);
+  ExpandEnvironmentStringsA(filepath->c_str(), s.data(), len);
 
   *filepath = std:::move(s);
 
