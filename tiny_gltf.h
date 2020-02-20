@@ -3513,6 +3513,7 @@ static bool ParseAsset(Asset *asset, std::string *err, const json &o,
   ParseStringProperty(&asset->version, err, o, "version", true, "Asset");
   ParseStringProperty(&asset->generator, err, o, "generator", false, "Asset");
   ParseStringProperty(&asset->minVersion, err, o, "minVersion", false, "Asset");
+  ParseStringProperty(&asset->copyright, err, o, "copyright", false, "Asset");
 
   ParseExtensionsProperty(&asset->extensions, err, o);
 
