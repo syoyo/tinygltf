@@ -206,6 +206,9 @@ $ ./tester_noexcept
 
 See `tests/fuzzer` for details.
 
+After running fuzzer on Ryzen9 3950X a week, at least `LoadASCIIFromString` looks safe except for out-of-memory error in Fuzzer.
+We may be better to introduce bounded memory size checking when parsing glTF data.
+
 ## Third party licenses
 
 * json.hpp : Licensed under the MIT License <http://opensource.org/licenses/MIT>. Copyright (c) 2013-2017 Niels Lohmann <http://nlohmann.me>.
