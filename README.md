@@ -215,3 +215,4 @@ We may be better to introduce bounded memory size checking when parsing glTF dat
 * stb_image : Public domain.
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
 * RapidJSON : Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved. http://rapidjson.org/
+* dlib(uridecode, uriencode) : Copyright (C) 2003  Davis E. King Boost Software License 1.0. http://dlib.net/dlib/server/server_http.cpp.html
