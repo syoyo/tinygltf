@@ -6500,7 +6500,8 @@ static void SerializeExtensionMap(const ExtensionMap &extensions, json &o) {
 }
 
 static void SerializeGltfAccessor(Accessor &accessor, json &o) {
-  SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
+  if (accessor.bufferView >= 0)
+    SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
 
   if (accessor.byteOffset != 0.0)
     SerializeNumberProperty<int>("byteOffset", int(accessor.byteOffset), o);
