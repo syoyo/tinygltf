@@ -7,6 +7,19 @@
 #include <string>
 #include <vector>
 
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Weverything"
+#endif
+
+#include "../../json.hpp"
+
+using json = nlohmann::json;
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -16,6 +29,8 @@
 #else
 #include "tiny_gltf.h"
 #endif
+
+#include "mesh-util.hh"
 
 namespace {
 
@@ -36,7 +51,6 @@ static std::string PrintMode(int mode) {
   return "**UNKNOWN**";
 }
 
-#if 0
 static std::string PrintTarget(int target) {
   if (target == 34962) {
     return "GL_ARRAY_BUFFER";
@@ -46,7 +60,6 @@ static std::string PrintTarget(int target) {
     return "**UNKNOWN**";
   }
 }
-#endif
 
 static std::string PrintType(int ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
@@ -93,6 +106,7 @@ static std::string PrintComponentType(int ty) {
   return "**UNKNOWN**";
 }
 
+#if 0
 // TODO(syoyo): Support sparse accessor(sparse vertex attribute).
 // TODO(syoyo): Support more data type
 struct VertexAttrib {
@@ -123,7 +137,11 @@ struct MeshPrim {
   std::map<int, VertexAttrib> weights;    // <slot, attrib>
   std::map<int, VertexAttrib>
       joints;  // <slot, attrib> store data as float type
+
+  int indices_type{-1}; // storage type(componentType) of `indices`.
+  std::vector<uint32_t> indices; // vertex indices
 };
+#endif
 
 static std::string GetFilePathExtension(const std::string &FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
@@ -356,13 +374,86 @@ static float Unpack(const unsigned char *ptr, int type) {
   }
 }
 
+static uint32_t UnpackIndex(const unsigned char *ptr, int type) {
+  if (type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+    unsigned char data = *ptr;
+    return uint32_t(data);
+  } else if (type == TINYGLTF_COMPONENT_TYPE_BYTE) {
+    char data = static_cast<char>(*ptr);
+    return uint32_t(data);
+  } else if (type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    uint16_t data = *reinterpret_cast<const uint16_t *>(ptr);
+    return uint32_t(data);
+  } else if (type == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    int16_t data = *reinterpret_cast<const int16_t *>(ptr);
+    return uint32_t(data);
+  } else if (type == TINYGLTF_COMPONENT_TYPE_INT) {
+    // TODO(syoyo): Check overflow(2G+ index)
+    int32_t data = *reinterpret_cast<const int32_t *>(ptr);
+    return uint32_t(data);
+  } else if (type == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    uint32_t data = *reinterpret_cast<const uint32_t *>(ptr);
+    return data;
+  } else {
+    std::cerr << "???: Unsupported type: " << PrintComponentType(type) << "\n";
+    return static_cast<uint32_t>(-1);
+  }
+}
+
 static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
-                     MeshPrim *out) {
+                     example::MeshPrim *out) {
   for (size_t i = 0; i < mesh.primitives.size(); i++) {
     const tinygltf::Primitive &primitive = mesh.primitives[i];
 
-    if (primitive.indices < 0) return false;
+    if (primitive.indices < 0) {
+      std::cerr << "Primitive indices must be provided\n";
+      return false;
+    }
 
+    // indices.
+    {
+      const tinygltf::Accessor &indexAccessor =
+        model.accessors[size_t(primitive.indices)];
+
+      size_t num_elements = indexAccessor.count;
+      std::cout << "index.elements = " << num_elements << "\n";
+
+      size_t byte_stride = ComponentTypeByteSize(indexAccessor.componentType);
+
+      const tinygltf::BufferView &indexBufferView =
+           model.bufferViews[size_t(indexAccessor.bufferView)];
+
+      // should be 34963(ELEMENT_ARRAY_BUFFER)
+      std::cout << "index.target = " << PrintTarget(indexBufferView.target) << "\n";
+      if (indexBufferView.target != TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER) {
+        std::cerr << "indexBufferView.target must be ELEMENT_ARRAY_BUFFER\n";
+        return false;
+      }
+
+      const tinygltf::Buffer &indexBuffer =
+          model.buffers[size_t(indexBufferView.buffer)];
+
+      std::vector<uint32_t> indices;
+
+      for (size_t k = 0; k < num_elements; k++) {
+
+        // TODO(syoyo): out-of-bounds check.
+        const unsigned char *ptr = indexBuffer.data.data() +
+                                   indexBufferView.byteOffset + (k * byte_stride) +
+                                   indexAccessor.byteOffset;
+
+        uint32_t idx = UnpackIndex(ptr, indexAccessor.componentType);
+
+        std::cout << "vertex_index[" << k << "] = " << idx << "\n";
+
+        indices.push_back(idx);
+      }
+
+      out->indices = indices;
+      out->indices_type = indexAccessor.componentType;
+    }
+
+    // attributes
     {
       std::map<std::string, int>::const_iterator it(
           primitive.attributes.begin());
@@ -419,7 +510,7 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
 
         size_t num_elems = accessor.count * elem_size;
 
-        VertexAttrib attrib;
+        example::VertexAttrib attrib;
         for (size_t k = 0; k < num_elems; k++) {
           // TODO(syoyo): out-of-bounds check.
           const unsigned char *ptr = buffer.data.data() +
@@ -469,13 +560,14 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
     }
 
     out->mode = primitive.mode;
+    out->name = mesh.name;
   }
 
   return true;
 }
 
 static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
-                        std::vector<MeshPrim> *outs) {
+                        std::vector<example::MeshPrim> *outs) {
   // Get .bin data
   {
     if (model.buffers.size() != 1) {
@@ -502,6 +594,7 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
     if (bin.size() != buffer.data.size()) {
       std::cerr << "Byte size mismatch. Failed to load file: " << buffer.uri
                 << "\n";
+      std::cerr << "  .bin size = " << bin.size() << ", size in 'buffer.uri' = " << buffer.data.size() << "\n";
       return false;
     }
   }
@@ -509,7 +602,7 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
   for (const auto &mesh : model.meshes) {
     std::cout << "mesh.name: " << mesh.name << "\n";
 
-    MeshPrim output;
+    example::MeshPrim output;
     bool ret = DumpMesh(model, mesh, &output);
     if (!ret) {
       return false;
@@ -527,6 +620,8 @@ int main(int argc, char **argv) {
   if (argc < 2) {
     std::cout << "mesh-dump input.gltf" << std::endl;
   }
+
+#if 0
 
   tinygltf::Model model;
   tinygltf::TinyGLTF loader;
@@ -567,9 +662,75 @@ int main(int argc, char **argv) {
     }
   }
 
+  json j;
+  {
+    std::ifstream i(input_filename);
+    i >> j;
+  }
+  std::cout << "j = " << j << "\n";
+
+  json j_patch = R"([
+    { "op": "add", "path": "/buffers/-", "value": {
+            "name": "plane/data",
+            "byteLength": 480,
+            "uri": "plane1.bin"
+        } }
+  ])"_json;
+
+  // a JSON value
+  json j_original = R"({
+    "baz": ["one", "two", "three"],
+    "foo": "bar"
+  })"_json;
+
+  //json j_patch = R"([
+  //  { "op": "remove", "path": "/buffers" }
+  //])"_json;
+
+  std::cout << "patch = " << j_patch.dump(2) << "\n";
+
+  json j_ret = j.patch(j_patch);
+  std::cout << "patched = " << j_ret.dump(2) << "\n";
+
   std::string basedir = GetBaseDir(input_filename);
-  std::vector<MeshPrim> meshes;
+  std::vector<example::MeshPrim> meshes;
   bool ret = ExtractMesh(basedir, model, &meshes);
+
+  size_t n = 0;
+  for (const auto &mesh : meshes) {
+    // Assume no duplicated name in .glTF data
+    std::string filename;
+    if (mesh.name.empty()) {
+      filename = "untitled-" + std::to_string(n) + ".obj";
+    } else {
+      filename = mesh.name + ".obj";
+    }
+
+    bool flip_y = true; // flip texcoord Y?
+    bool ok = example::SaveAsObjMesh(filename, mesh,);
+    if (!ok) {
+      return EXIT_FAILURE;
+    }
+    n++;
+  }
+#else
+
+  {
+    std::string input_filename(argv[1]);
+
+    // Require facevarying layout?
+    // false = try to keep GL-like mesh data as much as possible.
+    // true = reorder vertex data and re-assign vertex indices.
+    bool facevarying = false;
+
+    example::MeshPrim mesh;
+    bool ok = example::LoadObjMesh(input_filename, facevarying, &mesh);
+    if (!ok) {
+      return EXIT_FAILURE;
+    }
+  }
+
+#endif
 
   return ret ? EXIT_SUCCESS : EXIT_FAILURE;
 }
