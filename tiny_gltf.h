@@ -2615,12 +2615,14 @@ static void UpdateImageObject(Image &image, std::string &baseDir, int index,
                               void *user_data = nullptr) {
   std::string filename;
   std::string ext;
-
-  // If image have uri. Use it it as a filename
+  // If image has uri, use it it as a filename
   if (image.uri.size()) {
     filename = GetBaseFilename(image.uri);
     ext = GetFilePathExtension(filename);
-
+  }
+  else if (image.bufferView != -1) {
+	  //If there's no URI and the data exists in a buffer,
+	  //don't change properties or write images
   } else if (image.name.size()) {
     ext = MimeToExt(image.mimeType);
     // Otherwise use name as filename
@@ -2632,7 +2634,7 @@ static void UpdateImageObject(Image &image, std::string &baseDir, int index,
   }
 
   // If callback is set, modify image data object
-  if (*WriteImageData != nullptr) {
+  if (*WriteImageData != nullptr && !filename.empty()) {
     std::string uri;
     (*WriteImageData)(&baseDir, &filename, &image, embedImages, user_data);
   }
@@ -7340,11 +7342,10 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
       json image;
 
       std::string dummystring = "";
-      // UpdateImageObject need baseDir but only uses it if embededImages is
-      // enable, since we won't write separte images when writing to a stream we
-      // use a dummystring
-      UpdateImageObject(model->images[i], dummystring, int(i), false,
-                        &this->WriteImageData, this->write_image_user_data_);
+	  // UpdateImageObject need baseDir but only uses it if embeddedImages is
+	  // enabled, since we won't write separate images when writing to a stream we
+	  UpdateImageObject(model->images[i], dummystring, int(i), false,
+		  &this->WriteImageData, this->write_image_user_data_);
       SerializeGltfImage(model->images[i], image);
       JsonPushBack(images, std::move(image));
     }
