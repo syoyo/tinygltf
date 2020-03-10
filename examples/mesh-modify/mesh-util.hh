@@ -19,6 +19,11 @@ struct VertexAttrib {
                        // TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT
   uint64_t buffer_offset{0};
   size_t buffer_length{0};
+
+  // Optional.
+  std::vector<double> minValues;
+  std::vector<double> maxValues;
+
 };
 
 struct MeshPrim {
@@ -36,6 +41,10 @@ struct MeshPrim {
   std::map<int, VertexAttrib>
       joints;  // <slot, attrib> store data as float type
 
+
+  // min/max of index value. -1 = undef
+  int indices_min{-1};
+  int indices_max{-1};
   int indices_type{-1}; // storage type(componentType) of `indices`.
   std::vector<uint32_t> indices; // vertex indices
 };
@@ -46,10 +55,20 @@ struct MeshPrim {
 bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh);
 
 ///
+/// Save MeshPrim as glTF mesh
+///
+bool SaveAsGLTFMesh(const std::string &filename, const MeshPrim &mesh);
+
+///
 /// Loads .obj and convert to MeshPrim
 ///
 /// @param[in] facevarying Construct mesh with facevarying vertex layout(default false)
 ///
 bool LoadObjMesh(const std::string &filename, bool facevarying, MeshPrim *mesh);
+
+///
+/// Print MeshPrim datra
+///
+void PrintMeshPrim(const MeshPrim &mesh);
 
 } // namespace example

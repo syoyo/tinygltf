@@ -6,6 +6,11 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <fstream>
+
+#if !defined(__ANDROID__) && !defined(_WIN32)
+#include <wordexp.h>
+#endif
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -20,10 +25,6 @@ using json = nlohmann::json;
 #pragma clang diagnostic pop
 #endif
 
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-
 #ifdef _WIN32
 #include "../../tiny_gltf.h"
 #else
@@ -31,6 +32,10 @@ using json = nlohmann::json;
 #endif
 
 #include "mesh-util.hh"
+
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wunused-function"
+#endif
 
 namespace {
 
@@ -143,11 +148,13 @@ struct MeshPrim {
 };
 #endif
 
+#if 0
 static std::string GetFilePathExtension(const std::string &FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
     return FileName.substr(FileName.find_last_of(".") + 1);
   return "";
 }
+#endif
 
 static size_t ComponentTypeByteSize(int type) {
   switch (type) {
@@ -289,11 +296,13 @@ static std::string FindFile(const std::vector<std::string> &paths,
   return std::string();
 }
 
+#if 0
 static std::string GetBaseDir(const std::string &filepath) {
   if (filepath.find_last_of("/\\") != std::string::npos)
     return filepath.substr(0, filepath.find_last_of("/\\"));
   return "";
 }
+#endif
 
 static int GetSlotId(const std::string &name) {
   if (name.rfind("TEXCOORD_", 0) == 0) {
@@ -566,6 +575,7 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
   return true;
 }
 
+#if 0
 static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
                         std::vector<example::MeshPrim> *outs) {
   // Get .bin data
@@ -613,6 +623,7 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
 
   return true;
 }
+#endif
 
 }  // namespace
 
@@ -713,6 +724,8 @@ int main(int argc, char **argv) {
     }
     n++;
   }
+
+  return ret ? EXIT_SUCCESS : EXIT_FAILURE;
 #else
 
   {
@@ -728,9 +741,11 @@ int main(int argc, char **argv) {
     if (!ok) {
       return EXIT_FAILURE;
     }
+
+    PrintMeshPrim(mesh);
   }
 
+  return EXIT_SUCCESS;
 #endif
 
-  return ret ? EXIT_SUCCESS : EXIT_FAILURE;
 }

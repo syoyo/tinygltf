@@ -4,4 +4,4 @@ thread_dep = dependency('threads')
 
 incdir = include_directories(['../../', '../common'])
 
-executable('mesh-modify', ['mesh-modify.cc', 'mesh-util.cc'], include_directories : incdir, dependencies : thread_dep)
+executable('mesh-modify', ['mesh-modify.cc', 'mesh-util.cc', 'tinygltf_impl.cc'], include_directories : incdir, dependencies : thread_dep)
