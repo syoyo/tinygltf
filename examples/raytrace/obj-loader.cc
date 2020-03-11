@@ -150,6 +150,7 @@ bool LoadObj(const std::string &filename, float scale,
   tinyobj::attrib_t attrib;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;
+  std::string warn;
   std::string err;
 
   std::string basedir = GetBaseDir(filename) + "/";
@@ -158,11 +159,15 @@ bool LoadObj(const std::string &filename, float scale,
   // auto t_start = std::chrono::system_clock::now();
 
   bool ret =
-      tinyobj::LoadObj(&attrib, &shapes, &materials, &err, filename.c_str(),
+      tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, filename.c_str(),
                        basepath, /* triangulate */ true);
 
   // auto t_end = std::chrono::system_clock::now();
   // std::chrono::duration<double, std::milli> ms = t_end - t_start;
+
+  if (!warn.empty()) {
+    std::cout << warn << std::endl;
+  }
 
   if (!err.empty()) {
     std::cerr << err << std::endl;
