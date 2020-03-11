@@ -743,6 +743,15 @@ int main(int argc, char **argv) {
     }
 
     PrintMeshPrim(mesh);
+
+    std::string output_filename("output.gltf");
+
+    ok = example::SaveAsGLTFMesh(output_filename, mesh);
+    if (!ok) {
+      std::cerr << "Failed to save mesh as glTF\n";
+      return EXIT_FAILURE;
+    }
+    std::cout << "Write glTF: " << output_filename << "\n";
   }
 
   return EXIT_SUCCESS;

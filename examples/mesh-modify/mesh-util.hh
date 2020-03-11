@@ -24,6 +24,8 @@ struct VertexAttrib {
   std::vector<double> minValues;
   std::vector<double> maxValues;
 
+  size_t numElements() const;
+
 };
 
 struct MeshPrim {
@@ -37,7 +39,7 @@ struct MeshPrim {
   VertexAttrib tangent;                   // vec4
   VertexAttrib color;                     // vec3 or vec4
   std::map<int, VertexAttrib> texcoords;  // <slot, attrib>  vec2
-  std::map<int, VertexAttrib> weights;    // <slot, attrib>
+  std::map<int, VertexAttrib> weights;    // <slot, attrib>  vec4
   std::map<int, VertexAttrib>
       joints;  // <slot, attrib> store data as float type
 

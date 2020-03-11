@@ -14,6 +14,63 @@
 
 namespace example {
 
+#if 0
+static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
+  if (componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
+    return 1;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+    return 1;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    return 2;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    return 2;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_INT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+    return 4;
+  } else if (componentType == TINYGLTF_COMPONENT_TYPE_DOUBLE) {
+    return 8;
+  } else {
+    // Unknown componenty type
+    return -1;
+  }
+}
+#endif
+
+static inline int32_t GetNumComponentsInType(uint32_t ty) {
+  if (ty == TINYGLTF_TYPE_SCALAR) {
+    return 1;
+  } else if (ty == TINYGLTF_TYPE_VEC2) {
+    return 2;
+  } else if (ty == TINYGLTF_TYPE_VEC3) {
+    return 3;
+  } else if (ty == TINYGLTF_TYPE_VEC4) {
+    return 4;
+  } else if (ty == TINYGLTF_TYPE_MAT2) {
+    return 4;
+  } else if (ty == TINYGLTF_TYPE_MAT3) {
+    return 9;
+  } else if (ty == TINYGLTF_TYPE_MAT4) {
+    return 16;
+  } else {
+    // Unknown componenty type
+    return -1;
+  }
+}
+
+size_t VertexAttrib::numElements() const {
+  size_t n = GetNumComponentsInType(data_type);
+
+  return data.size() / n;
+}
+
+// https://stackoverflow.com/questions/8520560/get-a-file-name-from-a-path
+std::string GetBaseFilename(const std::string &filepath) {
+  return filepath.substr(filepath.find_last_of("/\\") + 1);
+}
+
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const std::vector<T> &v) {
   os << "(";
@@ -144,6 +201,361 @@ static std::string make_triple(int i, bool has_vn, bool has_vt) {
   return ss.str();
 }
 
+namespace {
+
+tinygltf::Accessor ConvertToGLTFAccessor(const VertexAttrib &attrib,
+                                         int bufferView, size_t byteOffset) {
+  tinygltf::Accessor accessor;
+
+  accessor.bufferView = bufferView;
+  accessor.name = attrib.name;
+  accessor.byteOffset = byteOffset;
+  accessor.componentType = attrib.component_type;
+  accessor.count = attrib.numElements();
+  accessor.type = attrib.data_type;
+  accessor.minValues = attrib.minValues;
+  accessor.maxValues = attrib.maxValues;
+
+  return accessor;
+}
+
+// data is appended to `buf`
+bool SerializeVertexAttribToBuffer(const VertexAttrib &attrib,
+                                   std::vector<uint8_t> *buf, size_t *begin_loc,
+                                   size_t *end_loc) {
+  (*begin_loc) = buf->size();
+
+  if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_BYTE) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      int8_t d = static_cast<int8_t>(attrib.data[i]);
+      buf->push_back(static_cast<uint8_t>(d));
+    }
+  } else if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      uint8_t d = static_cast<uint8_t>(attrib.data[i]);
+      buf->push_back(d);
+    }
+  } else if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      int16_t d = static_cast<int16_t>(attrib.data[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      uint16_t d = static_cast<uint16_t>(attrib.data[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_INT) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      int32_t d = static_cast<int32_t>(attrib.data[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      uint32_t d = static_cast<uint32_t>(attrib.data[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (attrib.component_type == TINYGLTF_COMPONENT_TYPE_FLOAT) {
+    for (size_t i = 0; i < attrib.data.size(); i++) {
+      float d = attrib.data[i];
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else {
+    std::cerr << "Unsupported component type: "
+              << PrintComponentType(attrib.component_type) << "\n";
+    return false;
+  }
+
+  (*end_loc) = buf->size();
+
+  return true;
+}
+
+// data is appended to `buf`
+bool SerializeVertexIndicesToBuffer(const std::vector<uint32_t> &indices,
+                                    int data_type, std::vector<uint8_t> *buf,
+                                    size_t *begin_loc, size_t *end_loc) {
+  // TODO(syoyo): Check alignment
+
+  (*begin_loc) = buf->size();
+
+  if (data_type == TINYGLTF_COMPONENT_TYPE_BYTE) {
+    for (size_t i = 0; i < indices.size(); i++) {
+      int8_t d = static_cast<int8_t>(indices[i]);
+      buf->push_back(static_cast<uint8_t>(d));
+    }
+  } else if (data_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+    for (size_t i = 0; i < indices.size(); i++) {
+      uint8_t d = static_cast<uint8_t>(indices[i]);
+      buf->push_back(d);
+    }
+  } else if (data_type == TINYGLTF_COMPONENT_TYPE_SHORT) {
+    for (size_t i = 0; i < indices.size(); i++) {
+      int16_t d = static_cast<int16_t>(indices[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (data_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+    for (size_t i = 0; i < indices.size(); i++) {
+      uint16_t d = static_cast<uint16_t>(indices[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (data_type == TINYGLTF_COMPONENT_TYPE_INT) {
+    for (size_t i = 0; i < indices.size(); i++) {
+      int32_t d = static_cast<int32_t>(indices[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else if (data_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    for (size_t i = 0; i < indices.size(); i++) {
+      uint32_t d = static_cast<uint32_t>(indices[i]);
+      uint8_t *ptr = reinterpret_cast<uint8_t *>(&d);
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+      ptr++;
+      buf->push_back(*ptr);
+    }
+  } else {
+    std::cerr << "Unsupported data type: " << PrintType(data_type) << "\n";
+    return false;
+  }
+
+  (*end_loc) = buf->size();
+
+  return true;
+}
+
+bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
+                       tinygltf::Mesh *gltfmesh,
+                       std::vector<tinygltf::Accessor> *accessors,
+                       std::vector<tinygltf::BufferView> *bufferViews,
+                       tinygltf::Buffer *buffer) {
+  std::vector<uint8_t> buf;
+
+  // single primitive per mesh
+  tinygltf::Primitive primitive;
+
+  // vertex index
+  {
+    size_t s, e;
+    if (!SerializeVertexIndicesToBuffer(mesh.indices, mesh.indices_type, &buf,
+                                        &s, &e)) {
+      return false;
+    }
+    std::cout << "indices: [" << s << ", " << e << "]\n";
+
+    tinygltf::BufferView bufferView;
+    bufferView.buffer = buffer_id;
+    bufferView.byteLength = e - s;
+    bufferView.byteOffset = s;
+    bufferView.target = TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+    bufferViews->push_back(bufferView);
+
+    tinygltf::Accessor accessor;
+    accessor.bufferView = bufferViews->size() - 1;
+    accessor.minValues.resize(1);
+    accessor.minValues[0] = mesh.indices_min;
+    accessor.maxValues.resize(1);
+    accessor.maxValues[0] = mesh.indices_max;
+    accessor.count = mesh.indices.size();
+    accessor.componentType = mesh.indices_type;
+    accessor.type = TINYGLTF_TYPE_SCALAR;
+    accessors->push_back(accessor);
+
+    primitive.indices = accessors->size() - 1;
+  }
+
+  // position
+  {
+    size_t s, e;
+    if (!SerializeVertexAttribToBuffer(mesh.position, &buf, &s, &e)) {
+      return false;
+    }
+    std::cout << "postion.byteRange: [" << s << ", " << e << "]\n";
+
+    tinygltf::BufferView bufferView;
+    bufferView.buffer = buffer_id;
+    bufferView.byteLength = e - s;
+    bufferView.byteOffset = s;
+    bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    bufferViews->push_back(bufferView);
+
+    tinygltf::Accessor accessor = ConvertToGLTFAccessor(
+        mesh.position, bufferViews->size() - 1, /* offset */ 0);
+    accessors->push_back(accessor);
+
+    primitive.attributes["POSITION"] = accessors->size() - 1;
+  }
+
+  if (mesh.normal.data.size() > 0) {
+    size_t s, e;
+    if (!SerializeVertexAttribToBuffer(mesh.normal, &buf, &s, &e)) {
+      return false;
+    }
+    std::cout << "normal.byteRange: [" << s << ", " << e << "]\n";
+
+    tinygltf::BufferView bufferView;
+    bufferView.buffer = buffer_id;
+    bufferView.byteLength = e - s;
+    bufferView.byteOffset = s;
+    bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    bufferViews->push_back(bufferView);
+
+    tinygltf::Accessor accessor = ConvertToGLTFAccessor(
+        mesh.normal, bufferViews->size() - 1, /* offset */ 0);
+    accessors->push_back(accessor);
+
+    primitive.attributes["NORMAL"] = accessors->size() - 1;
+  }
+
+  if (mesh.tangent.data.size() > 0) {
+    size_t s, e;
+    if (!SerializeVertexAttribToBuffer(mesh.tangent, &buf, &s, &e)) {
+      return false;
+    }
+    std::cout << "tangent.byteRange: [" << s << ", " << e << "]\n";
+
+    tinygltf::BufferView bufferView;
+    bufferView.buffer = buffer_id;
+    bufferView.byteLength = e - s;
+    bufferView.byteOffset = s;
+    bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+    bufferViews->push_back(bufferView);
+
+    tinygltf::Accessor accessor = ConvertToGLTFAccessor(
+        mesh.tangent, bufferViews->size() - 1, /* offset */ 0);
+    accessors->push_back(accessor);
+
+    primitive.attributes["TANGENT"] = accessors->size() - 1;
+  }
+
+  if (mesh.texcoords.size() > 0) {
+    for (const auto &item : mesh.texcoords) {
+      size_t s, e;
+      if (!SerializeVertexAttribToBuffer(item.second, &buf, &s, &e)) {
+        return false;
+      }
+      std::cout << "tangent.byteRange: [" << s << ", " << e << "]\n";
+
+      tinygltf::BufferView bufferView;
+      bufferView.buffer = buffer_id;
+      bufferView.byteLength = e - s;
+      bufferView.byteOffset = s;
+      bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+      bufferViews->push_back(bufferView);
+
+      tinygltf::Accessor accessor = ConvertToGLTFAccessor(
+          item.second, bufferViews->size() - 1, /* offset */ 0);
+      accessors->push_back(accessor);
+
+      std::string target = "TEXCOORD_" + std::to_string(item.first);
+      primitive.attributes[target] = accessors->size() - 1;
+    }
+  }
+
+  if (mesh.joints.size() > 0) {
+    for (const auto &item : mesh.joints) {
+      size_t s, e;
+      if (!SerializeVertexAttribToBuffer(item.second, &buf, &s, &e)) {
+        return false;
+      }
+      std::cout << "joint[" << item.first << "].byteRange: [" << s << ", " << e
+                << "]\n";
+
+      tinygltf::BufferView bufferView;
+      bufferView.buffer = buffer_id;
+      bufferView.byteLength = e - s;
+      bufferView.byteOffset = s;
+      bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+      bufferViews->push_back(bufferView);
+
+      tinygltf::Accessor accessor = ConvertToGLTFAccessor(
+          mesh.tangent, bufferViews->size() - 1, /* offset */ 0);
+      accessors->push_back(accessor);
+
+      std::string target = "JOINTS_" + std::to_string(item.first);
+      primitive.attributes[target] = accessors->size() - 1;
+    }
+  }
+
+  if (mesh.weights.size() > 0) {
+    for (const auto &item : mesh.weights) {
+      size_t s, e;
+      if (!SerializeVertexAttribToBuffer(item.second, &buf, &s, &e)) {
+        return false;
+      }
+      std::cout << "weight[" << item.first << "].byteRange: [" << s << ", " << e
+                << "]\n";
+
+      tinygltf::BufferView bufferView;
+      bufferView.buffer = buffer_id;
+      bufferView.byteLength = e - s;
+      bufferView.byteOffset = s;
+      bufferView.target = TINYGLTF_TARGET_ARRAY_BUFFER;
+      bufferViews->push_back(bufferView);
+
+      tinygltf::Accessor accessor = ConvertToGLTFAccessor(
+          mesh.tangent, bufferViews->size() - 1, /* offset */ 0);
+      accessors->push_back(accessor);
+
+      std::string target = "WEIGHTS_" + std::to_string(item.first);
+      primitive.attributes[target] = accessors->size() - 1;
+    }
+  }
+
+  primitive.mode = mesh.mode;
+
+  gltfmesh->primitives.push_back(primitive);
+
+  buffer->data = buf;
+  buffer->name = "bufffer0";  // temporary
+
+  return true;
+}
+
+}  // namespace
+
 bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh,
                    bool flip_texcoord_y) {
   std::ofstream ofs(filename);
@@ -203,11 +615,53 @@ bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh,
 }
 
 bool SaveAsGLTFMesh(const std::string &filename, const MeshPrim &mesh) {
-
   tinygltf::TinyGLTF ctx;
   tinygltf::Model model;
 
-  return true;
+  bool embedImages = false;
+  bool embedBuffers = false;
+  bool prettyPrint = true;
+  bool writeBinary = false;
+
+  // Create dummy node
+  tinygltf::Node node;
+  node.mesh = 0;
+  node.name = "mesh";
+
+  tinygltf::Scene scene;
+  scene.nodes.push_back(0);
+
+  model.defaultScene = 0;
+  model.scenes.push_back(scene);
+  model.nodes.push_back(node);
+
+  int buffer_id = 0;
+  tinygltf::Mesh gltfmesh;
+  tinygltf::Buffer buffer;
+  if (!ConvertToGLTFMesh(mesh, buffer_id, &gltfmesh, &(model.accessors),
+                         &(model.bufferViews), &buffer)) {
+    std::cerr << "Failed to convert Mesh\n";
+    return false;
+  }
+
+  std::cout << "mesh.name: " << mesh.name << "\n";
+  gltfmesh.name = mesh.name;
+
+  model.meshes.push_back(gltfmesh);
+
+  model.buffers.push_back(buffer);
+
+  // Fill some required fields
+  tinygltf::Asset asset;
+  asset.version = "2.0";  // required
+  asset.generator = "mesh-modify";
+
+  model.asset = asset;
+
+  bool ret = ctx.WriteGltfSceneToFile(&model, filename, embedImages,
+                                      embedBuffers, prettyPrint, writeBinary);
+
+  return ret;
 }
 
 bool RequireFacevaringLayout(const tinyobj::attrib_t &attrib,
@@ -259,10 +713,9 @@ bool RequireFacevaringLayout(const tinyobj::attrib_t &attrib,
 }
 
 static void ConstructVertexSkinWeight(
-  const std::vector<tinyobj::real_t> &vertices,
-  const std::vector<tinyobj::skin_weight_t> &skin_weights,
-  std::vector<tinyobj::skin_weight_t> *vertex_skin_weights)
-{
+    const std::vector<tinyobj::real_t> &vertices,
+    const std::vector<tinyobj::skin_weight_t> &skin_weights,
+    std::vector<tinyobj::skin_weight_t> *vertex_skin_weights) {
   size_t num_vertices = vertices.size() / 3;
 
   vertex_skin_weights->resize(num_vertices);
@@ -393,6 +846,7 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
           if ((idx0.normal_index < 0) || (idx1.normal_index < 0) ||
               (idx2.normal_index < 0)) {
             // This face does contain valid normal
+            // Calc geometric normal
             CalcNormal(n[0], v[0], v[1], v[2]);
             n[1][0] = n[0][0];
             n[1][1] = n[0][1];
@@ -416,6 +870,16 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
               n[2][k] = attrib.normals[3 * nf2 + k];
             }
           }
+        } else {
+          // Calc geometric normal
+          CalcNormal(n[0], v[0], v[1], v[2]);
+          n[1][0] = n[0][0];
+          n[1][1] = n[0][1];
+          n[1][2] = n[0][2];
+
+          n[2][0] = n[0][0];
+          n[2][1] = n[0][1];
+          n[2][2] = n[0][2];
         }
 
         mesh->position.data.push_back(v[0][0]);
@@ -460,13 +924,10 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
 
     // weights/joints
     if (attrib.skin_weights.size() > 0) {
-
       // Reorder vertex skin weights
       std::vector<tinyobj::skin_weight_t> vertex_skin_weights;
-      ConstructVertexSkinWeight(
-        attrib.vertices,
-        attrib.skin_weights,
-        &vertex_skin_weights);
+      ConstructVertexSkinWeight(attrib.vertices, attrib.skin_weights,
+                                &vertex_skin_weights);
 
       // Find max # of slots.
       size_t maxn = 0;
@@ -481,7 +942,6 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
       std::cout << "# of slots = " << num_slots << "\n";
 
       for (size_t t = 0; t < size_t(num_slots); t++) {
-
         VertexAttrib weights, joints;
 
         size_t num_faceverts = mesh->indices.size();
@@ -551,7 +1011,6 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
 
     // weights/joints
     if (attrib.skin_weights.size() > 0) {
-
       // Find max # of slots.
       size_t maxn = 0;
       for (size_t i = 0; i < attrib.skin_weights.size(); i++) {
@@ -565,7 +1024,6 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
       std::cout << "# of slots = " << num_slots << "\n";
 
       for (size_t s = 0; s < size_t(num_slots); s++) {
-
         VertexAttrib weights, joints;
 
         // Fill with zeros
@@ -582,18 +1040,21 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
           for (size_t j0 = 0; j0 < 4; j0++) {
             size_t j = s * 4 + j0;
             if (j < sw.weightValues.size()) {
-              joints.data[4 * dst_vid + j0] = float(sw.weightValues[j].joint_id);
+              joints.data[4 * dst_vid + j0] =
+                  float(sw.weightValues[j].joint_id);
               weights.data[4 * dst_vid + j0] = float(sw.weightValues[j].weight);
             }
           }
         }
 
         weights.data_type = TINYGLTF_TYPE_VEC4;
-        weights.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;  // storage format
+        weights.component_type =
+            TINYGLTF_COMPONENT_TYPE_FLOAT;  // storage format
         mesh->weights[s] = weights;
 
         joints.data_type = TINYGLTF_TYPE_VEC4;
-        joints.component_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;  // storage format
+        joints.component_type =
+            TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;  // storage format
 
         mesh->joints[s] = joints;
       }
@@ -769,6 +1230,11 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
           TINYGLTF_COMPONENT_TYPE_FLOAT;  // storage format
     }
   }
+
+  // Use filename as mesh's name
+  mesh->name = GetBaseFilename(filename);
+
+  mesh->mode = TINYGLTF_MODE_TRIANGLES;
 
   return true;
 }
