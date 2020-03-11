@@ -54,7 +54,7 @@ struct MeshPrim {
 ///
 /// Save MeshPrim as wavefront .obj
 ///
-bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh);
+bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh, bool flip_texcoord_y = true);
 
 ///
 /// Save MeshPrim as glTF mesh

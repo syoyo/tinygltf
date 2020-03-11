@@ -1,0 +1,5 @@
+all:
+	ninja
+
+clean:
+	ninja -t clean

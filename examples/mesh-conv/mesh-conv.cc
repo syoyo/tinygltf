@@ -148,13 +148,11 @@ struct MeshPrim {
 };
 #endif
 
-#if 0
 static std::string GetFilePathExtension(const std::string &FileName) {
   if (FileName.find_last_of(".") != std::string::npos)
     return FileName.substr(FileName.find_last_of(".") + 1);
   return "";
 }
-#endif
 
 static size_t ComponentTypeByteSize(int type) {
   switch (type) {
@@ -296,13 +294,11 @@ static std::string FindFile(const std::vector<std::string> &paths,
   return std::string();
 }
 
-#if 0
 static std::string GetBaseDir(const std::string &filepath) {
   if (filepath.find_last_of("/\\") != std::string::npos)
     return filepath.substr(0, filepath.find_last_of("/\\"));
   return "";
 }
-#endif
 
 static int GetSlotId(const std::string &name) {
   if (name.rfind("TEXCOORD_", 0) == 0) {
@@ -575,7 +571,6 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
   return true;
 }
 
-#if 0
 static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
                         std::vector<example::MeshPrim> *outs) {
   // Get .bin data
@@ -623,117 +618,127 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
 
   return true;
 }
-#endif
 
 }  // namespace
 
 int main(int argc, char **argv) {
-  if (argc < 2) {
-    std::cout << "mesh-dump input.gltf" << std::endl;
+  if (argc < 3) {
+    std::cout << "mesh-modify <op> <args>" << std::endl;
+    std::cout << "  op\n\n";
+    std::cout << "  gltf2obj input.gltf <flip_texcoord_y>\n";
+    std::cout << "  obj2gltf input.obj <verbose>\n";
+
+    return EXIT_FAILURE;
   }
 
-#if 0
+  std::string op = argv[1];
 
-  tinygltf::Model model;
-  tinygltf::TinyGLTF loader;
-  std::string err;
-  std::string warn;
+  if (op == "gltf2obj") {
 
-#ifdef _WIN32
-  std::string input_filename(argv[1] ? argv[1]
-                                     : "../../../models/Cube/Cube.gltf");
-#else
-  std::string input_filename(argv[1] ? argv[1] : "../../models/Cube/Cube.gltf");
-#endif
-
-  std::string ext = GetFilePathExtension(input_filename);
-
-  {
-    bool ret = false;
-    if (ext.compare("glb") == 0) {
-      // assume binary glTF.
-      ret = loader.LoadBinaryFromFile(&model, &err, &warn,
-                                      input_filename.c_str());
-    } else {
-      // assume ascii glTF.
-      ret =
-          loader.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+    bool flip_texcoord_y = true;
+    if (argc > 3) {
+      flip_texcoord_y = (std::atoi(argv[3]) > 0) ? true : false;
     }
 
-    if (!warn.empty()) {
-      printf("Warn: %s\n", warn.c_str());
+    tinygltf::Model model;
+    tinygltf::TinyGLTF loader;
+    std::string err;
+    std::string warn;
+
+    std::string input_filename(argv[2]);
+
+    std::string ext = GetFilePathExtension(input_filename);
+
+    {
+      bool ret = false;
+      if (ext.compare("glb") == 0) {
+        // assume binary glTF.
+        ret = loader.LoadBinaryFromFile(&model, &err, &warn,
+                                        input_filename.c_str());
+      } else {
+        // assume ascii glTF.
+        ret =
+            loader.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+      }
+
+      if (!warn.empty()) {
+        printf("Warn: %s\n", warn.c_str());
+      }
+
+      if (!err.empty()) {
+        printf("ERR: %s\n", err.c_str());
+      }
+      if (!ret) {
+        printf("Failed to load .glTF : %s\n", argv[1]);
+        exit(-1);
+      }
     }
 
-    if (!err.empty()) {
-      printf("ERR: %s\n", err.c_str());
+    json j;
+    {
+      std::ifstream i(input_filename);
+      i >> j;
     }
-    if (!ret) {
-      printf("Failed to load .glTF : %s\n", argv[1]);
-      exit(-1);
-    }
-  }
+    std::cout << "j = " << j << "\n";
 
-  json j;
-  {
-    std::ifstream i(input_filename);
-    i >> j;
-  }
-  std::cout << "j = " << j << "\n";
+    json j_patch = R"([
+      { "op": "add", "path": "/buffers/-", "value": {
+              "name": "plane/data",
+              "byteLength": 480,
+              "uri": "plane1.bin"
+          } }
+    ])"_json;
 
-  json j_patch = R"([
-    { "op": "add", "path": "/buffers/-", "value": {
-            "name": "plane/data",
-            "byteLength": 480,
-            "uri": "plane1.bin"
-        } }
-  ])"_json;
+    // a JSON value
+    json j_original = R"({
+      "baz": ["one", "two", "three"],
+      "foo": "bar"
+    })"_json;
 
-  // a JSON value
-  json j_original = R"({
-    "baz": ["one", "two", "three"],
-    "foo": "bar"
-  })"_json;
+    //json j_patch = R"([
+    //  { "op": "remove", "path": "/buffers" }
+    //])"_json;
 
-  //json j_patch = R"([
-  //  { "op": "remove", "path": "/buffers" }
-  //])"_json;
+    std::cout << "patch = " << j_patch.dump(2) << "\n";
 
-  std::cout << "patch = " << j_patch.dump(2) << "\n";
+    json j_ret = j.patch(j_patch);
+    std::cout << "patched = " << j_ret.dump(2) << "\n";
 
-  json j_ret = j.patch(j_patch);
-  std::cout << "patched = " << j_ret.dump(2) << "\n";
+    std::string basedir = GetBaseDir(input_filename);
+    std::vector<example::MeshPrim> meshes;
+    bool ret = ExtractMesh(basedir, model, &meshes);
 
-  std::string basedir = GetBaseDir(input_filename);
-  std::vector<example::MeshPrim> meshes;
-  bool ret = ExtractMesh(basedir, model, &meshes);
+    size_t n = 0;
+    for (const auto &mesh : meshes) {
+      // Assume no duplicated name in .glTF data
+      std::string filename;
+      if (mesh.name.empty()) {
+        filename = "untitled-" + std::to_string(n) + ".obj";
+      } else {
+        filename = mesh.name + ".obj";
+      }
 
-  size_t n = 0;
-  for (const auto &mesh : meshes) {
-    // Assume no duplicated name in .glTF data
-    std::string filename;
-    if (mesh.name.empty()) {
-      filename = "untitled-" + std::to_string(n) + ".obj";
-    } else {
-      filename = mesh.name + ".obj";
+      bool ok = example::SaveAsObjMesh(filename, mesh, flip_texcoord_y);
+      if (!ok) {
+        return EXIT_FAILURE;
+      }
+      n++;
     }
 
-    bool flip_y = true; // flip texcoord Y?
-    bool ok = example::SaveAsObjMesh(filename, mesh,);
-    if (!ok) {
-      return EXIT_FAILURE;
+    return ret ? EXIT_SUCCESS : EXIT_FAILURE;
+  } else if (op == "obj2gltf") {
+    std::string input_filename(argv[2]);
+
+    bool verbose = false;
+    if (argc > 3) {
+      verbose = (std::atoi(argv[3]) > 0) ? true : false;
     }
-    n++;
-  }
-
-  return ret ? EXIT_SUCCESS : EXIT_FAILURE;
-#else
-
-  {
-    std::string input_filename(argv[1]);
 
     // Require facevarying layout?
-    // false = try to keep GL-like mesh data as much as possible.
-    // true = reorder vertex data and re-assign vertex indices.
+    // facevarying representation is required if a vertex can have multiple normal/uv value.
+    // drawback of facevarying is mesh data increases.
+    // false = try to keep shared vertex representation as much as possible.
+    // true = reorder vertex data and re-assign vertex indices for facevarying data layout.
     bool facevarying = false;
 
     example::MeshPrim mesh;
@@ -742,7 +747,9 @@ int main(int argc, char **argv) {
       return EXIT_FAILURE;
     }
 
-    PrintMeshPrim(mesh);
+    if (verbose) {
+      PrintMeshPrim(mesh);
+    }
 
     std::string output_filename("output.gltf");
 
@@ -752,9 +759,11 @@ int main(int argc, char **argv) {
       return EXIT_FAILURE;
     }
     std::cout << "Write glTF: " << output_filename << "\n";
-  }
+    return EXIT_SUCCESS;
+  } else {
 
-  return EXIT_SUCCESS;
-#endif
+    std::cerr << "Unknown operation: " << op << "\n";
+    return EXIT_FAILURE;
+  }
 
 }

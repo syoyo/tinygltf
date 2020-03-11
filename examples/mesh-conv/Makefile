@@ -2,4 +2,4 @@
 EXTRA_CXXFLAGS :=
 
 all:
-	clang++ -std=c++11 -g -O1 -I../../ -I../common $(EXTRA_CXXFLAGS) -o mesh-modify mesh-modify.cc mesh-util.cc tinygltf_impl.cc
+	clang++ -std=c++11 -g -O1 -I../../ -I../common $(EXTRA_CXXFLAGS) -o mesh-conv mesh-conv.cc mesh-util.cc tinygltf_impl.cc
