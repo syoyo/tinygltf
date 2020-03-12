@@ -5,6 +5,7 @@
 import json
 import sys, os
 
+replace_indices = False
 attrib_names = ["TEXCOORD_0"]
 
 def check_accessor(src, target):
@@ -70,8 +71,17 @@ def main():
     source_mesh = gltf["meshes"][source_mesh_id]
     target_mesh = gltf["meshes"][target_mesh_id]
 
+
     source_prim = source_mesh["primitives"][source_primid]
     target_prim = target_mesh["primitives"][target_primid]
+
+    if replace_indices:
+        target_indices_id = target_prim["indices"]
+        src_indices_id = source_prim["indices"]
+
+        print("Replace vertex indices from {} to {}".format(target_indices_id, src_indices_id))
+        gltf["meshes"][target_mesh_id]["primitives"][target_primid]["indices"] = gltf["meshes"][source_mesh_id]["primitives"][source_primid]["indices"]
+
 
     for attrib in target_prim["attributes"]:
         print("attrib ", attrib)
