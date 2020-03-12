@@ -71,6 +71,7 @@ In extension(`ExtensionMap`), JSON number value is parsed as int or float(number
 * [glview](examples/glview) : Simple glTF geometry viewer.
 * [validator](examples/validator) : Simple glTF validator with JSON schema.
 * [basic](examples/basic) : Basic glTF viewer with texturing support.
+* [mesh-conv](examples/mesh-conv) : Convert glTF mesh to wavefront .obj, wavefront .obj to glTF mesh.
 
 ## Projects using TinyGLTF
 
@@ -216,3 +217,7 @@ We may be better to introduce bounded memory size checking when parsing glTF dat
 * catch : Copyright (c) 2012 Two Blue Cubes Ltd. All rights reserved. Distributed under the Boost Software License, Version 1.0.
 * RapidJSON : Copyright (C) 2015 THL A29 Limited, a Tencent company, and Milo Yip. All rights reserved. http://rapidjson.org/
 * dlib(uridecode, uriencode) : Copyright (C) 2003  Davis E. King Boost Software License 1.0. http://dlib.net/dlib/server/server_http.cpp.html
+
+### Used in examples
+
+* clipp: MIT License. https://github.com/muellan/clipp

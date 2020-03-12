@@ -2,11 +2,11 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <string>
 #include <vector>
-#include <fstream>
 
 #if !defined(__ANDROID__) && !defined(_WIN32)
 #include <wordexp.h>
@@ -18,6 +18,7 @@
 #endif
 
 #include "../../json.hpp"
+#include "../common/clipp.h"
 
 using json = nlohmann::json;
 
@@ -406,7 +407,9 @@ static uint32_t UnpackIndex(const unsigned char *ptr, int type) {
 }
 
 static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
-                     example::MeshPrim *out) {
+                     bool verbose, example::MeshPrim *out) {
+  out->prims.clear();
+
   for (size_t i = 0; i < mesh.primitives.size(); i++) {
     const tinygltf::Primitive &primitive = mesh.primitives[i];
 
@@ -415,10 +418,12 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
       return false;
     }
 
+    example::PrimSet out_prim;
+
     // indices.
     {
       const tinygltf::Accessor &indexAccessor =
-        model.accessors[size_t(primitive.indices)];
+          model.accessors[size_t(primitive.indices)];
 
       size_t num_elements = indexAccessor.count;
       std::cout << "index.elements = " << num_elements << "\n";
@@ -426,10 +431,11 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
       size_t byte_stride = ComponentTypeByteSize(indexAccessor.componentType);
 
       const tinygltf::BufferView &indexBufferView =
-           model.bufferViews[size_t(indexAccessor.bufferView)];
+          model.bufferViews[size_t(indexAccessor.bufferView)];
 
       // should be 34963(ELEMENT_ARRAY_BUFFER)
-      std::cout << "index.target = " << PrintTarget(indexBufferView.target) << "\n";
+      std::cout << "index.target = " << PrintTarget(indexBufferView.target)
+                << "\n";
       if (indexBufferView.target != TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER) {
         std::cerr << "indexBufferView.target must be ELEMENT_ARRAY_BUFFER\n";
         return false;
@@ -441,21 +447,22 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
       std::vector<uint32_t> indices;
 
       for (size_t k = 0; k < num_elements; k++) {
-
         // TODO(syoyo): out-of-bounds check.
         const unsigned char *ptr = indexBuffer.data.data() +
-                                   indexBufferView.byteOffset + (k * byte_stride) +
-                                   indexAccessor.byteOffset;
+                                   indexBufferView.byteOffset +
+                                   (k * byte_stride) + indexAccessor.byteOffset;
 
         uint32_t idx = UnpackIndex(ptr, indexAccessor.componentType);
 
-        std::cout << "vertex_index[" << k << "] = " << idx << "\n";
+        if (verbose) {
+          std::cout << "vertex_index[" << k << "] = " << idx << "\n";
+        }
 
         indices.push_back(idx);
       }
 
-      out->indices = indices;
-      out->indices_type = indexAccessor.componentType;
+      out_prim.indices = indices;
+      out_prim.indices_type = indexAccessor.componentType;
     }
 
     // attributes
@@ -522,7 +529,9 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
                                      bufferView.byteOffset + (k * byte_stride) +
                                      accessor.byteOffset;
           float value = Unpack(ptr, accessor.componentType);
-          std::cout << "[" << k << "] value = " << value << "\n";
+          if (verbose) {
+            std::cout << "[" << k << "] value = " << value << "\n";
+          }
           attrib.data.push_back(value);
         }
         attrib.component_type = accessor.componentType;
@@ -530,28 +539,27 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
         attrib.name = it->first;
 
         if (attrib.name.compare("POSITION") == 0) {
-          out->position = attrib;
+          out_prim.position = attrib;
         } else if (attrib.name.compare("NORMAL") == 0) {
-          out->normal = attrib;
+          out_prim.normal = attrib;
         } else if (attrib.name.compare("TANGENT") == 0) {
-          out->tangent = attrib;
+          out_prim.tangent = attrib;
         } else if (attrib.name.rfind("TEXCOORD_", 0) == 0) {
           int id = GetSlotId(attrib.name);
           std::cout << "texcoord[" << id << "]\n";
-          out->texcoords[id] = attrib;
+          out_prim.texcoords[id] = attrib;
         } else if (attrib.name.rfind("JOINTS_", 0) == 0) {
           int id = GetSlotId(attrib.name);
           std::cout << "joints[" << id << "]\n";
-          out->joints[id] = attrib;
+          out_prim.joints[id] = attrib;
         } else if (attrib.name.rfind("WEIGHTS_", 0) == 0) {
           int id = GetSlotId(attrib.name);
           std::cout << "weights[" << id << "]\n";
-          out->weights[id] = attrib;
+          out_prim.weights[id] = attrib;
         } else {
           std::cerr << "???: attrib.name = " << attrib.name << "\n";
           return false;
         }
-
       }
     }
 
@@ -564,15 +572,18 @@ static bool DumpMesh(const tinygltf::Model &model, const tinygltf::Mesh &mesh,
       return false;
     }
 
-    out->mode = primitive.mode;
-    out->name = mesh.name;
+    out_prim.mode = primitive.mode;
+
+    out->prims.push_back(out_prim);
   }
+
+  out->name = mesh.name;
 
   return true;
 }
 
 static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
-                        std::vector<example::MeshPrim> *outs) {
+                        bool verbose, std::vector<example::MeshPrim> *outs) {
   // Get .bin data
   {
     if (model.buffers.size() != 1) {
@@ -595,11 +606,13 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
     search_paths.push_back(asset_path);
 
     std::string abs_filepath = FindFile(search_paths, buffer.uri);
-    std::vector<uint8_t> bin = LoadBin(buffer.uri);
+    std::vector<uint8_t> bin = LoadBin(abs_filepath);
     if (bin.size() != buffer.data.size()) {
       std::cerr << "Byte size mismatch. Failed to load file: " << buffer.uri
                 << "\n";
-      std::cerr << "  .bin size = " << bin.size() << ", size in 'buffer.uri' = " << buffer.data.size() << "\n";
+      std::cerr << "  Searched absolute file path: " << abs_filepath << "\n";
+      std::cerr << "  .bin size = " << bin.size()
+                << ", size in 'buffer.uri' = " << buffer.data.size() << "\n";
       return false;
     }
   }
@@ -608,7 +621,7 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
     std::cout << "mesh.name: " << mesh.name << "\n";
 
     example::MeshPrim output;
-    bool ret = DumpMesh(model, mesh, &output);
+    bool ret = DumpMesh(model, mesh, verbose, &output);
     if (!ret) {
       return false;
     }
@@ -622,30 +635,40 @@ static bool ExtractMesh(const std::string &asset_path, tinygltf::Model &model,
 }  // namespace
 
 int main(int argc, char **argv) {
-  if (argc < 3) {
-    std::cout << "mesh-modify <op> <args>" << std::endl;
-    std::cout << "  op\n\n";
-    std::cout << "  gltf2obj input.gltf <flip_texcoord_y>\n";
-    std::cout << "  obj2gltf input.obj <verbose>\n";
+  std::string op;
+  std::string input_filename;
+  std::string output_filename = "output.gltf";
+  int uvset = 0;
+  bool verbose = false;
+  bool export_skinweight = true;
+  bool no_flip_texcoord_y = false;
 
+  auto cli =
+      (clipp::required("-i", "--input") &
+           clipp::value("input filename", input_filename),
+       clipp::option("-o", "--outout") &
+           clipp::value("Output filename(obj2fltf)", output_filename),
+       clipp::option("-v", "--verbose").set(verbose).doc("Verbose output"),
+       clipp::option("--export_skinweight") &
+           clipp::value("Export skin weights(gltf2obj). default true.",
+                        export_skinweight),
+       clipp::option("--uvset").set(uvset).doc("UV set(TEXCOORD_N) to use"),
+       clipp::option("--op") &
+           clipp::value("operation mode(`gltf2obj`, `obj2gltf`", op),
+       clipp::option("--no-flip-texcoord-y")
+           .set(no_flip_texcoord_y)
+           .doc("Do not flip texcoord Y"));
+
+  if (!clipp::parse(argc, argv, cli)) {
+    std::cout << clipp::make_man_page(cli, argv[0]);
     return EXIT_FAILURE;
   }
 
-  std::string op = argv[1];
-
   if (op == "gltf2obj") {
-
-    bool flip_texcoord_y = true;
-    if (argc > 3) {
-      flip_texcoord_y = (std::atoi(argv[3]) > 0) ? true : false;
-    }
-
     tinygltf::Model model;
     tinygltf::TinyGLTF loader;
     std::string err;
     std::string warn;
-
-    std::string input_filename(argv[2]);
 
     std::string ext = GetFilePathExtension(input_filename);
 
@@ -657,8 +680,8 @@ int main(int argc, char **argv) {
                                         input_filename.c_str());
       } else {
         // assume ascii glTF.
-        ret =
-            loader.LoadASCIIFromFile(&model, &err, &warn, input_filename.c_str());
+        ret = loader.LoadASCIIFromFile(&model, &err, &warn,
+                                       input_filename.c_str());
       }
 
       if (!warn.empty()) {
@@ -674,6 +697,7 @@ int main(int argc, char **argv) {
       }
     }
 
+#if 0
     json j;
     {
       std::ifstream i(input_filename);
@@ -693,7 +717,7 @@ int main(int argc, char **argv) {
     json j_original = R"({
       "baz": ["one", "two", "three"],
       "foo": "bar"
-    })"_json;
+  })"_json;
 
     //json j_patch = R"([
     //  { "op": "remove", "path": "/buffers" }
@@ -701,44 +725,50 @@ int main(int argc, char **argv) {
 
     std::cout << "patch = " << j_patch.dump(2) << "\n";
 
-    json j_ret = j.patch(j_patch);
-    std::cout << "patched = " << j_ret.dump(2) << "\n";
+  json j_ret = j.patch(j_patch);
+  std::cout << "patched = " << j_ret.dump(2) << "\n";
+#endif
 
     std::string basedir = GetBaseDir(input_filename);
     std::vector<example::MeshPrim> meshes;
-    bool ret = ExtractMesh(basedir, model, &meshes);
+    bool ret = ExtractMesh(basedir, model, verbose, &meshes);
 
     size_t n = 0;
     for (const auto &mesh : meshes) {
       // Assume no duplicated name in .glTF data
-      std::string filename;
+      std::string basename;
       if (mesh.name.empty()) {
-        filename = "untitled-" + std::to_string(n) + ".obj";
+        basename = "untitled-" + std::to_string(n);
       } else {
-        filename = mesh.name + ".obj";
+        basename = mesh.name;
       }
 
-      bool ok = example::SaveAsObjMesh(filename, mesh, flip_texcoord_y);
-      if (!ok) {
-        return EXIT_FAILURE;
+
+      for (size_t primid = 0; primid < mesh.prims.size(); primid++) {
+        example::ObjExportOption options;
+        options.primid = int(primid);
+        options.export_skinweights = export_skinweight;
+        options.uvset = uvset;
+        options.flip_texcoord_y = !no_flip_texcoord_y;
+
+        bool ok = example::SaveAsObjMesh(basename, mesh, options);
+        if (!ok) {
+          std::cout << "Failed to export mesh[" << mesh.name << "].primitives["
+                    << primid << "]\n";
+          // may ok;
+        }
       }
       n++;
     }
 
     return ret ? EXIT_SUCCESS : EXIT_FAILURE;
   } else if (op == "obj2gltf") {
-    std::string input_filename(argv[2]);
-
-    bool verbose = false;
-    if (argc > 3) {
-      verbose = (std::atoi(argv[3]) > 0) ? true : false;
-    }
-
     // Require facevarying layout?
-    // facevarying representation is required if a vertex can have multiple normal/uv value.
-    // drawback of facevarying is mesh data increases.
-    // false = try to keep shared vertex representation as much as possible.
-    // true = reorder vertex data and re-assign vertex indices for facevarying data layout.
+    // facevarying representation is required if a vertex can have multiple
+    // normal/uv value. drawback of facevarying is mesh data increases. false =
+    // try to keep shared vertex representation as much as possible. true =
+    // reorder vertex data and re-assign vertex indices for facevarying data
+    // layout.
     bool facevarying = false;
 
     example::MeshPrim mesh;
@@ -751,8 +781,6 @@ int main(int argc, char **argv) {
       PrintMeshPrim(mesh);
     }
 
-    std::string output_filename("output.gltf");
-
     ok = example::SaveAsGLTFMesh(output_filename, mesh);
     if (!ok) {
       std::cerr << "Failed to save mesh as glTF\n";
@@ -761,9 +789,7 @@ int main(int argc, char **argv) {
     std::cout << "Write glTF: " << output_filename << "\n";
     return EXIT_SUCCESS;
   } else {
-
     std::cerr << "Unknown operation: " << op << "\n";
     return EXIT_FAILURE;
   }
-
 }

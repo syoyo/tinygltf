@@ -28,9 +28,7 @@ struct VertexAttrib {
 
 };
 
-struct MeshPrim {
-  std::string name;
-  int32_t id{-1};
+struct PrimSet {
 
   int mode; // e.g. TRIANGLES
 
@@ -49,14 +47,35 @@ struct MeshPrim {
   int indices_max{-1};
   int indices_type{-1}; // storage type(componentType) of `indices`.
   std::vector<uint32_t> indices; // vertex indices
+
+};
+
+struct MeshPrim {
+  std::string name;
+  int32_t id{-1};
+
+  std::vector<PrimSet> prims;
+
+};
+
+struct ObjExportOption
+{
+  bool export_skinweights{true};
+  int primid{0}; /// Primitive id to export(default 0).
+  int uvset{0}; /// Tex coord ID to export(default 0).
+  bool flip_texcoord_y{true}; /// Flip texture coordinate V?(default true).
 };
 
 ///
 /// Save MeshPrim as wavefront .obj
 ///
-bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh, bool flip_texcoord_y = true);
-
+/// @param[in] basename Base filename. ".obj" will be appended.
+/// @param[in] mesh MeshPrim.
+/// @param[in] option Export options
 ///
+bool SaveAsObjMesh(const std::string &basename, const MeshPrim &mesh, const ObjExportOption &option);
+
+//
 /// Save MeshPrim as glTF mesh
 ///
 bool SaveAsGLTFMesh(const std::string &filename, const MeshPrim &mesh);

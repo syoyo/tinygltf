@@ -1,19 +1,34 @@
 # Mesh modify experiment
 
 Sometimes we want to tweak mesh attributes(e.g. vertex position, uv coord, etc).
-glTF itself does not allow ASCII representation of such data.
+glTF itself does not allow ASCII representation of such data so we need to write a converter.
 
 This example show how to
 
 - Export mesh data from .bin to .obj
 - Import mesh data to .bin(update corresponding buffer data) from .obj
 
+## Features
+
+* Support skin weights(`JOINTS_N`, `WEIGHTS_N`)
+
+## Supported attributes
+
+* [x] POSITION
+* [x] NORMAL
+* [x] TANGENT
+* [ ] COLOR  (vertex color)
+* [x] TEXCOORD_N
+  * Only single texcoord(uv set) is supported
+  * Specify `--uvset 1` to specify which UV to use.
+* [x] WEIGHTS_N, JOINTS_N
+
 ## Usage
 
 ### Wavefront .obj to glTF
 
 ```
-$ mesh-modify obj2gltf input.obj
+$ mesh-modify --op=obj2gltf input.obj
 ```
 
 All shapes in .obj are concatenated and create single glTF mesh.
@@ -26,7 +41,7 @@ Buffer is stored as external file(`.bin`)
 ### glTF to Wavefront .obj
 
 ```
-$ mesh-modify gltf2obj input.gltf
+$ mesh-modify --op=gltf2obj input.gltf
 ```
 
 .obj will be created for each glTF Mesh.

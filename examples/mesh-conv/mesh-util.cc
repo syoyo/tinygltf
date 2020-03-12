@@ -371,15 +371,18 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
                        std::vector<tinygltf::Accessor> *accessors,
                        std::vector<tinygltf::BufferView> *bufferViews,
                        tinygltf::Buffer *buffer) {
+  int prim_id = 0;
   std::vector<uint8_t> buf;
 
   // single primitive per mesh
   tinygltf::Primitive primitive;
 
+  const PrimSet &prim = mesh.prims[prim_id];
+
   // vertex index
   {
     size_t s, e;
-    if (!SerializeVertexIndicesToBuffer(mesh.indices, mesh.indices_type, &buf,
+    if (!SerializeVertexIndicesToBuffer(prim.indices, prim.indices_type, &buf,
                                         &s, &e)) {
       return false;
     }
@@ -393,13 +396,14 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     bufferViews->push_back(bufferView);
 
     tinygltf::Accessor accessor;
+    accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/indices";
     accessor.bufferView = bufferViews->size() - 1;
     accessor.minValues.resize(1);
-    accessor.minValues[0] = mesh.indices_min;
+    accessor.minValues[0] = prim.indices_min;
     accessor.maxValues.resize(1);
-    accessor.maxValues[0] = mesh.indices_max;
-    accessor.count = mesh.indices.size();
-    accessor.componentType = mesh.indices_type;
+    accessor.maxValues[0] = prim.indices_max;
+    accessor.count = prim.indices.size();
+    accessor.componentType = prim.indices_type;
     accessor.type = TINYGLTF_TYPE_SCALAR;
     accessors->push_back(accessor);
 
@@ -409,7 +413,7 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
   // position
   {
     size_t s, e;
-    if (!SerializeVertexAttribToBuffer(mesh.position, &buf, &s, &e)) {
+    if (!SerializeVertexAttribToBuffer(prim.position, &buf, &s, &e)) {
       return false;
     }
     std::cout << "postion.byteRange: [" << s << ", " << e << "]\n";
@@ -422,15 +426,16 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     bufferViews->push_back(bufferView);
 
     tinygltf::Accessor accessor = ConvertToGLTFAccessor(
-        mesh.position, bufferViews->size() - 1, /* offset */ 0);
+        prim.position, bufferViews->size() - 1, /* offset */ 0);
+    accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/POSITION";
     accessors->push_back(accessor);
 
     primitive.attributes["POSITION"] = accessors->size() - 1;
   }
 
-  if (mesh.normal.data.size() > 0) {
+  if (prim.normal.data.size() > 0) {
     size_t s, e;
-    if (!SerializeVertexAttribToBuffer(mesh.normal, &buf, &s, &e)) {
+    if (!SerializeVertexAttribToBuffer(prim.normal, &buf, &s, &e)) {
       return false;
     }
     std::cout << "normal.byteRange: [" << s << ", " << e << "]\n";
@@ -443,15 +448,16 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     bufferViews->push_back(bufferView);
 
     tinygltf::Accessor accessor = ConvertToGLTFAccessor(
-        mesh.normal, bufferViews->size() - 1, /* offset */ 0);
+        prim.normal, bufferViews->size() - 1, /* offset */ 0);
+    accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/NORMAL";
     accessors->push_back(accessor);
 
     primitive.attributes["NORMAL"] = accessors->size() - 1;
   }
 
-  if (mesh.tangent.data.size() > 0) {
+  if (prim.tangent.data.size() > 0) {
     size_t s, e;
-    if (!SerializeVertexAttribToBuffer(mesh.tangent, &buf, &s, &e)) {
+    if (!SerializeVertexAttribToBuffer(prim.tangent, &buf, &s, &e)) {
       return false;
     }
     std::cout << "tangent.byteRange: [" << s << ", " << e << "]\n";
@@ -464,14 +470,15 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     bufferViews->push_back(bufferView);
 
     tinygltf::Accessor accessor = ConvertToGLTFAccessor(
-        mesh.tangent, bufferViews->size() - 1, /* offset */ 0);
+        prim.tangent, bufferViews->size() - 1, /* offset */ 0);
+    accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/TANGENT";
     accessors->push_back(accessor);
 
     primitive.attributes["TANGENT"] = accessors->size() - 1;
   }
 
-  if (mesh.texcoords.size() > 0) {
-    for (const auto &item : mesh.texcoords) {
+  if (prim.texcoords.size() > 0) {
+    for (const auto &item : prim.texcoords) {
       size_t s, e;
       if (!SerializeVertexAttribToBuffer(item.second, &buf, &s, &e)) {
         return false;
@@ -487,6 +494,7 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
 
       tinygltf::Accessor accessor = ConvertToGLTFAccessor(
           item.second, bufferViews->size() - 1, /* offset */ 0);
+      accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/TEXCOORD_" + std::to_string(item.first);
       accessors->push_back(accessor);
 
       std::string target = "TEXCOORD_" + std::to_string(item.first);
@@ -494,8 +502,8 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     }
   }
 
-  if (mesh.joints.size() > 0) {
-    for (const auto &item : mesh.joints) {
+  if (prim.joints.size() > 0) {
+    for (const auto &item : prim.joints) {
       size_t s, e;
       if (!SerializeVertexAttribToBuffer(item.second, &buf, &s, &e)) {
         return false;
@@ -511,7 +519,8 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
       bufferViews->push_back(bufferView);
 
       tinygltf::Accessor accessor = ConvertToGLTFAccessor(
-          mesh.tangent, bufferViews->size() - 1, /* offset */ 0);
+          item.second, bufferViews->size() - 1, /* offset */ 0);
+      accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/JOINTS_" + std::to_string(item.first);
       accessors->push_back(accessor);
 
       std::string target = "JOINTS_" + std::to_string(item.first);
@@ -519,8 +528,8 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     }
   }
 
-  if (mesh.weights.size() > 0) {
-    for (const auto &item : mesh.weights) {
+  if (prim.weights.size() > 0) {
+    for (const auto &item : prim.weights) {
       size_t s, e;
       if (!SerializeVertexAttribToBuffer(item.second, &buf, &s, &e)) {
         return false;
@@ -536,7 +545,8 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
       bufferViews->push_back(bufferView);
 
       tinygltf::Accessor accessor = ConvertToGLTFAccessor(
-          mesh.tangent, bufferViews->size() - 1, /* offset */ 0);
+          item.second, bufferViews->size() - 1, /* offset */ 0);
+      accessor.name = mesh.name + "#" + std::to_string(prim_id) + "/WEIGHTS_" + std::to_string(item.first);
       accessors->push_back(accessor);
 
       std::string target = "WEIGHTS_" + std::to_string(item.first);
@@ -544,7 +554,7 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
     }
   }
 
-  primitive.mode = mesh.mode;
+  primitive.mode = prim.mode;
 
   gltfmesh->primitives.push_back(primitive);
 
@@ -554,62 +564,134 @@ bool ConvertToGLTFMesh(const MeshPrim &mesh, int buffer_id,
   return true;
 }
 
+bool HasValidSkinWeights(const PrimSet &prim)
+{
+  if ((prim.weights.size() > 0) && (prim.weights.size() == prim.joints.size())) {
+
+    if (prim.weights.size() != prim.joints.size()) {
+      std::cerr << "# of JOINTS(" << prim.joints.size() << ") and WEIGHTS(" << prim.weights.size() << ") differs\n";
+      return false;
+    }
+
+    size_t num_slots = prim.weights.size();
+
+    // Assume weight slots are tightly packed.
+    for (size_t slot = 0; slot < num_slots; slot++) {
+      if (!prim.weights.count(slot)) {
+        std::cerr << "WEIGHTS_" << slot << " not found.\n";
+        return false;;
+      }
+
+      if (!prim.joints.count(slot)) {
+        std::cerr << "JOINTS_" << slot << " not found.\n";
+        return false;;
+      }
+    }
+
+    return true;
+  }
+
+  return false;
+}
+
 }  // namespace
 
-bool SaveAsObjMesh(const std::string &filename, const MeshPrim &mesh,
-                   bool flip_texcoord_y) {
-  std::ofstream ofs(filename);
-  if (!ofs) {
-    std::cerr << "Failed to open .obj to write: " << filename << "\n";
+bool SaveAsObjMesh(const std::string &basename, const MeshPrim &mesh, const ObjExportOption &options) {
+  if (options.primid >= mesh.prims.size()) {
+    std::cerr << "mesh( " << mesh.name << ") does not contain " << options.primid << "th primitive. mesh.primitives.length = " << mesh.prims.size() << "\n";
     return false;
   }
+
+  const PrimSet &prim = mesh.prims[options.primid];
+
+  if (prim.texcoords.count(options.uvset)) {
+    std::cerr << "Exporting uvset " << options.uvset << " requested, but mesh( " << mesh.name << ") does not contain TEXCOORD_" << options.uvset << "\n";
+    std::cerr << "UV coord will not be exported to .obj\n";
+  }
+
+  std::string obj_filename = basename  + "_" + std::to_string(options.primid) + ".obj";
+  std::ofstream ofs(obj_filename);
+  if (!ofs) {
+    std::cerr << "Failed to open .obj to write: " << obj_filename << "\n";
+    return false;
+  }
+
 
   bool has_vn = false;
   bool has_vt = false;
 
-  has_vn = mesh.normal.data.size() == mesh.position.data.size();
-  has_vt = mesh.texcoords.count(0) &&
-           (mesh.texcoords.at(0).data.size() > 0);  // TEXCOORD_0
+  has_vn = prim.normal.data.size() == prim.position.data.size();
+  has_vt = prim.texcoords.count(options.uvset) &&
+           (prim.texcoords.at(options.uvset).data.size() > 0);
 
   // v
-  for (size_t i = 0; i < mesh.position.data.size() / 3; i++) {
-    ofs << "v " << mesh.position.data[3 * i + 0] << " "
-        << mesh.position.data[3 * i + 1] << " " << mesh.position.data[3 * i + 2]
+  for (size_t i = 0; i < prim.position.data.size() / 3; i++) {
+    ofs << "v " << prim.position.data[3 * i + 0] << " "
+        << prim.position.data[3 * i + 1] << " " << prim.position.data[3 * i + 2]
         << "\n";
   }
 
   // vn
-  for (size_t i = 0; i < mesh.normal.data.size() / 3; i++) {
-    ofs << "vn " << mesh.normal.data[3 * i + 0] << " "
-        << mesh.normal.data[3 * i + 1] << " " << mesh.normal.data[3 * i + 2]
+  for (size_t i = 0; i < prim.normal.data.size() / 3; i++) {
+    ofs << "vn " << prim.normal.data[3 * i + 0] << " "
+        << prim.normal.data[3 * i + 1] << " " << prim.normal.data[3 * i + 2]
         << "\n";
   }
 
-  assert((mesh.texcoords.at(0).data.size() / 2) ==
-         (mesh.position.data.size() / 3));
 
-  // vt
-  for (size_t i = 0; i < mesh.texcoords.at(0).data.size() / 2; i++) {
-    float y = mesh.texcoords.at(0).data[2 * i + 1];
-    if (flip_texcoord_y) {
-      y = 1.0f - y;
+  if (has_vt) {
+    assert((prim.texcoords.at(options.uvset).data.size() / 2) == (prim.position.data.size() / 3));
+
+    // vt
+    for (size_t i = 0; i < prim.texcoords.at(options.uvset).data.size() / 2; i++) {
+      float y = prim.texcoords.at(options.uvset).data[2 * i + 1];
+      if (options.flip_texcoord_y) {
+        y = 1.0f - y;
+      }
+      ofs << "vt " << prim.texcoords.at(options.uvset).data[2 * i + 0] << " " << y << "\n";
     }
-    ofs << "vt " << mesh.texcoords.at(0).data[2 * i + 0] << " " << y << "\n";
+  }
+
+  if (options.export_skinweights && HasValidSkinWeights(prim)) {
+
+    // WEIGHTS_ and JOINTS_ slots are tightly packed.
+
+    size_t num_slots = prim.weights.size();
+
+    for (size_t v = 0; v < prim.position.data.size() / 3; v++) { // vec3
+
+      std::vector<float> weights(num_slots * 4, 0.0f);
+      std::vector<float> joints(num_slots * 4, 0.0f);
+
+      for (size_t slot = 0; slot < num_slots; slot++) {
+        for (size_t k = 0; k < 4; k++) {
+          weights[slot * 4 + k] = prim.weights.at(slot).data[4 * v + k];
+          joints[slot * 4 + k] = prim.joints.at(slot).data[4 * v + k];
+        }
+      }
+
+      // vertex index start with 0.
+      ofs << "vw " << v << " " ;
+      for (size_t i = 0; i < weights.size(); i++) {
+        ofs << int(joints[i]) << " " << weights[i] << " ";
+      }
+      ofs << "\n";
+    }
+
   }
 
   // v, vn, vt has same index
-  for (size_t i = 0; i < mesh.indices.size() / 3; i++) {
+  for (size_t i = 0; i < prim.indices.size() / 3; i++) {
     // .obj's index start with 1.
-    int f0 = int(mesh.indices[3 * i + 0]) + 1;
-    int f1 = int(mesh.indices[3 * i + 1]) + 1;
-    int f2 = int(mesh.indices[3 * i + 2]) + 1;
+    int f0 = int(prim.indices[3 * i + 0]) + 1;
+    int f1 = int(prim.indices[3 * i + 1]) + 1;
+    int f2 = int(prim.indices[3 * i + 2]) + 1;
 
     ofs << "f " << make_triple(f0, has_vn, has_vt) << " "
         << make_triple(f1, has_vn, has_vt) << " "
         << make_triple(f2, has_vn, has_vt) << "\n";
   }
 
-  // TODO(syoyo): Write joints/weights
 
   return true;
 }
@@ -769,12 +851,14 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
   bmin[0] = bmin[1] = bmin[2] = std::numeric_limits<float>::max();
   bmax[0] = bmax[1] = bmax[2] = -std::numeric_limits<float>::max();
 
+  PrimSet prim;
+
   // reorder texcoords and normals so that it has same indexing to vertices.
   if (facevarying) {
-    mesh->position.data.clear();
-    mesh->normal.data.clear();
-    mesh->tangent.data.clear();
-    mesh->texcoords[0] = VertexAttrib();
+    prim.position.data.clear();
+    prim.normal.data.clear();
+    prim.tangent.data.clear();
+    prim.texcoords[0] = VertexAttrib();
 
     // Concat shapes
     for (size_t s = 0; s < shapes.size(); s++) {
@@ -882,43 +966,43 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
           n[2][2] = n[0][2];
         }
 
-        mesh->position.data.push_back(v[0][0]);
-        mesh->position.data.push_back(v[0][1]);
-        mesh->position.data.push_back(v[0][2]);
+        prim.position.data.push_back(v[0][0]);
+        prim.position.data.push_back(v[0][1]);
+        prim.position.data.push_back(v[0][2]);
 
-        mesh->position.data.push_back(v[1][0]);
-        mesh->position.data.push_back(v[1][1]);
-        mesh->position.data.push_back(v[1][2]);
+        prim.position.data.push_back(v[1][0]);
+        prim.position.data.push_back(v[1][1]);
+        prim.position.data.push_back(v[1][2]);
 
-        mesh->position.data.push_back(v[2][0]);
-        mesh->position.data.push_back(v[2][1]);
-        mesh->position.data.push_back(v[2][2]);
+        prim.position.data.push_back(v[2][0]);
+        prim.position.data.push_back(v[2][1]);
+        prim.position.data.push_back(v[2][2]);
 
-        mesh->normal.data.push_back(n[0][0]);
-        mesh->normal.data.push_back(n[0][1]);
-        mesh->normal.data.push_back(n[0][2]);
+        prim.normal.data.push_back(n[0][0]);
+        prim.normal.data.push_back(n[0][1]);
+        prim.normal.data.push_back(n[0][2]);
 
-        mesh->normal.data.push_back(n[1][0]);
-        mesh->normal.data.push_back(n[1][1]);
-        mesh->normal.data.push_back(n[1][2]);
+        prim.normal.data.push_back(n[1][0]);
+        prim.normal.data.push_back(n[1][1]);
+        prim.normal.data.push_back(n[1][2]);
 
-        mesh->normal.data.push_back(n[2][0]);
-        mesh->normal.data.push_back(n[2][1]);
-        mesh->normal.data.push_back(n[2][2]);
+        prim.normal.data.push_back(n[2][0]);
+        prim.normal.data.push_back(n[2][1]);
+        prim.normal.data.push_back(n[2][2]);
 
-        mesh->texcoords[0].data.push_back(tc[0][0]);
-        mesh->texcoords[0].data.push_back(tc[0][1]);
+        prim.texcoords[0].data.push_back(tc[0][0]);
+        prim.texcoords[0].data.push_back(tc[0][1]);
 
-        mesh->texcoords[0].data.push_back(tc[1][0]);
-        mesh->texcoords[0].data.push_back(tc[1][1]);
+        prim.texcoords[0].data.push_back(tc[1][0]);
+        prim.texcoords[0].data.push_back(tc[1][1]);
 
-        mesh->texcoords[0].data.push_back(tc[2][0]);
-        mesh->texcoords[0].data.push_back(tc[2][1]);
+        prim.texcoords[0].data.push_back(tc[2][0]);
+        prim.texcoords[0].data.push_back(tc[2][1]);
 
-        size_t idx = mesh->indices.size();
-        mesh->indices.push_back(int(idx) + 0);
-        mesh->indices.push_back(int(idx) + 1);
-        mesh->indices.push_back(int(idx) + 2);
+        size_t idx = prim.indices.size();
+        prim.indices.push_back(int(idx) + 0);
+        prim.indices.push_back(int(idx) + 1);
+        prim.indices.push_back(int(idx) + 2);
       }
     }
 
@@ -935,16 +1019,17 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
         maxn = std::max(vertex_skin_weights[i].weightValues.size(), maxn);
       }
 
+      std::cout << "Max # of weights = " << maxn << "\n";
       int num_slots = 0;
       if (maxn > 0) {
-        num_slots = (((maxn - 1) / 4) + 1) * 4;
+        num_slots = maxn / 4;
       }
-      std::cout << "# of slots = " << num_slots << "\n";
+      std::cout << "Max # of slots = " << num_slots << "\n";
 
       for (size_t t = 0; t < size_t(num_slots); t++) {
         VertexAttrib weights, joints;
 
-        size_t num_faceverts = mesh->indices.size();
+        size_t num_faceverts = prim.indices.size();
 
         // facevarying weights/joints Fill with zeros
         weights.data.resize(4 * num_faceverts, 0.0f);
@@ -971,42 +1056,42 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
           }
         }
 
-        mesh->weights[t] = weights;
-        mesh->joints[t] = joints;
+        prim.weights[t] = weights;
+        prim.joints[t] = joints;
       }
     }
 
   } else {
     // position/texcoord/normal can be represented in shared vertex manner
 
-    mesh->position.data.clear();
+    prim.position.data.clear();
     for (size_t v = 0; v < attrib.vertices.size(); v++) {
-      mesh->position.data.push_back(attrib.vertices[v]);
+      prim.position.data.push_back(attrib.vertices[v]);
     }
 
-    mesh->normal.data.clear();
+    prim.normal.data.clear();
     for (size_t v = 0; v < attrib.normals.size(); v++) {
-      mesh->normal.data.push_back(attrib.normals[v]);
+      prim.normal.data.push_back(attrib.normals[v]);
     }
 
-    mesh->texcoords[0] = VertexAttrib();
+    prim.texcoords[0] = VertexAttrib();
     for (size_t v = 0; v < attrib.texcoords.size(); v++) {
-      mesh->texcoords[0].data.push_back(attrib.texcoords[v]);
+      prim.texcoords[0].data.push_back(attrib.texcoords[v]);
     }
 
-    mesh->indices_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
-    mesh->indices.clear();
+    prim.indices_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
+    prim.indices.clear();
 
     size_t face_index_offset = 0;
     for (size_t s = 0; s < shapes.size(); s++) {
       const tinyobj::shape_t &shape = shapes[s];
 
       for (size_t f = 0; f < shape.mesh.indices.size(); f++) {
-        mesh->indices.push_back(uint32_t(face_index_offset) +
+        prim.indices.push_back(uint32_t(face_index_offset) +
                                 uint32_t(shape.mesh.indices[f].vertex_index));
       }
 
-      face_index_offset = mesh->indices.size();
+      face_index_offset = prim.indices.size();
     }
 
     // weights/joints
@@ -1017,9 +1102,10 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
         maxn = std::max(attrib.skin_weights[i].weightValues.size(), maxn);
       }
 
+      std::cout << "Max # of weights = " << maxn << "\n";
       int num_slots = 0;
       if (maxn > 0) {
-        num_slots = (((maxn - 1) / 4) + 1) * 4;
+        num_slots = maxn / 4;
       }
       std::cout << "# of slots = " << num_slots << "\n";
 
@@ -1027,13 +1113,13 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
         VertexAttrib weights, joints;
 
         // Fill with zeros
-        weights.data.resize(4 * (mesh->position.data.size() / 3), 0.0f);
-        joints.data.resize(4 * (mesh->position.data.size() / 3), 0.0f);
+        weights.data.resize(4 * (prim.position.data.size() / 3), 0.0f);
+        joints.data.resize(4 * (prim.position.data.size() / 3), 0.0f);
 
         for (size_t v = 0; v < attrib.skin_weights.size(); v++) {
           const tinyobj::skin_weight_t &sw = attrib.skin_weights[v];
 
-          assert(sw.vertex_id < (mesh->position.data.size() / 3));
+          assert(sw.vertex_id < (prim.position.data.size() / 3));
 
           size_t dst_vid = sw.vertex_id;
 
@@ -1050,13 +1136,13 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
         weights.data_type = TINYGLTF_TYPE_VEC4;
         weights.component_type =
             TINYGLTF_COMPONENT_TYPE_FLOAT;  // storage format
-        mesh->weights[s] = weights;
+        prim.weights[s] = weights;
 
         joints.data_type = TINYGLTF_TYPE_VEC4;
         joints.component_type =
             TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;  // storage format
 
-        mesh->joints[s] = joints;
+        prim.joints[s] = joints;
       }
     }
   }
@@ -1066,15 +1152,15 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
     {
       uint32_t minv = 0.0;
       uint32_t maxv = 0.0;
-      for (size_t i = 0; i < mesh->indices.size(); i++) {
-        minv = std::min(minv, uint32_t(mesh->indices[i]));
-        maxv = std::max(maxv, uint32_t(mesh->indices[i]));
+      for (size_t i = 0; i < prim.indices.size(); i++) {
+        minv = std::min(minv, uint32_t(prim.indices[i]));
+        maxv = std::max(maxv, uint32_t(prim.indices[i]));
       }
 
-      mesh->indices_min = int(minv);
-      mesh->indices_max = int(maxv);
+      prim.indices_min = int(minv);
+      prim.indices_max = int(maxv);
 
-      mesh->indices_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
+      prim.indices_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT;
     }
 
     {
@@ -1083,25 +1169,25 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
       bmin[0] = bmin[1] = bmin[2] = std::numeric_limits<float>::max();
       bmax[0] = bmax[1] = bmax[2] = -std::numeric_limits<float>::max();
 
-      for (size_t i = 0; i < mesh->position.data.size() / 3; i++) {
+      for (size_t i = 0; i < prim.position.data.size() / 3; i++) {
         for (size_t k = 0; k < 3; k++) {
-          bmin[k] = std::min(bmin[k], mesh->position.data[3 * i + k]);
-          bmax[k] = std::max(bmax[k], mesh->position.data[3 * i + k]);
+          bmin[k] = std::min(bmin[k], prim.position.data[3 * i + k]);
+          bmax[k] = std::max(bmax[k], prim.position.data[3 * i + k]);
         }
       }
 
-      mesh->position.minValues.resize(3);
-      mesh->position.minValues[0] = bmin[0];
-      mesh->position.minValues[1] = bmin[1];
-      mesh->position.minValues[2] = bmin[2];
+      prim.position.minValues.resize(3);
+      prim.position.minValues[0] = bmin[0];
+      prim.position.minValues[1] = bmin[1];
+      prim.position.minValues[2] = bmin[2];
 
-      mesh->position.maxValues.resize(3);
-      mesh->position.maxValues[0] = bmax[0];
-      mesh->position.maxValues[1] = bmax[1];
-      mesh->position.maxValues[2] = bmax[2];
+      prim.position.maxValues.resize(3);
+      prim.position.maxValues[0] = bmax[0];
+      prim.position.maxValues[1] = bmax[1];
+      prim.position.maxValues[2] = bmax[2];
 
-      mesh->position.data_type = TINYGLTF_TYPE_VEC3;
-      mesh->position.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;
+      prim.position.data_type = TINYGLTF_TYPE_VEC3;
+      prim.position.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;
     }
 
     {
@@ -1110,57 +1196,57 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
       bmin[0] = bmin[1] = bmin[2] = std::numeric_limits<float>::max();
       bmax[0] = bmax[1] = bmax[2] = -std::numeric_limits<float>::max();
 
-      for (size_t i = 0; i < mesh->normal.data.size() / 3; i++) {
+      for (size_t i = 0; i < prim.normal.data.size() / 3; i++) {
         for (size_t k = 0; k < 3; k++) {
-          bmin[k] = std::min(bmin[k], mesh->normal.data[3 * i + k]);
-          bmax[k] = std::max(bmax[k], mesh->normal.data[3 * i + k]);
+          bmin[k] = std::min(bmin[k], prim.normal.data[3 * i + k]);
+          bmax[k] = std::max(bmax[k], prim.normal.data[3 * i + k]);
         }
       }
 
-      mesh->normal.minValues.resize(3);
-      mesh->normal.minValues[0] = bmin[0];
-      mesh->normal.minValues[1] = bmin[1];
-      mesh->normal.minValues[2] = bmin[2];
+      prim.normal.minValues.resize(3);
+      prim.normal.minValues[0] = bmin[0];
+      prim.normal.minValues[1] = bmin[1];
+      prim.normal.minValues[2] = bmin[2];
 
-      mesh->normal.maxValues.resize(3);
-      mesh->normal.maxValues[0] = bmax[0];
-      mesh->normal.maxValues[1] = bmax[1];
-      mesh->normal.maxValues[2] = bmax[2];
+      prim.normal.maxValues.resize(3);
+      prim.normal.maxValues[0] = bmax[0];
+      prim.normal.maxValues[1] = bmax[1];
+      prim.normal.maxValues[2] = bmax[2];
 
-      mesh->normal.data_type = TINYGLTF_TYPE_VEC3;
-      mesh->normal.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;
+      prim.normal.data_type = TINYGLTF_TYPE_VEC3;
+      prim.normal.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;
     }
 
     {
       float bmin[4];
       float bmax[4];
       bmin[0] = bmin[1] = bmin[2] = bmin[3] = std::numeric_limits<float>::max();
-      bmax[0] = bmax[1] = bmax[2] = bmin[3] =
+      bmax[0] = bmax[1] = bmax[2] = bmax[3] =
           -std::numeric_limits<float>::max();
 
       size_t n = 3;
 
-      for (size_t i = 0; i < mesh->tangent.data.size() / n; i++) {
+      for (size_t i = 0; i < prim.tangent.data.size() / n; i++) {
         for (size_t k = 0; k < n; k++) {
-          bmin[k] = std::min(bmin[k], mesh->tangent.data[n * i + k]);
-          bmax[k] = std::max(bmax[k], mesh->tangent.data[n * i + k]);
+          bmin[k] = std::min(bmin[k], prim.tangent.data[n * i + k]);
+          bmax[k] = std::max(bmax[k], prim.tangent.data[n * i + k]);
         }
       }
 
-      mesh->tangent.minValues.resize(n);
-      mesh->tangent.maxValues.resize(n);
+      prim.tangent.minValues.resize(n);
+      prim.tangent.maxValues.resize(n);
       for (size_t k = 0; k < n; k++) {
-        mesh->tangent.minValues[k] = bmin[k];
-        mesh->tangent.maxValues[k] = bmax[k];
+        prim.tangent.minValues[k] = bmin[k];
+        prim.tangent.maxValues[k] = bmax[k];
       }
 
-      mesh->tangent.data_type =
+      prim.tangent.data_type =
           (n == 3) ? TINYGLTF_TYPE_VEC3 : TINYGLTF_TYPE_VEC4;
-      mesh->tangent.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;
+      prim.tangent.component_type = TINYGLTF_COMPONENT_TYPE_FLOAT;
     }
 
     // texcoord
-    for (auto &item : mesh->texcoords) {
+    for (auto &item : prim.texcoords) {
       float bmin[2];
       float bmax[2];
       bmin[0] = bmin[1] = std::numeric_limits<float>::max();
@@ -1185,22 +1271,32 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
     }
 
     // joints
-    for (auto &item : mesh->joints) {
-      float bmin;
-      float bmax;
-      bmin = std::numeric_limits<float>::max();
-      bmax = -std::numeric_limits<float>::max();
+    for (auto &item : prim.joints) {
 
-      for (size_t i = 0; i < item.second.data.size(); i++) {
-        bmin = std::min(bmin, item.second.data[i]);
-        bmax = std::max(bmax, item.second.data[i]);
+      std::cout << "joint -- " << item.first << "\n";
+
+      float bmin[4];
+      float bmax[4];
+      bmin[0] = bmin[1] = bmin[2] = bmin[3] = float(std::numeric_limits<uint16_t>::max());
+      bmax[0] = bmax[1] = bmax[2] = bmax[3] =
+          float(-std::numeric_limits<uint16_t>::max());
+
+      size_t n = 4;
+
+      for (size_t i = 0; i < item.second.data.size() / n; i++) {
+        for (size_t k = 0; k < n; k++) {
+          bmin[k] = std::min(bmin[k], item.second.data[n * i + k]);
+          bmax[k] = std::max(bmax[k], item.second.data[n * i + k]);
+        }
       }
 
-      item.second.minValues.resize(1);
-      item.second.maxValues.resize(1);
-
-      item.second.minValues[0] = bmin;
-      item.second.maxValues[0] = bmax;
+      // TODO(syoyo): check if the value is within ushort max
+      item.second.minValues.resize(n);
+      item.second.maxValues.resize(n);
+      for (size_t k = 0; k < n; k++) {
+        item.second.minValues[k] = bmin[k];
+        item.second.maxValues[k] = bmax[k];
+      }
 
       item.second.data_type = TINYGLTF_TYPE_VEC4;
       item.second.component_type =
@@ -1208,22 +1304,29 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
     }
 
     // weights
-    for (auto &item : mesh->weights) {
-      float bmin;
-      float bmax;
-      bmin = std::numeric_limits<float>::max();
-      bmax = -std::numeric_limits<float>::max();
+    for (auto &item : prim.weights) {
 
-      for (size_t i = 0; i < item.second.data.size(); i++) {
-        bmin = std::min(bmin, item.second.data[i]);
-        bmax = std::max(bmax, item.second.data[i]);
+      float bmin[4];
+      float bmax[4];
+      bmin[0] = bmin[1] = bmin[2] = bmin[3] = std::numeric_limits<float>::max();
+      // do not allow negative weight
+      bmax[0] = bmax[1] = bmax[2] = bmax[3] = 0.0f;
+
+      size_t n = 4;
+
+      for (size_t i = 0; i < item.second.data.size() / n; i++) {
+        for (size_t k = 0; k < 4; k++) {
+          bmin[k] = std::min(bmin[k], item.second.data[n * i + k]);
+          bmax[k] = std::max(bmax[k], item.second.data[n * i + k]);
+        }
       }
 
-      item.second.minValues.resize(1);
-      item.second.maxValues.resize(1);
-
-      item.second.minValues[0] = bmin;
-      item.second.maxValues[0] = bmax;
+      item.second.minValues.resize(n);
+      item.second.maxValues.resize(n);
+      for (size_t k = 0; k < n; k++) {
+        item.second.minValues[k] = bmin[k];
+        item.second.maxValues[k] = bmax[k];
+      }
 
       item.second.data_type = TINYGLTF_TYPE_VEC4;
       item.second.component_type =
@@ -1231,137 +1334,146 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
     }
   }
 
+  prim.mode = TINYGLTF_MODE_TRIANGLES;
+
+  mesh->prims.clear();
+  mesh->prims.push_back(prim);
+
   // Use filename as mesh's name
   mesh->name = GetBaseFilename(filename);
 
-  mesh->mode = TINYGLTF_MODE_TRIANGLES;
 
   return true;
 }
 
 void PrintMeshPrim(const MeshPrim &mesh) {
-  std::cout << "indices.component_type : "
-            << PrintComponentType(mesh.indices_type) << "\n";
-  std::cout << "# of indices : " << mesh.indices.size() << "\n";
-  std::cout << "  indices.min = " << mesh.indices_min
-            << ", max = " << mesh.indices_max << "\n";
-  for (size_t i = 0; i < mesh.indices.size(); i++) {
-    std::cout << "  index[" << i << "] = " << mesh.indices[i] << "\n";
-  }
+  for (size_t p = 0; p < mesh.prims.size(); p++) {
+    const PrimSet &prim = mesh.prims[p];
+    std::cout << "--- primitive[" << p << "] ---\n";
 
-  std::cout << "position.type : " << PrintType(mesh.position.data_type) << "\n";
-  std::cout << "position.component_type : "
-            << PrintComponentType(mesh.position.component_type) << "\n";
-  std::cout << "# of positions : " << mesh.position.data.size() / 3 << "\n";
-  if ((mesh.position.minValues.size() == 3) &&
-      (mesh.position.maxValues.size() == 3)) {
-    std::cout << "  position.min = " << mesh.position.minValues
-              << ", max = " << mesh.position.maxValues << "\n";
-  }
-  for (size_t i = 0; i < mesh.position.data.size() / 3; i++) {
-    std::cout << "  position[" << i << "] = " << mesh.position.data[3 * i + 0]
-              << ", " << mesh.position.data[3 * i + 1] << ", "
-              << mesh.position.data[3 * i + 2] << std::endl;
-  }
-
-  std::cout << "normal.type : " << PrintType(mesh.normal.data_type) << "\n";
-  std::cout << "normal.component_type : "
-            << PrintComponentType(mesh.normal.component_type) << "\n";
-  std::cout << "# of normals : " << mesh.normal.data.size() / 3 << "\n";
-  if ((mesh.normal.minValues.size() == 3) &&
-      (mesh.normal.maxValues.size() == 3)) {
-    std::cout << "  normal.min = " << mesh.normal.minValues
-              << ", max = " << mesh.normal.maxValues << "\n";
-  }
-  for (size_t i = 0; i < mesh.normal.data.size() / 3; i++) {
-    std::cout << "  normal[" << i << "] = " << mesh.normal.data[3 * i + 0]
-              << ", " << mesh.normal.data[3 * i + 1] << ", "
-              << mesh.normal.data[3 * i + 2] << std::endl;
-  }
-
-  if (mesh.tangent.data.size() > 0) {
-    assert((mesh.tangent.data_type == TINYGLTF_TYPE_VEC3) ||
-           (mesh.tangent.data_type == TINYGLTF_TYPE_VEC4));
-
-    size_t n = mesh.tangent.data_type == TINYGLTF_TYPE_VEC3 ? 3 : 4;
-
-    std::cout << "tangent.type : " << PrintType(mesh.tangent.data_type) << "\n";
-    std::cout << "tangent.component_type : "
-              << PrintComponentType(mesh.tangent.component_type) << "\n";
-    std::cout << "# of tangents : " << mesh.tangent.data.size() / n << "\n";
-    if ((mesh.tangent.minValues.size() == 3) &&
-        (mesh.tangent.maxValues.size() == 3)) {
-      std::cout << "  tangent.min = " << mesh.tangent.minValues
-                << ", max = " << mesh.tangent.maxValues << "\n";
+    std::cout << "indices.component_type : "
+              << PrintComponentType(prim.indices_type) << "\n";
+    std::cout << "# of indices : " << prim.indices.size() << "\n";
+    std::cout << "  indices.min = " << prim.indices_min
+              << ", max = " << prim.indices_max << "\n";
+    for (size_t i = 0; i < prim.indices.size(); i++) {
+      std::cout << "  index[" << i << "] = " << prim.indices[i] << "\n";
     }
-    for (size_t i = 0; i < mesh.tangent.data.size() / n; i++) {
-      std::cout << "  tangent[" << i << "] = " << mesh.tangent.data[n * i + 0]
-                << ", " << mesh.tangent.data[n * i + 1] << ", "
-                << mesh.tangent.data[n * i + 2];
 
-      if (n == 4) {
-        std::cout << ", " << mesh.tangent.data[n * i + 3];
+    std::cout << "position.type : " << PrintType(prim.position.data_type) << "\n";
+    std::cout << "position.component_type : "
+              << PrintComponentType(prim.position.component_type) << "\n";
+    std::cout << "# of positions : " << prim.position.data.size() / 3 << "\n";
+    if ((prim.position.minValues.size() == 3) &&
+        (prim.position.maxValues.size() == 3)) {
+      std::cout << "  position.min = " << prim.position.minValues
+                << ", max = " << prim.position.maxValues << "\n";
+    }
+    for (size_t i = 0; i < prim.position.data.size() / 3; i++) {
+      std::cout << "  position[" << i << "] = " << prim.position.data[3 * i + 0]
+                << ", " << prim.position.data[3 * i + 1] << ", "
+                << prim.position.data[3 * i + 2] << std::endl;
+    }
+
+    std::cout << "normal.type : " << PrintType(prim.normal.data_type) << "\n";
+    std::cout << "normal.component_type : "
+              << PrintComponentType(prim.normal.component_type) << "\n";
+    std::cout << "# of normals : " << prim.normal.data.size() / 3 << "\n";
+    if ((prim.normal.minValues.size() == 3) &&
+        (prim.normal.maxValues.size() == 3)) {
+      std::cout << "  normal.min = " << prim.normal.minValues
+                << ", max = " << prim.normal.maxValues << "\n";
+    }
+    for (size_t i = 0; i < prim.normal.data.size() / 3; i++) {
+      std::cout << "  normal[" << i << "] = " << prim.normal.data[3 * i + 0]
+                << ", " << prim.normal.data[3 * i + 1] << ", "
+                << prim.normal.data[3 * i + 2] << std::endl;
+    }
+
+    if (prim.tangent.data.size() > 0) {
+      assert((prim.tangent.data_type == TINYGLTF_TYPE_VEC3) ||
+             (prim.tangent.data_type == TINYGLTF_TYPE_VEC4));
+
+      size_t n = prim.tangent.data_type == TINYGLTF_TYPE_VEC3 ? 3 : 4;
+
+      std::cout << "tangent.type : " << PrintType(prim.tangent.data_type) << "\n";
+      std::cout << "tangent.component_type : "
+                << PrintComponentType(prim.tangent.component_type) << "\n";
+      std::cout << "# of tangents : " << prim.tangent.data.size() / n << "\n";
+      if ((prim.tangent.minValues.size() == 3) &&
+          (prim.tangent.maxValues.size() == 3)) {
+        std::cout << "  tangent.min = " << prim.tangent.minValues
+                  << ", max = " << prim.tangent.maxValues << "\n";
       }
-      std::cout << std::endl;
-    }
-  }
+      for (size_t i = 0; i < prim.tangent.data.size() / n; i++) {
+        std::cout << "  tangent[" << i << "] = " << prim.tangent.data[n * i + 0]
+                  << ", " << prim.tangent.data[n * i + 1] << ", "
+                  << prim.tangent.data[n * i + 2];
 
-  std::cout << "# of texcoord slots : " << mesh.texcoords.size() << "\n";
-  for (const auto &item : mesh.texcoords) {
-    std::cout << "TEXCOORD_" << item.first << "\n";
-
-    assert(item.second.data_type == TINYGLTF_TYPE_VEC2);
-    std::cout << "texcoord.type : " << PrintType(item.second.data_type) << "\n";
-    std::cout << "texcoord.component_type : "
-              << PrintComponentType(item.second.component_type) << "\n";
-    std::cout << "# of texcoords : " << item.second.data.size() / 2 << "\n";
-    if ((item.second.minValues.size() == 2) &&
-        (item.second.maxValues.size() == 2)) {
-      std::cout << "  texcood.min = " << item.second.minValues
-                << ", max = " << item.second.maxValues << "\n";
-    }
-    for (size_t i = 0; i < item.second.data.size() / 2; i++) {
-      std::cout << "  texcoord[" << i << "] = " << item.second.data[2 * i + 0]
-                << ", " << item.second.data[2 * i + 1];
-      std::cout << std::endl;
-    }
-  }
-
-  assert(mesh.joints.size() == mesh.weights.size());
-  std::cout << "# of joints/weights slots : " << mesh.joints.size() << "\n";
-  for (const auto &item : mesh.joints) {
-    assert(mesh.weights.count(item.first));
-
-    assert(item.second.data_type == TINYGLTF_TYPE_VEC4);
-
-    // joint must be uint8 or uint16
-    assert(
-        (item.second.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) ||
-        (item.second.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT));
-
-    std::cout << "joint.type : " << PrintType(item.second.data_type) << "\n";
-    std::cout << "joint.component_type : "
-              << PrintComponentType(item.second.component_type) << "\n";
-
-    std::cout << "JOINTS_" << item.first << "\n";
-    for (size_t i = 0; i < item.second.data.size(); i++) {
-      std::cout << "  joints[" << i << "] = " << int(item.second.data[i])
-                << "\n";
+        if (n == 4) {
+          std::cout << ", " << prim.tangent.data[n * i + 3];
+        }
+        std::cout << std::endl;
+      }
     }
 
-    const VertexAttrib &attrib = mesh.weights.at(item.first);
+    std::cout << "# of texcoord slots : " << prim.texcoords.size() << "\n";
+    for (const auto &item : prim.texcoords) {
+      std::cout << "TEXCOORD_" << item.first << "\n";
 
-    // weight must be uint8 or uint16(normalized), or float
-    assert((attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) ||
-           (attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) ||
-           (attrib.component_type == TINYGLTF_COMPONENT_TYPE_FLOAT));
+      assert(item.second.data_type == TINYGLTF_TYPE_VEC2);
+      std::cout << "texcoord.type : " << PrintType(item.second.data_type) << "\n";
+      std::cout << "texcoord.component_type : "
+                << PrintComponentType(item.second.component_type) << "\n";
+      std::cout << "# of texcoords : " << item.second.data.size() / 2 << "\n";
+      if ((item.second.minValues.size() == 2) &&
+          (item.second.maxValues.size() == 2)) {
+        std::cout << "  texcood.min = " << item.second.minValues
+                  << ", max = " << item.second.maxValues << "\n";
+      }
+      for (size_t i = 0; i < item.second.data.size() / 2; i++) {
+        std::cout << "  texcoord[" << i << "] = " << item.second.data[2 * i + 0]
+                  << ", " << item.second.data[2 * i + 1];
+        std::cout << std::endl;
+      }
+    }
 
-    std::cout << "weight.type : " << PrintType(attrib.data_type) << "\n";
-    std::cout << "weight.component_type : "
-              << PrintComponentType(attrib.component_type) << "\n";
-    std::cout << "WEIGHTS_" << item.first << "\n";
-    for (size_t i = 0; i < attrib.data.size(); i++) {
-      std::cout << "  weights[" << i << "] = " << attrib.data[i] << "\n";
+    assert(prim.joints.size() == prim.weights.size());
+    std::cout << "# of joints/weights slots : " << prim.joints.size() << "\n";
+    for (const auto &item : prim.joints) {
+      assert(prim.weights.count(item.first));
+
+      assert(item.second.data_type == TINYGLTF_TYPE_VEC4);
+
+      // joint must be uint8 or uint16
+      assert(
+          (item.second.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) ||
+          (item.second.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT));
+
+      std::cout << "joint.type : " << PrintType(item.second.data_type) << "\n";
+      std::cout << "joint.component_type : "
+                << PrintComponentType(item.second.component_type) << "\n";
+
+      std::cout << "JOINTS_" << item.first << "\n";
+      for (size_t i = 0; i < item.second.data.size(); i++) {
+        std::cout << "  joints[" << i << "] = " << int(item.second.data[i])
+                  << "\n";
+      }
+
+      const VertexAttrib &attrib = prim.weights.at(item.first);
+
+      // weight must be uint8 or uint16(normalized), or float
+      assert((attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) ||
+             (attrib.component_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) ||
+             (attrib.component_type == TINYGLTF_COMPONENT_TYPE_FLOAT));
+
+      std::cout << "weight.type : " << PrintType(attrib.data_type) << "\n";
+      std::cout << "weight.component_type : "
+                << PrintComponentType(attrib.component_type) << "\n";
+      std::cout << "WEIGHTS_" << item.first << "\n";
+      for (size_t i = 0; i < attrib.data.size(); i++) {
+        std::cout << "  weights[" << i << "] = " << attrib.data[i] << "\n";
+      }
     }
   }
 }
