@@ -1273,8 +1273,6 @@ bool LoadObjMesh(const std::string &filename, bool facevarying,
     // joints
     for (auto &item : prim.joints) {
 
-      std::cout << "joint -- " << item.first << "\n";
-
       float bmin[4];
       float bmax[4];
       bmin[0] = bmin[1] = bmin[2] = bmin[3] = float(std::numeric_limits<uint16_t>::max());
