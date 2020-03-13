@@ -117,7 +117,10 @@ def main():
     num_target_buffers = len(target["buffers"])
     num_target_bufferViews = len(target["bufferViews"])
     num_target_accessors = len(target["accessors"])
-    num_target_materials = len(target["materials"])
+    num_target_materials = 0
+    if "materials" in target:
+        num_target_materials = len(target["materials"])
+
     print("num_target_meshes: ", num_target_meshes)
     print("num_target_buffers: ", num_target_buffers)
     print("num_target_bufferViews: ", num_target_bufferViews)
