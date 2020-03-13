@@ -6,12 +6,21 @@ Append(merge) mesh of glTF A to glTF B.
 
 `skin`, `nodes`, etc are not appended(to be merged).
 
+## Usage
+
+concatenate sourceN.gltf to target.gltf and save it to merged.gltf
+
+```
+$ python concat_mesh.py source0.gltf <source1.gltf source2.gltf ...> target.gltf merged.gltf
+```
+
 ## TODO
 
-* [ ] Support multiple glTFs to merge
+* [x] Support multiple glTFs to merge(concat)
 * [ ] Support merging skin
 * [ ] Support merging different node hierarchies
-* [ ] `images`, `textures`
+* [ ] Support `images`, `textures`, `materials`
+* [ ] Support other glTF info
 
 # replace_attrib.py
 
