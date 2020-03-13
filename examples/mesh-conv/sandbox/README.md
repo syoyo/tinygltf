@@ -19,7 +19,7 @@ $ python concat_mesh.py source0.gltf <source1.gltf source2.gltf ...> target.gltf
 * [x] Support multiple glTFs to merge(concat)
 * [ ] Support merging skin
 * [ ] Support merging different node hierarchies
-* [ ] Support `images`, `textures`, `materials`
+* [x] Support `images`, `textures`, `materials`, `samplers`
 * [ ] Support other glTF info
 
 # replace_attrib.py
