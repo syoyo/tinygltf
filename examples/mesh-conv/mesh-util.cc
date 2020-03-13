@@ -604,7 +604,7 @@ bool SaveAsObjMesh(const std::string &basename, const MeshPrim &mesh, const ObjE
 
   const PrimSet &prim = mesh.prims[options.primid];
 
-  if (prim.texcoords.count(options.uvset)) {
+  if (!prim.texcoords.count(options.uvset)) {
     std::cerr << "Exporting uvset " << options.uvset << " requested, but mesh( " << mesh.name << ") does not contain TEXCOORD_" << options.uvset << "\n";
     std::cerr << "UV coord will not be exported to .obj\n";
   }
