@@ -397,6 +397,9 @@ static uint32_t UnpackIndex(const unsigned char *ptr, int type) {
     // TODO(syoyo): Check overflow(2G+ index)
     int32_t data = *reinterpret_cast<const int32_t *>(ptr);
     return uint32_t(data);
+  } else if (type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_INT) {
+    uint32_t data = *reinterpret_cast<const uint32_t *>(ptr);
+    return uint32_t(data);
   } else if (type == TINYGLTF_COMPONENT_TYPE_SHORT) {
     uint32_t data = *reinterpret_cast<const uint32_t *>(ptr);
     return data;
