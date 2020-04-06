@@ -19,3 +19,7 @@ $ make
 Plese use solution file located at `basic` folder.
 
 
+## Limitation
+
+There are so many limitations in this example(e.g. no PBR shader. the shader only shows texture of textures[0] if available).
+
