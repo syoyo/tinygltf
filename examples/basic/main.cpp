@@ -194,7 +194,9 @@ void drawMesh(tinygltf::Model &model, tinygltf::Mesh &mesh) {
 
 // recursively draw node and children nodes of model
 void drawModelNodes(tinygltf::Model &model, tinygltf::Node &node) {
-  drawMesh(model, model.meshes[node.mesh]);
+  if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
+    drawMesh(model, model.meshes[node.mesh]);
+  }
   for (size_t i = 0; i < node.children.size(); i++) {
     drawModelNodes(model, model.nodes[node.children[i]]);
   }
