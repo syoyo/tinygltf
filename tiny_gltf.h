@@ -2660,8 +2660,11 @@ bool WriteWholeFile(std::string *err, const std::string &filepath,
 #ifdef _WIN32
 #if defined(__GLIBCXX__)  // mingw
   int file_descriptor =
-      _wopen(UTF8ToWchar(filepath).c_str(), _O_WRONLY | _O_BINARY);
-  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
+      _wopen(UTF8ToWchar(filepath).c_str(), _O_CREAT | _O_WRONLY |
+                                            _O_TRUNC | _O_BINARY);
+  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor,
+                                           std::ios_base::out |
+                                           std::ios_base::binary);
   std::ostream f(&wfile_buf);
 #elif defined(_MSC_VER)
   std::ofstream f(UTF8ToWchar(filepath).c_str(), std::ofstream::binary);
@@ -6418,8 +6421,11 @@ static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
 #ifdef _WIN32
 #if defined(__GLIBCXX__)  // mingw
   int file_descriptor =
-      _wopen(UTF8ToWchar(binFilename).c_str(), _O_WRONLY | _O_BINARY);
-  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
+      _wopen(UTF8ToWchar(binFilename).c_str(), _O_CREAT | _O_WRONLY |
+                                               _O_TRUNC | _O_BINARY);
+  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor,
+                                           std::ios_base::out |
+                                           std::ios_base::binary);
   std::ostream output(&wfile_buf);
   if (!wfile_buf.is_open()) return false;
 #elif defined(_MSC_VER)
@@ -7322,8 +7328,11 @@ static bool WriteGltfFile(const std::string &output,
   std::ofstream gltfFile(UTF8ToWchar(output).c_str());
 #elif defined(__GLIBCXX__)
   int file_descriptor =
-      _wopen(UTF8ToWchar(output).c_str(), _O_WRONLY | _O_BINARY);
-  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
+      _wopen(UTF8ToWchar(output).c_str(), _O_CREAT | _O_WRONLY |
+                                          _O_TRUNC | _O_BINARY);
+  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor,
+                                           std::ios_base::out |
+                                           std::ios_base::binary);
   std::ostream gltfFile(&wfile_buf);
   if (!wfile_buf.is_open()) return false;
 #else
@@ -7410,8 +7419,11 @@ static void WriteBinaryGltfFile(const std::string &output,
   std::ofstream gltfFile(UTF8ToWchar(output).c_str(), std::ios::binary);
 #elif defined(__GLIBCXX__)
   int file_descriptor =
-      _wopen(UTF8ToWchar(output).c_str(), _O_WRONLY | _O_BINARY);
-  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
+      _wopen(UTF8ToWchar(output).c_str(), _O_CREAT | _O_WRONLY |
+                                          _O_TRUNC | _O_BINARY);
+  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor,
+                                           std::ios_base::out |
+                                           std::ios_base::binary);
   std::ostream gltfFile(&wfile_buf);
 #else
   std::ofstream gltfFile(output.c_str(), std::ios::binary);
