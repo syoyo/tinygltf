@@ -2592,11 +2592,12 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
       return false;
     }
     size_t size = AAsset_getLength(asset);
-    if (size <= 0) {
+    if (size == 0) {
       if (err) {
         (*err) += "Invalid file size : " + filepath +
                   " (does the path point to a directory?)";
       }
+      return false;
     }
     out->resize(size);
     AAsset_read(asset, reinterpret_cast<char *>(&out->at(0)), size);
