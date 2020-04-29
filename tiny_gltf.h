@@ -59,6 +59,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <cmath> // std::fabs
 
 #ifndef TINYGLTF_USE_CPP14
 #include <functional>
