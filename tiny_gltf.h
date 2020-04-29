@@ -6513,7 +6513,7 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   if (accessor.bufferView >= 0)
     SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
 
-  if (accessor.byteOffset != 0.0)
+  if (accessor.byteOffset != 0)
     SerializeNumberProperty<int>("byteOffset", int(accessor.byteOffset), o);
 
   SerializeNumberProperty<int>("componentType", accessor.componentType, o);
