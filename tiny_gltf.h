@@ -7083,6 +7083,12 @@ static void SerializeGltfCamera(const Camera &camera, json &o) {
   } else {
     // ???
   }
+
+  if(camera.extras.Type() != NULL_TYPE)
+  {
+    SerializeValue("extras", camera.extras, o);
+  }
+  SerializeExtensionMap(camera.extensions, o);
 }
 
 static void SerializeGltfScene(Scene &scene, json &o) {
