@@ -323,7 +323,8 @@ class Value {
   }
 
   // Use this function if you want to have number value as int.
-  double GetNumberAsInt() const {
+  // TODO(syoyo): Support int value larger than 32 bits
+  int GetNumberAsInt() const {
     if (type_ == REAL_TYPE) {
       return int(real_value_);
     } else {
