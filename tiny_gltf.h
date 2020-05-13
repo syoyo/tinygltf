@@ -1115,9 +1115,9 @@ struct SpotLight {
 struct Light {
   std::string name;
   std::vector<double> color;
-  double intensity;
+  double intensity{1.0};
   std::string type;
-  double range;
+  double range{0.0}; // 0.0 = inifinite
   SpotLight spot;
 
   Light() : intensity(1.0), range(0.0) {}
@@ -6970,7 +6970,9 @@ static void SerializeSpotLight(SpotLight &spot, json &o) {
 static void SerializeGltfLight(Light &light, json &o) {
   if (!light.name.empty()) SerializeStringProperty("name", light.name, o);
   SerializeNumberProperty("intensity", light.intensity, o);
-  SerializeNumberProperty("range", light.range, o);
+  if (light.range > 0.0) {
+    SerializeNumberProperty("range", light.range, o);
+  }
   SerializeNumberArrayProperty("color", light.color, o);
   SerializeStringProperty("type", light.type, o);
   if (light.type == "spot") {
