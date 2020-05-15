@@ -1,0 +1,376 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 8,
+      "max": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "min": [
+        -0.5,
+        -0.5,
+        -0.5
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5125,
+      "count": 36,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "copyright": "NVIDIA Corporation",
+    "generator": "Iray glTF plugin",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 96,
+      "byteStride": 12
+    },
+    {
+      "buffer": 0,
+      "byteLength": 144,
+      "byteOffset": 96
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 240,
+      "uri": "issue-261.bin"
+    }
+  ],
+  "cameras": [
+    {
+      "extensions": {
+        "NV_Iray": {
+          "mip_burn_highlights": 0.699999988079071,
+          "mip_burn_highlights_per_component": false,
+          "mip_camera_shutter": 4.0,
+          "mip_cm2_factor": 1.0,
+          "mip_crush_blacks": 0.5,
+          "mip_f_number": 1.0,
+          "mip_film_iso": 100.0,
+          "mip_gamma": 2.200000047683716,
+          "mip_saturation": 1.0,
+          "mip_vignetting": 0.00019999999494757503,
+          "mip_whitepoint": [
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ],
+          "tm_enable_tonemapper": true,
+          "tm_tonemapper": "mia_exposure_photographic"
+        }
+      },
+      "extras": {
+        "resolution": [
+          640,
+          480
+        ]
+      },
+      "name": "default",
+      "perspective": {
+        "aspectRatio": 1.3333333730697632,
+        "yfov": 0.9272952079772949,
+        "zfar": 1000.0,
+        "znear": 0.1
+      },
+      "type": "perspective"
+    }
+  ],
+  "extensions": {
+    "KHR_lights_punctual": {
+      "lights": [
+        {
+          "color": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "intensity": 1000.0,
+          "name": "light",
+          "type": "point"
+        }
+      ]
+    },
+    "NV_MDL": {
+      "modules": [
+        "mdl::base",
+        "mdl::nvidia::core_definitions",
+        "mdl::state"
+      ],
+      "shaders": [
+        {
+          "definition": "mdl::base::environment_spherical(texture_2d)",
+          "name": "env_shd"
+        },
+        {
+          "arguments": {
+            "base_color": [
+              0.0055217444896698,
+              0.36859095096588135,
+              0.0041161770932376385
+            ],
+            "normal=": 2
+          },
+          "definition": "mdl::nvidia::core_definitions::flex_material",
+          "name": "cube_instance_material"
+        },
+        {
+          "definition": "mdl::state::normal()",
+          "name": "mdl::state::normal_341"
+        },
+        {
+          "arguments": {
+            "base_color": [
+              0.0055217444896698,
+              0.36859095096588135,
+              0.0041161770932376385
+            ],
+            "normal=": 4
+          },
+          "definition": "mdl::nvidia::core_definitions::flex_material",
+          "name": "cube_instance_material"
+        },
+        {
+          "definition": "mdl::state::normal()",
+          "name": "mdl::state::normal_341"
+        }
+      ]
+    }
+  },
+  "extensionsUsed": [
+    "NV_MDL",
+    "NV_Iray",
+    "KHR_lights_punctual"
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "extras": {
+        "mdl_shader": 1
+      },
+      "name": "cube_instance_material",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0055217444896698,
+          0.36859095096588135,
+          0.0041161770932376385,
+          1.0
+        ]
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "cube",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0
+          },
+          "indices": 1,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "camera": 0,
+      "extensions": {
+        "NV_Iray": {
+          "iview:fkey": -1,
+          "iview:fov": 53.130104064941406,
+          "iview:interest": [
+            0.1342654824256897,
+            -0.14356137812137604,
+            0.037264324724674225
+          ],
+          "iview:position": [
+            0.9729073643684387,
+            1.2592438459396362,
+            2.4199187755584717
+          ],
+          "iview:roll": 0.0,
+          "iview:up": [
+            0.0,
+            1.0,
+            0.0
+          ]
+        }
+      },
+      "matrix": [
+        0.9432751389105357,
+        -1.1769874756875739e-16,
+        -0.3320120665176343,
+        0.0,
+        -0.16119596696756341,
+        0.8742297945345237,
+        -0.45797175303889276,
+        0.0,
+        0.290254840694694,
+        0.48551237507207207,
+        0.8246392308792816,
+        0.0,
+        0.9729073377709113,
+        1.2592438262175363,
+        2.419918748461627,
+        1.0
+      ],
+      "name": "CamInst"
+    },
+    {
+      "extensions": {
+        "NV_Iray": {
+          "caustic": true,
+          "caustic_cast": true,
+          "caustic_recv": true,
+          "face_back": true,
+          "face_front": true,
+          "finalgather": true,
+          "finalgather_cast": true,
+          "finalgather_recv": true,
+          "globillum": true,
+          "globillum_cast": true,
+          "globillum_recv": true,
+          "material=": 3,
+          "pickable": true,
+          "reflection_cast": true,
+          "reflection_recv": true,
+          "refraction_cast": true,
+          "refraction_recv": true,
+          "shadow_cast": true,
+          "shadow_recv": true,
+          "transparency_cast": true,
+          "transparency_recv": true,
+          "visible": true
+        }
+      },
+      "mesh": 0,
+      "name": "cube_instance"
+    },
+    {
+      "extensions": {
+        "KHR_lights_punctual": {
+          "light": 0
+        },
+        "NV_Iray": {
+          "shadow_cast": true,
+          "visible": false
+        }
+      },
+      "matrix": [
+        0.6988062355563571,
+        -7.76042172309776e-17,
+        -0.7153110128800992,
+        -0.0,
+        -0.4276881690736487,
+        0.8015668284138362,
+        -0.41781987700564616,
+        -0.0,
+        0.57336957992379,
+        0.5979051928078428,
+        0.5601398979107212,
+        0.0,
+        2.3640632834071384,
+        2.465226204472449,
+        2.309515908392224,
+        1.0
+      ],
+      "name": "light_inst"
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "extensions": {
+        "NV_Iray": {
+          "CP_canny_threshold1": 40,
+          "CP_canny_threshold2": 120,
+          "CP_color_quantization": 8,
+          "IVP_color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "TM_drago_bias": 0.8500000238418579,
+          "TM_drago_gamma2": 2.200000047683716,
+          "TM_drago_saturation": 1.0,
+          "TM_durand_contrast": 4.0,
+          "TM_durand_gamma": 2.200000047683716,
+          "TM_durand_saturation": 1.0,
+          "TM_durand_sigma_color": 2.0,
+          "TM_durand_sigma_space": 2.0,
+          "TM_linear_gamma": 2.200000047683716,
+          "TM_reinhard_color_adapt": 0.8999999761581421,
+          "TM_reinhard_gamma": 1.0,
+          "TM_reinhard_intensity": 0.0,
+          "TM_reinhard_light_adapt": 1.0,
+          "TM_reye_Ywhite": 1000000.0,
+          "TM_reye_bsize": 2,
+          "TM_reye_bthres": 3.0,
+          "TM_reye_gamma": 2.200000047683716,
+          "TM_reye_key": 0.5,
+          "TM_reye_saturation": 1.0,
+          "TM_reye_whitebalance": [
+            1.0,
+            0.9965101480484009,
+            0.9805564880371094,
+            0.0
+          ],
+          "environment_dome_depth": 200.0,
+          "environment_dome_height": 200.0,
+          "environment_dome_mode": "infinite",
+          "environment_dome_position": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "environment_dome_radius": 100.0,
+          "environment_dome_rotation_angle": 0.0,
+          "environment_dome_width": 200.0,
+          "environment_function=": 0,
+          "environment_function_intensity": 1.9900000095367432,
+          "iray_instancing": "off",
+          "iview::inline_color": [
+            1.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "iview::inline_width": 1.0,
+          "iview::magnifier_size": 300,
+          "iview::offset": 10.0,
+          "iview::outline_color": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "iview::outline_width": 2.0,
+          "iview::overview": true,
+          "iview::zoom_factor": 1.0,
+          "samples": 4.0,
+          "shadow_cast": true,
+          "shadow_recv": true
+        }
+      },
+      "nodes": [
+        0,
+        1,
+        2
+      ]
+    }
+  ]
+}
