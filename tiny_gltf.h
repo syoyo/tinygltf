@@ -2618,9 +2618,11 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
       _wopen(UTF8ToWchar(filepath).c_str(), _O_RDONLY | _O_BINARY);
   __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
   std::istream f(&wfile_buf);
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) || defined(_LIBCPP_VERSION)
+  // For libcxx, assume _LIBCPP_HAS_OPEN_WITH_WCHAR is defined to accept `wchar_t *`
   std::ifstream f(UTF8ToWchar(filepath).c_str(), std::ifstream::binary);
-#else  // clang?
+#else
+  // Unknown compiler/runtime
   std::ifstream f(filepath.c_str(), std::ifstream::binary);
 #endif
 #else
