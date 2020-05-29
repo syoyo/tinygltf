@@ -42,7 +42,7 @@ jobs:
         g++ -std=c++11 -o loader_example loader_example.cc
     - name: test
       run: |
-        ./loader_example
+        ./loader_example models/Cube/Cube.gltf
 
     - name: tests
       run: |
@@ -72,7 +72,7 @@ jobs:
 
     - name: loader_example_test
       run: |
-        ./loader_example
+        ./loader_example models/Cube/Cube.gltf
 
     - name: tests
       run: |
@@ -116,6 +116,8 @@ jobs:
       - name: Build
         run: |
             clang++ -std=c++11 -g -O0 -o loader_example loader_example.cc
+            ./loader_example models/Cube/Cube.gltf
+
             git clone https://github.com/Tencent/rapidjson
             clang++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
 
