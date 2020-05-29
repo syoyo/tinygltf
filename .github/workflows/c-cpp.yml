@@ -17,6 +17,19 @@ jobs:
     - name: test
         ./loader_example
 
+    - name: tests
+      run: |
+        cd tests
+        g++ -I../  -std=c++11 -g -O0 -o tester tester.cc
+        ./tester
+
+    - name: noexcept_tests
+      run: |
+        cd tests
+        g++ -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
+        ./tester_noexcept
+
+
   build-rapidjson-linux:
 
     runs-on: ubuntu-latest
@@ -27,6 +40,22 @@ jobs:
     - name: build
       run: |
         git clone https://github.com/Tencent/rapidjson
+        g++ -v
         g++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
-    - name: test
+
+    - name: loader_example_test
+      run: |
         ./loader_example
+
+    - name: tests
+      run: |
+        cd tests
+        g++ -DTINYGLTF_USE_RAPIDJSON -I../../rapidjson/include/rapidjson -I../  -std=c++11 -g -O0 -o tester tester.cc
+        ./tester
+
+    - name: noexcept_tests
+      run: |
+        cd tests
+        g++ -DTINYGLTF_USE_RAPIDJSON -I../../rapidjson/include/rapidjson -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
+        ./tester_noexcept
+
