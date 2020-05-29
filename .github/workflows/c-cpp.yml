@@ -30,6 +30,24 @@ jobs:
             git clone https://github.com/Tencent/rapidjson
             g++-4.8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
 
+  # compile with mingw gcc cross
+  build-mingw-cross:
+
+    runs-on: ubuntu-18.04
+    name: Build with MinGW gcc cross
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Build
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+            sudo apt-get install -y mingw-w64
+            x86_64-w64-mingw32-g++ -std=c++11 -o loader_example loader_example.cc
+
+
   build-linux:
 
     runs-on: ubuntu-latest
