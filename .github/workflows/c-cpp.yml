@@ -47,6 +47,26 @@ jobs:
             sudo apt-get install -y mingw-w64
             x86_64-w64-mingw32-g++ -std=c++11 -o loader_example loader_example.cc
 
+  # Windows(x64) + Visual Studio 2019 build
+  build-windows-msvc:
+
+    runs-on: windows-latest
+    name: Build for Windows(x64, MSVC)
+
+    # Use system installed cmake
+    # https://help.github.com/en/actions/reference/software-installed-on-github-hosted-runners
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 16 2019" -DTINYGLTF_BUILD_EXAMPLES=Off ..
+          cd ..
+      - name: Build
+        run: cmake --build build --config Release
+
 
   build-linux:
 
