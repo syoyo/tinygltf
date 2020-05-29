@@ -3,15 +3,30 @@ name: C/C++ CI
 on: [push, pull_request]
 
 jobs:
-  build:
+
+  build-linux:
 
     runs-on: ubuntu-latest
+    name: Buld with gcc
 
     steps:
     - uses: actions/checkout@v2
-    - name: cmake
+    - name: build
       run: |
-        mkdir build
-        cd build
-        cmake ..
-        make
+        g++ -std=c++11 -o loader_example loader_example.cc
+    - name: test
+        ./loader_example
+
+  build-rapidjson-linux:
+
+    runs-on: ubuntu-latest
+    name: Buld with gcc + rapidjson
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: |
+        git clone https://github.com/Tencent/rapidjson
+        g++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
+    - name: test
+        ./loader_example
