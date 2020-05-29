@@ -86,3 +86,36 @@ jobs:
         g++ -DTINYGLTF_USE_RAPIDJSON -I../../rapidjson/include/rapidjson -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
         ./tester_noexcept
 
+  # Cross-compile for aarch64 linux target
+  build-cross-aarch64:
+
+    runs-on: ubuntu-18.04
+    name: Build on cross aarch64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Build
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+            sudo apt-get install -y gcc-8-aarch64-linux-gnu g++-8-aarch64-linux-gnu
+
+            git clone https://github.com/Tencent/rapidjson
+            aarch64-linux-gnu-g++-8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
+
+  # macOS clang
+  build-macos:
+
+    runs-on: macos-latest
+    name: Build on macOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Build
+        run: |
+            clang++ -std=c++11 -g -O0 -o loader_example loader_example.cc
+            git clone https://github.com/Tencent/rapidjson
+            clang++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
+
