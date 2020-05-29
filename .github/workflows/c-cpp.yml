@@ -41,6 +41,7 @@ jobs:
       run: |
         g++ -std=c++11 -o loader_example loader_example.cc
     - name: test
+      run: |
         ./loader_example
 
     - name: tests
