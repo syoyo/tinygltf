@@ -87,12 +87,14 @@ jobs:
         cd tests
         g++ -I../  -std=c++11 -g -O0 -o tester tester.cc
         ./tester
+        cd ..
 
     - name: noexcept_tests
       run: |
         cd tests
         g++ -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
         ./tester_noexcept
+        cd ..
 
 
   build-rapidjson-linux:
@@ -115,14 +117,16 @@ jobs:
     - name: tests
       run: |
         cd tests
-        g++ -DTINYGLTF_USE_RAPIDJSON -I../../rapidjson/include/rapidjson -I../  -std=c++11 -g -O0 -o tester tester.cc
+        g++ -DTINYGLTF_USE_RAPIDJSON -I../rapidjson/include/rapidjson -I../  -std=c++11 -g -O0 -o tester tester.cc
         ./tester
+        cd ..
 
     - name: noexcept_tests
       run: |
         cd tests
-        g++ -DTINYGLTF_USE_RAPIDJSON -I../../rapidjson/include/rapidjson -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
+        g++ -DTINYGLTF_USE_RAPIDJSON -I../rapidjson/include/rapidjson -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
         ./tester_noexcept
+        cd ..
 
   # Cross-compile for aarch64 linux target
   build-cross-aarch64:
