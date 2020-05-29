@@ -6274,6 +6274,13 @@ static void SerializeNumberProperty(const std::string &key, T number,
   JsonAddMember(obj, key.c_str(), json(number));
 }
 
+#ifdef TINYGLTF_USE_RAPIDJSON
+template <>
+void SerializeNumberProperty(const std::string &key, size_t number, json &obj) {
+  JsonAddMember(obj, key.c_str(), json(static_cast<uint64_t>(number)));
+}
+#endif
+
 template <typename T>
 static void SerializeNumberArrayProperty(const std::string &key,
                                          const std::vector<T> &value,
