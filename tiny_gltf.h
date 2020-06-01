@@ -1215,7 +1215,7 @@ typedef bool (*FileExistsFunction)(const std::string &abs_filename, void *);
 ///
 /// ExpandFilePathFunction type. Signature for custom filesystem callbacks.
 ///
-typedef std::string (*ExpandFilePathFunction)(const std::string &, void *);
+typedef void (*ExpandFilePathFunction)(std::string *, void *);
 
 ///
 /// ReadWholeFileFunction type. Signature for custom filesystem callbacks.
@@ -1249,7 +1249,7 @@ struct FsCallbacks {
 
 bool FileExists(const std::string &abs_filename, void *);
 
-std::string ExpandFilePath(const std::string &filepath, void *);
+void ExpandFilePath(std::string *filepath, void *);
 
 bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
                    const std::string &filepath, void *);
@@ -1968,8 +1968,8 @@ static std::string FindFile(const std::vector<std::string> &paths,
   }
 
   for (size_t i = 0; i < paths.size(); i++) {
-    std::string absPath =
-        fs->ExpandFilePath(JoinPath(paths[i], filepath), fs->user_data);
+    std::string absPath = JoinPath(paths[i], filepath);
+    fs->ExpandFilePath(&absPath, fs->user_data);
     if (fs->FileExists(absPath, fs->user_data)) {
       return absPath;
     }
@@ -2532,39 +2532,34 @@ bool FileExists(const std::string &abs_filename, void *) {
   return ret;
 }
 
-std::string ExpandFilePath(const std::string &filepath, void *) {
+void ExpandFilePath(std::string *filepath, void *) {
 #ifdef _WIN32
-  DWORD len = ExpandEnvironmentStringsA(filepath.c_str(), NULL, 0);
-  char *str = new char[len];
-  ExpandEnvironmentStringsA(filepath.c_str(), str, len);
+  DWORD len = ExpandEnvironmentStringsA(filepath->c_str(), NULL, 0);
+  std::string s;
+  s.reserve(len);
+  ExpandEnvironmentStringsA(filepath->c_str(), const_cast<char*>(s.data()), len);
 
-  std::string s(str);
-
-  delete[] str;
-
-  return s;
+  *filepath = std::move(s);
 #else
 
 #if defined(TARGET_OS_IPHONE) || defined(TARGET_IPHONE_SIMULATOR) || \
     defined(__ANDROID__) || defined(__EMSCRIPTEN__)
   // no expansion
-  std::string s = filepath;
 #else
+  if (filepath->empty()) {
+    return;
+  }
+
   std::string s;
   wordexp_t p;
 
-  if (filepath.empty()) {
-    return "";
-  }
-
   // Quote the string to keep any spaces in filepath intact.
-  std::string quoted_path = "\"" + filepath + "\"";
+  std::string quoted_path = "\"" + *filepath + "\"";
   // char** w;
   int ret = wordexp(quoted_path.c_str(), &p, 0);
   if (ret) {
     // err
-    s = filepath;
-    return s;
+    return;
   }
 
   // Use first element only.
@@ -2572,12 +2567,12 @@ std::string ExpandFilePath(const std::string &filepath, void *) {
     s = std::string(p.we_wordv[0]);
     wordfree(&p);
   } else {
-    s = filepath;
+    s = *filepath;
   }
 
 #endif
 
-  return s;
+  *filepath = std::move(s);
 #endif
 }
 
