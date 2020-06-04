@@ -2483,6 +2483,15 @@ static inline std::wstring UTF8ToWchar(const std::string &str) {
                       (int)wstr.size());
   return wstr;
 }
+
+static inline std::string WcharToUTF8(const std::wstring &wstr) {
+  int str_size = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(),
+                                      nullptr, 0, NULL, NULL);
+  std::string str(str_size, 0);
+  WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), &str[0],
+                      (int)str.size(), NULL, NULL);
+  return str;
+}
 #endif
 
 #ifndef TINYGLTF_NO_FS
@@ -2534,15 +2543,15 @@ bool FileExists(const std::string &abs_filename, void *) {
 
 std::string ExpandFilePath(const std::string &filepath, void *) {
 #ifdef _WIN32
-  DWORD len = ExpandEnvironmentStringsA(filepath.c_str(), NULL, 0);
-  char *str = new char[len];
-  ExpandEnvironmentStringsA(filepath.c_str(), str, len);
+  std::wstring wfilepath = UTF8ToWchar(filepath);
+  DWORD wlen = ExpandEnvironmentStringsW(wfilepath.c_str(), NULL, 0);
+  wchar_t *wstr = new wchar_t[wlen];
+  ExpandEnvironmentStringsW(wfilepath.c_str(), wstr, wlen);
 
-  std::string s(str);
-
-  delete[] str;
-
-  return s;
+  std::wstring ws(wstr);
+  delete[] wstr;
+  return WcharToUTF8(ws);
+  
 #else
 
 #if defined(TARGET_OS_IPHONE) || defined(TARGET_IPHONE_SIMULATOR) || \
@@ -7326,8 +7335,8 @@ static void SerializeGltfModel(Model *model, json &o) {
     {
       auto has_khr_lights_punctual = std::find_if(
           extensionsUsed.begin(), extensionsUsed.end(), [](const std::string &s) {
-            return (s.compare("KHR_lights_punctual") == 0);
-          });
+                         return (s.compare("KHR_lights_punctual") == 0);
+                       });
 
       if (has_khr_lights_punctual == extensionsUsed.end()) {
         extensionsUsed.push_back("KHR_lights_punctual");
