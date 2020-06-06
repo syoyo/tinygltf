@@ -412,3 +412,19 @@ TEST_CASE("image-uri-spaces", "[issue-236]") {
   REQUIRE(true == ret);
 }
 
+#ifndef TINYGLTF_NO_FS
+TEST_CASE("expandpath-utf-8", "[pr-226]") {
+
+  std::string s1 = "\xe5\xaf\xb9"; // utf-8 string
+
+  std::string ret = tinygltf::ExpandFilePath(s1, /* userdata */nullptr);
+
+  // expected: E5 AF B9
+  REQUIRE(3 == ret.size());
+
+  REQUIRE(0xe5 == static_cast<uint8_t>(ret[0]));
+  REQUIRE(0xaf == static_cast<uint8_t>(ret[1]));
+  REQUIRE(0xb9 == static_cast<uint8_t>(ret[2]));
+
+}
+#endif
