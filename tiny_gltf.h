@@ -2543,15 +2543,16 @@ bool FileExists(const std::string &abs_filename, void *) {
 
 std::string ExpandFilePath(const std::string &filepath, void *) {
 #ifdef _WIN32
+  // Assume input `filepath` is encoded in UTF-8
   std::wstring wfilepath = UTF8ToWchar(filepath);
-  DWORD wlen = ExpandEnvironmentStringsW(wfilepath.c_str(), NULL, 0);
+  DWORD wlen = ExpandEnvironmentStringsW(wfilepath.c_str(), nullptr, 0);
   wchar_t *wstr = new wchar_t[wlen];
   ExpandEnvironmentStringsW(wfilepath.c_str(), wstr, wlen);
 
   std::wstring ws(wstr);
   delete[] wstr;
   return WcharToUTF8(ws);
-  
+
 #else
 
 #if defined(TARGET_OS_IPHONE) || defined(TARGET_IPHONE_SIMULATOR) || \
