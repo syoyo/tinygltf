@@ -1,0 +1,165 @@
+name: C/C++ CI
+
+on: [push, pull_request]
+
+jobs:
+
+  # compile with older gcc4.8
+  build-gcc48:
+
+    runs-on: ubuntu-18.04
+    name: Build with gcc 4.8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Build
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+            sudo apt-get install -y gcc-4.8 g++-4.8
+            g++-4.8 -std=c++11 -o loader_example loader_example.cc
+
+      - name: NoexceptBuild
+        run: |
+            g++-4.8 -DTINYGLTF_NOEXCEPTION -std=c++11 -o loader_example loader_example.cc
+
+      - name: RapidjsonBuild
+        run: |
+            git clone https://github.com/Tencent/rapidjson
+            g++-4.8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
+
+  # compile with mingw gcc cross
+  build-mingw-cross:
+
+    runs-on: ubuntu-18.04
+    name: Build with MinGW gcc cross
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Build
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+            sudo apt-get install -y mingw-w64
+            x86_64-w64-mingw32-g++ -std=c++11 -o loader_example loader_example.cc
+
+  # Windows(x64) + Visual Studio 2019 build
+  build-windows-msvc:
+
+    runs-on: windows-latest
+    name: Build for Windows(x64, MSVC)
+
+    # Use system installed cmake
+    # https://help.github.com/en/actions/reference/software-installed-on-github-hosted-runners
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 16 2019" -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On ..
+          cd ..
+      - name: Build
+        run: cmake --build build --config Release
+
+
+  build-linux:
+
+    runs-on: ubuntu-latest
+    name: Buld with gcc
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: |
+        g++ -std=c++11 -o loader_example loader_example.cc
+    - name: test
+      run: |
+        ./loader_example models/Cube/Cube.gltf
+
+    - name: tests
+      run: |
+        cd tests
+        g++ -I../  -std=c++11 -g -O0 -o tester tester.cc
+        ./tester
+        cd ..
+
+    - name: noexcept_tests
+      run: |
+        cd tests
+        g++ -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
+        ./tester_noexcept
+        cd ..
+
+
+  build-rapidjson-linux:
+
+    runs-on: ubuntu-latest
+    name: Buld with gcc + rapidjson
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: |
+        git clone https://github.com/Tencent/rapidjson
+        g++ -v
+        g++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
+
+    - name: loader_example_test
+      run: |
+        ./loader_example models/Cube/Cube.gltf
+
+    - name: tests
+      run: |
+        cd tests
+        g++ -DTINYGLTF_USE_RAPIDJSON -I../rapidjson/include/rapidjson -I../  -std=c++11 -g -O0 -o tester tester.cc
+        ./tester
+        cd ..
+
+    - name: noexcept_tests
+      run: |
+        cd tests
+        g++ -DTINYGLTF_USE_RAPIDJSON -I../rapidjson/include/rapidjson -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
+        ./tester_noexcept
+        cd ..
+
+  # Cross-compile for aarch64 linux target
+  build-cross-aarch64:
+
+    runs-on: ubuntu-18.04
+    name: Build on cross aarch64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Build
+        run: |
+            sudo apt-get update
+            sudo apt-get install -y build-essential
+            sudo apt-get install -y gcc-8-aarch64-linux-gnu g++-8-aarch64-linux-gnu
+
+            git clone https://github.com/Tencent/rapidjson
+            aarch64-linux-gnu-g++-8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
+
+  # macOS clang
+  build-macos:
+
+    runs-on: macos-latest
+    name: Build on macOS
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Build
+        run: |
+            clang++ -std=c++11 -g -O0 -o loader_example loader_example.cc
+            ./loader_example models/Cube/Cube.gltf
+
+            git clone https://github.com/Tencent/rapidjson
+            clang++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
+
