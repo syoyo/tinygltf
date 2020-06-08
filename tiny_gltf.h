@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.4.3 Introduce TINYGLTF_ENABLE_SERIALIZER.
 //  - v2.4.2 Decode percent-encoded URI.
 //  - v2.4.1 Fix some glTF object class does not have `extensions` and/or
 //  `extras` property.
@@ -1323,6 +1324,8 @@ class TinyGLTF {
                             const std::string &base_dir = "",
                             unsigned int check_sections = REQUIRE_VERSION);
 
+#if defined(TINYGLTF_ENABLE_SERIALIZER)
+
   ///
   /// Write glTF to stream, buffers and images will be embeded
   ///
@@ -1336,15 +1339,21 @@ class TinyGLTF {
                             bool embedImages, bool embedBuffers,
                             bool prettyPrint, bool writeBinary);
 
+#endif
+
   ///
   /// Set callback to use for loading image data
   ///
   void SetImageLoader(LoadImageDataFunction LoadImageData, void *user_data);
 
+#if defined(TINYGLTF_ENABLE_SERIALIZER)
+
   ///
   /// Set callback to use for writing image data
   ///
   void SetImageWriter(WriteImageDataFunction WriteImageData, void *user_data);
+
+#endif
 
   ///
   /// Set callbacks to use for filesystem (fs) access and their user data
@@ -2393,10 +2402,14 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
 }
 #endif
 
+#if defined(TINYGLTF_ENABLE_SERIALIZER)
+
 void TinyGLTF::SetImageWriter(WriteImageDataFunction func, void *user_data) {
   WriteImageData = func;
   write_image_user_data_ = user_data;
 }
+
+#endif
 
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
 static void WriteToMemory_stbi(void *context, void *data, int size) {
@@ -6214,6 +6227,8 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
   return ret;
 }
 
+#if defined(TINYGLTF_ENABLE_SERIALIZER)
+
 ///////////////////////
 // GLTF Serialization
 ///////////////////////
@@ -7618,6 +7633,8 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
 
   return true;
 }
+
+#endif // TINYGLTF_ENABLE_SERIALIZER
 
 }  // namespace tinygltf
 
