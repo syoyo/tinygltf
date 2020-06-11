@@ -1540,6 +1540,11 @@ class TinyGLTF {
 
 #include "sajson.h"
 
+// Serialization is not available for sajson backend.
+#ifdef TINYGLTF_ENABLE_SERIALIZER
+#undef TINYGLTF_ENABLE_SERIALIZER
+#endif
+
 #else
 
 // Default = nlohmann json
@@ -1683,7 +1688,57 @@ struct JsonDocument : public rapidjson::Document {
 #elif defined(TINYGLTF_USE_SAJSON)
 
 using json = sajson::value;
-using JsonDocument = sajson::document;
+using JsonDocument = json;
+
+// TODO(syoyo): Implement
+// muda
+
+class sajson_const_iterator
+{
+ public:
+  sajson_const_iterator() = default;
+  sajson_const_iterator(const sajson::value &v) : _v(v) {
+  }
+
+  sajson_const_iterator(const sajson_const_iterator &rhs) = default;
+  sajson_const_iterator &operator=(const sajson_const_iterator &rhs) = default;
+
+  std::string key() const {
+  }
+
+  sajson::value &value() {
+    return _v;
+  }
+
+  sajson::value *begin() {
+    return &_v;
+  }
+
+  bool operator!=(sajson_const_iterator &rhs) {
+    // TODO
+    assert(0);
+    return false;
+  }
+
+  sajson_const_iterator &operator++() {
+    // TODO
+    assert(0);
+    return (*this);
+  }
+
+  sajson::value &operator*() {
+    return _v;
+  }
+
+ private:
+  // `sajson::value` itself is a small struct, so having a copy of it
+  // does not affect performance and memory consumption.
+  sajson::value _v;
+
+};
+
+using json_const_iterator = sajson_const_iterator;
+using json_const_array_iterator = json_const_iterator;
 
 #else // nlohmann JSON
 using nlohmann::json;
@@ -3034,10 +3089,13 @@ bool IsArray(const json &o) {
 #endif
 }
 
-#if !defined(TINYGLTF_USE_SAJSON)
 json_const_array_iterator ArrayBegin(const json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.Begin();
+#elif TINYGLTF_USE_SAJSON
+  // TODO(syoyo): Implement
+  assert(0);
+  return json_const_array_iterator(o);
 #else
   return o.begin();
 #endif
@@ -3046,11 +3104,14 @@ json_const_array_iterator ArrayBegin(const json &o) {
 json_const_array_iterator ArrayEnd(const json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.End();
+#elif TINYGLTF_USE_SAJSON
+  // TODO(syoyo): Implement
+  assert(0);
+  return json_const_array_iterator(o);
 #else
   return o.end();
 #endif
 }
-#endif
 
 bool IsObject(const json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -3062,10 +3123,14 @@ bool IsObject(const json &o) {
 #endif
 }
 
-#if !defined(TINYGLTF_USE_SAJSON)
 json_const_iterator ObjectBegin(const json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.MemberBegin();
+#elif defined(TINYGLTF_USE_SAJSON)
+  assert(o.get_type() == sajson::TYPE_OBJECT);
+  // TODO(syoyo): Implement
+  assert(0);
+  return json_const_iterator(o);
 #else
   return o.begin();
 #endif
@@ -3074,16 +3139,23 @@ json_const_iterator ObjectBegin(const json &o) {
 json_const_iterator ObjectEnd(const json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.MemberEnd();
+#elif defined(TINYGLTF_USE_SAJSON)
+  assert(o.get_type() == sajson::TYPE_OBJECT);
+  // TODO(syoyo): Implement
+  assert(0);
+  return json_const_iterator(o);
 #else
   return o.end();
 #endif
 }
-#endif
 
-#if !defined(TINYGLTF_USE_SAJSON)
 const char *GetKey(json_const_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->name.GetString();
+#elif defined(TINYGLTF_USE_SAJSON)
+  // TODO(syoyo): Implement
+  assert(0);
+  return nullptr;
 #else
   return it.key().c_str();
 #endif
@@ -3096,6 +3168,10 @@ bool FindMember(const json &o, const char *member, json_const_iterator &it) {
   }
   it = o.FindMember(member);
   return it != o.MemberEnd();
+#elif defined(TINYGLTF_USE_SAJSON)
+  // TODO(syoyo): Implement
+  assert(0);
+  return false;
 #else
   it = o.find(member);
   return it != o.end();
@@ -3105,11 +3181,14 @@ bool FindMember(const json &o, const char *member, json_const_iterator &it) {
 const json &GetValue(json_const_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->value;
+#elif defined(TINYGLTF_USE_SAJSON)
+  // TODO(syoyo): Implement
+  assert(0);
+  return it.value();
 #else
   return it.value();
 #endif
 }
-#endif
 
 std::string JsonToString(const json &o, int spacing = -1) {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -3184,7 +3263,10 @@ static bool ParseJsonAsValue(Value *ret, const json &o) {
       break;
       // all types are covered, so no `case default`
   }
-#else
+#elif defined(TINYGLTF_USE_SAJSON)
+  // TODO
+  assert(0);
+#else // json.hpp
   switch (o.type()) {
     case json::value_t::object: {
       Value::Object value_object;
@@ -3266,6 +3348,11 @@ static bool ParseBooleanProperty(bool *ret, std::string *err, const json &o,
   isBoolean = value.IsBool();
   if (isBoolean) {
     boolValue = value.GetBool();
+  }
+#elif defined(TINYGLTF_USE_SAJSON)
+  isBoolean = value.is_boolean();
+  if (isBoolean) {
+    boolValue = value.get_boolean_value();
   }
 #else
   isBoolean = value.is_boolean();
@@ -3355,6 +3442,11 @@ static bool ParseUnsignedProperty(size_t *ret, std::string *err, const json &o,
   } else if (value.IsUint64()) {
     uValue = value.GetUint64();
     isUValue = true;
+  }
+#elif defined(TINYGLTF_USE_SAJSON)
+  isUValue = value.get_type() == sajson::TYPE_INTEGER;
+  if (isUValue) {
+    uValue = value.get_integer_value();
   }
 #else
   isUValue = value.is_number_unsigned();
@@ -6134,10 +6226,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   // 19. Parse Extras
   ParseExtrasProperty(&model->extras, v);
 
+#if !defined(TINYGLTF_USE_SAJSON)
+  // TODO(syoyo): Support SAJSON backend
   if (store_original_json_for_extras_and_extensions_) {
     model->extras_json_string = JsonToString(v["extras"]);
     model->extensions_json_string = JsonToString(v["extensions"]);
   }
+#endif
 
   return true;
 }
