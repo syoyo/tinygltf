@@ -1253,7 +1253,8 @@ struct FsCallbacks {
 bool FileExists(const std::string &abs_filename, void *);
 
 ///
-/// Expand file path(e.g. `~` to home directory on posix, `%APPDATA%` to `C:\Users\tinygltf\AppData`)
+/// Expand file path(e.g. `~` to home directory on posix, `%APPDATA%` to
+/// `C:\Users\tinygltf\AppData`)
 ///
 /// @param[in] filepath File path string. Assume UTF-8
 /// @param[in] userdata User data. Set to `nullptr` if you don't need it.
@@ -2495,7 +2496,7 @@ static inline std::wstring UTF8ToWchar(const std::string &str) {
 
 static inline std::string WcharToUTF8(const std::wstring &wstr) {
   int str_size = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(),
-                                      nullptr, 0, NULL, NULL);
+                                     nullptr, 0, NULL, NULL);
   std::string str(str_size, 0);
   WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), &str[0],
                       (int)str.size(), NULL, NULL);
@@ -2638,7 +2639,8 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
   std::istream f(&wfile_buf);
 #elif defined(_MSC_VER) || defined(_LIBCPP_VERSION)
-  // For libcxx, assume _LIBCPP_HAS_OPEN_WITH_WCHAR is defined to accept `wchar_t *`
+  // For libcxx, assume _LIBCPP_HAS_OPEN_WITH_WCHAR is defined to accept
+  // `wchar_t *`
   std::ifstream f(UTF8ToWchar(filepath).c_str(), std::ifstream::binary);
 #else
   // Unknown compiler/runtime
@@ -3000,7 +3002,9 @@ json_const_iterator ObjectEnd(const json &o) {
 #endif
 }
 
-const char *GetKey(json_const_iterator &it) {
+// Making this a const char* results in a pointer to a temporary when
+// TINYGLTF_USE_RAPIDJSON is off.
+std::string GetKey(json_const_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->name.GetString();
 #else
@@ -7343,8 +7347,9 @@ static void SerializeGltfModel(Model *model, json &o) {
 
     // Also add "KHR_lights_punctual" to `extensionsUsed`
     {
-      auto has_khr_lights_punctual = std::find_if(
-          extensionsUsed.begin(), extensionsUsed.end(), [](const std::string &s) {
+      auto has_khr_lights_punctual =
+          std::find_if(extensionsUsed.begin(), extensionsUsed.end(),
+                       [](const std::string &s) {
                          return (s.compare("KHR_lights_punctual") == 0);
                        });
 
