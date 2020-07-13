@@ -5709,10 +5709,12 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
       for (auto &target : primitive.targets) {
         for (auto &attribute : target) {
-          model
-              ->bufferViews[size_t(
-                  model->accessors[size_t(attribute.second)].bufferView)]
-              .target = TINYGLTF_TARGET_ARRAY_BUFFER;
+          auto bufferView =
+              model->accessors[size_t(attribute.second)].bufferView;
+          if (bufferView > 0) {
+            model->bufferViews[size_t(bufferView)].target =
+                TINYGLTF_TARGET_ARRAY_BUFFER;
+          }
         }
       }
     }
