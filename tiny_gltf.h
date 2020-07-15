@@ -5711,7 +5711,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         for (auto &attribute : target) {
           auto bufferView =
               model->accessors[size_t(attribute.second)].bufferView;
-          if (bufferView > 0) {
+          // bufferView could be null(-1) for sparse morph target
+          if (bufferView >= 0) {
             model->bufferViews[size_t(bufferView)].target =
                 TINYGLTF_TARGET_ARRAY_BUFFER;
           }
