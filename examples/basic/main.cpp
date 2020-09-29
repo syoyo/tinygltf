@@ -329,7 +329,7 @@ static void error_callback(int error, const char *description) {
 }
 
 int main(int argc, char **argv) {
-  std::string filename = "../../models/Cube/Cube.gltf";
+  std::string filename = "../../../models/Cube/Cube.gltf";
 
   if (argc > 1) {
     filename = argv[1];
@@ -341,9 +341,12 @@ int main(int argc, char **argv) {
 
   // Force create OpenGL 3.3
   // NOTE(syoyo): Linux + NVIDIA driver segfaults for some reason? commenting out glfwWindowHint will work.
+  // Note (PE): On laptops with intel hd graphics card you can overcome the segfault by enabling experimental, see below (tested on lenovo thinkpad)
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glewExperimental = GL_TRUE;
+
 #ifdef __APPLE__
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
