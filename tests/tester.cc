@@ -3,6 +3,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
+// Nlohmann json(include ../json.hpp)
+#include "json.hpp"
+
 #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
 
@@ -410,6 +413,28 @@ TEST_CASE("image-uri-spaces", "[issue-236]") {
   }
 
   REQUIRE(true == ret);
+}
+
+TEST_CASE("serialize-empty-material", "[issue-294]") {
+
+  tinygltf::Model m;
+
+  tinygltf::Material mat;
+  mat.pbrMetallicRoughness.baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f}; // default baseColorFactor
+  m.materials.push_back(mat);
+
+  std::stringstream os;
+
+  tinygltf::TinyGLTF ctx;
+  ctx.WriteGltfSceneToStream(&m, os, false, false);
+
+  // use nlohmann json
+  nlohmann::json j = nlohmann::json::parse(os.str());
+
+  REQUIRE(1 == j["materials"].size());
+  REQUIRE(j["asset"].is_null());
+  REQUIRE(j["materials"][0].is_object());
+
 }
 
 #ifndef TINYGLTF_NO_FS

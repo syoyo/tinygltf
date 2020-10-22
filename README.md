@@ -3,7 +3,7 @@
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 `TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
-If you are looking for old, C++03 version, please use `devel-picojson` branch.
+If you are looking for old, C++03 version, please use `devel-picojson` branch(but not maintained anymore).
 
 ## Status
 
@@ -12,6 +12,10 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch.
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
  - v2.1.0 release(Draco support)
  - v2.0.0 release(22 Aug, 2018)!
+
+### Branches
+
+* `sajson` : Use sajson to parse JSON. Parsing only but faster compile time(2x reduction compared to json.hpp and RapidJson)
 
 ## Builds
 
