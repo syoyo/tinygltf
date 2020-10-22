@@ -3,6 +3,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
+// Nlohmann json(include ../json.hpp)
+#include "json.hpp"
+
 #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
 
@@ -425,8 +428,8 @@ TEST_CASE("serialize-empty-material", "[issue-294]") {
   tinygltf::TinyGLTF ctx;
   ctx.WriteGltfSceneToStream(&m, os, false, false);
 
-  // use nlohmann json(included inside of tiny_gltf.h)
-  json j = json::parse(os.str());
+  // use nlohmann json
+  nlohmann::json j = nlohmann::json::parse(os.str());
 
   REQUIRE(1 == j["materials"].size());
   REQUIRE(j["asset"].is_null());
