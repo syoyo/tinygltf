@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.4.3 Fix null object output when when material has all default parameters.
 //  - v2.4.2 Decode percent-encoded URI.
 //  - v2.4.1 Fix some glTF object class does not have `extensions` and/or
 //  `extras` property.
@@ -7225,6 +7226,15 @@ static void SerializeGltfModel(Model *model, json &o) {
     for (unsigned int i = 0; i < model->materials.size(); ++i) {
       json material;
       SerializeGltfMaterial(model->materials[i], material);
+
+      if (JsonIsNull(material)) {
+        // Issue 294.
+        // `material` does not have any required parameters
+        // so the result may be null(unmodified) when all material parameters have default value.
+        //
+        // null is not allowed thus we create an empty JSON object.
+        JsonSetObject(material);
+      }
       JsonPushBack(materials, std::move(material));
     }
     JsonAddMember(o, "materials", std::move(materials));
