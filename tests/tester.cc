@@ -412,6 +412,28 @@ TEST_CASE("image-uri-spaces", "[issue-236]") {
   REQUIRE(true == ret);
 }
 
+TEST_CASE("serialize-empty-material", "[issue-294]") {
+
+  tinygltf::Model m;
+
+  tinygltf::Material mat;
+  mat.pbrMetallicRoughness.baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f}; // default baseColorFactor
+  m.materials.push_back(mat);
+
+  std::stringstream os;
+
+  tinygltf::TinyGLTF ctx;
+  ctx.WriteGltfSceneToStream(&m, os, false, false);
+
+  // use nlohmann json(included inside of tiny_gltf.h)
+  json j = json::parse(os.str());
+
+  REQUIRE(1 == j["materials"].size());
+  REQUIRE(j["asset"].is_null());
+  REQUIRE(j["materials"][0].is_object());
+
+}
+
 #ifndef TINYGLTF_NO_FS
 TEST_CASE("expandpath-utf-8", "[pr-226]") {
 
