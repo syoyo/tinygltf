@@ -2313,7 +2313,12 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
 
   // force 32-bit textures for common Vulkan compatibility. It appears that
   // some GPU drivers do not support 24-bit images for Vulkan
+  #ifdef TINYGLTF_PRESERVE_IMAGE_CHANNELS
+  req_comp = 0;
+  #else
   req_comp = 4;
+  #endif
+
   int bits = 8;
   int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
 
@@ -2384,6 +2389,10 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
       return false;
     }
   }
+
+  #ifdef TINYGLTF_PRESERVE_IMAGE_CHANNELS
+  req_comp = comp;
+  #endif
 
   image->width = w;
   image->height = h;
