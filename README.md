@@ -155,6 +155,10 @@ if (!ret) {
 }
 ```
 
+#### Loader options
+
+* `TinyGLTF::SetPreserveimageChannels(bool onoff)`. `true` to preserve image channels as stored in image file for loaded image. `false` by default for backward compatibility(image channels are widen to `RGBA` 4 channels). Effective only when using builtin image loader(STB image loader).
+
 ## Compile options
 
 * `TINYGLTF_NOEXCEPTION` : Disable C++ exception in JSON parsing. You can use `-fno-exceptions` or by defining the symbol `JSON_NOEXCEPTION` and `TINYGLTF_NOEXCEPTION`  to fully remove C++ exception codes when compiling TinyGLTF.
