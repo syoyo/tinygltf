@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
 //  - v2.4.3 Fix null object output when when material has all default parameters.
 //  - v2.4.2 Decode percent-encoded URI.
 //  - v2.4.1 Fix some glTF object class does not have `extensions` and/or
@@ -1190,7 +1191,7 @@ enum SectionCheck {
 ///
 typedef bool (*LoadImageDataFunction)(Image *, const int, std::string *,
                                       std::string *, int, int,
-                                      const unsigned char *, int, void *);
+                                      const unsigned char *, int, void *user_pointer);
 
 ///
 /// WriteImageDataFunction type. Signature for custom image writing callbacks.
@@ -1347,6 +1348,11 @@ class TinyGLTF {
   void SetImageLoader(LoadImageDataFunction LoadImageData, void *user_data);
 
   ///
+  /// Unset(remove) callback of loading image data
+  ///
+  void RemoveImageLoader();
+
+  ///
   /// Set callback to use for writing image data
   ///
   void SetImageWriter(WriteImageDataFunction WriteImageData, void *user_data);
@@ -1384,6 +1390,18 @@ class TinyGLTF {
     return store_original_json_for_extras_and_extensions_;
   }
 
+  ///
+  /// Specify whether preserve image channales when loading images or not.
+  /// (Not effective when the user suppy their own LoadImageData callbacks)
+  ///
+  void SetPreserveImageChannels(bool onoff) {
+    preserve_image_channels_ = onoff;
+  }
+
+  bool GetPreserveImageChannels() const {
+    return preserve_image_channels_;
+  }
+
  private:
   ///
   /// Loads glTF asset from string(memory).
@@ -1402,6 +1420,8 @@ class TinyGLTF {
   bool serialize_default_values_ = false;  ///< Serialize default values?
 
   bool store_original_json_for_extras_and_extensions_ = false;
+
+  bool preserve_image_channels_ = false; /// Default false(expand channels to RGBA) for backward compatibility.
 
   FsCallbacks fs = {
 #ifndef TINYGLTF_NO_FS
@@ -1422,7 +1442,8 @@ class TinyGLTF {
 #else
       nullptr;
 #endif
-  void *load_image_user_data_ = reinterpret_cast<void *>(&fs);
+  void *load_image_user_data_{nullptr};
+  bool user_image_loader_{false};
 
   WriteImageDataFunction WriteImageData =
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
@@ -1430,7 +1451,7 @@ class TinyGLTF {
 #else
       nullptr;
 #endif
-  void *write_image_user_data_ = reinterpret_cast<void *>(&fs);
+  void *write_image_user_data_{nullptr};
 };
 
 #ifdef __clang__
@@ -1683,6 +1704,19 @@ void JsonParse(JsonDocument &doc, const char *str, size_t length,
 #endif
 
 namespace tinygltf {
+
+///
+/// Internal LoadImageDataOption struct.
+/// This struct is passed through `user_pointer` in LoadImageData.
+/// The struct is not passed when the user supply their own LoadImageData callbacks.
+///
+struct LoadImageDataOption
+{
+  // true: preserve image channels(e.g. load as RGB image if the image has RGB channels)
+  // default `false`(channels are expanded to RGBA for backward compatiblity).
+  bool preserve_channels{false};
+
+};
 
 // Equals function for Value, for recursivity
 static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
@@ -2298,22 +2332,40 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
 void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
   LoadImageData = func;
   load_image_user_data_ = user_data;
+  user_image_loader_ = true;
+}
+
+void TinyGLTF::RemoveImageLoader() {
+  LoadImageData =
+#ifndef TINYGLTF_NO_STB_IMAGE
+      &tinygltf::LoadImageData;
+#else
+      nullptr;
+#endif
+
+  load_image_user_data_ = nullptr;
+  user_image_loader_ = false;
 }
 
 #ifndef TINYGLTF_NO_STB_IMAGE
 bool LoadImageData(Image *image, const int image_idx, std::string *err,
                    std::string *warn, int req_width, int req_height,
                    const unsigned char *bytes, int size, void *user_data) {
-  (void)user_data;
   (void)warn;
+
+  LoadImageDataOption option;
+  if (user_data) {
+    option = *reinterpret_cast<LoadImageDataOption *>(user_data);
+  }
 
   int w = 0, h = 0, comp = 0, req_comp = 0;
 
   unsigned char *data = nullptr;
 
-  // force 32-bit textures for common Vulkan compatibility. It appears that
+  // preserve_channels true: Use channels stored in the image file.
+  // false: force 32-bit textures for common Vulkan compatibility. It appears that
   // some GPU drivers do not support 24-bit images for Vulkan
-  req_comp = 4;
+  req_comp = option.preserve_channels ? 0 : 4;
   int bits = 8;
   int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
 
@@ -2385,13 +2437,18 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
     }
   }
 
+  if (req_comp != 0) {
+    // loaded data has `req_comp` channels(components)
+    comp = req_comp;
+  }
+
   image->width = w;
   image->height = h;
-  image->component = req_comp;
+  image->component = comp;
   image->bits = bits;
   image->pixel_type = pixel_type;
-  image->image.resize(static_cast<size_t>(w * h * req_comp) * size_t(bits / 8));
-  std::copy(data, data + w * h * req_comp * (bits / 8), image->image.begin());
+  image->image.resize(static_cast<size_t>(w * h * comp) * size_t(bits / 8));
+  std::copy(data, data + w * h * comp * (bits / 8), image->image.begin());
   stbi_image_free(data);
 
   return true;
@@ -5826,6 +5883,18 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   // 11. Parse Image
+  void *load_image_user_data{nullptr};
+
+  LoadImageDataOption load_image_option;
+
+  if (user_image_loader_) {
+    // Use user supplied pointer
+    load_image_user_data = load_image_user_data_;
+  } else {
+    load_image_option.preserve_channels = preserve_image_channels_;
+    load_image_user_data = reinterpret_cast<void *>(&load_image_option);
+  }
+
   {
     int idx = 0;
     bool success = ForEachInArray(v, "images", [&](const json &o) {
@@ -5838,7 +5907,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       Image image;
       if (!ParseImage(&image, idx, err, warn, o,
                       store_original_json_for_extras_and_extensions_, base_dir,
-                      &fs, &this->LoadImageData, load_image_user_data_)) {
+                      &fs, &this->LoadImageData, load_image_user_data)) {
         return false;
       }
 
@@ -5876,7 +5945,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         bool ret = LoadImageData(
             &image, idx, err, warn, image.width, image.height,
             &buffer.data[bufferView.byteOffset],
-            static_cast<int>(bufferView.byteLength), load_image_user_data_);
+            static_cast<int>(bufferView.byteLength), load_image_user_data);
         if (!ret) {
           return false;
         }
