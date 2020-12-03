@@ -613,7 +613,7 @@ struct Sampler {
   int wrapT =
       TINYGLTF_TEXTURE_WRAP_REPEAT;  // ["CLAMP_TO_EDGE", "MIRRORED_REPEAT",
                                      // "REPEAT"], default "REPEAT"
-  int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;  // TinyGLTF extension
+  //int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;  // TinyGLTF extension. currently not used.
 
   Value extras;
   ExtensionMap extensions;
@@ -626,8 +626,7 @@ struct Sampler {
       : minFilter(-1),
         magFilter(-1),
         wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
-        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT),
-        wrapR(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
+        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
   DEFAULT_METHODS(Sampler)
   bool operator==(const Sampler &) const;
 };
@@ -1256,7 +1255,7 @@ bool FileExists(const std::string &abs_filename, void *);
 
 ///
 /// Expand file path(e.g. `~` to home directory on posix, `%APPDATA%` to
-/// `C:\Users\tinygltf\AppData`)
+/// `C:\\Users\\tinygltf\\AppData`)
 ///
 /// @param[in] filepath File path string. Assume UTF-8
 /// @param[in] userdata User data. Set to `nullptr` if you don't need it.
@@ -1930,8 +1929,9 @@ bool Sampler::operator==(const Sampler &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
          this->magFilter == other.magFilter &&
          this->minFilter == other.minFilter && this->name == other.name &&
-         this->wrapR == other.wrapR && this->wrapS == other.wrapS &&
          this->wrapT == other.wrapT;
+
+         //this->wrapR == other.wrapR && this->wrapS == other.wrapS &&
 }
 bool Scene::operator==(const Scene &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
@@ -5086,12 +5086,12 @@ static bool ParseSampler(Sampler *sampler, std::string *err, const json &o,
   int magFilter = -1;
   int wrapS = TINYGLTF_TEXTURE_WRAP_REPEAT;
   int wrapT = TINYGLTF_TEXTURE_WRAP_REPEAT;
-  int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;
+  //int wrapR = TINYGLTF_TEXTURE_WRAP_REPEAT;
   ParseIntegerProperty(&minFilter, err, o, "minFilter", false);
   ParseIntegerProperty(&magFilter, err, o, "magFilter", false);
   ParseIntegerProperty(&wrapS, err, o, "wrapS", false);
   ParseIntegerProperty(&wrapT, err, o, "wrapT", false);
-  ParseIntegerProperty(&wrapR, err, o, "wrapR", false);  // tinygltf extension
+  //ParseIntegerProperty(&wrapR, err, o, "wrapR", false);  // tinygltf extension
 
   // TODO(syoyo): Check the value is alloed one.
   // (e.g. we allow 9728(NEAREST), but don't allow 9727)
@@ -5100,7 +5100,7 @@ static bool ParseSampler(Sampler *sampler, std::string *err, const json &o,
   sampler->magFilter = magFilter;
   sampler->wrapS = wrapS;
   sampler->wrapT = wrapT;
-  sampler->wrapR = wrapR;
+  //sampler->wrapR = wrapR;
 
   ParseExtensionsProperty(&(sampler->extensions), err, o);
   ParseExtrasProperty(&(sampler->extras), o);
@@ -7133,7 +7133,7 @@ static void SerializeGltfSampler(Sampler &sampler, json &o) {
   if (sampler.minFilter != -1) {
     SerializeNumberProperty("minFilter", sampler.minFilter, o);
   }
-  SerializeNumberProperty("wrapR", sampler.wrapR, o);
+  //SerializeNumberProperty("wrapR", sampler.wrapR, o);
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
 

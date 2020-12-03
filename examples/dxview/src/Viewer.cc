@@ -610,7 +610,7 @@ void Viewer::buildSamplerDescs() {
 
     samplerDesc.AddressU = toTextureAddressMode(glTFSampler.wrapS);
     samplerDesc.AddressV = toTextureAddressMode(glTFSampler.wrapT);
-    samplerDesc.AddressW = toTextureAddressMode(glTFSampler.wrapR);
+    samplerDesc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
     samplerDesc.MaxLOD = 256;
 
     samplerDescs_.push_back(samplerDesc);
