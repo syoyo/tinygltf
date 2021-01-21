@@ -27,7 +27,8 @@
 
 // Version:
 //  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
-//  - v2.4.3 Fix null object output when when material has all default parameters.
+//  - v2.4.3 Fix null object output when when material has all default
+//  parameters.
 //  - v2.4.2 Decode percent-encoded URI.
 //  - v2.4.1 Fix some glTF object class does not have `extensions` and/or
 //  `extras` property.
@@ -849,8 +850,10 @@ struct Accessor {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  std::vector<double> minValues;  // optional
-  std::vector<double> maxValues;  // optional
+  std::vector<double>
+      minValues;  // optional. integer value is promoted to double
+  std::vector<double>
+      maxValues;  // optional. integer value is promoted to double
 
   struct {
     int count;
@@ -1190,7 +1193,8 @@ enum SectionCheck {
 ///
 typedef bool (*LoadImageDataFunction)(Image *, const int, std::string *,
                                       std::string *, int, int,
-                                      const unsigned char *, int, void *user_pointer);
+                                      const unsigned char *, int,
+                                      void *user_pointer);
 
 ///
 /// WriteImageDataFunction type. Signature for custom image writing callbacks.
@@ -1397,9 +1401,7 @@ class TinyGLTF {
     preserve_image_channels_ = onoff;
   }
 
-  bool GetPreserveImageChannels() const {
-    return preserve_image_channels_;
-  }
+  bool GetPreserveImageChannels() const { return preserve_image_channels_; }
 
  private:
   ///
@@ -1420,7 +1422,8 @@ class TinyGLTF {
 
   bool store_original_json_for_extras_and_extensions_ = false;
 
-  bool preserve_image_channels_ = false; /// Default false(expand channels to RGBA) for backward compatibility.
+  bool preserve_image_channels_ = false;  /// Default false(expand channels to
+                                          /// RGBA) for backward compatibility.
 
   FsCallbacks fs = {
 #ifndef TINYGLTF_NO_FS
@@ -1707,14 +1710,14 @@ namespace tinygltf {
 ///
 /// Internal LoadImageDataOption struct.
 /// This struct is passed through `user_pointer` in LoadImageData.
-/// The struct is not passed when the user supply their own LoadImageData callbacks.
+/// The struct is not passed when the user supply their own LoadImageData
+/// callbacks.
 ///
-struct LoadImageDataOption
-{
-  // true: preserve image channels(e.g. load as RGB image if the image has RGB channels)
-  // default `false`(channels are expanded to RGBA for backward compatiblity).
+struct LoadImageDataOption {
+  // true: preserve image channels(e.g. load as RGB image if the image has RGB
+  // channels) default `false`(channels are expanded to RGBA for backward
+  // compatiblity).
   bool preserve_channels{false};
-
 };
 
 // Equals function for Value, for recursivity
@@ -2363,8 +2366,8 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
   unsigned char *data = nullptr;
 
   // preserve_channels true: Use channels stored in the image file.
-  // false: force 32-bit textures for common Vulkan compatibility. It appears that
-  // some GPU drivers do not support 24-bit images for Vulkan
+  // false: force 32-bit textures for common Vulkan compatibility. It appears
+  // that some GPU drivers do not support 24-bit images for Vulkan
   req_comp = option.preserve_channels ? 0 : 4;
   int bits = 8;
   int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
@@ -6621,8 +6624,33 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
 
   SerializeNumberProperty<int>("componentType", accessor.componentType, o);
   SerializeNumberProperty<size_t>("count", accessor.count, o);
-  SerializeNumberArrayProperty<double>("min", accessor.minValues, o);
-  SerializeNumberArrayProperty<double>("max", accessor.maxValues, o);
+
+  if ((accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT) ||
+      (accessor.componentType == TINYGLTF_COMPONENT_TYPE_DOUBLE)) {
+    SerializeNumberArrayProperty<double>("min", accessor.minValues, o);
+    SerializeNumberArrayProperty<double>("max", accessor.maxValues, o);
+  } else {
+    // Issue #301. Serialize as integer.
+    // Assume int value is within [-2**31-1, 2**31-1]
+    {
+      std::vector<int> values;
+      std::transform(accessor.minValues.begin(), accessor.minValues.end(),
+                     std::back_inserter(values),
+                     [](double v) { return static_cast<int>(v); });
+
+      SerializeNumberArrayProperty<int>("min", values, o);
+    }
+
+    {
+      std::vector<int> values;
+      std::transform(accessor.maxValues.begin(), accessor.maxValues.end(),
+                     std::back_inserter(values),
+                     [](double v) { return static_cast<int>(v); });
+
+      SerializeNumberArrayProperty<int>("max", values, o);
+    }
+  }
+
   if (accessor.normalized)
     SerializeValue("normalized", Value(accessor.normalized), o);
   std::string type;
@@ -7299,7 +7327,8 @@ static void SerializeGltfModel(Model *model, json &o) {
       if (JsonIsNull(material)) {
         // Issue 294.
         // `material` does not have any required parameters
-        // so the result may be null(unmodified) when all material parameters have default value.
+        // so the result may be null(unmodified) when all material parameters
+        // have default value.
         //
         // null is not allowed thus we create an empty JSON object.
         JsonSetObject(material);
