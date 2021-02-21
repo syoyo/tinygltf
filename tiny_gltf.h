@@ -298,7 +298,7 @@ class Value {
 
   DEFAULT_METHODS(Value)
 
-  char Type() const { return static_cast<const char>(type_); }
+  char Type() const { return static_cast<char>(type_); }
 
   bool IsBool() const { return (type_ == BOOL_TYPE); }
 
