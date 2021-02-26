@@ -77,6 +77,7 @@ In extension(`ExtensionMap`), JSON number value is parsed as int or float(number
 * [glview](examples/glview) : Simple glTF geometry viewer.
 * [validator](examples/validator) : Simple glTF validator with JSON schema.
 * [basic](examples/basic) : Basic glTF viewer with texturing support.
+* [build-gltf](examples/build-gltf) : Build simple glTF scene from a scratch.
 
 ## Projects using TinyGLTF
 

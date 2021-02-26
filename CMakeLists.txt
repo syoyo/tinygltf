@@ -6,7 +6,8 @@ SET(CMAKE_CXX_STANDARD 11)
 
 option(TINYGLTF_BUILD_LOADER_EXAMPLE "Build loader_example" ON)
 option(TINYGLTF_BUILD_GL_EXAMPLES "Build GL exampels(requires glfw, OpenGL, etc)" OFF)
-option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE "Build validator exampe" OFF)
+option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE "Build validator example" OFF)
+option(TINYGLTF_BUILD_BUILDER_EXAMPLE "Build glTF builder example" OFF)
 
 if (TINYGLTF_BUILD_LOADER_EXAMPLE)
   ADD_EXECUTABLE ( loader_example
@@ -22,6 +23,11 @@ endif (TINYGLTF_BUILD_GL_EXAMPLES)
 if (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
   ADD_SUBDIRECTORY ( examples/validator )
 endif (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
+
+if (TINYGLTF_BUILD_BUILDER_EXAMPLE)
+  ADD_SUBDIRECTORY ( examples/build-gltf )
+endif (TINYGLTF_BUILD_BUILDER_EXAMPLE)
+
 #
 # TinuGLTF is a header-only library, so no library build. just install header files.
 #
