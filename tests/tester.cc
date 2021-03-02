@@ -432,7 +432,6 @@ TEST_CASE("serialize-empty-material", "[issue-294]") {
   nlohmann::json j = nlohmann::json::parse(os.str());
 
   REQUIRE(1 == j["materials"].size());
-  REQUIRE(j["asset"].is_null());
   REQUIRE(j["materials"][0].is_object());
 
 }
