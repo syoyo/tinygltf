@@ -4,7 +4,7 @@
 //
 // The MIT License (MIT)
 //
-// Copyright (c) 2015 - 2020 Syoyo Fujita, Aurélien Chatelain and many
+// Copyright (c) 2015 - Present Syoyo Fujita, Aurélien Chatelain and many
 // contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -1071,7 +1071,7 @@ struct Buffer {
 };
 
 struct Asset {
-  std::string version;  // required
+  std::string version = "2.0";  // required
   std::string generator;
   std::string minVersion;
   std::string copyright;
@@ -6760,9 +6760,14 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
     SerializeStringProperty("copyright", asset.copyright, o);
   }
 
-  if (!asset.version.empty()) {
-    SerializeStringProperty("version", asset.version, o);
+  if (asset.version.empty()) {
+    // Just in case
+    // `version` must be defined
+    asset.version = "2.0";
   }
+
+  // TODO(syoyo): Do we need to check if `version` is greater or equal to 2.0?
+  SerializeStringProperty("version", asset.version, o);
 
   if (asset.extras.Keys().size()) {
     SerializeValue("extras", asset.extras, o);
