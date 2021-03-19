@@ -1538,11 +1538,13 @@ class TinyGLTF {
 #ifndef TINYGLTF_USE_RAPIDJSON
 #include "json.hpp"
 #else
+#ifndef TINYGLTF_NO_INCLUDE_RAPIDJSON
 #include "document.h"
 #include "prettywriter.h"
 #include "rapidjson.h"
 #include "stringbuffer.h"
 #include "writer.h"
+#endif
 #endif
 #endif
 
