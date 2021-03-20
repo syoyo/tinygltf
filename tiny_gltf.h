@@ -4472,6 +4472,7 @@ static bool GetAttributeForAllPoints(uint32_t componentType, draco::Mesh *mesh,
 static bool ParseDracoExtension(Primitive *primitive, Model *model,
                                 std::string *err,
                                 const Value &dracoExtensionValue) {
+  (void)err;
   auto bufferViewValue = dracoExtensionValue.Get("bufferView");
   if (!bufferViewValue.IsInt()) return false;
   auto attributesValue = dracoExtensionValue.Get("attributes");
