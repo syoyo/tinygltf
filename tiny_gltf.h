@@ -4533,7 +4533,6 @@ static bool ParseDracoExtension(Primitive *primitive, Model *model,
 
     int dracoAttributeIndex = attribute.second.Get<int>();
     const auto pAttribute = mesh->GetAttributeByUniqueId(dracoAttributeIndex);
-    const auto pBuffer = pAttribute->buffer();
     const auto componentType =
         model->accessors[primitiveAttribute->second].componentType;
 
