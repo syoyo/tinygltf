@@ -7243,11 +7243,17 @@ static void SerializeGltfScene(Scene &scene, json &o) {
 }
 
 static void SerializeGltfSkin(Skin &skin, json &o) {
-  if (skin.inverseBindMatrices != -1)
-    SerializeNumberProperty("inverseBindMatrices", skin.inverseBindMatrices, o);
-
+  // required
   SerializeNumberArrayProperty<int>("joints", skin.joints, o);
-  SerializeNumberProperty("skeleton", skin.skeleton, o);
+
+  if (skin.inverseBindMatrices >= 0) {
+    SerializeNumberProperty("inverseBindMatrices", skin.inverseBindMatrices, o);
+  }
+
+  if (skin.skeleton >= 0) {
+    SerializeNumberProperty("skeleton", skin.skeleton, o);
+  }
+
   if (skin.name.size()) {
     SerializeStringProperty("name", skin.name, o);
   }
