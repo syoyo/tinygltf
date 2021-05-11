@@ -5832,13 +5832,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         {
           json_const_iterator it;
           if (FindMember(o, "extensions", it)) {
-            model->extensions_json_string = JsonToString(GetValue(it));
+            scene.extensions_json_string = JsonToString(GetValue(it));
           }
         }
         {
           json_const_iterator it;
           if (FindMember(o, "extras", it)) {
-            model->extras_json_string = JsonToString(GetValue(it));
+            scene.extras_json_string = JsonToString(GetValue(it));
           }
         }
       }
