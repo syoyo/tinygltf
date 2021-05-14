@@ -604,7 +604,7 @@ struct Sampler {
   // `magFilter`. Set -1 in TinyGLTF(issue #186)
   int minFilter =
       -1;  // optional. -1 = no filter defined. ["NEAREST", "LINEAR",
-           // "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_NEAREST",
+           // "NEAREST_MIPMAP_NEAREST", "LINEAR_MIPMAP_NEAREST",
            // "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_LINEAR"]
   int magFilter =
       -1;  // optional. -1 = no filter defined. ["NEAREST", "LINEAR"]
