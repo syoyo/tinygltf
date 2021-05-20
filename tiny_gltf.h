@@ -191,14 +191,14 @@ AAssetManager *asset_manager = nullptr;
 #endif
 
 typedef enum {
-  NULL_TYPE = 0,
-  REAL_TYPE = 1,
-  INT_TYPE = 2,
-  BOOL_TYPE = 3,
-  STRING_TYPE = 4,
-  ARRAY_TYPE = 5,
-  BINARY_TYPE = 6,
-  OBJECT_TYPE = 7
+  NULL_TYPE,
+  REAL_TYPE,
+  INT_TYPE,
+  BOOL_TYPE,
+  STRING_TYPE,
+  ARRAY_TYPE,
+  BINARY_TYPE,
+  OBJECT_TYPE
 } Type;
 
 static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
