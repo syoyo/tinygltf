@@ -191,14 +191,14 @@ AAssetManager *asset_manager = nullptr;
 #endif
 
 typedef enum {
-  NULL_TYPE = 0,
-  REAL_TYPE = 1,
-  INT_TYPE = 2,
-  BOOL_TYPE = 3,
-  STRING_TYPE = 4,
-  ARRAY_TYPE = 5,
-  BINARY_TYPE = 6,
-  OBJECT_TYPE = 7
+  NULL_TYPE,
+  REAL_TYPE,
+  INT_TYPE,
+  BOOL_TYPE,
+  STRING_TYPE,
+  ARRAY_TYPE,
+  BINARY_TYPE,
+  OBJECT_TYPE
 } Type;
 
 static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
@@ -604,7 +604,7 @@ struct Sampler {
   // `magFilter`. Set -1 in TinyGLTF(issue #186)
   int minFilter =
       -1;  // optional. -1 = no filter defined. ["NEAREST", "LINEAR",
-           // "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_NEAREST",
+           // "NEAREST_MIPMAP_NEAREST", "LINEAR_MIPMAP_NEAREST",
            // "NEAREST_MIPMAP_LINEAR", "LINEAR_MIPMAP_LINEAR"]
   int magFilter =
       -1;  // optional. -1 = no filter defined. ["NEAREST", "LINEAR"]
@@ -5832,13 +5832,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         {
           json_const_iterator it;
           if (FindMember(o, "extensions", it)) {
-            model->extensions_json_string = JsonToString(GetValue(it));
+            scene.extensions_json_string = JsonToString(GetValue(it));
           }
         }
         {
           json_const_iterator it;
           if (FindMember(o, "extras", it)) {
-            model->extras_json_string = JsonToString(GetValue(it));
+            scene.extras_json_string = JsonToString(GetValue(it));
           }
         }
       }
