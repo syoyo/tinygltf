@@ -176,6 +176,20 @@ if (!ret) {
 * `TINYGLTF_USE_RAPIDJSON` : Use RapidJSON as a JSON parser/serializer. RapidJSON files are not included in TinyGLTF repo. Please set an include path to RapidJSON if you enable this featrure.
 * `TINYGLTF_USE_CPP14` : Use C++14 feature(requires C++14 compiler). This may give better performance than C++11.
 
+## CMake options
+
+You can add tinygltf using `add_subdirectory` feature.
+If you add tinygltf to your project using `add_subdirectory`, it would be better to set `TINYGLTF_HEADER_ONLY` on(just add an include path to tinygltf) and `TINYGLTF_INSTALL` off(Which does not install tinygltf files).
+
+```
+// Your project's CMakeLists.txt
+...
+
+set(TINYGLTF_HEADER_ONLY ON CACHE INTERNAL "" FORCE)
+set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
+add_subdirectory(/path/to/tinygltf)
+```
+
 
 ### Saving gltTF 2.0 model
 
