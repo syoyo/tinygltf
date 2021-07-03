@@ -432,8 +432,37 @@ TEST_CASE("serialize-empty-material", "[issue-294]") {
   nlohmann::json j = nlohmann::json::parse(os.str());
 
   REQUIRE(1 == j["materials"].size());
-  REQUIRE(j["asset"].is_null());
   REQUIRE(j["materials"][0].is_object());
+
+}
+
+TEST_CASE("empty-skeleton-id", "[issue-321]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/regression/unassigned-skeleton.gltf");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+  REQUIRE(true == ret);
+
+  REQUIRE(model.skins.size() == 1);
+  REQUIRE(model.skins[0].skeleton == -1); // unassigned
+
+  std::stringstream os;
+
+  ctx.WriteGltfSceneToStream(&model, os, false, false);
+
+  // use nlohmann json
+  nlohmann::json j = nlohmann::json::parse(os.str());
+
+  // Ensure `skeleton` property is not written to .gltf(was serialized as -1)
+  REQUIRE(1 == j["skins"].size());
+  REQUIRE(j["skins"][0].is_object());
+  REQUIRE(j["skins"][0].count("skeleton") == 0);
 
 }
 
