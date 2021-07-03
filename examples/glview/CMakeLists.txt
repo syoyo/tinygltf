@@ -29,7 +29,7 @@ if (DEFINED DRACO_DIR)
     # TODO(syoyo): better CMake script for draco
     add_definitions(-DTINYGLTF_ENABLE_DRACO)
     include_directories(${DRACO_DIR}/include)
-  
+
     link_directories(${DRACO_DIR}/lib)
     set(DRACO_LIBRARY draco)
   endif ()
@@ -49,9 +49,9 @@ add_executable(glview
   )
 
 target_link_libraries ( glview
-  ${DRACO_LIBRARY} 
+  ${DRACO_LIBRARY}
   ${GLFW3_UNIX_LINK_LIBRARIES}
-  ${GLEW_LIBRARY}
+  ${GLEW_LIBRARIES}
   ${GLFW3_glfw_LIBRARY}
   ${OPENGL_gl_LIBRARY}
   ${OPENGL_glu_LIBRARY}

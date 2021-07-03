@@ -7,6 +7,7 @@ SET(CMAKE_CXX_STANDARD 11)
 option(TINYGLTF_BUILD_LOADER_EXAMPLE "Build loader_example(load glTF and dump infos)" ON)
 option(TINYGLTF_BUILD_GL_EXAMPLES "Build GL exampels(requires glfw, OpenGL, etc)" OFF)
 option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE "Build validator exampe" OFF)
+option(TINYGLTF_BUILD_BUILDER_EXAMPLE "Build glTF builder example" OFF)
 option(TINYGLTF_HEADER_ONLY "On: header-only mode. Off: create tinygltf library(No TINYGLTF_IMPLEMENTATION required in your project)" OFF)
 option(TINYGLTF_INSTALL "Install tinygltf files during install step. Usually set to OFF if you include tinygltf through add_subdirectory()" ON)
 
@@ -25,12 +26,16 @@ if (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
   ADD_SUBDIRECTORY ( examples/validator )
 endif (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
 
+if (TINYGLTF_BUILD_BUILDER_EXAMPLE)
+  ADD_SUBDIRECTORY ( examples/build-gltf )
+endif (TINYGLTF_BUILD_BUILDER_EXAMPLE)
+
 #
 # for add_subdirectory and standalone build
 #
 if (TINYGLTF_HEADER_ONLY)
   add_library(tinygltf INTERFACE)
-  
+
   target_include_directories(tinygltf
           INTERFACE
           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -61,7 +66,7 @@ if (TINYGLTF_INSTALL)
     DESTINATION
     include
     )
-  
+
   INSTALL ( FILES
     cmake/TinyGLTFConfig.cmake
     DESTINATION
