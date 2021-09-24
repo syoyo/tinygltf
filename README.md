@@ -7,6 +7,8 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch(bu
 
 ## Status
 
+Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature addition planned.
+
  - v2.4.0 Experimental RapidJSON support. Experimental C++14 support(C++14 may give better performance)
  - v2.3.0 Modified Material representation according to glTF 2.0 schema(and introduced TextureInfo class)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
