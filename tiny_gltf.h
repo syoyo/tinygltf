@@ -2040,9 +2040,12 @@ static std::string GetBaseDir(const std::string &filepath) {
   return "";
 }
 
-// https://stackoverflow.com/questions/8520560/get-a-file-name-from-a-path
 static std::string GetBaseFilename(const std::string &filepath) {
-  return filepath.substr(filepath.find_last_of("/\\") + 1);
+  constexpr char path_separators[2] = { '/', '\\' };
+  auto idx = filepath.find_last_of(path_separators);
+  if (idx != std::string::npos)
+    return filepath.substr(idx + 1);
+  return filepath;
 }
 
 std::string base64_encode(unsigned char const *, unsigned int len);
@@ -7528,24 +7531,17 @@ static void WriteBinaryGltfStream(std::ostream &stream,
   const std::string header = "glTF";
   const int version = 2;
 
-  // https://stackoverflow.com/questions/3407012/c-rounding-up-to-the-nearest-multiple-of-a-number
-  auto roundUp = [](uint32_t numToRound, uint32_t multiple) {
-    if (multiple == 0) return numToRound;
-
-    uint32_t remainder = numToRound % multiple;
-    if (remainder == 0) return numToRound;
-
-    return numToRound + multiple - remainder;
-  };
-
-  const uint32_t padding_size =
-      roundUp(uint32_t(content.size()), 4) - uint32_t(content.size());
+  const uint32_t content_size = uint32_t(content.size());
+  const uint32_t binBuffer_size = uint32_t(binBuffer.size());
+  // determine number of padding bytes required to ensure 4 byte alignment
+  const uint32_t padding_size = content_size % 4 == 0 ? 0 : 4 - content_size % 4;
+  const uint32_t bin_padding_size = binBuffer_size % 4 == 0 ? 0 : 4 - binBuffer_size % 4;
 
   // 12 bytes for header, JSON content length, 8 bytes for JSON chunk info.
-  // Chunk data must be located at 4-byte boundary.
+  // Chunk data must be located at 4-byte boundary, which may require padding
   const uint32_t length =
-      12 + 8 + roundUp(uint32_t(content.size()), 4) +
-      (binBuffer.size() ? (8 + roundUp(uint32_t(binBuffer.size()), 4)) : 0);
+      12 + 8 + content_size + content_padding +
+      (binBuffer_size ? (8 + binBuffer_size + bin_padding_size : 0);
 
   stream.write(header.c_str(), std::streamsize(header.size()));
   stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
@@ -7566,8 +7562,6 @@ static void WriteBinaryGltfStream(std::ostream &stream,
     stream.write(padding.c_str(), std::streamsize(padding.size()));
   }
   if (binBuffer.size() > 0) {
-    const uint32_t bin_padding_size =
-        roundUp(uint32_t(binBuffer.size()), 4) - uint32_t(binBuffer.size());
     // BIN chunk info, then BIN data
     const uint32_t bin_length = uint32_t(binBuffer.size()) + bin_padding_size;
     const uint32_t bin_format = 0x004e4942;
