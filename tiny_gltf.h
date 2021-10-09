@@ -7541,7 +7541,7 @@ static void WriteBinaryGltfStream(std::ostream &stream,
   // Chunk data must be located at 4-byte boundary, which may require padding
   const uint32_t length =
       12 + 8 + content_size + content_padding_size +
-      (binBuffer_size ? (8 + binBuffer_size + bin_padding_size : 0);
+      (binBuffer_size ? (8 + binBuffer_size + bin_padding_size : 0));
 
   stream.write(header.c_str(), std::streamsize(header.size()));
   stream.write(reinterpret_cast<const char *>(&version), sizeof(version));
