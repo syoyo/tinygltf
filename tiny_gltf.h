@@ -275,9 +275,8 @@ class Value {
     real_value_ = i;
   }
   explicit Value(double n) : type_(REAL_TYPE) { real_value_ = n; }
-  explicit Value(const std::string &s) : type_(STRING_TYPE) {
-    string_value_ = s;
-  }
+  explicit Value(const std::string &s)
+      : type_(STRING_TYPE), string_value_(s) {}
   explicit Value(std::string &&s)
       : type_(STRING_TYPE), string_value_(std::move(s)) {}
   explicit Value(const unsigned char *p, size_t n) : type_(BINARY_TYPE) {
@@ -287,13 +286,17 @@ class Value {
   explicit Value(std::vector<unsigned char> &&v) noexcept
       : type_(BINARY_TYPE),
         binary_value_(std::move(v)) {}
-  explicit Value(const Array &a) : type_(ARRAY_TYPE) { array_value_ = a; }
-  explicit Value(Array &&a) noexcept : type_(ARRAY_TYPE),
-                                       array_value_(std::move(a)) {}
+  explicit Value(const Array &a)
+      : type_(ARRAY_TYPE), array_value_(a) {}
+  explicit Value(Array &&a) noexcept
+      : type_(ARRAY_TYPE),
+        array_value_(std::move(a)) {}
 
-  explicit Value(const Object &o) : type_(OBJECT_TYPE) { object_value_ = o; }
-  explicit Value(Object &&o) noexcept : type_(OBJECT_TYPE),
-                                        object_value_(std::move(o)) {}
+  explicit Value(const Object &o)
+      : type_(OBJECT_TYPE), object_value_(o) {}
+  explicit Value(Object &&o) noexcept
+      : type_(OBJECT_TYPE),
+        object_value_(std::move(o)) {}
 
   DEFAULT_METHODS(Value)
 
@@ -966,7 +969,7 @@ struct Camera {
   PerspectiveCamera perspective;
   OrthographicCamera orthographic;
 
-  Camera() {}
+  Camera() = default;
   DEFAULT_METHODS(Camera)
   bool operator==(const Camera &) const;
 
@@ -1288,7 +1291,7 @@ class TinyGLTF {
 #pragma clang diagnostic pop
 #endif
 
-  ~TinyGLTF() {}
+  ~TinyGLTF() = default;
 
   ///
   /// Loads glTF ASCII asset from a file.
@@ -2028,8 +2031,8 @@ static std::string FindFile(const std::vector<std::string> &paths,
 }
 
 static std::string GetFilePathExtension(const std::string &FileName) {
-  if (FileName.find_last_of(".") != std::string::npos)
-    return FileName.substr(FileName.find_last_of(".") + 1);
+  if (FileName.find_last_of('.') != std::string::npos)
+    return FileName.substr(FileName.find_last_of('.') + 1);
   return "";
 }
 
@@ -2811,7 +2814,6 @@ static void UpdateImageObject(Image &image, std::string &baseDir, int index,
 
   // If callback is set, modify image data object
   if (*WriteImageData != nullptr && !filename.empty()) {
-    std::string uri;
     (*WriteImageData)(&baseDir, &filename, &image, embedImages, user_data);
   }
 }
@@ -3795,7 +3797,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     // Just only save some information here. Loading actual image data from
     // bufferView is done after this `ParseImage` function.
     image->bufferView = bufferView;
-    image->mimeType = mime_type;
+    image->mimeType = std::move(mime_type);
     image->width = width;
     image->height = height;
 
@@ -4744,7 +4746,7 @@ static bool ParsePbrMetallicRoughness(
       }
       return false;
     }
-    pbr->baseColorFactor = baseColorFactor;
+    pbr->baseColorFactor = std::move(baseColorFactor);
   }
 
   {
@@ -6232,10 +6234,6 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
     }
     return false;
   }
-
-  // Extract JSON string.
-  std::string jsonString(reinterpret_cast<const char *>(&bytes[20]),
-                         model_length);
 
   is_binary_ = true;
   bin_data_ = bytes + 20 + model_length +
