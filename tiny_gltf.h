@@ -2445,7 +2445,7 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
   image->component = comp;
   image->bits = bits;
   image->pixel_type = pixel_type;
-  image->image.resize(static_cast<size_t>(w * h * comp) * size_t(bits / 8));
+  image->image.resize((static_cast<size_t>(w) * h * comp) * static_cast<size_t>(bits / 8));
   std::copy(data, data + w * h * comp * (bits / 8), image->image.begin());
   stbi_image_free(data);
 
