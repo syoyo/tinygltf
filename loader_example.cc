@@ -524,7 +524,7 @@ static void Dump(const tinygltf::Model &model) {
                 << std::endl;
 
       std::cout << Indent(1) << "channels : [ " << std::endl;
-      for (size_t j = 0; i < animation.channels.size(); i++) {
+      for (size_t j = 0; j < animation.channels.size(); j++) {
         std::cout << Indent(2)
                   << "sampler     : " << animation.channels[j].sampler
                   << std::endl;
