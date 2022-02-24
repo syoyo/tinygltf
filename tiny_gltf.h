@@ -4238,7 +4238,7 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   ParseIntegerProperty(&indices_buffer_view, err, indices_obj, "bufferView",
                        true);
   ParseIntegerProperty(&indices_byte_offset, err, indices_obj, "byteOffset",
-                       true);
+                       false);
   ParseIntegerProperty(&component_type, err, indices_obj, "componentType",
                        true);
 
@@ -4246,7 +4246,7 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   ParseIntegerProperty(&values_buffer_view, err, values_obj, "bufferView",
                        true);
   ParseIntegerProperty(&values_byte_offset, err, values_obj, "byteOffset",
-                       true);
+                       false);
 
   accessor->sparse.count = count;
   accessor->sparse.indices.bufferView = indices_buffer_view;
