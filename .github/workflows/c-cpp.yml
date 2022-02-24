@@ -47,7 +47,8 @@ jobs:
             sudo apt-get install -y mingw-w64
             x86_64-w64-mingw32-g++ -std=c++11 -o loader_example loader_example.cc
 
-  # Windows(x64) + Visual Studio 2019 build
+  # Windows(x64) + Visual Studio 2022 build
+  # Assume windows-latest have VS2022 installed
   build-windows-msvc:
 
     runs-on: windows-latest
@@ -62,7 +63,8 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 16 2019" -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On ..
+          cmake --help
+          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On ..
           cd ..
       - name: Build
         run: cmake --build build --config Release
