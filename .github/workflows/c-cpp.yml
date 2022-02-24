@@ -62,7 +62,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 16 2019" -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On ..
+          cmake -G "Visual Studio 16 2019" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On ..
           cd ..
       - name: Build
         run: cmake --build build --config Release
