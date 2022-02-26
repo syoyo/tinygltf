@@ -2217,7 +2217,7 @@ std::string base64_decode(std::string const &encoded_string) {
 // FOR ANY DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR OTHERWISE,
 // ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 // DEALINGS IN THE SOFTWARE.
-// 
+//
 namespace dlib {
 
 inline unsigned char from_hex(unsigned char ch) {
@@ -4217,7 +4217,9 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   accessor->sparse.isSparse = true;
 
   int count = 0;
-  ParseIntegerProperty(&count, err, o, "count", true);
+  if (!ParseIntegerProperty(&count, err, o, "count", true, "SparseAccessor")) {
+    return false;
+  }
 
   json_const_iterator indices_iterator;
   json_const_iterator values_iterator;
@@ -4235,16 +4237,22 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   const json &values_obj = GetValue(values_iterator);
 
   int indices_buffer_view = 0, indices_byte_offset = 0, component_type = 0;
-  ParseIntegerProperty(&indices_buffer_view, err, indices_obj, "bufferView",
-                       true);
+  if (!ParseIntegerProperty(&indices_buffer_view, err, indices_obj, "bufferView",
+                       true, "SparseAccessor")) {
+    return false;
+  }
   ParseIntegerProperty(&indices_byte_offset, err, indices_obj, "byteOffset",
                        false);
-  ParseIntegerProperty(&component_type, err, indices_obj, "componentType",
-                       true);
+  if (!ParseIntegerProperty(&component_type, err, indices_obj, "componentType",
+                       true, "SparseAccessor")) {
+    return false;
+  }
 
   int values_buffer_view = 0, values_byte_offset = 0;
-  ParseIntegerProperty(&values_buffer_view, err, values_obj, "bufferView",
-                       true);
+  if (!ParseIntegerProperty(&values_buffer_view, err, values_obj, "bufferView",
+                       true, "SparseAccessor")) {
+    return false;
+  }
   ParseIntegerProperty(&values_byte_offset, err, values_obj, "byteOffset",
                        false);
 
@@ -4254,8 +4262,6 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   accessor->sparse.indices.componentType = component_type;
   accessor->sparse.values.bufferView = values_buffer_view;
   accessor->sparse.values.byteOffset = values_byte_offset;
-
-  // todo check theses values
 
   return true;
 }
