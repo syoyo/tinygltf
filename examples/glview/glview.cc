@@ -771,6 +771,30 @@ static void DrawCurves(tinygltf::Scene &scene, const tinygltf::Mesh &mesh) {
 }
 #endif
 
+static void QuatToAngleAxis(const std::vector<double> quaternion,
+			    double &outAngleDegrees,
+			    double *axis) {
+  double qx = quaternion[0];
+  double qy = quaternion[1];
+  double qz = quaternion[2];
+  double qw = quaternion[3];
+  
+  double angleRadians = 2 * acos(qw);
+  if (angleRadians == 0.0) {
+    outAngleDegrees = 0.0;
+    axis[0] = 0.0;
+    axis[1] = 0.0;
+    axis[2] = 1.0;
+    return;
+  }
+
+  double denom = sqrt(1-qw*qw);
+  outAngleDegrees = angleRadians * 180.0 / M_PI;
+  axis[0] = qx / denom;
+  axis[1] = qy / denom;
+  axis[2] = qz / denom;
+}
+
 // Hierarchically draw nodes
 static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
   // Apply xform
@@ -785,15 +809,20 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
       glScaled(node.scale[0], node.scale[1], node.scale[2]);
     }
 
-    if (node.rotation.size() == 4) {
-      glRotated(node.rotation[0], node.rotation[1], node.rotation[2],
-                node.rotation[3]);
-    }
-
     if (node.translation.size() == 3) {
       glTranslated(node.translation[0], node.translation[1],
                    node.translation[2]);
+    }    
+
+    if (node.rotation.size() == 4) {
+      double angleDegrees;
+      double axis[3];
+
+      QuatToAngleAxis(node.rotation, angleDegrees, axis);
+      
+      glRotated(angleDegrees, axis[0], axis[1], axis[2]);
     }
+
   }
 
   // std::cout << "node " << node.name << ", Meshes " << node.meshes.size() <<
