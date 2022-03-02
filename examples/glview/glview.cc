@@ -805,10 +805,6 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
     glMultMatrixd(node.matrix.data());
   } else {
     // Assume Trans x Rotate x Scale order
-    if (node.scale.size() == 3) {
-      glScaled(node.scale[0], node.scale[1], node.scale[2]);
-    }
-
     if (node.translation.size() == 3) {
       glTranslated(node.translation[0], node.translation[1],
                    node.translation[2]);
@@ -823,6 +819,9 @@ static void DrawNode(tinygltf::Model &model, const tinygltf::Node &node) {
       glRotated(angleDegrees, axis[0], axis[1], axis[2]);
     }
 
+    if (node.scale.size() == 3) {
+      glScaled(node.scale[0], node.scale[1], node.scale[2]);
+    }
   }
 
   // std::cout << "node " << node.name << ", Meshes " << node.meshes.size() <<
