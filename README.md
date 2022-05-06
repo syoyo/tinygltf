@@ -3,11 +3,12 @@
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 `TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
+(Also, you can use RadpidJSON as an JSON backend) 
 If you are looking for old, C++03 version, please use `devel-picojson` branch(but not maintained anymore).
 
 ## Status
 
-Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature addition planned.
+Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature additions planned.
 
  - v2.4.0 Experimental RapidJSON support. Experimental C++14 support(C++14 may give better performance)
  - v2.3.0 Modified Material representation according to glTF 2.0 schema(and introduced TextureInfo class)
@@ -94,6 +95,7 @@ In extension(`ExtensionMap`), JSON number value is parsed as int or float(number
 * [Vulkan-Samples](https://github.com/KhronosGroup/Vulkan-Samples) - The Vulkan Samples is collection of resources to help you develop optimized Vulkan applications.
 * [TDME2](https://github.com/andreasdr/tdme2) - TDME2 - ThreeDeeMiniEngine2 is a lightweight 3D engine including tools suited for 3D game development using C++11
 * [SanityEngine](https://github.com/DethRaid/SanityEngine) - A C++/D3D12 renderer focused on the personal and proessional development of its developer
+* [Open3D](http://www.open3d.org/) - A Modern Library for 3D Data Processing 
 * Your projects here! (Please send PR)
 
 ## TODOs
