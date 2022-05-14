@@ -39,8 +39,8 @@ bool loadModel(tinygltf::Model &model, const char *filename) {
   return res;
 }
 
-std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
-                               tinygltf::Model &model, tinygltf::Mesh &mesh) {
+void bindMesh(std::map<int, GLuint>& vbos,
+              tinygltf::Model &model, tinygltf::Mesh &mesh) {
   for (size_t i = 0; i < model.bufferViews.size(); ++i) {
     const tinygltf::BufferView &bufferView = model.bufferViews[i];
     if (bufferView.target == 0) {  // TODO impl drawarrays
@@ -144,12 +144,10 @@ std::map<int, GLuint> bindMesh(std::map<int, GLuint> vbos,
       }
     }
   }
-
-  return vbos;
 }
 
 // bind models
-void bindModelNodes(std::map<int, GLuint> vbos, tinygltf::Model &model,
+void bindModelNodes(std::map<int, GLuint>& vbos, tinygltf::Model &model,
                     tinygltf::Node &node) {
   if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
     bindMesh(vbos, model, model.meshes[node.mesh]);
@@ -160,7 +158,8 @@ void bindModelNodes(std::map<int, GLuint> vbos, tinygltf::Model &model,
     bindModelNodes(vbos, model, model.nodes[node.children[i]]);
   }
 }
-GLuint bindModel(tinygltf::Model &model) {
+
+std::pair<GLuint, std::map<int, GLuint>> bindModel(tinygltf::Model &model) {
   std::map<int, GLuint> vbos;
   GLuint vao;
   glGenVertexArrays(1, &vao);
@@ -173,18 +172,28 @@ GLuint bindModel(tinygltf::Model &model) {
   }
 
   glBindVertexArray(0);
-  // cleanup vbos
-  for (size_t i = 0; i < vbos.size(); ++i) {
-    glDeleteBuffers(1, &vbos[i]);
+  // cleanup vbos but do not delete index buffers yet
+  for (auto it = vbos.cbegin(); it != vbos.cend();) {
+    tinygltf::BufferView bufferView = model.bufferViews[it->first];
+    if (bufferView.target != GL_ELEMENT_ARRAY_BUFFER) {
+      glDeleteBuffers(1, &vbos[it->first]);
+      vbos.erase(it++);
+    }
+    else {
+      ++it;
+    }
   }
 
-  return vao;
+  return {vao, vbos};
 }
 
-void drawMesh(tinygltf::Model &model, tinygltf::Mesh &mesh) {
+void drawMesh(const std::map<int, GLuint>& vbos,
+              tinygltf::Model &model, tinygltf::Mesh &mesh) {
   for (size_t i = 0; i < mesh.primitives.size(); ++i) {
     tinygltf::Primitive primitive = mesh.primitives[i];
     tinygltf::Accessor indexAccessor = model.accessors[primitive.indices];
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos.at(indexAccessor.bufferView));
 
     glDrawElements(primitive.mode, indexAccessor.count,
                    indexAccessor.componentType,
@@ -193,20 +202,22 @@ void drawMesh(tinygltf::Model &model, tinygltf::Mesh &mesh) {
 }
 
 // recursively draw node and children nodes of model
-void drawModelNodes(tinygltf::Model &model, tinygltf::Node &node) {
+void drawModelNodes(const std::pair<GLuint, std::map<int, GLuint>>& vaoAndEbos,
+                    tinygltf::Model &model, tinygltf::Node &node) {
   if ((node.mesh >= 0) && (node.mesh < model.meshes.size())) {
-    drawMesh(model, model.meshes[node.mesh]);
+    drawMesh(vaoAndEbos.second, model, model.meshes[node.mesh]);
   }
   for (size_t i = 0; i < node.children.size(); i++) {
-    drawModelNodes(model, model.nodes[node.children[i]]);
+    drawModelNodes(vaoAndEbos, model, model.nodes[node.children[i]]);
   }
 }
-void drawModel(GLuint vao, tinygltf::Model &model) {
-  glBindVertexArray(vao);
+void drawModel(const std::pair<GLuint, std::map<int, GLuint>>& vaoAndEbos,
+               tinygltf::Model &model) {
+  glBindVertexArray(vaoAndEbos.first);
 
   const tinygltf::Scene &scene = model.scenes[model.defaultScene];
   for (size_t i = 0; i < scene.nodes.size(); ++i) {
-    drawModelNodes(model, model.nodes[scene.nodes[i]]);
+    drawModelNodes(vaoAndEbos, model, model.nodes[scene.nodes[i]]);
   }
 
   glBindVertexArray(0);
@@ -282,7 +293,7 @@ void displayLoop(Window &window, const std::string &filename) {
   tinygltf::Model model;
   if (!loadModel(model, filename.c_str())) return;
 
-  GLuint vao = bindModel(model);
+  std::pair<GLuint, std::map<int, GLuint>> vaoAndEbos = bindModel(model);
   // dbgModel(model); return;
 
   // Model matrix : an identity matrix (model will be at the origin)
@@ -317,10 +328,12 @@ void displayLoop(Window &window, const std::string &filename) {
     glUniform3fv(sun_position_u, 1, &sun_position[0]);
     glUniform3fv(sun_color_u, 1, &sun_color[0]);
 
-    drawModel(vao, model);
+    drawModel(vaoAndEbos, model);
     glfwSwapBuffers(window.window);
     glfwPollEvents();
   }
+
+  glDeleteVertexArrays(1, &vaoAndEbos.first);
 }
 
 static void error_callback(int error, const char *description) {
