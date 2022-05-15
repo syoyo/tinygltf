@@ -1608,7 +1608,7 @@ class TinyGLTF {
 #include <wordexp.h>
 #endif
 
-#if defined(__sparcv9)
+#if defined(__sparcv9) || defined(__powerpc__)
 // Big endian
 #else
 #if (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) || MINIZ_X86_OR_X64_CPU
