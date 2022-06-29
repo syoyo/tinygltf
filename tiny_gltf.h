@@ -7632,7 +7632,7 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
       // UpdateImageObject need baseDir but only uses it if embeddedImages is
       // enabled, since we won't write separate images when writing to a stream
       // we
-      UpdateImageObject(model->images[i], dummystring, int(i), false,
+      UpdateImageObject(model->images[i], dummystring, int(i), true,
                         &this->WriteImageData, this->write_image_user_data_);
       SerializeGltfImage(model->images[i], image);
       JsonPushBack(images, std::move(image));
