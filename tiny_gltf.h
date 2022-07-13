@@ -3092,11 +3092,17 @@ std::string JsonToString(const json &o, int spacing = -1) {
   StringBuffer buffer;
   if (spacing == -1) {
     Writer<StringBuffer> writer(buffer);
-    o.Accept(writer);
+    // TODO: Better error handling.
+    // https://github.com/syoyo/tinygltf/issues/332
+    if (!o.Accept(writer)) {
+      return "tiny_gltf::JsonToString() failed rapidjson conversion";
+    }
   } else {
     PrettyWriter<StringBuffer> writer(buffer);
     writer.SetIndent(' ', uint32_t(spacing));
-    o.Accept(writer);
+    if (!o.Accept(writer)) {
+      return "tiny_gltf::JsonToString() failed rapidjson conversion";
+    }
   }
   return buffer.GetString();
 #else
