@@ -1424,6 +1424,10 @@ class TinyGLTF {
   bool preserve_image_channels_ = false;  /// Default false(expand channels to
                                           /// RGBA) for backward compatibility.
 
+  // Warning & error messages 
+  std::string warn_;
+  std::string err_;
+
   FsCallbacks fs = {
 #ifndef TINYGLTF_NO_FS
       &tinygltf::FileExists, &tinygltf::ExpandFilePath,
@@ -7525,7 +7529,7 @@ static bool WriteGltfFile(const std::string &output,
   return WriteGltfStream(gltfFile, content);
 }
 
-static void WriteBinaryGltfStream(std::ostream &stream,
+static bool WriteBinaryGltfStream(std::ostream &stream,
                                   const std::string &content,
                                   const std::vector<unsigned char> &binBuffer) {
   const std::string header = "glTF";
@@ -7579,9 +7583,12 @@ static void WriteBinaryGltfStream(std::ostream &stream,
                    std::streamsize(padding.size()));
     }
   }
+
+  // TODO: Check error on stream.write
+  return true;
 }
 
-static void WriteBinaryGltfFile(const std::string &output,
+static bool WriteBinaryGltfFile(const std::string &output,
                                 const std::string &content,
                                 const std::vector<unsigned char> &binBuffer) {
 #ifdef _WIN32
@@ -7599,7 +7606,7 @@ static void WriteBinaryGltfFile(const std::string &output,
 #else
   std::ofstream gltfFile(output.c_str(), std::ios::binary);
 #endif
-  WriteBinaryGltfStream(gltfFile, content, binBuffer);
+  return WriteBinaryGltfStream(gltfFile, content, binBuffer);
 }
 
 bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
@@ -7647,12 +7654,11 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
   }
 
   if (writeBinary) {
-    WriteBinaryGltfStream(stream, JsonToString(output), binBuffer);
+    return WriteBinaryGltfStream(stream, JsonToString(output), binBuffer);
   } else {
-    WriteGltfStream(stream, JsonToString(output, prettyPrint ? 2 : -1));
+    return WriteGltfStream(stream, JsonToString(output, prettyPrint ? 2 : -1));
   }
 
-  return true;
 }
 
 bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
@@ -7737,12 +7743,11 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   }
 
   if (writeBinary) {
-    WriteBinaryGltfFile(filename, JsonToString(output), binBuffer);
+    return WriteBinaryGltfFile(filename, JsonToString(output), binBuffer);
   } else {
-    WriteGltfFile(filename, JsonToString(output, (prettyPrint ? 2 : -1)));
+    return WriteGltfFile(filename, JsonToString(output, (prettyPrint ? 2 : -1)));
   }
 
-  return true;
 }
 
 }  // namespace tinygltf
