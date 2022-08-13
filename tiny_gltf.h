@@ -6693,6 +6693,27 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   if (accessor.extras.Type() != NULL_TYPE) {
     SerializeValue("extras", accessor.extras, o);
   }
+
+  // sparse
+  if (accessor.sparse.isSparse)
+  {
+      json sparse;
+      SerializeNumberProperty<int>("count", accessor.sparse.count, sparse);
+      {
+          json indices;
+          SerializeNumberProperty<int>("bufferView", accessor.sparse.indices.bufferView, indices);
+          SerializeNumberProperty<int>("byteOffset", accessor.sparse.indices.byteOffset, indices);
+          SerializeNumberProperty<int>("componentType", accessor.sparse.indices.componentType, indices);
+          JsonAddMember(sparse, "indices", std::move(indices));
+      }
+      {
+          json values;
+          SerializeNumberProperty<int>("bufferView", accessor.sparse.values.bufferView, values);
+          SerializeNumberProperty<int>("byteOffset", accessor.sparse.values.bufferView, values);
+          JsonAddMember(sparse, "values", std::move(values));
+      }
+      JsonAddMember(o, "sparse", std::move(sparse));
+  }
 }
 
 static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
