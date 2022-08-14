@@ -6709,7 +6709,7 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
       {
           json values;
           SerializeNumberProperty<int>("bufferView", accessor.sparse.values.bufferView, values);
-          SerializeNumberProperty<int>("byteOffset", accessor.sparse.values.bufferView, values);
+          SerializeNumberProperty<int>("byteOffset", accessor.sparse.values.byteOffset, values);
           JsonAddMember(sparse, "values", std::move(values));
       }
       JsonAddMember(o, "sparse", std::move(sparse));
