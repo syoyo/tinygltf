@@ -3,13 +3,15 @@
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 `TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
-(Also, you can use RadpidJSON as an JSON backend) 
+(Also, you can use RadpidJSON as an JSON backend)
 If you are looking for old, C++03 version, please use `devel-picojson` branch(but not maintained anymore).
 
 ## Status
 
 Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature additions planned.
 
+ - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
+ - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
  - v2.4.0 Experimental RapidJSON support. Experimental C++14 support(C++14 may give better performance)
  - v2.3.0 Modified Material representation according to glTF 2.0 schema(and introduced TextureInfo class)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
@@ -18,7 +20,7 @@ Currently TinyGLTF is stable and maintainance mode. No drastic changes and featu
 
 ### Branches
 
-* `sajson` : Use sajson to parse JSON. Parsing only but faster compile time(2x reduction compared to json.hpp and RapidJson)
+* `sajson` : Use sajson to parse JSON. Parsing only but faster compile time(2x reduction compared to json.hpp and RapidJson), but not well maintained.
 
 ## Builds
 
@@ -29,6 +31,8 @@ Currently TinyGLTF is stable and maintainance mode. No drastic changes and featu
 ![C/C++ CI](https://github.com/syoyo/tinygltf/workflows/C/C++%20CI/badge.svg)
 
 ## Features
+
+Probably mostly feature-complete. Last missing feature is Draco encoding: https://github.com/syoyo/tinygltf/issues/207
 
 * Written in portable C++. C++-11 with STL dependency only.
   * [x] macOS + clang(LLVM)
@@ -95,12 +99,12 @@ In extension(`ExtensionMap`), JSON number value is parsed as int or float(number
 * [Vulkan-Samples](https://github.com/KhronosGroup/Vulkan-Samples) - The Vulkan Samples is collection of resources to help you develop optimized Vulkan applications.
 * [TDME2](https://github.com/andreasdr/tdme2) - TDME2 - ThreeDeeMiniEngine2 is a lightweight 3D engine including tools suited for 3D game development using C++11
 * [SanityEngine](https://github.com/DethRaid/SanityEngine) - A C++/D3D12 renderer focused on the personal and proessional development of its developer
-* [Open3D](http://www.open3d.org/) - A Modern Library for 3D Data Processing 
+* [Open3D](http://www.open3d.org/) - A Modern Library for 3D Data Processing
 * Your projects here! (Please send PR)
 
 ## TODOs
 
-* [ ] Write C++ code generator which emits C++ code from JSON schema for robust parsing.
+* [ ] Robust URI decoding/encoding. https://github.com/syoyo/tinygltf/issues/369
 * [ ] Mesh Compression/decompression(Open3DGC, etc)
   * [x] Load Draco compressed mesh
   * [ ] Save Draco compressed mesh
@@ -110,6 +114,10 @@ In extension(`ExtensionMap`), JSON number value is parsed as int or float(number
   * [ ] OpenEXR extension through TinyEXR.
 * [ ] 16bit PNG support in Serialization
 * [ ] Write example and tests for `animation` and `skin`
+
+### Optional
+
+* [ ] Write C++ code generator which emits C++ code from JSON schema for robust parsing?
 
 ## Licenses
 
