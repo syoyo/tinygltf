@@ -6248,44 +6248,109 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
 
   unsigned int version;       // 4 bytes
   unsigned int length;        // 4 bytes
-  unsigned int model_length;  // 4 bytes
-  unsigned int model_format;  // 4 bytes;
+  unsigned int chunk0_length;  // 4 bytes
+  unsigned int chunk0_format;  // 4 bytes;
 
-  // @todo { Endian swap for big endian machine. }
   memcpy(&version, bytes + 4, 4);
   swap4(&version);
   memcpy(&length, bytes + 8, 4);
   swap4(&length);
-  memcpy(&model_length, bytes + 12, 4);
-  swap4(&model_length);
-  memcpy(&model_format, bytes + 16, 4);
-  swap4(&model_format);
+  memcpy(&chunk0_length, bytes + 12, 4); // JSON data length
+  swap4(&chunk0_length);
+  memcpy(&chunk0_format, bytes + 16, 4);
+  swap4(&chunk0_format);
 
+  // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#binary-gltf-layout
+  //
   // In case the Bin buffer is not present, the size is exactly 20 + size of
   // JSON contents,
   // so use "greater than" operator.
-  if ((20 + model_length > size) || (model_length < 1) || (length > size) ||
-      (20 + model_length > length) ||
-      (model_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
+  //
+  // https://github.com/syoyo/tinygltf/issues/372
+  // Use 64bit uint to avoid integer overflow.
+  uint64_t json_size = 20ull + uint64_t(chunk0_length);
+
+  if (json_size > std::numeric_limits<uint32_t>::max()) {
+    // Do not allow 4GB or more GLB data.
+   (*err) = "Invalid glTF binary. GLB data exceeds 4GB.";
+  }
+
+  if ((json_size > uint64_t(size)) || (chunk0_length < 1) || (length > size) ||
+      (json_size > uint64_t(length)) ||
+      (chunk0_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
     }
     return false;
   }
 
+  // Padding check
+  // The start and the end of each chunk must be aligned to a 4-byte boundary.
+  // No padding check for chunk0 start since its 4byte-boundary is ensured.
+  if ((json_size % 4) != 0) {
+    if (err) {
+      (*err) = "JSON Chunk end does not aligned to a 4-byte boundary.";
+    }
+  }
+
+  // Read Chunk1 info(BIN data)
+  if ((json_size + 8ull) > uint64_t(length)) {
+    if (err) {
+      (*err) = "Insufficient storage space for Chunk1(BIN data).";
+    }
+    return false;
+  }
+
+  unsigned int chunk1_length;  // 4 bytes
+  unsigned int chunk1_format;  // 4 bytes;
+  memcpy(&chunk1_length, bytes + json_size, 4); // JSON data length
+  swap4(&chunk1_length);
+  memcpy(&chunk1_format, bytes + json_size + 4, 4);
+  swap4(&chunk1_format);
+
+  if (chunk1_length < 4) {
+    // TODO: Do we allow 0byte BIN data?
+    if (err) {
+      (*err) = "Insufficient Chunk1(BIN) data size.";
+    }
+    return false;
+  }
+
+  if ((chunk1_length % 4) != 0) {
+    if (err) {
+      (*err) = "BIN Chunk end does not aligned to a 4-byte boundary.";
+    }
+    return false;
+  }
+
+  if (uint64_t(chunk1_length) + json_size > uint64_t(length)) {
+    if (err) {
+      (*err) = "BIN Chunk data length exceeds the GLB size.";
+    }
+    return false;
+  }
+
+  if (chunk1_format != 0x004e4942) {
+    if (err) {
+      (*err) = "Invlid type for chunk1 data.";
+    }
+    return false;
+  }
+
+  bin_data_ = bytes + json_size +
+              8;  // 4 bytes (bin_buffer_length) + 4 bytes(bin_buffer_format)
+
+  bin_size_ = size_t(chunk1_length);
+
   // Extract JSON string.
   std::string jsonString(reinterpret_cast<const char *>(&bytes[20]),
-                         model_length);
+                         chunk0_length);
 
   is_binary_ = true;
-  bin_data_ = bytes + 20 + model_length +
-              8;  // 4 bytes (buffer_length) + 4 bytes(buffer_format)
-  bin_size_ =
-      length - (20 + model_length);  // extract header + JSON scene data.
 
   bool ret = LoadFromString(model, err, warn,
                             reinterpret_cast<const char *>(&bytes[20]),
-                            model_length, base_dir, check_sections);
+                            chunk0_length, base_dir, check_sections);
   if (!ret) {
     return ret;
   }
