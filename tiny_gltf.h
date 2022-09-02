@@ -3229,9 +3229,11 @@ static bool ParseJsonAsValue(Value *ret, const json &o) {
       break;
   }
 #endif
+  const bool isNotNull = val.Type() != NULL_TYPE;
+
   if (ret) *ret = std::move(val);
 
-  return val.Type() != NULL_TYPE;
+  return isNotNull;
 }
 
 static bool ParseExtrasProperty(Value *ret, const json &o) {
