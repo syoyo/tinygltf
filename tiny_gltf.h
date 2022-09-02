@@ -3229,9 +3229,11 @@ static bool ParseJsonAsValue(Value *ret, const json &o) {
       break;
   }
 #endif
+  const bool isNotNull = val.Type() != NULL_TYPE;
+
   if (ret) *ret = std::move(val);
 
-  return val.Type() != NULL_TYPE;
+  return isNotNull;
 }
 
 static bool ParseExtrasProperty(Value *ret, const json &o) {
@@ -3671,7 +3673,8 @@ static bool ParseParameterProperty(Parameter *param, std::string *err,
     // Found a number array.
     return true;
   } else if (ParseNumberProperty(&param->number_value, err, o, prop, false)) {
-    return param->has_number_value = true;
+    param->has_number_value = true;
+    return true;
   } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
                                false)) {
     return true;
