@@ -66,6 +66,11 @@
 #include <string>
 #include <vector>
 
+//Auto-detect C++14 standard version
+#if !defined(TINYGLTF_USE_CPP14) && defined(__cplusplus) && (__cplusplus >= 201402L)
+#define TINYGLTF_USE_CPP14
+#endif
+
 #ifndef TINYGLTF_USE_CPP14
 #include <functional>
 #endif
