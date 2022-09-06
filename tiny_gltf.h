@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.6.1 Better GLB validation check when loading.
 //  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
 //           Disable expanding file path for security(no use of awkward `wordexp` anymore).
 //  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
