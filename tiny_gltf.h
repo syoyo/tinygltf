@@ -3873,7 +3873,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     image->uri = uri;
 #ifdef TINYGLTF_NO_EXTERNAL_IMAGE
     return true;
-#endif
+#else
     std::string decoded_uri = dlib::urldecode(uri);
     if (!LoadExternalFile(&img, err, warn, decoded_uri, basedir,
                           /* required */ false, /* required bytes */ 0,
@@ -3895,6 +3895,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
       }
       return false;
     }
+#endif
   }
 
   if (*LoadImageData == nullptr) {
