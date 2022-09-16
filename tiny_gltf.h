@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.6.2 Fix out-of-bounds access of accessors. PR#379.
 //  - v2.6.1 Better GLB validation check when loading.
 //  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
 //           Disable expanding file path for security(no use of awkward `wordexp` anymore).
