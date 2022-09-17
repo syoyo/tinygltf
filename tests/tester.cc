@@ -519,15 +519,13 @@ TEST_CASE("empty-bin-buffer", "[issue-382]") {
   buffer.data.push_back(0);
   model_single_byte_buffer.buffers.push_back(buffer);
   stream = std::stringstream();
-  ret = ctx.WriteGltfSceneToStream(&model_single_byte_buffer, stream, false,
-                                   true);
+  ret = ctx.WriteGltfSceneToStream(&model_single_byte_buffer, stream, false, true);
   REQUIRE(ret == true);
   str = stream.str();
   bytes = (unsigned char*)str.data();
-  ret = ctx.LoadBinaryFromMemory(&model_single_byte_buffer, &err, &warn, bytes,
-                                 str.size());
-  if (err.empty()) {
-    std::cerr << "there should have been an error reported" << std::endl;
+  ret = ctx.LoadBinaryFromMemory(&model_single_byte_buffer, &err, &warn, bytes, str.size());
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
   }
-  REQUIRE(false == ret);
+  REQUIRE(true == ret);
 }
