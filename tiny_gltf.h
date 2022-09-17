@@ -4113,7 +4113,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const json &o,
 
       if ((bin_size == 0) || (bin_data == nullptr)) {
         if (err) {
-          (*err) += "Invalid binary data in `Buffer'.\n";
+          (*err) += "Invalid binary data in `Buffer', or GLB with empty BIN chunk.\n";
         }
         return false;
       }
@@ -6286,15 +6286,15 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   //
   // https://github.com/syoyo/tinygltf/issues/372
   // Use 64bit uint to avoid integer overflow.
-  uint64_t json_size = 20ull + uint64_t(chunk0_length);
+  uint64_t header_and_json_size = 20ull + uint64_t(chunk0_length);
 
-  if (json_size > std::numeric_limits<uint32_t>::max()) {
+  if (header_and_json_size > std::numeric_limits<uint32_t>::max()) {
     // Do not allow 4GB or more GLB data.
    (*err) = "Invalid glTF binary. GLB data exceeds 4GB.";
   }
 
-  if ((json_size > uint64_t(size)) || (chunk0_length < 1) || (length > size) ||
-      (json_size > uint64_t(length)) ||
+  if ((header_and_json_size > uint64_t(size)) || (chunk0_length < 1) || (length > size) ||
+      (header_and_json_size > uint64_t(length)) ||
       (chunk0_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
@@ -6305,60 +6305,69 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   // Padding check
   // The start and the end of each chunk must be aligned to a 4-byte boundary.
   // No padding check for chunk0 start since its 4byte-boundary is ensured.
-  if ((json_size % 4) != 0) {
+  if ((header_and_json_size % 4) != 0) {
     if (err) {
       (*err) = "JSON Chunk end does not aligned to a 4-byte boundary.";
     }
   }
 
-  // Read Chunk1 info(BIN data)
-  if ((json_size + 8ull) > uint64_t(length)) {
-    if (err) {
-      (*err) = "Insufficient storage space for Chunk1(BIN data).";
+  // Chunk1(BIN) data
+  // The spec says: When the binary buffer is empty or when it is stored by other means, this chunk SHOULD be omitted.
+  if (header_and_json_size <= uint64_t(length)) {
+
+    // Just in case...
+    bin_data_ = nullptr;
+    bin_size_ = 0;
+  } else {
+    // Read Chunk1 info(BIN data)
+    // At least Chunk1 should have 12 bytes(8 bytes(header) + 4 bytes(bin content))
+    if ((header_and_json_size + 12ull) >= uint64_t(length)) {
+      if (err) {
+        (*err) = "Insufficient storage space for Chunk1(BIN data). At least Chunk1 Must have 12bytes or more bytes, but got " + std::to_string((header_and_json_size + 12ull) - uint64_t(length)) + ".\n";
+      }
+      return false;
     }
-    return false;
-  }
 
-  unsigned int chunk1_length;  // 4 bytes
-  unsigned int chunk1_format;  // 4 bytes;
-  memcpy(&chunk1_length, bytes + json_size, 4); // JSON data length
-  swap4(&chunk1_length);
-  memcpy(&chunk1_format, bytes + json_size + 4, 4);
-  swap4(&chunk1_format);
+    unsigned int chunk1_length;  // 4 bytes
+    unsigned int chunk1_format;  // 4 bytes;
+    memcpy(&chunk1_length, bytes + header_and_json_size, 4); // JSON data length
+    swap4(&chunk1_length);
+    memcpy(&chunk1_format, bytes + header_and_json_size + 4, 4);
+    swap4(&chunk1_format);
 
-  if (chunk1_length < 4) {
-    // TODO: Do we allow 0byte BIN data?
-    if (err) {
-      (*err) = "Insufficient Chunk1(BIN) data size.";
+    if (chunk1_length < 4) {
+      if (err) {
+        (*err) = "Insufficient Chunk1(BIN) data size.";
+      }
+      return false;
     }
-    return false;
-  }
 
-  if ((chunk1_length % 4) != 0) {
-    if (err) {
-      (*err) = "BIN Chunk end does not aligned to a 4-byte boundary.";
+    if ((chunk1_length % 4) != 0) {
+      if (err) {
+        (*err) = "BIN Chunk end does not aligned to a 4-byte boundary.";
+      }
+      return false;
     }
-    return false;
-  }
 
-  if (uint64_t(chunk1_length) + json_size > uint64_t(length)) {
-    if (err) {
-      (*err) = "BIN Chunk data length exceeds the GLB size.";
+    if (uint64_t(chunk1_length) + header_and_json_size > uint64_t(length)) {
+      if (err) {
+        (*err) = "BIN Chunk data length exceeds the GLB size.";
+      }
+      return false;
     }
-    return false;
-  }
 
-  if (chunk1_format != 0x004e4942) {
-    if (err) {
-      (*err) = "Invlid type for chunk1 data.";
+    if (chunk1_format != 0x004e4942) {
+      if (err) {
+        (*err) = "Invlid type for chunk1 data.";
+      }
+      return false;
     }
-    return false;
+
+    bin_data_ = bytes + header_and_json_size +
+                8;  // 4 bytes (bin_buffer_length) + 4 bytes(bin_buffer_format)
+
+    bin_size_ = size_t(chunk1_length);
   }
-
-  bin_data_ = bytes + json_size +
-              8;  // 4 bytes (bin_buffer_length) + 4 bytes(bin_buffer_format)
-
-  bin_size_ = size_t(chunk1_length);
 
   // Extract JSON string.
   std::string jsonString(reinterpret_cast<const char *>(&bytes[20]),
