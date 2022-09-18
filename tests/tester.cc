@@ -501,6 +501,9 @@ TEST_CASE("empty-bin-buffer", "[issue-382]") {
   }
   REQUIRE(true == ret);
 
+  err.clear();
+  warn.clear();
+
   tinygltf::Model model_empty_buffer;
   model_empty_buffer.buffers.push_back(tinygltf::Buffer());
   stream = std::stringstream();
@@ -514,6 +517,9 @@ TEST_CASE("empty-bin-buffer", "[issue-382]") {
   }
   REQUIRE(false == ret);
 
+  err.clear();
+  warn.clear();
+
   tinygltf::Model model_single_byte_buffer;
   tinygltf::Buffer buffer;
   buffer.data.push_back(0);
@@ -522,6 +528,11 @@ TEST_CASE("empty-bin-buffer", "[issue-382]") {
   ret = ctx.WriteGltfSceneToStream(&model_single_byte_buffer, stream, false, true);
   REQUIRE(ret == true);
   str = stream.str();
+  {
+    std::ofstream ofs("tmp.glb");
+    ofs.write(str.data(), str.size());
+  }
+
   bytes = (unsigned char*)str.data();
   ret = ctx.LoadBinaryFromMemory(&model_single_byte_buffer, &err, &warn, bytes, str.size());
   if (!err.empty()) {
