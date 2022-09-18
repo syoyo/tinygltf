@@ -68,4 +68,11 @@ loader_example
 tests/tester
 tests/tester_noexcept
 tests/issue-97.gltf
+tests/issue-261.gltf
 
+# unignore
+!Makefile
+!examples/build-gltf/Makefile
+!examples/raytrace/cornellbox_suzanne.obj
+!tests/Makefile
+!tools/windows/premake5.exe
