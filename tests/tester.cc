@@ -482,3 +482,61 @@ TEST_CASE("expandpath-utf-8", "[pr-226]") {
 
 }
 #endif
+
+TEST_CASE("empty-bin-buffer", "[issue-382]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  tinygltf::Model model_empty;
+  std::stringstream stream;
+  bool ret = ctx.WriteGltfSceneToStream(&model_empty, stream, false, true);
+  REQUIRE(ret == true);
+  std::string str = stream.str();
+  const unsigned char* bytes = (unsigned char*)str.data();
+  ret = ctx.LoadBinaryFromMemory(&model, &err, &warn, bytes, str.size());
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+  REQUIRE(true == ret);
+
+  err.clear();
+  warn.clear();
+
+  tinygltf::Model model_empty_buffer;
+  model_empty_buffer.buffers.push_back(tinygltf::Buffer());
+  stream = std::stringstream();
+  ret = ctx.WriteGltfSceneToStream(&model_empty_buffer, stream, false, true);
+  REQUIRE(ret == true);
+  str = stream.str();
+  bytes = (unsigned char*)str.data();
+  ret = ctx.LoadBinaryFromMemory(&model, &err, &warn, bytes, str.size());
+  if (err.empty()) {
+    std::cerr << "there should have been an error reported" << std::endl;
+  }
+  REQUIRE(false == ret);
+
+  err.clear();
+  warn.clear();
+
+  tinygltf::Model model_single_byte_buffer;
+  tinygltf::Buffer buffer;
+  buffer.data.push_back(0);
+  model_single_byte_buffer.buffers.push_back(buffer);
+  stream = std::stringstream();
+  ret = ctx.WriteGltfSceneToStream(&model_single_byte_buffer, stream, false, true);
+  REQUIRE(ret == true);
+  str = stream.str();
+  {
+    std::ofstream ofs("tmp.glb");
+    ofs.write(str.data(), str.size());
+  }
+
+  bytes = (unsigned char*)str.data();
+  ret = ctx.LoadBinaryFromMemory(&model_single_byte_buffer, &err, &warn, bytes, str.size());
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+  REQUIRE(true == ret);
+}
