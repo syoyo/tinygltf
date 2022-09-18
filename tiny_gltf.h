@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.6.3 Fix GLB file with empty BIN chunk was not handled. PR#382 and PR#383.
 //  - v2.6.2 Fix out-of-bounds access of accessors. PR#379.
 //  - v2.6.1 Better GLB validation check when loading.
 //  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
