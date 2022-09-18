@@ -71,7 +71,7 @@ tests/issue-97.gltf
 tests/issue-261.gltf
 
 # unignore
-!/Makefile
+!Makefile
 !examples/build-gltf/Makefile
 !examples/raytrace/cornellbox_suzanne.obj
 !tests/Makefile

@@ -6311,19 +6311,22 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
     }
   }
 
+  //std::cout << "header_and_json_size = " << header_and_json_size << "\n";
+  //std::cout << "length = " << length << "\n";
+
   // Chunk1(BIN) data
   // The spec says: When the binary buffer is empty or when it is stored by other means, this chunk SHOULD be omitted.
-  if (header_and_json_size <= uint64_t(length)) {
+  // So when header + JSON data == binary size, Chunk1 is omitted.
+  if (header_and_json_size == uint64_t(length)) {
 
-    // Just in case...
     bin_data_ = nullptr;
     bin_size_ = 0;
   } else {
     // Read Chunk1 info(BIN data)
-    // At least Chunk1 should have 12 bytes(8 bytes(header) + 4 bytes(bin content))
-    if ((header_and_json_size + 12ull) >= uint64_t(length)) {
+    // At least Chunk1 should have 12 bytes(8 bytes(header) + 4 bytes(bin payload could be 1~3 bytes, but need to be aliged to 4 bytes)
+    if ((header_and_json_size + 12ull) > uint64_t(length)) {
       if (err) {
-        (*err) = "Insufficient storage space for Chunk1(BIN data). At least Chunk1 Must have 12bytes or more bytes, but got " + std::to_string((header_and_json_size + 12ull) - uint64_t(length)) + ".\n";
+        (*err) = "Insufficient storage space for Chunk1(BIN data). At least Chunk1 Must have 4 bytes or more bytes, but got " + std::to_string((header_and_json_size + 12ull) - uint64_t(length)) + ".\n";
       }
       return false;
     }
@@ -6334,6 +6337,8 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
     swap4(&chunk1_length);
     memcpy(&chunk1_format, bytes + header_and_json_size + 4, 4);
     swap4(&chunk1_format);
+
+    //std::cout << "chunk1_length = " << chunk1_length << "\n";
 
     if (chunk1_length < 4) {
       if (err) {
@@ -6362,6 +6367,8 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
       }
       return false;
     }
+
+    //std::cout << "chunk1_length = " << chunk1_length << "\n";
 
     bin_data_ = bytes + header_and_json_size +
                 8;  // 4 bytes (bin_buffer_length) + 4 bytes(bin_buffer_format)
