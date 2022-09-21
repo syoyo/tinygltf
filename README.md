@@ -86,6 +86,12 @@ In extension(`ExtensionMap`), JSON number value is parsed as int or float(number
 * [basic](examples/basic) : Basic glTF viewer with texturing support.
 * [build-gltf](examples/build-gltf) : Build simple glTF scene from a scratch.
 
+### WASI/WASM build
+
+Users who want to run TinyGLTF securely and safely(e.g. need to handle malcious glTF file to serve online glTF conver),
+I recommend to build TinyGLTF for WASM target.
+WASI build example is located in [wasm](wasm) .
+
 ## Projects using TinyGLTF
 
 * px_render Single header C++ Libraries for Thread Scheduling, Rendering, and so on... https://github.com/pplux/px
