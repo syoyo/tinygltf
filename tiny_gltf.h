@@ -1609,7 +1609,7 @@ class TinyGLTF {
 #define WIN32_LEAN_AND_MEAN
 #define TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
 #endif
-#include <windows.h>  // include API for expanding a file path
+#include <Windows.h>  // include API for expanding a file path
 
 #ifdef TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
 #undef WIN32_LEAN_AND_MEAN
@@ -2562,7 +2562,7 @@ void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) { fs = callbacks; }
 static inline std::wstring UTF8ToWchar(const std::string &str) {
   int wstr_size =
       MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), nullptr, 0);
-  std::wstring wstr(wstr_size, 0);
+  std::wstring wstr((size_t)wstr_size, 0);
   MultiByteToWideChar(CP_UTF8, 0, str.data(), (int)str.size(), &wstr[0],
                       (int)wstr.size());
   return wstr;
@@ -2570,10 +2570,10 @@ static inline std::wstring UTF8ToWchar(const std::string &str) {
 
 static inline std::string WcharToUTF8(const std::wstring &wstr) {
   int str_size = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(),
-                                     nullptr, 0, NULL, NULL);
-  std::string str(str_size, 0);
+                                     nullptr, 0, nullptr, nullptr);
+  std::string str((size_t)str_size, 0);
   WideCharToMultiByte(CP_UTF8, 0, wstr.data(), (int)wstr.size(), &str[0],
-                      (int)str.size(), NULL, NULL);
+                      (int)str.size(), nullptr, nullptr);
   return str;
 }
 #endif
@@ -5810,7 +5810,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         if (accessorsIndex < model->accessors.size()) {
           const auto bufferView = model->accessors[accessorsIndex].bufferView;
           // bufferView could be null(-1) for sparse morph target
-          if (bufferView >= 0 && bufferView < model->bufferViews.size()) {
+          if (bufferView >= 0 && bufferView < (int)model->bufferViews.size()) {
             model->bufferViews[size_t(bufferView)].target =
                 TINYGLTF_TARGET_ARRAY_BUFFER;
           }
@@ -5823,7 +5823,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           if (accessorsIndex < model->accessors.size()) {
             const auto bufferView = model->accessors[accessorsIndex].bufferView;
             // bufferView could be null(-1) for sparse morph target
-            if (bufferView >= 0 && bufferView < model->bufferViews.size()) {
+            if (bufferView >= 0 && bufferView < (int)model->bufferViews.size()) {
               model->bufferViews[size_t(bufferView)].target =
                   TINYGLTF_TARGET_ARRAY_BUFFER;
             }
