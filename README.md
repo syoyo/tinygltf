@@ -106,6 +106,7 @@ WASI build example is located in [wasm](wasm) .
 * [TDME2](https://github.com/andreasdr/tdme2) - TDME2 - ThreeDeeMiniEngine2 is a lightweight 3D engine including tools suited for 3D game development using C++11
 * [SanityEngine](https://github.com/DethRaid/SanityEngine) - A C++/D3D12 renderer focused on the personal and proessional development of its developer
 * [Open3D](http://www.open3d.org/) - A Modern Library for 3D Data Processing
+* [Supernova Engine](https://github.com/supernovaengine/supernova) - Game engine for 2D and 3D projects with Lua or C++ in data oriented design.
 * Your projects here! (Please send PR)
 
 ## TODOs
