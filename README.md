@@ -229,7 +229,7 @@ add_subdirectory(/path/to/tinygltf)
 
 #### Setup
 
-Python 2.6 or 2.7 required.
+Python required.
 Git clone https://github.com/KhronosGroup/glTF-Sample-Models to your local dir.
 
 #### Run parsing test
