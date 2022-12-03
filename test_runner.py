@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-# Assume python 2.6 or 2.7
-
 import glob
 import os
 import subprocess
