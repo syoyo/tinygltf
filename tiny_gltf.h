@@ -2834,7 +2834,7 @@ static std::string MimeToExt(const std::string &mimeType) {
   return "";
 }
 
-static void UpdateImageObject(const Image &image, std::string &baseDir,
+static bool UpdateImageObject(const Image &image, std::string &baseDir,
                               int index, bool embedImages,
                               WriteImageDataFunction *WriteImageData,
                               std::string *out_uri, void *user_data) {
@@ -2857,17 +2857,24 @@ static void UpdateImageObject(const Image &image, std::string &baseDir,
     filename = std::to_string(index) + "." + ext;
   }
 
-  // If callback is set, modify image data object
+  // If callback is set and image data exists, modify image data object. If
+  // image data does not exist, this is not considered a failure and the
+  // original uri should be maintained.
   bool imageWritten = false;
-  if (*WriteImageData != nullptr && !filename.empty()) {
+  if (*WriteImageData != nullptr && !filename.empty() && !image.image.empty()) {
     imageWritten = (*WriteImageData)(&baseDir, &filename, &image, embedImages,
                                      out_uri, user_data);
+    if (!imageWritten) {
+      return false;
+    }
   }
 
   // Use the original uri if the image was not written.
   if (!imageWritten) {
     *out_uri = image.uri;
   }
+
+  return true;
 }
 
 bool IsDataURI(const std::string &in) {
@@ -7817,9 +7824,11 @@ bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
       // enabled, since we won't write separate images when writing to a stream
       // we
       std::string uri;
-      UpdateImageObject(model->images[i], dummystring, int(i), true,
-                        &this->WriteImageData, &uri,
-                        this->write_image_user_data_);
+      if (!UpdateImageObject(model->images[i], dummystring, int(i), true,
+                             &this->WriteImageData, &uri,
+                             this->write_image_user_data_)) {
+        return false;
+      }
       SerializeGltfImage(model->images[i], uri, image);
       JsonPushBack(images, std::move(image));
     }
@@ -7908,9 +7917,11 @@ bool TinyGLTF::WriteGltfSceneToFile(const Model *model,
       json image;
 
       std::string uri;
-      UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
-                        &this->WriteImageData, &uri,
-                        this->write_image_user_data_);
+      if (!UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
+                             &this->WriteImageData, &uri,
+                             this->write_image_user_data_)) {
+        return false;
+      }
       SerializeGltfImage(model->images[i], uri, image);
       JsonPushBack(images, std::move(image));
     }
