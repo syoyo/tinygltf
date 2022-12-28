@@ -593,13 +593,38 @@ TEST_CASE("serialize-image-callback", "[issue-394]") {
 
   tinygltf::TinyGLTF ctx;
   ctx.SetImageWriter(writer, (void *)0xba5e1e55);
-  ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
+  bool result = ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
                              false);
 
   // use nlohmann json
   nlohmann::json j = nlohmann::json::parse(os.str());
 
+  REQUIRE(true == result);
   REQUIRE(1 == j["images"].size());
   REQUIRE(j["images"][0].is_object());
   REQUIRE(j["images"][0]["uri"].get<std::string>() == "bar");
+}
+
+TEST_CASE("serialize-image-failure", "[issue-394]") {
+  tinygltf::Model m;
+  tinygltf::Image i;
+  // Set some data so the ImageWriter callback will be called
+  i.image = {255, 255, 255, 255};
+  m.images.push_back(i);
+
+  std::stringstream os;
+
+  auto writer = [](const std::string *basepath, const std::string *filename,
+                   const tinygltf::Image *image, bool embedImages,
+                   std::string *out_uri, void *user_pointer) -> bool {
+    return false;
+  };
+
+  tinygltf::TinyGLTF ctx;
+  ctx.SetImageWriter(writer, (void *)0xba5e1e55);
+  bool result = ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
+                             false);
+
+  REQUIRE(false == result);
+  REQUIRE(os.str().size() == 0);
 }
