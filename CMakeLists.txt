@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.6)
 
 PROJECT (tinygltf)
 
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
 SET(CMAKE_CXX_STANDARD 11)
 
 option(TINYGLTF_BUILD_LOADER_EXAMPLE "Build loader_example(load glTF and dump infos)" ON)
@@ -54,7 +57,10 @@ else (TINYGLTF_HEADER_ONLY)
 endif (TINYGLTF_HEADER_ONLY)
 
 if (TINYGLTF_INSTALL)
-
+  install(TARGETS tinygltf EXPORT tinygltfTargets)
+  install(EXPORT tinygltfTargets NAMESPACE tinygltf:: FILE TinyGLTFTargets.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake)
+  configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/TinyGLTFConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/TinyGLTFConfig.cmake INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/TinyGLTFConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake)
   # Do not install .lib even if !TINYGLTF_HEADER_ONLY
 
   INSTALL ( FILES
@@ -65,12 +71,6 @@ if (TINYGLTF_INSTALL)
     ${TINYGLTF_EXTRA_SOUECES}
     DESTINATION
     include
-    )
-
-  INSTALL ( FILES
-    cmake/TinyGLTFConfig.cmake
-    DESTINATION
-    cmake
     )
 
 endif(TINYGLTF_INSTALL)

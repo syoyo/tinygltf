@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393.
 //  - v2.6.3 Fix GLB file with empty BIN chunk was not handled. PR#382 and PR#383.
 //  - v2.6.2 Fix out-of-bounds access of accessors. PR#379.
 //  - v2.6.1 Better GLB validation check when loading.
@@ -1216,9 +1217,13 @@ typedef bool (*LoadImageDataFunction)(Image *, const int, std::string *,
 
 ///
 /// WriteImageDataFunction type. Signature for custom image writing callbacks.
+/// The out_uri parameter becomes the URI written to the gltf and may reference
+/// a file or contain a data URI.
 ///
-typedef bool (*WriteImageDataFunction)(const std::string *, const std::string *,
-                                       Image *, bool, void *);
+typedef bool (*WriteImageDataFunction)(const std::string *basepath,
+                                       const std::string *filename,
+                                       const Image *image, bool embedImages,
+                                       std::string *out_uri, void *user_pointer);
 
 #ifndef TINYGLTF_NO_STB_IMAGE
 // Declaration of default image loader callback
@@ -1230,7 +1235,8 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
 #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
 // Declaration of default image writer callback
 bool WriteImageData(const std::string *basepath, const std::string *filename,
-                    Image *image, bool embedImages, void *);
+                    const Image *image, bool embedImages, std::string *out_uri,
+                    void *);
 #endif
 
 ///
@@ -1357,13 +1363,13 @@ class TinyGLTF {
   ///
   /// Write glTF to stream, buffers and images will be embedded
   ///
-  bool WriteGltfSceneToStream(Model *model, std::ostream &stream,
+  bool WriteGltfSceneToStream(const Model *model, std::ostream &stream,
                               bool prettyPrint, bool writeBinary);
 
   ///
   /// Write glTF to file.
   ///
-  bool WriteGltfSceneToFile(Model *model, const std::string &filename,
+  bool WriteGltfSceneToFile(const Model *model, const std::string &filename,
                             bool embedImages, bool embedBuffers,
                             bool prettyPrint, bool writeBinary);
 
@@ -2495,7 +2501,8 @@ static void WriteToMemory_stbi(void *context, void *data, int size) {
 }
 
 bool WriteImageData(const std::string *basepath, const std::string *filename,
-                    Image *image, bool embedImages, void *fsPtr) {
+                    const Image *image, bool embedImages, std::string *out_uri,
+                    void *fsPtr) {
   const std::string ext = GetFilePathExtension(*filename);
 
   // Write image to temporary buffer
@@ -2537,9 +2544,8 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   if (embedImages) {
     // Embed base64-encoded image into URI
     if (data.size()) {
-      image->uri =
-          header +
-          base64_encode(&data[0], static_cast<unsigned int>(data.size()));
+      *out_uri = header +
+                base64_encode(&data[0], static_cast<unsigned int>(data.size()));
     } else {
       // Throw error?
     }
@@ -2557,7 +2563,7 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
     } else {
       // Throw error?
     }
-    image->uri = *filename;
+    *out_uri = *filename;
   }
 
   return true;
@@ -2828,10 +2834,10 @@ static std::string MimeToExt(const std::string &mimeType) {
   return "";
 }
 
-static void UpdateImageObject(Image &image, std::string &baseDir, int index,
-                              bool embedImages,
-                              WriteImageDataFunction *WriteImageData = nullptr,
-                              void *user_data = nullptr) {
+static void UpdateImageObject(const Image &image, std::string &baseDir,
+                              int index, bool embedImages,
+                              WriteImageDataFunction *WriteImageData,
+                              std::string *out_uri, void *user_data) {
   std::string filename;
   std::string ext;
   // If image has uri, use it as a filename
@@ -2852,9 +2858,15 @@ static void UpdateImageObject(Image &image, std::string &baseDir, int index,
   }
 
   // If callback is set, modify image data object
+  bool imageWritten = false;
   if (*WriteImageData != nullptr && !filename.empty()) {
-    std::string uri;
-    (*WriteImageData)(&baseDir, &filename, &image, embedImages, user_data);
+    imageWritten = (*WriteImageData)(&baseDir, &filename, &image, embedImages,
+                                     out_uri, user_data);
+  }
+
+  // Use the original uri if the image was not written.
+  if (!imageWritten) {
+    *out_uri = image.uri;
   }
 }
 
@@ -6755,7 +6767,7 @@ static void SerializeExtensionMap(const ExtensionMap &extensions, json &o) {
   JsonAddMember(o, "extensions", std::move(extMap));
 }
 
-static void SerializeGltfAccessor(Accessor &accessor, json &o) {
+static void SerializeGltfAccessor(const Accessor &accessor, json &o) {
   if (accessor.bufferView >= 0)
     SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
 
@@ -6847,7 +6859,8 @@ static void SerializeGltfAccessor(Accessor &accessor, json &o) {
   }
 }
 
-static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
+static void SerializeGltfAnimationChannel(const AnimationChannel &channel,
+                                          json &o) {
   SerializeNumberProperty("sampler", channel.sampler, o);
   {
     json target;
@@ -6866,7 +6879,8 @@ static void SerializeGltfAnimationChannel(AnimationChannel &channel, json &o) {
   SerializeExtensionMap(channel.extensions, o);
 }
 
-static void SerializeGltfAnimationSampler(AnimationSampler &sampler, json &o) {
+static void SerializeGltfAnimationSampler(const AnimationSampler &sampler,
+                                          json &o) {
   SerializeNumberProperty("input", sampler.input, o);
   SerializeNumberProperty("output", sampler.output, o);
   SerializeStringProperty("interpolation", sampler.interpolation, o);
@@ -6876,7 +6890,7 @@ static void SerializeGltfAnimationSampler(AnimationSampler &sampler, json &o) {
   }
 }
 
-static void SerializeGltfAnimation(Animation &animation, json &o) {
+static void SerializeGltfAnimation(const Animation &animation, json &o) {
   if (!animation.name.empty())
     SerializeStringProperty("name", animation.name, o);
 
@@ -6912,7 +6926,7 @@ static void SerializeGltfAnimation(Animation &animation, json &o) {
   SerializeExtensionMap(animation.extensions, o);
 }
 
-static void SerializeGltfAsset(Asset &asset, json &o) {
+static void SerializeGltfAsset(const Asset &asset, json &o) {
   if (!asset.generator.empty()) {
     SerializeStringProperty("generator", asset.generator, o);
   }
@@ -6921,14 +6935,15 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
     SerializeStringProperty("copyright", asset.copyright, o);
   }
 
-  if (asset.version.empty()) {
+  auto version = asset.version;
+  if (version.empty()) {
     // Just in case
     // `version` must be defined
-    asset.version = "2.0";
+    version = "2.0";
   }
 
   // TODO(syoyo): Do we need to check if `version` is greater or equal to 2.0?
-  SerializeStringProperty("version", asset.version, o);
+  SerializeStringProperty("version", version, o);
 
   if (asset.extras.Keys().size()) {
     SerializeValue("extras", asset.extras, o);
@@ -6937,7 +6952,7 @@ static void SerializeGltfAsset(Asset &asset, json &o) {
   SerializeExtensionMap(asset.extensions, o);
 }
 
-static void SerializeGltfBufferBin(Buffer &buffer, json &o,
+static void SerializeGltfBufferBin(const Buffer &buffer, json &o,
                                    std::vector<unsigned char> &binBuffer) {
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
   binBuffer = buffer.data;
@@ -6949,7 +6964,7 @@ static void SerializeGltfBufferBin(Buffer &buffer, json &o,
   }
 }
 
-static void SerializeGltfBuffer(Buffer &buffer, json &o) {
+static void SerializeGltfBuffer(const Buffer &buffer, json &o) {
   SerializeNumberProperty("byteLength", buffer.data.size(), o);
   SerializeGltfBufferData(buffer.data, o);
 
@@ -6960,7 +6975,7 @@ static void SerializeGltfBuffer(Buffer &buffer, json &o) {
   }
 }
 
-static bool SerializeGltfBuffer(Buffer &buffer, json &o,
+static bool SerializeGltfBuffer(const Buffer &buffer, json &o,
                                 const std::string &binFilename,
                                 const std::string &binBaseFilename) {
   if (!SerializeGltfBufferData(buffer.data, binFilename)) return false;
@@ -6975,7 +6990,7 @@ static bool SerializeGltfBuffer(Buffer &buffer, json &o,
   return true;
 }
 
-static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
+static void SerializeGltfBufferView(const BufferView &bufferView, json &o) {
   SerializeNumberProperty("buffer", bufferView.buffer, o);
   SerializeNumberProperty<size_t>("byteLength", bufferView.byteLength, o);
 
@@ -7001,14 +7016,16 @@ static void SerializeGltfBufferView(BufferView &bufferView, json &o) {
   }
 }
 
-static void SerializeGltfImage(Image &image, json &o) {
-  // if uri empty, the mimeType and bufferview should be set
-  if (image.uri.empty()) {
+static void SerializeGltfImage(const Image &image, const std::string uri,
+                               json &o) {
+  // From 2.7.0, we look for `uri` parameter, not `Image.uri`
+  // if uri is empty, the mimeType and bufferview should be set
+  if (uri.empty()) {
     SerializeStringProperty("mimeType", image.mimeType, o);
     SerializeNumberProperty<int>("bufferView", image.bufferView, o);
   } else {
     // TODO(syoyo): dlib::urilencode?
-    SerializeStringProperty("uri", image.uri, o);
+    SerializeStringProperty("uri", uri, o);
   }
 
   if (image.name.size()) {
@@ -7022,7 +7039,7 @@ static void SerializeGltfImage(Image &image, json &o) {
   SerializeExtensionMap(image.extensions, o);
 }
 
-static void SerializeGltfTextureInfo(TextureInfo &texinfo, json &o) {
+static void SerializeGltfTextureInfo(const TextureInfo &texinfo, json &o) {
   SerializeNumberProperty("index", texinfo.index, o);
 
   if (texinfo.texCoord != 0) {
@@ -7036,7 +7053,7 @@ static void SerializeGltfTextureInfo(TextureInfo &texinfo, json &o) {
   SerializeExtensionMap(texinfo.extensions, o);
 }
 
-static void SerializeGltfNormalTextureInfo(NormalTextureInfo &texinfo,
+static void SerializeGltfNormalTextureInfo(const NormalTextureInfo &texinfo,
                                            json &o) {
   SerializeNumberProperty("index", texinfo.index, o);
 
@@ -7055,8 +7072,8 @@ static void SerializeGltfNormalTextureInfo(NormalTextureInfo &texinfo,
   SerializeExtensionMap(texinfo.extensions, o);
 }
 
-static void SerializeGltfOcclusionTextureInfo(OcclusionTextureInfo &texinfo,
-                                              json &o) {
+static void SerializeGltfOcclusionTextureInfo(
+    const OcclusionTextureInfo &texinfo, json &o) {
   SerializeNumberProperty("index", texinfo.index, o);
 
   if (texinfo.texCoord != 0) {
@@ -7074,7 +7091,7 @@ static void SerializeGltfOcclusionTextureInfo(OcclusionTextureInfo &texinfo,
   SerializeExtensionMap(texinfo.extensions, o);
 }
 
-static void SerializeGltfPbrMetallicRoughness(PbrMetallicRoughness &pbr,
+static void SerializeGltfPbrMetallicRoughness(const PbrMetallicRoughness &pbr,
                                               json &o) {
   std::vector<double> default_baseColorFactor = {1.0, 1.0, 1.0, 1.0};
   if (!Equals(pbr.baseColorFactor, default_baseColorFactor)) {
@@ -7109,7 +7126,7 @@ static void SerializeGltfPbrMetallicRoughness(PbrMetallicRoughness &pbr,
   }
 }
 
-static void SerializeGltfMaterial(Material &material, json &o) {
+static void SerializeGltfMaterial(const Material &material, json &o) {
   if (material.name.size()) {
     SerializeStringProperty("name", material.name, o);
   }
@@ -7185,7 +7202,7 @@ static void SerializeGltfMaterial(Material &material, json &o) {
   }
 }
 
-static void SerializeGltfMesh(Mesh &mesh, json &o) {
+static void SerializeGltfMesh(const Mesh &mesh, json &o) {
   json primitives;
   JsonReserveArray(primitives, mesh.primitives.size());
   for (unsigned int i = 0; i < mesh.primitives.size(); ++i) {
@@ -7254,7 +7271,7 @@ static void SerializeGltfMesh(Mesh &mesh, json &o) {
   }
 }
 
-static void SerializeSpotLight(SpotLight &spot, json &o) {
+static void SerializeSpotLight(const SpotLight &spot, json &o) {
   SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
   SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
   SerializeExtensionMap(spot.extensions, o);
@@ -7263,7 +7280,7 @@ static void SerializeSpotLight(SpotLight &spot, json &o) {
   }
 }
 
-static void SerializeGltfLight(Light &light, json &o) {
+static void SerializeGltfLight(const Light &light, json &o) {
   if (!light.name.empty()) SerializeStringProperty("name", light.name, o);
   SerializeNumberProperty("intensity", light.intensity, o);
   if (light.range > 0.0) {
@@ -7282,7 +7299,7 @@ static void SerializeGltfLight(Light &light, json &o) {
   }
 }
 
-static void SerializeGltfNode(Node &node, json &o) {
+static void SerializeGltfNode(const Node &node, json &o) {
   if (node.translation.size() > 0) {
     SerializeNumberArrayProperty<double>("translation", node.translation, o);
   }
@@ -7320,7 +7337,7 @@ static void SerializeGltfNode(Node &node, json &o) {
   SerializeNumberArrayProperty<int>("children", node.children, o);
 }
 
-static void SerializeGltfSampler(Sampler &sampler, json &o) {
+static void SerializeGltfSampler(const Sampler &sampler, json &o) {
   if (sampler.magFilter != -1) {
     SerializeNumberProperty("magFilter", sampler.magFilter, o);
   }
@@ -7389,7 +7406,7 @@ static void SerializeGltfCamera(const Camera &camera, json &o) {
   SerializeExtensionMap(camera.extensions, o);
 }
 
-static void SerializeGltfScene(Scene &scene, json &o) {
+static void SerializeGltfScene(const Scene &scene, json &o) {
   SerializeNumberArrayProperty<int>("nodes", scene.nodes, o);
 
   if (scene.name.size()) {
@@ -7401,7 +7418,7 @@ static void SerializeGltfScene(Scene &scene, json &o) {
   SerializeExtensionMap(scene.extensions, o);
 }
 
-static void SerializeGltfSkin(Skin &skin, json &o) {
+static void SerializeGltfSkin(const Skin &skin, json &o) {
   // required
   SerializeNumberArrayProperty<int>("joints", skin.joints, o);
 
@@ -7418,7 +7435,7 @@ static void SerializeGltfSkin(Skin &skin, json &o) {
   }
 }
 
-static void SerializeGltfTexture(Texture &texture, json &o) {
+static void SerializeGltfTexture(const Texture &texture, json &o) {
   if (texture.sampler > -1) {
     SerializeNumberProperty("sampler", texture.sampler, o);
   }
@@ -7437,7 +7454,7 @@ static void SerializeGltfTexture(Texture &texture, json &o) {
 ///
 /// Serialize all properties except buffers and images.
 ///
-static void SerializeGltfModel(Model *model, json &o) {
+static void SerializeGltfModel(const Model *model, json &o) {
   // ACCESSORS
   if (model->accessors.size()) {
     json accessors;
@@ -7763,7 +7780,7 @@ static bool WriteBinaryGltfFile(const std::string &output,
   return WriteBinaryGltfStream(gltfFile, content, binBuffer);
 }
 
-bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
+bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
                                       bool prettyPrint = true,
                                       bool writeBinary = false) {
   JsonDocument output;
@@ -7799,9 +7816,11 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
       // UpdateImageObject need baseDir but only uses it if embeddedImages is
       // enabled, since we won't write separate images when writing to a stream
       // we
+      std::string uri;
       UpdateImageObject(model->images[i], dummystring, int(i), true,
-                        &this->WriteImageData, this->write_image_user_data_);
-      SerializeGltfImage(model->images[i], image);
+                        &this->WriteImageData, &uri,
+                        this->write_image_user_data_);
+      SerializeGltfImage(model->images[i], uri, image);
       JsonPushBack(images, std::move(image));
     }
     JsonAddMember(output, "images", std::move(images));
@@ -7812,10 +7831,10 @@ bool TinyGLTF::WriteGltfSceneToStream(Model *model, std::ostream &stream,
   } else {
     return WriteGltfStream(stream, JsonToString(output, prettyPrint ? 2 : -1));
   }
-
 }
 
-bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
+bool TinyGLTF::WriteGltfSceneToFile(const Model *model,
+                                    const std::string &filename,
                                     bool embedImages = false,
                                     bool embedBuffers = false,
                                     bool prettyPrint = true,
@@ -7888,9 +7907,11 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
     for (unsigned int i = 0; i < model->images.size(); ++i) {
       json image;
 
+      std::string uri;
       UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
-                        &this->WriteImageData, this->write_image_user_data_);
-      SerializeGltfImage(model->images[i], image);
+                        &this->WriteImageData, &uri,
+                        this->write_image_user_data_);
+      SerializeGltfImage(model->images[i], uri, image);
       JsonPushBack(images, std::move(image));
     }
     JsonAddMember(output, "images", std::move(images));
@@ -7901,7 +7922,6 @@ bool TinyGLTF::WriteGltfSceneToFile(Model *model, const std::string &filename,
   } else {
     return WriteGltfFile(filename, JsonToString(output, (prettyPrint ? 2 : -1)));
   }
-
 }
 
 }  // namespace tinygltf
