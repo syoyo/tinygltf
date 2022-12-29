@@ -7023,7 +7023,7 @@ static void SerializeGltfBufferView(const BufferView &bufferView, json &o) {
   }
 }
 
-static void SerializeGltfImage(const Image &image, const std::string uri,
+static void SerializeGltfImage(const Image &image, const std::string &uri,
                                json &o) {
   // From 2.7.0, we look for `uri` parameter, not `Image.uri`
   // if uri is empty, the mimeType and bufferview should be set
