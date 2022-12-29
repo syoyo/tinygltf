@@ -10,6 +10,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch(bu
 
 Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature additions planned.
 
+ - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393
  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
  - v2.4.0 Experimental RapidJSON support. Experimental C++14 support(C++14 may give better performance)
