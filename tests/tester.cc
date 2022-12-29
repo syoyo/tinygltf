@@ -540,3 +540,66 @@ TEST_CASE("empty-bin-buffer", "[issue-382]") {
   }
   REQUIRE(true == ret);
 }
+
+TEST_CASE("serialize-const-image", "[issue-394]") {
+  tinygltf::Model m;
+  tinygltf::Image i;
+  i.width = 1;
+  i.height = 1;
+  i.component = 4;
+  i.bits = 8;
+  i.pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+  i.image = {255, 255, 255, 255};
+  i.uri = "image.png";
+  m.images.push_back(i);
+
+  std::stringstream os;
+
+  tinygltf::TinyGLTF ctx;
+  ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
+                             false);
+  REQUIRE(m.images[0].uri == i.uri);
+
+  // use nlohmann json
+  nlohmann::json j = nlohmann::json::parse(os.str());
+
+  REQUIRE(1 == j["images"].size());
+  REQUIRE(j["images"][0].is_object());
+  REQUIRE(j["images"][0]["uri"].get<std::string>() != i.uri);
+  REQUIRE(j["images"][0]["uri"].get<std::string>().rfind("data:", 0) == 0);
+}
+
+TEST_CASE("serialize-image-callback", "[issue-394]") {
+  tinygltf::Model m;
+  tinygltf::Image i;
+  i.width = 1;
+  i.height = 1;
+  i.bits = 32;
+  i.image = {255, 255, 255, 255};
+  i.uri = "foo";
+  m.images.push_back(i);
+
+  std::stringstream os;
+
+  auto writer = [](const std::string *basepath, const std::string *filename,
+                   const tinygltf::Image *image, bool embedImages,
+                   std::string *out_uri, void *user_pointer) -> bool {
+    REQUIRE(*filename == "foo");
+    REQUIRE(embedImages == true);
+    REQUIRE(user_pointer == (void *)0xba5e1e55);
+    *out_uri = "bar";
+    return true;
+  };
+
+  tinygltf::TinyGLTF ctx;
+  ctx.SetImageWriter(writer, (void *)0xba5e1e55);
+  ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
+                             false);
+
+  // use nlohmann json
+  nlohmann::json j = nlohmann::json::parse(os.str());
+
+  REQUIRE(1 == j["images"].size());
+  REQUIRE(j["images"][0].is_object());
+  REQUIRE(j["images"][0]["uri"].get<std::string>() == "bar");
+}
