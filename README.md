@@ -10,13 +10,14 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch(bu
 
 Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature additions planned.
 
+ - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image. PR#397
  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393
  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
  - v2.4.0 Experimental RapidJSON support. Experimental C++14 support(C++14 may give better performance)
  - v2.3.0 Modified Material representation according to glTF 2.0 schema(and introduced TextureInfo class)
  - v2.2.0 release(Support loading 16bit PNG. Sparse accessor support)
- - v2.1.0 release(Draco support)
+ - v2.1.0 release(Draco decoding support)
  - v2.0.0 release(22 Aug, 2018)!
 
 ### Branches
