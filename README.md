@@ -2,13 +2,13 @@
 
 `TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
-`TinyGLTF` uses Niels Lohmann's json library(https://github.com/nlohmann/json), so now it requires C++11 compiler.
+`TinyGLTF` uses Niels Lohmann's json library (https://github.com/nlohmann/json), so now it requires C++11 compiler.
 (Also, you can use RadpidJSON as an JSON backend)
-If you are looking for old, C++03 version, please use `devel-picojson` branch(but not maintained anymore).
+If you are looking for old, C++03 version, please use `devel-picojson` branch (but not maintained anymore).
 
 ## Status
 
-Currently TinyGLTF is stable and maintainance mode. No drastic changes and feature additions planned.
+Currently TinyGLTF is stable and maintenance mode. No drastic changes and feature additions planned.
 
  - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image. PR#397
  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393
