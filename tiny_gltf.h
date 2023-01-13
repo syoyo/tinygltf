@@ -26,6 +26,7 @@
 // THE SOFTWARE.
 
 // Version:
+//  - v2.8.1 Missed serialization texture sampler name fixed. PR#399.
 //  - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image. PR#397.
 //  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393.
 //  - v2.6.3 Fix GLB file with empty BIN chunk was not handled. PR#382 and PR#383.
