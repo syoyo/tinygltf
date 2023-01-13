@@ -7440,6 +7440,9 @@ static void SerializeGltfNode(const Node &node, json &o) {
 }
 
 static void SerializeGltfSampler(const Sampler &sampler, json &o) {
+  if (!sampler.name.empty()) {
+    SerializeStringProperty("name", sampler.name, o);
+  }
   if (sampler.magFilter != -1) {
     SerializeNumberProperty("magFilter", sampler.magFilter, o);
   }
