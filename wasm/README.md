@@ -4,7 +4,7 @@ Experimental WASI/WASM build
 
 Download wasi-sdk https://github.com/WebAssembly/wasi-sdk
 
-Compile tinygltf with C++ exceptions and threads off. See `Makefile` for details
+Compile tinygltf without C++ exceptions and threads. See `Makefile` for details
 (NOTE: TinyGLTF itself does not use RTTI and threading feature(C++ threads, posix, win32 thread))
 
 ## Build examples and Run
