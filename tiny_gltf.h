@@ -547,9 +547,10 @@ typedef std::map<std::string, Value> ExtensionMap;
 
 struct AnimationChannel {
   int sampler;              // required
-  int target_node;          // required (index of the node to target)
-  std::string target_path;  // required in ["translation", "rotation", "scale",
-                            // "weights"]
+  int target_node;          // optional index of the node to target (alternative
+                            // target should be provided by extension)
+  std::string target_path;  // required with standard values of ["translation",
+                            // "rotation", "scale", "weights"]
   Value extras;
   ExtensionMap extensions;
   ExtensionMap target_extensions;
@@ -5103,12 +5104,7 @@ static bool ParseAnimationChannel(
   if (FindMember(o, "target", targetIt) && IsObject(GetValue(targetIt))) {
     const json &target_object = GetValue(targetIt);
 
-    if (!ParseIntegerProperty(&targetIndex, err, target_object, "node", true)) {
-      if (err) {
-        (*err) += "`node` field is missing in animation.channels.target\n";
-      }
-      return false;
-    }
+    ParseIntegerProperty(&targetIndex, err, target_object, "node", false);
 
     if (!ParseStringProperty(&channel->target_path, err, target_object, "path",
                              true)) {
@@ -6968,7 +6964,11 @@ static void SerializeGltfAnimationChannel(const AnimationChannel &channel,
   SerializeNumberProperty("sampler", channel.sampler, o);
   {
     json target;
-    SerializeNumberProperty("node", channel.target_node, target);
+
+    if (channel.target_node > 0) {
+      SerializeNumberProperty("node", channel.target_node, target);
+    }
+
     SerializeStringProperty("path", channel.target_path, target);
 
     SerializeExtensionMap(channel.target_extensions, target);
