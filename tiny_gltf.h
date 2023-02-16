@@ -3292,7 +3292,7 @@ static bool ParseJsonAsValue(Value *ret, const ::detail::json &o) {
         val = Value(i);
       } else {
         double d = 0.0;
-        GetDouble(o, d);
+        detail::GetDouble(o, d);
         val = Value(d);
       }
       break;
@@ -6555,7 +6555,7 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 namespace detail {
 ::detail::json JsonFromString(const char *s) {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  return ::detail::json(s, GetAllocator());
+  return ::detail::json(s, ::detail::GetAllocator());
 #else
   return ::detail::json(s);
 #endif
@@ -6563,7 +6563,7 @@ namespace detail {
 
 void JsonAssign(::detail::json &dest, const ::detail::json &src) {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  dest.CopyFrom(src, GetAllocator());
+  dest.CopyFrom(src, ::detail::GetAllocator());
 #else
   dest = src;
 #endif
@@ -6574,7 +6574,7 @@ void JsonAddMember(::detail::json &o, const char *key, ::detail::json &&value) {
   if (!o.IsObject()) {
     o.SetObject();
   }
-  o.AddMember(json(key, GetAllocator()), std::move(value), GetAllocator());
+  o.AddMember(::detail::json(key, ::detail::GetAllocator()), std::move(value), ::detail::GetAllocator());
 #else
   o[key] = std::move(value);
 #endif
@@ -6582,7 +6582,7 @@ void JsonAddMember(::detail::json &o, const char *key, ::detail::json &&value) {
 
 void JsonPushBack(::detail::json &o, ::detail::json &&value) {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  o.PushBack(std::move(value), GetAllocator());
+  o.PushBack(std::move(value), ::detail::GetAllocator());
 #else
   o.push_back(std::move(value));
 #endif
@@ -6607,7 +6607,7 @@ void JsonSetObject(::detail::json &o) {
 void JsonReserveArray(::detail::json &o, size_t s) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   o.SetArray();
-  o.Reserve(static_cast<rapidjson::SizeType>(s), GetAllocator());
+  o.Reserve(static_cast<rapidjson::SizeType>(s), ::detail::GetAllocator());
 #endif
   (void)(o);
   (void)(s);
@@ -6676,17 +6676,17 @@ static bool ValueToJson(const Value &value, ::detail::json *ret) {
       obj.SetBool(value.Get<bool>());
       break;
     case STRING_TYPE:
-      obj.SetString(value.Get<std::string>().c_str(), GetAllocator());
+      obj.SetString(value.Get<std::string>().c_str(), ::detail::GetAllocator());
       break;
     case ARRAY_TYPE: {
       obj.SetArray();
       obj.Reserve(static_cast<rapidjson::SizeType>(value.ArrayLen()),
-                  GetAllocator());
+                  ::detail::GetAllocator());
       for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
         Value elementValue = value.Get(int(i));
         ::detail::json elementJson;
         if (ValueToJson(value.Get(int(i)), &elementJson))
-          obj.PushBack(std::move(elementJson), GetAllocator());
+          obj.PushBack(std::move(elementJson), ::detail::GetAllocator());
       }
       break;
     }
@@ -6701,8 +6701,8 @@ static bool ValueToJson(const Value &value, ::detail::json *ret) {
       for (auto &it : objMap) {
         ::detail::json elementJson;
         if (ValueToJson(it.second, &elementJson)) {
-          obj.AddMember(::detail::json(it.first.c_str(), GetAllocator()),
-                        std::move(elementJson), GetAllocator());
+          obj.AddMember(::detail::json(it.first.c_str(), ::detail::GetAllocator()),
+                        std::move(elementJson), ::detail::GetAllocator());
         }
       }
       break;
