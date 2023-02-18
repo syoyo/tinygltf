@@ -16,10 +16,10 @@
 #include <sstream>
 #include <fstream>
 
-static JsonDocument JsonConstruct(const char* str)
+static tinygltf::detail::JsonDocument JsonConstruct(const char* str)
 {
-  JsonDocument doc;
-  JsonParse(doc, str, strlen(str));
+  tinygltf::detail::JsonDocument doc;
+  tinygltf::detail::JsonParse(doc, str, strlen(str));
   return doc;
 }
 
@@ -275,9 +275,9 @@ TEST_CASE("parse-integer", "[bounds-checking]") {
 
     err.clear();
     {
-      JsonDocument o;
+      tinygltf::detail::JsonDocument o;
       double nan = std::numeric_limits<double>::quiet_NaN();
-      tinygltf::JsonAddMember(o, "int", json(nan));
+      tinygltf::detail::JsonAddMember(o, "int", tinygltf::detail::json(nan));
       CHECK_FALSE(tinygltf::ParseIntegerProperty(
         &result, &err, o,
         "int", true));
@@ -321,9 +321,9 @@ TEST_CASE("parse-unsigned", "[bounds-checking]") {
 
     err.clear();
     {
-      JsonDocument o;
+      tinygltf::detail::JsonDocument o;
       double nan = std::numeric_limits<double>::quiet_NaN();
-      tinygltf::JsonAddMember(o, "int", json(nan));
+      tinygltf::detail::JsonAddMember(o, "int", tinygltf::detail::json(nan));
       CHECK_FALSE(tinygltf::ParseUnsignedProperty(
         &result, &err, o,
         "int", true));
