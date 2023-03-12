@@ -504,7 +504,8 @@ TEST_CASE("serialize-empty-material", "[issue-294]") {
   std::stringstream os;
 
   tinygltf::TinyGLTF ctx;
-  ctx.WriteGltfSceneToStream(&m, os, false, false);
+  bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+  REQUIRE(true == ret);
 
   // use nlohmann json
   nlohmann::json j = nlohmann::json::parse(os.str());
@@ -532,7 +533,8 @@ TEST_CASE("empty-skeleton-id", "[issue-321]") {
 
   std::stringstream os;
 
-  ctx.WriteGltfSceneToStream(&model, os, false, false);
+  ret = ctx.WriteGltfSceneToStream(&model, os, false, false);
+  REQUIRE(true == ret);
 
   // use nlohmann json
   nlohmann::json j = nlohmann::json::parse(os.str());
@@ -634,8 +636,9 @@ TEST_CASE("serialize-const-image", "[issue-394]") {
   std::stringstream os;
 
   tinygltf::TinyGLTF ctx;
-  ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
+  bool ret = ctx.WriteGltfSceneToStream(const_cast<const tinygltf::Model *>(&m), os, false,
                              false);
+  REQUIRE(true == ret);
   REQUIRE(m.images[0].uri == i.uri);
 
   // use nlohmann json
