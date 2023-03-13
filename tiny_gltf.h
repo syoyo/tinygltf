@@ -7780,7 +7780,7 @@ static void SerializeGltfModel(const Model *model, detail::json &o) {
 
 static bool WriteGltfStream(std::ostream &stream, const std::string &content) {
   stream << content << std::endl;
-  return true;
+  return stream.good();
 }
 
 static bool WriteGltfFile(const std::string &output,
@@ -7863,8 +7863,8 @@ static bool WriteBinaryGltfStream(std::ostream &stream,
     }
   }
 
-  // TODO: Check error on stream.write
-  return true;
+  stream.flush();
+  return stream.good();
 }
 
 static bool WriteBinaryGltfFile(const std::string &output,
