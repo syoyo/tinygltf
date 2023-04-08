@@ -301,6 +301,9 @@ class Value {
   }
   explicit Value(std::string &&s)
       : type_(STRING_TYPE), string_value_(std::move(s)) {}
+  explicit Value(const char *s) : type_(STRING_TYPE) {
+    string_value_ = s;
+  }
   explicit Value(const unsigned char *p, size_t n) : type_(BINARY_TYPE) {
     binary_value_.resize(n);
     memcpy(binary_value_.data(), p, n);
