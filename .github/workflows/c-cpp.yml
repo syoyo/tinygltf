@@ -4,41 +4,43 @@ on: [push, pull_request]
 
 jobs:
 
-  # compile with older gcc4.8
-  build-gcc48:
+  # gcc4.8 is too old and ubuntu-18.04 image is not supported in GitHub Actions anymore,
+  # so disable this build.
+  ## compile with older gcc4.8
+  #build-gcc48:
 
-    runs-on: ubuntu-18.04
-    name: Build with gcc 4.8
+  #  runs-on: ubuntu-18.04
+  #  name: Build with gcc 4.8
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
+  #  steps:
+  #    - name: Checkout
+  #      uses: actions/checkout@v1
 
-      - name: Build
-        run: |
-            sudo apt-get update
-            sudo apt-get install -y build-essential
-            sudo apt-get install -y gcc-4.8 g++-4.8
-            g++-4.8 -std=c++11 -o loader_example loader_example.cc
+  #    - name: Build
+  #      run: |
+  #          sudo apt-get update
+  #          sudo apt-get install -y build-essential
+  #          sudo apt-get install -y gcc-4.8 g++-4.8
+  #          g++-4.8 -std=c++11 -o loader_example loader_example.cc
 
-      - name: NoexceptBuild
-        run: |
-            g++-4.8 -DTINYGLTF_NOEXCEPTION -std=c++11 -o loader_example loader_example.cc
+  #    - name: NoexceptBuild
+  #      run: |
+  #          g++-4.8 -DTINYGLTF_NOEXCEPTION -std=c++11 -o loader_example loader_example.cc
 
-      - name: RapidjsonBuild
-        run: |
-            git clone https://github.com/Tencent/rapidjson
-            g++-4.8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
+  #    - name: RapidjsonBuild
+  #      run: |
+  #          git clone https://github.com/Tencent/rapidjson
+  #          g++-4.8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
 
   # compile with mingw gcc cross
   build-mingw-cross:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     name: Build with MinGW gcc cross
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
 
       - name: Build
         run: |
@@ -133,20 +135,20 @@ jobs:
   # Cross-compile for aarch64 linux target
   build-cross-aarch64:
 
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     name: Build on cross aarch64
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2
       - name: Build
         run: |
             sudo apt-get update
             sudo apt-get install -y build-essential
-            sudo apt-get install -y gcc-8-aarch64-linux-gnu g++-8-aarch64-linux-gnu
+            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
             git clone https://github.com/Tencent/rapidjson
-            aarch64-linux-gnu-g++-8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
+            aarch64-linux-gnu-g++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
 
   # macOS clang
   build-macos:
