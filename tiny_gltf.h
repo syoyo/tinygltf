@@ -411,12 +411,12 @@ class Value {
 
   bool operator==(const tinygltf::Value &other) const;
 
-  Value & operator[](std::string const& key) {
+  Value & operator[](const std::string &key) {
     assert(type_ == OBJECT_TYPE);
     return object_value_[key];
   }
 
-  void Push(Value const& val) {
+  void Push(const Value &val) {
     assert(type_ == ARRAY_TYPE);
     array_value_.push_back(val);
   }
