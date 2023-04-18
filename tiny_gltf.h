@@ -6970,7 +6970,7 @@ static void SerializeGltfAnimationChannel(const AnimationChannel &channel,
   {
     detail::json target;
 
-    if (channel.target_node > 0) {
+    if (channel.target_node >= 0) {
       SerializeNumberProperty("node", channel.target_node, target);
     }
 
