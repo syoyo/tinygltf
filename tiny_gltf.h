@@ -1305,6 +1305,12 @@ typedef bool (*WriteWholeFileFunction)(std::string *, const std::string &,
                                        void *);
 
 ///
+/// GetFileSizeFunction type. Signature for custom filesystem callbacks.
+///
+typedef bool (*GetFileSizeFunction)(size_t *filesize_out, std::string *err, const std::string &abs_filename,
+                                    void *userdata);
+
+///
 /// A structure containing all required filesystem callbacks and a pointer to
 /// their user data.
 ///
@@ -1313,6 +1319,7 @@ struct FsCallbacks {
   ExpandFilePathFunction ExpandFilePath;
   ReadWholeFileFunction ReadWholeFile;
   WriteWholeFileFunction WriteWholeFile;
+  GetFileSizeFunction GetFileSizeInBytes; // To avoid GetFileSize Win32 API, add `InBytes` suffix.
 
   void *user_data;  // An argument that is passed to all fs callbacks
 };
@@ -1336,6 +1343,9 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
 
 bool WriteWholeFile(std::string *err, const std::string &filepath,
                     const std::vector<unsigned char> &contents, void *);
+
+bool GetFileSizeInBytes(size_t *filesize_out, std::string *err, const std::string &filepath,
+                    void *);
 #endif
 
 ///
@@ -1475,6 +1485,19 @@ class TinyGLTF {
     preserve_image_channels_ = onoff;
   }
 
+  ///
+  /// Set maximum allowed external file size in bytes.
+  /// Default: 2GB
+  /// Only effective for built-in ReadWholeFileFunction FS function.
+  ///
+  void SetMaxExternalFileSize(size_t max_bytes) {
+    max_external_file_size_ = max_bytes;
+  }
+
+  size_t GetMaxExternalFileSize() const {
+    return max_external_file_size_;
+  }
+
   bool GetPreserveImageChannels() const { return preserve_image_channels_; }
 
  private:
@@ -1499,6 +1522,8 @@ class TinyGLTF {
   bool preserve_image_channels_ = false;  /// Default false(expand channels to
                                           /// RGBA) for backward compatibility.
 
+  size_t max_external_file_size_{size_t((std::numeric_limits<int32_t>::max)())}; // Default 2GB
+
   // Warning & error messages
   std::string warn_;
   std::string err_;
@@ -1506,11 +1531,11 @@ class TinyGLTF {
   FsCallbacks fs = {
 #ifndef TINYGLTF_NO_FS
       &tinygltf::FileExists, &tinygltf::ExpandFilePath,
-      &tinygltf::ReadWholeFile, &tinygltf::WriteWholeFile,
+      &tinygltf::ReadWholeFile, &tinygltf::WriteWholeFile, &tinygltf::GetFileSizeInBytes,
 
       nullptr  // Fs callback user data
 #else
-      nullptr, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr, nullptr,
 
       nullptr  // Fs callback user data
 #endif
@@ -1557,6 +1582,7 @@ class TinyGLTF {
 #ifndef TINYGLTF_NO_FS
 #include <cstdio>
 #include <fstream>
+#include <sys/stat.h> // for is_directory check
 #endif
 #include <sstream>
 
@@ -2110,9 +2136,19 @@ static std::string FindFile(const std::vector<std::string> &paths,
     return std::string();
   }
 
+  // https://github.com/syoyo/tinygltf/issues/416
+  // Use strlen() since std::string's size/length reports the number of elements in the buffer, not the length of string(null-terminated)
+  // strip null-character in the middle of string.
+  size_t slength = strlen(filepath.c_str());
+  if (slength == 0) {
+    return std::string();
+  }
+
+  std::string cleaned_filepath = std::string(filepath.c_str());
+
   for (size_t i = 0; i < paths.size(); i++) {
     std::string absPath =
-        fs->ExpandFilePath(JoinPath(paths[i], filepath), fs->user_data);
+        fs->ExpandFilePath(JoinPath(paths[i], cleaned_filepath), fs->user_data);
     if (fs->FileExists(absPath, fs->user_data)) {
       return absPath;
     }
@@ -2358,7 +2394,7 @@ bool URIDecode(const std::string &in_uri, std::string *out_uri,
 static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
                              std::string *warn, const std::string &filename,
                              const std::string &basedir, bool required,
-                             size_t reqBytes, bool checkSize, FsCallbacks *fs) {
+                             size_t reqBytes, bool checkSize, size_t maxFileSize, FsCallbacks *fs) {
   if (fs == nullptr || fs->FileExists == nullptr ||
       fs->ExpandFilePath == nullptr || fs->ReadWholeFile == nullptr) {
     // This is a developer error, assert() ?
@@ -2382,6 +2418,29 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
       (*failMsgOut) += "File not found : " + filename + "\n";
     }
     return false;
+  }
+
+  // Check file size
+  if (fs->GetFileSizeInBytes) {
+
+    size_t file_size{0};
+    std::string _err;
+    bool ok = fs-GetFileSizeInBytes(&file_size, &_err, filepath, fs->user_data);
+    if (!ok) {
+      if (_err.size()) {
+        if (failMsgOut) {
+          (*failMsgOut) += "Getting file size failed : " + filename + ", err = " + _err + "\n";
+        }
+      }
+      return false;
+    }
+
+    if (file_size > maxFileSize) {
+      if (failMsgOut) {
+        (*failMsgOut) += "File size " + std::to_string(file_size) + " exceeds maximum allowed file size " + std::to_string(maxFileSize) + " : " + filepath + "\n";
+      }
+      return false;
+    }
   }
 
   std::vector<unsigned char> buf;
@@ -2690,12 +2749,23 @@ bool FileExists(const std::string &abs_filename, void *) {
 #else
 #ifdef _WIN32
 #if defined(_MSC_VER) || defined(__GLIBCXX__) || defined(_LIBCPP_VERSION)
+
+  // First check if a file is a directory.
+  DWORD result = GetFileAttributesW(UTF8ToWchar(abs_filename).c_str());
+  if (result == INVALID_FILE_ATTRIBUTES) {
+    return false;
+  }
+  if (result & FILE_ATTRIBUTE_DIRECTORY) {
+    return false;
+  }
+
   FILE *fp = nullptr;
   errno_t err = _wfopen_s(&fp, UTF8ToWchar(abs_filename).c_str(), L"rb");
   if (err != 0) {
     return false;
   }
 #else
+  // TODO: is_directory check
   FILE *fp = nullptr;
   errno_t err = fopen_s(&fp, abs_filename.c_str(), "rb");
   if (err != 0) {
@@ -2704,6 +2774,14 @@ bool FileExists(const std::string &abs_filename, void *) {
 #endif
 
 #else
+  struct stat sb;
+  if (stat(abs_filename.c_str(), &sb)) {
+    return false;
+  }
+  if (S_ISDIR(sb.st_mode)) {
+    return false;
+  }
+
   FILE *fp = fopen(abs_filename.c_str(), "rb");
 #endif
   if (fp) {
@@ -2780,6 +2858,100 @@ std::string ExpandFilePath(const std::string &filepath, void *) {
 #endif
 }
 
+bool GetFileSizeInBytes(size_t *filesize_out, std::string *err,
+                   const std::string &filepath, void *userdata) {
+  (void)userdata;
+
+#ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
+  if (asset_manager) {
+    AAsset *asset = AAssetManager_open(asset_manager, filepath.c_str(),
+                                       AASSET_MODE_STREAMING);
+    if (!asset) {
+      if (err) {
+        (*err) += "File open error : " + filepath + "\n";
+      }
+      return false;
+    }
+    size_t size = AAsset_getLength(asset);
+
+    if (size == 0) {
+      if (err) {
+        (*err) += "Invalid file size : " + filepath +
+                  " (does the path point to a directory?)";
+      }
+      return false;
+    }
+
+    return true;
+  } else {
+    if (err) {
+      (*err) += "No asset manager specified : " + filepath + "\n";
+    }
+    return false;
+  }
+#else
+#ifdef _WIN32
+#if defined(__GLIBCXX__)  // mingw
+  int file_descriptor =
+      _wopen(UTF8ToWchar(filepath).c_str(), _O_RDONLY | _O_BINARY);
+  __gnu_cxx::stdio_filebuf<char> wfile_buf(file_descriptor, std::ios_base::in);
+  std::istream f(&wfile_buf);
+#elif defined(_MSC_VER) || defined(_LIBCPP_VERSION)
+  // For libcxx, assume _LIBCPP_HAS_OPEN_WITH_WCHAR is defined to accept
+  // `wchar_t *`
+  std::ifstream f(UTF8ToWchar(filepath).c_str(), std::ifstream::binary);
+#else
+  // Unknown compiler/runtime
+  std::ifstream f(filepath.c_str(), std::ifstream::binary);
+#endif
+#else
+  std::ifstream f(filepath.c_str(), std::ifstream::binary);
+#endif
+  if (!f) {
+    if (err) {
+      (*err) += "File open error : " + filepath + "\n";
+    }
+    return false;
+  }
+
+  // For directory(and pipe?), peek() will fail(Posix gnustl/libc++ only)
+  int buf = f.peek();
+  if (!f) {
+    if (err) {
+      (*err) += "File read error. Maybe empty file or invalid file : " + filepath + "\n";
+    }
+    return false;
+  }
+
+  f.seekg(0, f.end);
+  size_t sz = static_cast<size_t>(f.tellg());
+
+  //std::cout << "sz = " << sz << "\n";
+  f.seekg(0, f.beg);
+
+  if (int64_t(sz) < 0) {
+    if (err) {
+      (*err) += "Invalid file size : " + filepath +
+                " (does the path point to a directory?)";
+    }
+    return false;
+  } else if (sz == 0) {
+    if (err) {
+      (*err) += "File is empty : " + filepath + "\n";
+    }
+    return false;
+  } else if (sz >= (std::numeric_limits<std::streamoff>::max)()) {
+    if (err) {
+      (*err) += "Invalid file size : " + filepath + "\n";
+    }
+    return false;
+  }
+
+  (*filesize_out) = sz;
+  return true;
+#endif
+}
+
 bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
                    const std::string &filepath, void *) {
 #ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
@@ -2835,8 +3007,19 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
     return false;
   }
 
+  // For directory(and pipe?), peek() will fail(Posix gnustl/libc++ only)
+  int buf = f.peek();
+  if (!f) {
+    if (err) {
+      (*err) += "File read error. Maybe empty file or invalid file : " + filepath + "\n";
+    }
+    return false;
+  }
+
   f.seekg(0, f.end);
   size_t sz = static_cast<size_t>(f.tellg());
+
+  //std::cout << "sz = " << sz << "\n";
   f.seekg(0, f.beg);
 
   if (int64_t(sz) < 0) {
@@ -2848,6 +3031,11 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   } else if (sz == 0) {
     if (err) {
       (*err) += "File is empty : " + filepath + "\n";
+    }
+    return false;
+  } else if (sz >= (std::numeric_limits<std::streamoff>::max)()) {
+    if (err) {
+      (*err) += "Invalid file size : " + filepath + "\n";
     }
     return false;
   }
@@ -3876,7 +4064,7 @@ static bool ParseAsset(Asset *asset, std::string *err, const detail::json &o,
 static bool ParseImage(Image *image, const int image_idx, std::string *err,
                        std::string *warn, const detail::json &o,
                        bool store_original_json_for_extras_and_extensions,
-                       const std::string &basedir, FsCallbacks *fs,
+                       const std::string &basedir, const size_t max_file_size, FsCallbacks *fs,
                        const URICallbacks *uri_cb,
                        LoadImageDataFunction *LoadImageData = nullptr,
                        void *load_image_user_data = nullptr) {
@@ -3976,8 +4164,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     if (!DecodeDataURI(&img, image->mimeType, uri, 0, false)) {
       if (err) {
         (*err) += "Failed to decode 'uri' for image[" +
-                  std::to_string(image_idx) + "] name = [" + image->name +
-                  "]\n";
+                  std::to_string(image_idx) + "] name = \"" + image->name +
+                  "\"\n";
       }
       return false;
     }
@@ -3992,8 +4180,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     if (!uri_cb->decode(uri, &decoded_uri, uri_cb->user_data)) {
       if (warn) {
         (*warn) += "Failed to decode 'uri' for image[" +
-                   std::to_string(image_idx) + "] name = [" + image->name +
-                   "]\n";
+                   std::to_string(image_idx) + "] name = \"" + image->name +
+                   "\"\n";
       }
 
       // Image loading failure is not critical to overall gltf loading.
@@ -4002,11 +4190,11 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
 
     if (!LoadExternalFile(&img, err, warn, decoded_uri, basedir,
                           /* required */ false, /* required bytes */ 0,
-                          /* checksize */ false, fs)) {
+                          /* checksize */ false, /* max file size */ max_file_size, fs)) {
       if (warn) {
         (*warn) += "Failed to load external 'uri' for image[" +
-                   std::to_string(image_idx) + "] name = [" + image->name +
-                   "]\n";
+                   std::to_string(image_idx) + "] name = \"" + decoded_uri +
+                   "\"\n";
       }
       // If the image cannot be loaded, keep uri as image->uri.
       return true;
@@ -4015,8 +4203,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     if (img.empty()) {
       if (warn) {
         (*warn) += "Image data is empty for image[" +
-                   std::to_string(image_idx) + "] name = [" + image->name +
-                   "] \n";
+                   std::to_string(image_idx) + "] name = \"" + image->name +
+                   "\" \n";
       }
       return false;
     }
@@ -4179,7 +4367,7 @@ static bool ParseOcclusionTextureInfo(
 static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
                         bool store_original_json_for_extras_and_extensions,
                         FsCallbacks *fs, const URICallbacks *uri_cb,
-                        const std::string &basedir, bool is_binary = false,
+                        const std::string &basedir, const size_t max_buffer_size, bool is_binary = false,
                         const unsigned char *bin_data = nullptr,
                         size_t bin_size = 0) {
   size_t byteLength;
@@ -4231,7 +4419,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
         }
         if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr,
                               decoded_uri, basedir, /* required */ true,
-                              byteLength, /* checkSize */ true, fs)) {
+                              byteLength, /* checkSize */ true, /* max_file_size */max_buffer_size, fs)) {
           return false;
         }
       }
@@ -4279,7 +4467,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
       }
       if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr, decoded_uri,
                             basedir, /* required */ true, byteLength,
-                            /* checkSize */ true, fs)) {
+                            /* checkSize */ true, /* max file size */max_buffer_size, fs)) {
         return false;
       }
     }
@@ -5814,7 +6002,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       Buffer buffer;
       if (!ParseBuffer(&buffer, err, o,
                        store_original_json_for_extras_and_extensions_, &fs,
-                       &uri_cb, base_dir, is_binary_, bin_data_, bin_size_)) {
+                       &uri_cb, base_dir, max_external_file_size_, is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
@@ -6085,7 +6273,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       Image image;
       if (!ParseImage(&image, idx, err, warn, o,
                       store_original_json_for_extras_and_extensions_, base_dir,
-                      &fs, &uri_cb, &this->LoadImageData,
+                      max_external_file_size_, &fs, &uri_cb, &this->LoadImageData,
                       load_image_user_data)) {
         return false;
       }
