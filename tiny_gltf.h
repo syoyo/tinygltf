@@ -1519,7 +1519,7 @@ class TinyGLTF {
   bool preserve_image_channels_ = false;  /// Default false(expand channels to
                                           /// RGBA) for backward compatibility.
 
-  size_t max_external_file_size_{(std::numeric_limits<int32_t>::max)()}; // Default 2GB
+  size_t max_external_file_size_{size_t((std::numeric_limits<int32_t>::max)())}; // Default 2GB
 
   // Warning & error messages
   std::string warn_;
