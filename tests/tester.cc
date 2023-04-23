@@ -721,3 +721,39 @@ TEST_CASE("serialize-image-failure", "[issue-394]") {
   REQUIRE(false == result);
   REQUIRE(os.str().size() == 0);
 }
+
+TEST_CASE("filesize-check", "[issue-416]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  ctx.SetMaxExternalFileSize(10); // 10 bytes. will fail to load texture image.
+
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/Cube/Cube.gltf");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+
+  REQUIRE(false == ret);
+}
+
+TEST_CASE("load-issue-416-model", "[issue-416]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "issue-416.gltf");
+  if (!warn.empty()) {
+    std::cout << "WARN:" << warn << std::endl;
+  }
+  if (!err.empty()) {
+    std::cerr << "ERR:" << err << std::endl;
+  }
+
+  // external file load fails, but reading glTF itself is ok.
+  REQUIRE(true == ret);
+}
