@@ -721,3 +721,20 @@ TEST_CASE("serialize-image-failure", "[issue-394]") {
   REQUIRE(false == result);
   REQUIRE(os.str().size() == 0);
 }
+
+TEST_CASE("filesize-check", "[issue-416]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  ctx.SetMaxExternalFileSize(10); // 10 bytes. will fail to load texture image.
+
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/Cube/Cube.gltf");
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+
+  REQUIRE(false == ret);
+}
