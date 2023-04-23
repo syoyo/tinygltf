@@ -4177,8 +4177,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     if (!uri_cb->decode(uri, &decoded_uri, uri_cb->user_data)) {
       if (warn) {
         (*warn) += "Failed to decode 'uri' for image[" +
-                   std::to_string(image_idx) + "] name = [" + image->name +
-                   "]\n";
+                   std::to_string(image_idx) + "] name = \"" + image->name +
+                   "\"\n";
       }
 
       // Image loading failure is not critical to overall gltf loading.
@@ -4190,8 +4190,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
                           /* checksize */ false, /* max file size */ max_file_size, fs)) {
       if (warn) {
         (*warn) += "Failed to load external 'uri' for image[" +
-                   std::to_string(image_idx) + "] name = [" + decoded_uri +
-                   "]\n";
+                   std::to_string(image_idx) + "] name = \"" + decoded_uri +
+                   "\"\n";
       }
       // If the image cannot be loaded, keep uri as image->uri.
       return true;
@@ -4200,8 +4200,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     if (img.empty()) {
       if (warn) {
         (*warn) += "Image data is empty for image[" +
-                   std::to_string(image_idx) + "] name = [" + image->name +
-                   "] \n";
+                   std::to_string(image_idx) + "] name = \"" + image->name +
+                   "\" \n";
       }
       return false;
     }

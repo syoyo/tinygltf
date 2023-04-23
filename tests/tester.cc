@@ -738,3 +738,22 @@ TEST_CASE("filesize-check", "[issue-416]") {
 
   REQUIRE(false == ret);
 }
+
+TEST_CASE("load-issue-416-model", "[issue-416]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  bool ret = ctx.LoadASCIIFromFile(&model, &err, &warn, "issue-416.gltf");
+  if (!warn.empty()) {
+    std::cout << "WARN:" << warn << std::endl;
+  }
+  if (!err.empty()) {
+    std::cerr << "ERR:" << err << std::endl;
+  }
+
+  // external file load fails, but reading glTF itself is ok.
+  REQUIRE(true == ret);
+}
