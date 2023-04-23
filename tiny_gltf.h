@@ -2755,7 +2755,6 @@ bool FileExists(const std::string &abs_filename, void *) {
   if (result & FILE_ATTRIBUTE_DIRECTORY) {
     return false;
   }
-    }
 
   FILE *fp = nullptr;
   errno_t err = _wfopen_s(&fp, UTF8ToWchar(abs_filename).c_str(), L"rb");
