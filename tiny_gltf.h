@@ -2425,7 +2425,7 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
 
     size_t file_size{0};
     std::string _err;
-    bool ok = fs-GetFileSizeInBytes(&file_size, &_err, filepath, fs->user_data);
+    bool ok = fs->GetFileSizeInBytes(&file_size, &_err, filepath, fs->user_data);
     if (!ok) {
       if (_err.size()) {
         if (failMsgOut) {
