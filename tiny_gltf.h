@@ -1062,6 +1062,7 @@ class Node {
   std::string name;
   int skin;
   int mesh;
+  int light;  // light source index (KHR_lights_punctual)
   std::vector<int> children;
   std::vector<double> rotation;     // length must be 0 or 4
   std::vector<double> scale;        // length must be 0 or 3
@@ -5090,6 +5091,20 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
     }
   }
 
+  // KHR_lights_punctual: parse light source reference
+  int light = -1;
+  if (node->extensions.count("KHR_lights_punctual") != 0) {
+    auto const& light_ext = node->extensions["KHR_lights_punctual"];
+    if (light_ext.Has("light")) {
+      light = light_ext.Get("light").GetNumberAsInt();
+    } else {
+      *err += "Node has extension KHR_lights_punctual, but does not reference "
+        "a light source.\n";
+      return false;
+    }
+  }
+  node->light = light;
+  
   return true;
 }
 
