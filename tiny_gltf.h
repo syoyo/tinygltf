@@ -103,7 +103,139 @@
   x &operator=(const x &) = default;   \
   x &operator=(x &&) TINYGLTF_NOEXCEPT = default;
 
+///
+/// Headers for JSON utils.
+///
+// TODO(vsatish)(p0): What are the implications of moving json includes into the
+// header? As a starter, they would be included everywhere we include the
+// header. Is that an issue?
+#ifdef __clang__
+// Disable some warnings for external files.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wfloat-equal"
+#pragma clang diagnostic ignored "-Wexit-time-destructors"
+#pragma clang diagnostic ignored "-Wconversion"
+#pragma clang diagnostic ignored "-Wold-style-cast"
+#pragma clang diagnostic ignored "-Wglobal-constructors"
+#if __has_warning("-Wreserved-id-macro")
+#pragma clang diagnostic ignored "-Wreserved-id-macro"
+#endif
+#pragma clang diagnostic ignored "-Wdisabled-macro-expansion"
+#pragma clang diagnostic ignored "-Wpadded"
+#pragma clang diagnostic ignored "-Wc++98-compat"
+#pragma clang diagnostic ignored "-Wc++98-compat-pedantic"
+#pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
+#pragma clang diagnostic ignored "-Wswitch-enum"
+#pragma clang diagnostic ignored "-Wimplicit-fallthrough"
+#pragma clang diagnostic ignored "-Wweak-vtables"
+#pragma clang diagnostic ignored "-Wcovered-switch-default"
+#if __has_warning("-Wdouble-promotion")
+#pragma clang diagnostic ignored "-Wdouble-promotion"
+#endif
+#if __has_warning("-Wcomma")
+#pragma clang diagnostic ignored "-Wcomma"
+#endif
+#if __has_warning("-Wzero-as-null-pointer-constant")
+#pragma clang diagnostic ignored "-Wzero-as-null-pointer-constant"
+#endif
+#if __has_warning("-Wcast-qual")
+#pragma clang diagnostic ignored "-Wcast-qual"
+#endif
+#if __has_warning("-Wmissing-variable-declarations")
+#pragma clang diagnostic ignored "-Wmissing-variable-declarations"
+#endif
+#if __has_warning("-Wmissing-prototypes")
+#pragma clang diagnostic ignored "-Wmissing-prototypes"
+#endif
+#if __has_warning("-Wcast-align")
+#pragma clang diagnostic ignored "-Wcast-align"
+#endif
+#if __has_warning("-Wnewline-eof")
+#pragma clang diagnostic ignored "-Wnewline-eof"
+#endif
+#if __has_warning("-Wunused-parameter")
+#pragma clang diagnostic ignored "-Wunused-parameter"
+#endif
+#if __has_warning("-Wmismatched-tags")
+#pragma clang diagnostic ignored "-Wmismatched-tags"
+#endif
+#if __has_warning("-Wextra-semi-stmt")
+#pragma clang diagnostic ignored "-Wextra-semi-stmt"
+#endif
+#endif
+
+// Disable GCC warnings
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wtype-limits"
+#endif  // __GNUC__
+
+#ifndef TINYGLTF_NO_INCLUDE_JSON
+#ifndef TINYGLTF_USE_RAPIDJSON
+#include "json.hpp"
+#else
+// RapidJSON handled further down in impl. portion - see note with JSON utils
+// below
+#endif
+#endif
+
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
 namespace tinygltf {
+
+///
+/// JSON utils.
+///
+/// NOTE: For now, only nlohmann/json impl. (ifndef TINYGLTF_USE_RAPIDJSON) is
+/// exposed in header for corresponding tinygltf::TinyGLTF::LoadFromJSON(..., const JsonDocument &doc, ...)
+/// endpoint (see relevant comment above it for why).
+#ifdef TINYGLTF_USE_RAPIDJSON
+// RapidJSON handled further down in impl. portion
+#else
+using nlohmann::json;
+using json_const_iterator = json::const_iterator;
+using json_const_array_iterator = json_const_iterator;
+using JsonDocument = json;
+#endif
+
+#ifndef TINYGLTF_USE_RAPIDJSON
+// Fwd declarations
+
+void JsonParse(JsonDocument &doc, const char *str, size_t length,
+               bool throwExc = false);
+
+bool GetInt(const json &o, int &val);
+bool GetDouble(const json &o, double &val);
+bool GetNumber(const json &o, double &val);
+bool GetString(const json &o, std::string &val);
+
+bool IsArray(const json &o);
+json_const_array_iterator ArrayBegin(const json &o);
+json_const_array_iterator ArrayEnd(const json &o);
+
+bool IsObject(const json &o);
+json_const_iterator ObjectBegin(const json &o);
+json_const_iterator ObjectEnd(const json &o);
+
+std::string GetKey(json_const_iterator &it);
+bool FindMember(const json &o, const char *member, json_const_iterator &it);
+const json &GetValue(json_const_iterator &it);
+std::string JsonToString(const json &o, int spacing = -1);
+
+json JsonFromString(const char *s);
+void JsonAssign(json &dest, const json &src);
+void JsonAddMember(json &o, const char *key, json &&value);
+void JsonPushBack(json &o, json &&value);
+bool JsonIsNull(const json &o);
+void JsonSetObject(json &o);
+void JsonReserveArray(json &o, size_t s);
+#endif
 
 #define TINYGLTF_MODE_POINTS (0)
 #define TINYGLTF_MODE_LINE (1)
@@ -1441,6 +1573,7 @@ class TinyGLTF {
   /// message to `warn` for example it fails to load asserts. Returns false and
   /// set error string to `err` if there's an error.
   ///
+  // TODO(vsatish)(p1): Propagate required_properties to other endpoints
   bool LoadASCIIFromString(Model *model, std::string *err, std::string *warn,
                            const char *str, const unsigned int length,
                            const std::string &base_dir,
@@ -1468,6 +1601,18 @@ class TinyGLTF {
                             const unsigned int length,
                             const std::string &base_dir = "",
                             unsigned int check_sections = REQUIRE_VERSION);
+
+// NOTE(vsatish): Haven't yet scoped out what it would entail to expose the
+// RapidJSON JsonDocument impl. in the tinygltf header since it seems to depend
+// on more complex machinery such as allocators. Constraining to nlohmann/json
+// for now.
+#ifndef TINYGLTF_USE_RAPIDJSON
+  bool LoadFromJSON(Model *model, std::string *err, std::string *warn,
+                      const JsonDocument &doc,
+                      const std::string &base_dir = "",
+                      unsigned int check_sections = REQUIRE_VERSION,
+                      bool required_properties = true);
+#endif
 
   ///
   /// Write glTF to stream, buffers and images will be embedded
@@ -1554,6 +1699,16 @@ class TinyGLTF {
   ///
   bool LoadFromString(Model *model, std::string *err, std::string *warn,
                       const char *str, const unsigned int length,
+                      const std::string &base_dir, unsigned int check_sections, bool required_properties = true);
+
+  ///
+  /// Loads glTF asset from JSON.
+  /// `length` = strlen(str);
+  /// Set warning message to `warn` for example it fails to load asserts
+  /// Returns false and set error string to `err` if there's an error.
+  ///
+  bool FromJSON(Model *model, std::string *err, std::string *warn,
+                      const JsonDocument &v,
                       const std::string &base_dir, unsigned int check_sections, bool required_properties = true);
 
   const unsigned char *bin_data_ = nullptr;
@@ -1691,7 +1846,7 @@ class TinyGLTF {
 
 #ifndef TINYGLTF_NO_INCLUDE_JSON
 #ifndef TINYGLTF_USE_RAPIDJSON
-#include "json.hpp"
+// nlohmann/json handled further up in header portion
 #else
 #ifndef TINYGLTF_NO_INCLUDE_RAPIDJSON
 #include "document.h"
@@ -1776,7 +1931,19 @@ class TinyGLTF {
 #endif
 #endif
 
-namespace {
+
+#ifdef __APPLE__
+#include "TargetConditionals.h"
+#endif
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++98-compat"
+#endif
+
+
+namespace tinygltf {
+
 #ifdef TINYGLTF_USE_RAPIDJSON
 
 #ifdef TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
@@ -1840,14 +2007,11 @@ struct JsonDocument : public rapidjson::Document {
 #endif  // TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
 
 #else
-using nlohmann::json;
-using json_const_iterator = json::const_iterator;
-using json_const_array_iterator = json_const_iterator;
-using JsonDocument = json;
+// nlohmann/json handled further up in header portion
 #endif
 
 void JsonParse(JsonDocument &doc, const char *str, size_t length,
-               bool throwExc = false) {
+               bool throwExc) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   (void)throwExc;
   doc.Parse(str, length);
@@ -1855,18 +2019,6 @@ void JsonParse(JsonDocument &doc, const char *str, size_t length,
   doc = json::parse(str, str + length, nullptr, throwExc);
 #endif
 }
-}  // namespace
-
-#ifdef __APPLE__
-#include "TargetConditionals.h"
-#endif
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wc++98-compat"
-#endif
-
-namespace tinygltf {
 
 ///
 /// Internal LoadImageDataOption struct.
@@ -3138,7 +3290,6 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
   return true;
 }
 
-namespace {
 bool GetInt(const json &o, int &val) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   if (!o.IsDouble()) {
@@ -3297,7 +3448,7 @@ const json &GetValue(json_const_iterator &it) {
 #endif
 }
 
-std::string JsonToString(const json &o, int spacing = -1) {
+std::string JsonToString(const json &o, int spacing) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   using namespace rapidjson;
   StringBuffer buffer;
@@ -3321,7 +3472,6 @@ std::string JsonToString(const json &o, int spacing = -1) {
 #endif
 }
 
-}  // namespace
 
 static bool ParseJsonAsValue(Value *ret, const json &o) {
   Value val{};
@@ -5766,6 +5916,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 #endif
 
+  return FromJSON(model, err, warn, v, base_dir, check_sections, required_properties);
+}
+
+bool TinyGLTF::FromJSON(Model *model, std::string *err, std::string *warn,
+                              const JsonDocument &v,
+                              const std::string &base_dir,
+                              unsigned int check_sections,
+                              bool required_properties) {
+  // TODO(vsatish)(p3): Potentially redundant?
   if (!IsObject(v)) {
     // root is not an object.
     if (err) {
@@ -6670,10 +6829,22 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
   return ret;
 }
 
+bool TinyGLTF::LoadFromJSON(Model *model, std::string *err,
+                                   std::string *warn, const JsonDocument &doc,
+                                   const std::string &base_dir,
+                                   unsigned int check_sections,
+                                   bool required_properties) {
+  is_binary_ = false;
+  bin_data_ = nullptr;
+  bin_size_ = 0;
+
+  return FromJSON(model, err, warn, doc, base_dir,
+                        check_sections, required_properties);
+}
+
 ///////////////////////
 // GLTF Serialization
 ///////////////////////
-namespace {
 json JsonFromString(const char *s) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return json(s, GetAllocator());
@@ -6733,7 +6904,6 @@ void JsonReserveArray(json &o, size_t s) {
   (void)(o);
   (void)(s);
 }
-}  // namespace
 
 // typedef std::pair<std::string, json> json_object_pair;
 
