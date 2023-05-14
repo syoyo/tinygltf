@@ -1602,11 +1602,18 @@ class TinyGLTF {
                             const std::string &base_dir = "",
                             unsigned int check_sections = REQUIRE_VERSION);
 
-// NOTE(vsatish): Haven't yet scoped out what it would entail to expose the
-// RapidJSON JsonDocument impl. in the tinygltf header since it seems to depend
-// on more complex machinery such as allocators. Constraining to nlohmann/json
-// for now.
 #ifndef TINYGLTF_USE_RAPIDJSON
+  ///
+  /// Loads glTF asset from JSON(memory).
+  /// `base_dir` is a search path of glTF asset(e.g. images). Path Must be an
+  /// expanded path (e.g. no tilde(`~`), no environment variables).
+  /// Set warning message to `warn` for example it fails to load asserts.
+  /// Returns false and set error string to `err` if there's an error.
+  ///
+  /// NOTE(vsatish): Haven't yet scoped out what it would entail to expose the
+  /// RapidJSON JsonDocument impl. in the tinygltf header since it seems to
+  /// depend on more complex machinery such as allocators. Constraining to
+  /// nlohmann/json for now.
   bool LoadFromJSON(Model *model, std::string *err, std::string *warn,
                       const JsonDocument &doc,
                       const std::string &base_dir = "",
@@ -1702,8 +1709,7 @@ class TinyGLTF {
                       const std::string &base_dir, unsigned int check_sections, bool required_properties = true);
 
   ///
-  /// Loads glTF asset from JSON.
-  /// `length` = strlen(str);
+  /// Loads glTF asset from JSON(memory).
   /// Set warning message to `warn` for example it fails to load asserts
   /// Returns false and set error string to `err` if there's an error.
   ///
