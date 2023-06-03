@@ -6767,7 +6767,16 @@ void JsonAddMember(detail::json &o, const char *key, detail::json &&value) {
   if (!o.IsObject()) {
     o.SetObject();
   }
-  o.AddMember(detail::json(key, detail::GetAllocator()), std::move(value), detail::GetAllocator());
+
+  // Issue 420.
+  // AddMember may create duplicated key, so use [] API when a key already exists.
+  // https://github.com/Tencent/rapidjson/issues/771#issuecomment-254386863
+  detail::json_const_iterator it;
+  if (detail::FindMember(o, key, it)) {
+    o[key] = std::move(value); // replace
+  } else {
+    o.AddMember(detail::json(key, detail::GetAllocator()), std::move(value), detail::GetAllocator());
+  }
 #else
   o[key] = std::move(value);
 #endif
