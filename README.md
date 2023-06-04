@@ -197,17 +197,6 @@ if (!ret) {
 * `TINYGLTF_USE_RAPIDJSON` : Use RapidJSON as a JSON parser/serializer. RapidJSON files are not included in TinyGLTF repo. Please set an include path to RapidJSON if you enable this feature.
 * `TINYGLTF_USE_CPP14` : Use C++14 feature(requires C++14 compiler). This may give better performance than C++11.
 
-### Wuffs image loader option(faster and secure JPEG/PNG deocoding)
-
-You can use `wuffs` image loader to load JPEG and PNG in fast and securely.
-(`stb_image` has some security issues, whereas `wuffs` is well fuzz tested)
-
-Not that some uncommon JPEG format is unsupported in `wuffs` `std/jpeg` decoder.
-
-* `TINYGLTF_USE_WUFFS_IMAGE_LOADER` : Use `wuffs` to load images. `stb_image` related stuff will be disabled.
-  * `TINYGLTF_NO_STB_IMAGE` supercedes `wuffs` macros. i.e. when `TINYGLTF_NO_STB_IMAGE` is defined, both `stb_image` and `wuffs` are disabled.
-* `TINYGLTF_NO_WUFFS_IMPLEMENTATION` : Do not define `WUFFS_IMPLEMENTATION` inside `tiny_gltf.h`. Define this macro if you use `wuffs` in another C/C++ file.
-
 
 ## CMake options
 

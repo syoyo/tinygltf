@@ -25,32 +25,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Version:
-//  - v2.8.1 Missed serialization texture sampler name fixed. PR#399.
-//  - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image. PR#397.
-//  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393.
-//  - v2.6.3 Fix GLB file with empty BIN chunk was not handled. PR#382 and PR#383.
-//  - v2.6.2 Fix out-of-bounds access of accessors. PR#379.
-//  - v2.6.1 Better GLB validation check when loading.
-//  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
-//           Disable expanding file path for security(no use of awkward `wordexp` anymore).
-//  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
-//  - v2.4.3 Fix null object output when material has all default
-//  parameters.
-//  - v2.4.2 Decode percent-encoded URI.
-//  - v2.4.1 Fix some glTF object class does not have `extensions` and/or
-//  `extras` property.
-//  - v2.4.0 Experimental RapidJSON and C++14 support(Thanks to @jrkoone).
-//  - v2.3.1 Set default value of minFilter and magFilter in Sampler to -1.
-//  - v2.3.0 Modified Material representation according to glTF 2.0 schema
-//           (and introduced TextureInfo class)
-//           Change the behavior of `Value::IsNumber`. It return true either the
-//           value is int or real.
-//  - v2.2.0 Add loading 16bit PNG support. Add Sparse accessor support(Thanks
-//  to @Ybalrid)
-//  - v2.1.0 Add draco compression.
-//  - v2.0.1 Add comparison feature(Thanks to @Selmar).
-//  - v2.0.0 glTF 2.0!.
+// Version: - v2.8.10
+// See https://github.com/syoyo/tinygltf/releases for release history.
 //
 // Tiny glTF loader is using following third party libraries:
 //
