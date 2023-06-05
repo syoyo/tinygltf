@@ -4007,6 +4007,30 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
   return true;
 }
 
+template <typename GltfType>
+static bool ParseExtrasAndExtensions(GltfType * target, std::string *err,
+    const detail::json & o, bool store_json_strings) {
+  
+  ParseExtensionsProperty(&target->extensions, err, o);
+  ParseExtrasProperty(&target->extras, o);
+
+  if (store_json_strings) {
+    {
+      detail::json_const_iterator it;
+      if (detail::FindMember(o, "extensions", it)) {
+        target->extensions_json_string = detail::JsonToString(detail::GetValue(it));
+      }
+    }
+    {
+      detail::json_const_iterator it;
+      if (detail::FindMember(o, "extras", it)) {
+        target->extras_json_string = detail::JsonToString(detail::GetValue(it));
+      }
+    }
+  }
+  return true;
+}
+
 static bool ParseAsset(Asset *asset, std::string *err, const detail::json &o,
                        bool store_original_json_for_extras_and_extensions) {
   ParseStringProperty(&asset->version, err, o, "version", true, "Asset");
@@ -4014,26 +4038,7 @@ static bool ParseAsset(Asset *asset, std::string *err, const detail::json &o,
   ParseStringProperty(&asset->minVersion, err, o, "minVersion", false, "Asset");
   ParseStringProperty(&asset->copyright, err, o, "copyright", false, "Asset");
 
-  ParseExtensionsProperty(&asset->extensions, err, o);
-
-  // Unity exporter version is added as extra here
-  ParseExtrasProperty(&(asset->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        asset->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        asset->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
-
+  ParseExtrasAndExtensions(asset, err, o, store_original_json_for_extras_and_extensions);
   return true;
 }
 
@@ -4074,23 +4079,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     return false;
   }
 
-  ParseExtensionsProperty(&image->extensions, err, o);
-  ParseExtrasProperty(&image->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator eit;
-      if (detail::FindMember(o, "extensions", eit)) {
-        image->extensions_json_string = detail::JsonToString(detail::GetValue(eit));
-      }
-    }
-    {
-      detail::json_const_iterator eit;
-      if (detail::FindMember(o, "extras", eit)) {
-        image->extras_json_string = detail::JsonToString(detail::GetValue(eit));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(image, err, o, store_original_json_for_extras_and_extensions);
 
   if (hasBufferView) {
     int bufferView = -1;
@@ -4210,23 +4199,7 @@ static bool ParseTexture(Texture *texture, std::string *err, const detail::json 
   texture->sampler = sampler;
   texture->source = source;
 
-  ParseExtensionsProperty(&texture->extensions, err, o);
-  ParseExtrasProperty(&texture->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        texture->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        texture->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(texture, err, o, store_original_json_for_extras_and_extensions);
 
   ParseStringProperty(&texture->name, err, o, "name", false);
 
@@ -4247,23 +4220,7 @@ static bool ParseTextureInfo(
 
   ParseIntegerProperty(&texinfo->texCoord, err, o, "texCoord", false);
 
-  ParseExtensionsProperty(&texinfo->extensions, err, o);
-  ParseExtrasProperty(&texinfo->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        texinfo->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        texinfo->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(texinfo, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -4283,23 +4240,7 @@ static bool ParseNormalTextureInfo(
   ParseIntegerProperty(&texinfo->texCoord, err, o, "texCoord", false);
   ParseNumberProperty(&texinfo->scale, err, o, "scale", false);
 
-  ParseExtensionsProperty(&texinfo->extensions, err, o);
-  ParseExtrasProperty(&texinfo->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        texinfo->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        texinfo->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(texinfo, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -4319,23 +4260,7 @@ static bool ParseOcclusionTextureInfo(
   ParseIntegerProperty(&texinfo->texCoord, err, o, "texCoord", false);
   ParseNumberProperty(&texinfo->strength, err, o, "strength", false);
 
-  ParseExtensionsProperty(&texinfo->extensions, err, o);
-  ParseExtrasProperty(&texinfo->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        texinfo->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        texinfo->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(texinfo, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -4451,23 +4376,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
 
   ParseStringProperty(&buffer->name, err, o, "name", false);
 
-  ParseExtensionsProperty(&buffer->extensions, err, o);
-  ParseExtrasProperty(&buffer->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        buffer->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        buffer->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(buffer, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -4523,23 +4432,7 @@ static bool ParseBufferView(
 
   ParseStringProperty(&bufferView->name, err, o, "name", false);
 
-  ParseExtensionsProperty(&bufferView->extensions, err, o);
-  ParseExtrasProperty(&bufferView->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        bufferView->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        bufferView->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(bufferView, err, o, store_original_json_for_extras_and_extensions);
 
   bufferView->buffer = buffer;
   bufferView->byteOffset = byteOffset;
@@ -4599,6 +4492,7 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   accessor->sparse.values.bufferView = values_buffer_view;
   accessor->sparse.values.byteOffset = values_byte_offset;
 
+  // TODO(agnat): Parse extras and extensions of the sparse object
   return true;
 }
 
@@ -4682,23 +4576,7 @@ static bool ParseAccessor(Accessor *accessor, std::string *err, const detail::js
     }
   }
 
-  ParseExtensionsProperty(&(accessor->extensions), err, o);
-  ParseExtrasProperty(&(accessor->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        accessor->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        accessor->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(accessor, err, o, store_original_json_for_extras_and_extensions);
 
   // check if accessor has a "sparse" object:
   detail::json_const_iterator iterator;
@@ -4945,23 +4823,7 @@ static bool ParsePrimitive(Primitive *primitive, Model *model, std::string *err,
     }
   }
 
-  ParseExtrasProperty(&(primitive->extras), o);
-  ParseExtensionsProperty(&primitive->extensions, err, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        primitive->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        primitive->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(primitive, err, o, store_original_json_for_extras_and_extensions);
 
 #ifdef TINYGLTF_ENABLE_DRACO
   auto dracoExtension =
@@ -4999,23 +4861,7 @@ static bool ParseMesh(Mesh *mesh, Model *model, std::string *err, const detail::
   // Should probably check if has targets and if dimensions fit
   ParseNumberArrayProperty(&mesh->weights, err, o, "weights", false);
 
-  ParseExtensionsProperty(&mesh->extensions, err, o);
-  ParseExtrasProperty(&(mesh->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        mesh->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        mesh->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(mesh, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5048,23 +4894,7 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
 
   ParseNumberArrayProperty(&node->weights, err, o, "weights", false);
 
-  ParseExtensionsProperty(&node->extensions, err, o);
-  ParseExtrasProperty(&(node->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        node->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        node->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(node, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5110,23 +4940,7 @@ static bool ParsePbrMetallicRoughness(
   ParseNumberProperty(&pbr->metallicFactor, err, o, "metallicFactor", false);
   ParseNumberProperty(&pbr->roughnessFactor, err, o, "roughnessFactor", false);
 
-  ParseExtensionsProperty(&pbr->extensions, err, o);
-  ParseExtrasProperty(&pbr->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        pbr->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        pbr->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(pbr, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5234,24 +5048,8 @@ static bool ParseMaterial(Material *material, std::string *err, const detail::js
     }
   }
 
-  material->extensions.clear();
-  ParseExtensionsProperty(&material->extensions, err, o);
-  ParseExtrasProperty(&(material->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator eit;
-      if (detail::FindMember(o, "extensions", eit)) {
-        material->extensions_json_string = detail::JsonToString(detail::GetValue(eit));
-      }
-    }
-    {
-      detail::json_const_iterator eit;
-      if (detail::FindMember(o, "extras", eit)) {
-        material->extras_json_string = detail::JsonToString(detail::GetValue(eit));
-      }
-    }
-  }
+  material->extensions.clear(); // Note(agnat): Why?
+  ParseExtrasAndExtensions(material, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5289,28 +5087,13 @@ static bool ParseAnimationChannel(
         channel->target_extensions_json_string = detail::JsonToString(detail::GetValue(it));
       }
     }
+    // TODO(agnat): Parse target extras
   }
 
   channel->sampler = samplerIndex;
   channel->target_node = targetIndex;
 
-  ParseExtensionsProperty(&channel->extensions, err, o);
-  ParseExtrasProperty(&(channel->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        channel->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        channel->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(channel, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5366,23 +5149,8 @@ static bool ParseAnimation(Animation *animation, std::string *err,
         }
         sampler.input = inputIndex;
         sampler.output = outputIndex;
-        ParseExtensionsProperty(&(sampler.extensions), err, o);
-        ParseExtrasProperty(&(sampler.extras), s);
-
-        if (store_original_json_for_extras_and_extensions) {
-          {
-            detail::json_const_iterator eit;
-            if (detail::FindMember(o, "extensions", eit)) {
-              sampler.extensions_json_string = detail::JsonToString(detail::GetValue(eit));
-            }
-          }
-          {
-            detail::json_const_iterator eit;
-            if (detail::FindMember(o, "extras", eit)) {
-              sampler.extras_json_string = detail::JsonToString(detail::GetValue(eit));
-            }
-          }
-        }
+        ParseExtrasAndExtensions(&sampler, err, o,
+            store_original_json_for_extras_and_extensions);
 
         animation->samplers.emplace_back(std::move(sampler));
       }
@@ -5391,23 +5159,7 @@ static bool ParseAnimation(Animation *animation, std::string *err,
 
   ParseStringProperty(&animation->name, err, o, "name", false);
 
-  ParseExtensionsProperty(&animation->extensions, err, o);
-  ParseExtrasProperty(&(animation->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        animation->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        animation->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(animation, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5437,23 +5189,7 @@ static bool ParseSampler(Sampler *sampler, std::string *err, const detail::json 
   sampler->wrapT = wrapT;
   // sampler->wrapR = wrapR;
 
-  ParseExtensionsProperty(&(sampler->extensions), err, o);
-  ParseExtrasProperty(&(sampler->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        sampler->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        sampler->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(sampler, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5476,23 +5212,7 @@ static bool ParseSkin(Skin *skin, std::string *err, const detail::json &o,
   ParseIntegerProperty(&invBind, err, o, "inverseBindMatrices", true, "Skin");
   skin->inverseBindMatrices = invBind;
 
-  ParseExtensionsProperty(&(skin->extensions), err, o);
-  ParseExtrasProperty(&(skin->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        skin->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        skin->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(skin, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5523,23 +5243,7 @@ static bool ParsePerspectiveCamera(
   camera->yfov = yfov;
   camera->znear = znear;
 
-  ParseExtensionsProperty(&camera->extensions, err, o);
-  ParseExtrasProperty(&(camera->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        camera->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        camera->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(camera, err, o, store_original_json_for_extras_and_extensions);
 
   // TODO(syoyo): Validate parameter values.
 
@@ -5551,23 +5255,7 @@ static bool ParseSpotLight(SpotLight *light, std::string *err, const detail::jso
   ParseNumberProperty(&light->innerConeAngle, err, o, "innerConeAngle", false);
   ParseNumberProperty(&light->outerConeAngle, err, o, "outerConeAngle", false);
 
-  ParseExtensionsProperty(&light->extensions, err, o);
-  ParseExtrasProperty(&light->extras, o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        light->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        light->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(light, err, o, store_original_json_for_extras_and_extensions);
 
   // TODO(syoyo): Validate parameter values.
 
@@ -5598,23 +5286,7 @@ static bool ParseOrthographicCamera(
     return false;
   }
 
-  ParseExtensionsProperty(&camera->extensions, err, o);
-  ParseExtrasProperty(&(camera->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        camera->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        camera->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(camera, err, o, store_original_json_for_extras_and_extensions);
 
   camera->xmag = xmag;
   camera->ymag = ymag;
@@ -5696,23 +5368,7 @@ static bool ParseCamera(Camera *camera, std::string *err, const detail::json &o,
 
   ParseStringProperty(&camera->name, err, o, "name", false);
 
-  ParseExtensionsProperty(&camera->extensions, err, o);
-  ParseExtrasProperty(&(camera->extras), o);
-
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        camera->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        camera->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(camera, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -5754,23 +5410,8 @@ static bool ParseLight(Light *light, std::string *err, const detail::json &o,
   ParseNumberArrayProperty(&light->color, err, o, "color", false);
   ParseNumberProperty(&light->range, err, o, "range", false);
   ParseNumberProperty(&light->intensity, err, o, "intensity", false);
-  ParseExtensionsProperty(&light->extensions, err, o);
-  ParseExtrasProperty(&(light->extras), o);
 
-  if (store_original_json_for_extras_and_extensions) {
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extensions", it)) {
-        light->extensions_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-    {
-      detail::json_const_iterator it;
-      if (detail::FindMember(o, "extras", it)) {
-        light->extras_json_string = detail::JsonToString(detail::GetValue(it));
-      }
-    }
-  }
+  ParseExtrasAndExtensions(light, err, o, store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -6162,24 +5803,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
       ParseStringProperty(&scene.name, err, o, "name", false);
 
-      ParseExtensionsProperty(&scene.extensions, err, o);
-      ParseExtrasProperty(&scene.extras, o);
-
-      if (store_original_json_for_extras_and_extensions_) {
-        {
-          detail::json_const_iterator it;
-          if (detail::FindMember(o, "extensions", it)) {
-            scene.extensions_json_string = detail::JsonToString(detail::GetValue(it));
-          }
-        }
-        {
-          detail::json_const_iterator it;
-          if (detail::FindMember(o, "extras", it)) {
-            scene.extras_json_string = detail::JsonToString(detail::GetValue(it));
-          }
-        }
-      }
-
+      ParseExtrasAndExtensions(&scene, err, o, store_original_json_for_extras_and_extensions_);
       model->scenes.emplace_back(std::move(scene));
       return true;
     });
@@ -6425,8 +6049,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
   }
 
-  // 17. Parse Extensions
-  ParseExtensionsProperty(&model->extensions, err, v);
+  // 17. Parse Extras & Extensions
+  ParseExtrasAndExtensions(model, err, v, store_original_json_for_extras_and_extensions_);
 
   // 18. Specific extension implementations
   {
@@ -6462,14 +6086,6 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         }
       }
     }
-  }
-
-  // 19. Parse Extras
-  ParseExtrasProperty(&model->extras, v);
-
-  if (store_original_json_for_extras_and_extensions_) {
-    model->extras_json_string = detail::JsonToString(v["extras"]);
-    model->extensions_json_string = detail::JsonToString(v["extensions"]);
   }
 
   return true;
