@@ -2891,7 +2891,7 @@ bool GetFileSizeInBytes(size_t *filesize_out, std::string *err,
   }
 
   // For directory(and pipe?), peek() will fail(Posix gnustl/libc++ only)
-  int buf = f.peek();
+  f.peek();
   if (!f) {
     if (err) {
       (*err) += "File read error. Maybe empty file or invalid file : " + filepath + "\n";
@@ -2984,7 +2984,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   }
 
   // For directory(and pipe?), peek() will fail(Posix gnustl/libc++ only)
-  int buf = f.peek();
+  f.peek();
   if (!f) {
     if (err) {
       (*err) += "File read error. Maybe empty file or invalid file : " + filepath + "\n";
