@@ -6693,6 +6693,17 @@ static void SerializeExtensionMap(const ExtensionMap &extensions, detail::json &
   detail::JsonAddMember(o, "extensions", std::move(extMap));
 }
 
+static void SerializeExtras(const Value & extras, detail::json & o) {
+  if (extras.Type() != NULL_TYPE) 
+    SerializeValue("extras", extras, o);
+}
+
+template <typename GltfType>
+void SerializeExtrasAndExtensions(const GltfType & obj, detail::json & o) {
+  SerializeExtensionMap(obj.extensions, o);
+  SerializeExtras(obj.extras, o);
+}
+
 static void SerializeGltfAccessor(const Accessor &accessor, detail::json &o) {
   if (accessor.bufferView >= 0)
     SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
@@ -6759,9 +6770,7 @@ static void SerializeGltfAccessor(const Accessor &accessor, detail::json &o) {
   SerializeStringProperty("type", type, o);
   if (!accessor.name.empty()) SerializeStringProperty("name", accessor.name, o);
 
-  if (accessor.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", accessor.extras, o);
-  }
+  SerializeExtrasAndExtensions(accessor, o);
 
   // sparse
   if (accessor.sparse.isSparse)
@@ -6773,14 +6782,17 @@ static void SerializeGltfAccessor(const Accessor &accessor, detail::json &o) {
           SerializeNumberProperty<int>("bufferView", accessor.sparse.indices.bufferView, indices);
           SerializeNumberProperty<int>("byteOffset", accessor.sparse.indices.byteOffset, indices);
           SerializeNumberProperty<int>("componentType", accessor.sparse.indices.componentType, indices);
+          SerializeExtrasAndExtensions(accessor.sparse.indices, indices);
           detail::JsonAddMember(sparse, "indices", std::move(indices));
       }
       {
           detail::json values;
           SerializeNumberProperty<int>("bufferView", accessor.sparse.values.bufferView, values);
           SerializeNumberProperty<int>("byteOffset", accessor.sparse.values.byteOffset, values);
+          SerializeExtrasAndExtensions(accessor.sparse.values, values);
           detail::JsonAddMember(sparse, "values", std::move(values));
       }
+      SerializeExtrasAndExtensions(accessor.sparse, sparse);
       detail::JsonAddMember(o, "sparse", std::move(sparse));
   }
 }
@@ -6798,15 +6810,12 @@ static void SerializeGltfAnimationChannel(const AnimationChannel &channel,
     SerializeStringProperty("path", channel.target_path, target);
 
     SerializeExtensionMap(channel.target_extensions, target);
+    SerializeExtras(channel.target_extras, target);
 
     detail::JsonAddMember(o, "target", std::move(target));
   }
 
-  if (channel.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", channel.extras, o);
-  }
-
-  SerializeExtensionMap(channel.extensions, o);
+  SerializeExtrasAndExtensions(channel, o);
 }
 
 static void SerializeGltfAnimationSampler(const AnimationSampler &sampler,
@@ -6815,9 +6824,7 @@ static void SerializeGltfAnimationSampler(const AnimationSampler &sampler,
   SerializeNumberProperty("output", sampler.output, o);
   SerializeStringProperty("interpolation", sampler.interpolation, o);
 
-  if (sampler.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", sampler.extras, o);
-  }
+  SerializeExtrasAndExtensions(sampler, o);
 }
 
 static void SerializeGltfAnimation(const Animation &animation, detail::json &o) {
@@ -6849,11 +6856,7 @@ static void SerializeGltfAnimation(const Animation &animation, detail::json &o) 
     detail::JsonAddMember(o, "samplers", std::move(samplers));
   }
 
-  if (animation.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", animation.extras, o);
-  }
-
-  SerializeExtensionMap(animation.extensions, o);
+  SerializeExtrasAndExtensions(animation, o);
 }
 
 static void SerializeGltfAsset(const Asset &asset, detail::json &o) {
@@ -6875,11 +6878,7 @@ static void SerializeGltfAsset(const Asset &asset, detail::json &o) {
   // TODO(syoyo): Do we need to check if `version` is greater or equal to 2.0?
   SerializeStringProperty("version", version, o);
 
-  if (asset.extras.Keys().size()) {
-    SerializeValue("extras", asset.extras, o);
-  }
-
-  SerializeExtensionMap(asset.extensions, o);
+  SerializeExtrasAndExtensions(asset, o);
 }
 
 static void SerializeGltfBufferBin(const Buffer &buffer, detail::json &o,
@@ -6889,9 +6888,7 @@ static void SerializeGltfBufferBin(const Buffer &buffer, detail::json &o,
 
   if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
 
-  if (buffer.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", buffer.extras, o);
-  }
+  SerializeExtrasAndExtensions(buffer, o);
 }
 
 static void SerializeGltfBuffer(const Buffer &buffer, detail::json &o) {
@@ -6900,9 +6897,7 @@ static void SerializeGltfBuffer(const Buffer &buffer, detail::json &o) {
 
   if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
 
-  if (buffer.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", buffer.extras, o);
-  }
+  SerializeExtrasAndExtensions(buffer, o);
 }
 
 static bool SerializeGltfBuffer(const Buffer &buffer, detail::json &o,
@@ -6914,9 +6909,7 @@ static bool SerializeGltfBuffer(const Buffer &buffer, detail::json &o,
 
   if (buffer.name.size()) SerializeStringProperty("name", buffer.name, o);
 
-  if (buffer.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", buffer.extras, o);
-  }
+  SerializeExtrasAndExtensions(buffer, o);
   return true;
 }
 
@@ -6941,9 +6934,7 @@ static void SerializeGltfBufferView(const BufferView &bufferView, detail::json &
     SerializeStringProperty("name", bufferView.name, o);
   }
 
-  if (bufferView.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", bufferView.extras, o);
-  }
+  SerializeExtrasAndExtensions(bufferView, o);
 }
 
 static void SerializeGltfImage(const Image &image, const std::string &uri,
@@ -6961,11 +6952,7 @@ static void SerializeGltfImage(const Image &image, const std::string &uri,
     SerializeStringProperty("name", image.name, o);
   }
 
-  if (image.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", image.extras, o);
-  }
-
-  SerializeExtensionMap(image.extensions, o);
+  SerializeExtrasAndExtensions(image, o);
 }
 
 static void SerializeGltfTextureInfo(const TextureInfo &texinfo, detail::json &o) {
@@ -6975,11 +6962,7 @@ static void SerializeGltfTextureInfo(const TextureInfo &texinfo, detail::json &o
     SerializeNumberProperty("texCoord", texinfo.texCoord, o);
   }
 
-  if (texinfo.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", texinfo.extras, o);
-  }
-
-  SerializeExtensionMap(texinfo.extensions, o);
+  SerializeExtrasAndExtensions(texinfo, o);
 }
 
 static void SerializeGltfNormalTextureInfo(const NormalTextureInfo &texinfo,
@@ -6994,11 +6977,7 @@ static void SerializeGltfNormalTextureInfo(const NormalTextureInfo &texinfo,
     SerializeNumberProperty("scale", texinfo.scale, o);
   }
 
-  if (texinfo.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", texinfo.extras, o);
-  }
-
-  SerializeExtensionMap(texinfo.extensions, o);
+  SerializeExtrasAndExtensions(texinfo, o);
 }
 
 static void SerializeGltfOcclusionTextureInfo(
@@ -7013,11 +6992,7 @@ static void SerializeGltfOcclusionTextureInfo(
     SerializeNumberProperty("strength", texinfo.strength, o);
   }
 
-  if (texinfo.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", texinfo.extras, o);
-  }
-
-  SerializeExtensionMap(texinfo.extensions, o);
+  SerializeExtrasAndExtensions(texinfo, o);
 }
 
 static void SerializeGltfPbrMetallicRoughness(const PbrMetallicRoughness &pbr,
@@ -7048,11 +7023,7 @@ static void SerializeGltfPbrMetallicRoughness(const PbrMetallicRoughness &pbr,
     detail::JsonAddMember(o, "metallicRoughnessTexture", std::move(texinfo));
   }
 
-  SerializeExtensionMap(pbr.extensions, o);
-
-  if (pbr.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", pbr.extras, o);
-  }
+  SerializeExtrasAndExtensions(pbr, o);
 }
 
 static void SerializeGltfMaterial(const Material &material, detail::json &o) {
@@ -7124,11 +7095,7 @@ static void SerializeGltfMaterial(const Material &material, detail::json &o) {
 
 #endif
 
-  SerializeExtensionMap(material.extensions, o);
-
-  if (material.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", material.extras, o);
-  }
+  SerializeExtrasAndExtensions(material, o);
 }
 
 static void SerializeGltfMesh(const Mesh &mesh, detail::json &o) {
@@ -7175,11 +7142,7 @@ static void SerializeGltfMesh(const Mesh &mesh, detail::json &o) {
       detail::JsonAddMember(primitive, "targets", std::move(targets));
     }
 
-    SerializeExtensionMap(gltfPrimitive.extensions, primitive);
-
-    if (gltfPrimitive.extras.Type() != NULL_TYPE) {
-      SerializeValue("extras", gltfPrimitive.extras, primitive);
-    }
+    SerializeExtrasAndExtensions(gltfPrimitive, o);
 
     detail::JsonPushBack(primitives, std::move(primitive));
   }
@@ -7194,19 +7157,13 @@ static void SerializeGltfMesh(const Mesh &mesh, detail::json &o) {
     SerializeStringProperty("name", mesh.name, o);
   }
 
-  SerializeExtensionMap(mesh.extensions, o);
-  if (mesh.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", mesh.extras, o);
-  }
+  SerializeExtrasAndExtensions(mesh, o);
 }
 
 static void SerializeSpotLight(const SpotLight &spot, detail::json &o) {
   SerializeNumberProperty("innerConeAngle", spot.innerConeAngle, o);
   SerializeNumberProperty("outerConeAngle", spot.outerConeAngle, o);
-  SerializeExtensionMap(spot.extensions, o);
-  if (spot.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", spot.extras, o);
-  }
+  SerializeExtrasAndExtensions(spot, o);
 }
 
 static void SerializeGltfLight(const Light &light, detail::json &o) {
@@ -7222,10 +7179,7 @@ static void SerializeGltfLight(const Light &light, detail::json &o) {
     SerializeSpotLight(light.spot, spot);
     detail::JsonAddMember(o, "spot", std::move(spot));
   }
-  SerializeExtensionMap(light.extensions, o);
-  if (light.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", light.extras, o);
-  }
+  SerializeExtrasAndExtensions(light, o);
 }
 
 static void SerializeGltfNode(const Node &node, detail::json &o) {
@@ -7257,11 +7211,8 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
     SerializeNumberArrayProperty<double>("weights", node.weights, o);
   }
 
-  if (node.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", node.extras, o);
-  }
+  SerializeExtrasAndExtensions(node, o);
 
-  SerializeExtensionMap(node.extensions, o);
   if (!node.name.empty()) SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
 }
@@ -7280,9 +7231,7 @@ static void SerializeGltfSampler(const Sampler &sampler, detail::json &o) {
   SerializeNumberProperty("wrapS", sampler.wrapS, o);
   SerializeNumberProperty("wrapT", sampler.wrapT, o);
 
-  if (sampler.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", sampler.extras, o);
-  }
+  SerializeExtrasAndExtensions(sampler, o);
 }
 
 static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
@@ -7292,9 +7241,7 @@ static void SerializeGltfOrthographicCamera(const OrthographicCamera &camera,
   SerializeNumberProperty("xmag", camera.xmag, o);
   SerializeNumberProperty("ymag", camera.ymag, o);
 
-  if (camera.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", camera.extras, o);
-  }
+  SerializeExtrasAndExtensions(camera, o);
 }
 
 static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
@@ -7309,9 +7256,7 @@ static void SerializeGltfPerspectiveCamera(const PerspectiveCamera &camera,
     SerializeNumberProperty("yfov", camera.yfov, o);
   }
 
-  if (camera.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", camera.extras, o);
-  }
+  SerializeExtrasAndExtensions(camera, o);
 }
 
 static void SerializeGltfCamera(const Camera &camera, detail::json &o) {
@@ -7332,10 +7277,7 @@ static void SerializeGltfCamera(const Camera &camera, detail::json &o) {
     // ???
   }
 
-  if (camera.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", camera.extras, o);
-  }
-  SerializeExtensionMap(camera.extensions, o);
+  SerializeExtrasAndExtensions(camera, o);
 }
 
 static void SerializeGltfScene(const Scene &scene, detail::json &o) {
@@ -7344,10 +7286,7 @@ static void SerializeGltfScene(const Scene &scene, detail::json &o) {
   if (scene.name.size()) {
     SerializeStringProperty("name", scene.name, o);
   }
-  if (scene.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", scene.extras, o);
-  }
-  SerializeExtensionMap(scene.extensions, o);
+  SerializeExtrasAndExtensions(scene, o);
 }
 
 static void SerializeGltfSkin(const Skin &skin, detail::json &o) {
@@ -7365,6 +7304,8 @@ static void SerializeGltfSkin(const Skin &skin, detail::json &o) {
   if (skin.name.size()) {
     SerializeStringProperty("name", skin.name, o);
   }
+
+  SerializeExtrasAndExtensions(skin, o);
 }
 
 static void SerializeGltfTexture(const Texture &texture, detail::json &o) {
@@ -7377,10 +7318,7 @@ static void SerializeGltfTexture(const Texture &texture, detail::json &o) {
   if (texture.name.size()) {
     SerializeStringProperty("name", texture.name, o);
   }
-  if (texture.extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", texture.extras, o);
-  }
-  SerializeExtensionMap(texture.extensions, o);
+  SerializeExtrasAndExtensions(texture, o);
 }
 
 ///
@@ -7548,8 +7486,8 @@ static void SerializeGltfModel(const Model *model, detail::json &o) {
     detail::JsonAddMember(o, "cameras", std::move(cameras));
   }
 
-  // EXTENSIONS
-  SerializeExtensionMap(model->extensions, o);
+  // EXTRAS & EXTENSIONS
+  SerializeExtrasAndExtensions(*model, o);
 
   auto extensionsUsed = model->extensionsUsed;
 
@@ -7594,11 +7532,6 @@ static void SerializeGltfModel(const Model *model, detail::json &o) {
   // Extensions used
   if (extensionsUsed.size()) {
     SerializeStringArrayProperty("extensionsUsed", extensionsUsed, o);
-  }
-
-  // EXTRAS
-  if (model->extras.Type() != NULL_TYPE) {
-    SerializeValue("extras", model->extras, o);
   }
 }
 
