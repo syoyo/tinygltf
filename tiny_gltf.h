@@ -532,11 +532,13 @@ struct AnimationChannel {
                             // "rotation", "scale", "weights"]
   Value extras;
   ExtensionMap extensions;
+  Value target_extras;
   ExtensionMap target_extensions;
 
   // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
   std::string extras_json_string;
   std::string extensions_json_string;
+  std::string target_extras_json_string;
   std::string target_extensions_json_string;
 
   AnimationChannel() : sampler(-1), target_node(-1) {}
@@ -856,19 +858,33 @@ struct Accessor {
   std::vector<double>
       maxValues;  // optional. integer value is promoted to double
 
-  struct {
+  struct Sparse {
     int count;
     bool isSparse;
     struct {
       int byteOffset;
       int bufferView;
       int componentType;  // a TINYGLTF_COMPONENT_TYPE_ value
+      Value extras;
+      ExtensionMap extensions;
+      std::string extras_json_string;
+      std::string extensions_json_string;
     } indices;
     struct {
       int bufferView;
       int byteOffset;
+      Value extras;
+      ExtensionMap extensions;
+      std::string extras_json_string;
+      std::string extensions_json_string;
     } values;
-  } sparse;
+    Value extras;
+    ExtensionMap extensions;
+    std::string extras_json_string;
+    std::string extensions_json_string;
+  };
+
+  Sparse sparse;
 
   ///
   /// Utility function to compute byteStride for a given bufferView object.
@@ -4441,14 +4457,17 @@ static bool ParseBufferView(
   return true;
 }
 
-static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
-                                const detail::json &o) {
-  accessor->sparse.isSparse = true;
+static bool ParseSparseAccessor(Accessor::Sparse *sparse, std::string *err,
+                                const detail::json &o,
+                                bool store_original_json_for_extras_and_extensions) {
+  sparse->isSparse = true;
 
   int count = 0;
   if (!ParseIntegerProperty(&count, err, o, "count", true, "SparseAccessor")) {
     return false;
   }
+
+  ParseExtrasAndExtensions(sparse, err, o, store_original_json_for_extras_and_extensions);
 
   detail::json_const_iterator indices_iterator;
   detail::json_const_iterator values_iterator;
@@ -4485,14 +4504,18 @@ static bool ParseSparseAccessor(Accessor *accessor, std::string *err,
   ParseIntegerProperty(&values_byte_offset, err, values_obj, "byteOffset",
                        false);
 
-  accessor->sparse.count = count;
-  accessor->sparse.indices.bufferView = indices_buffer_view;
-  accessor->sparse.indices.byteOffset = indices_byte_offset;
-  accessor->sparse.indices.componentType = component_type;
-  accessor->sparse.values.bufferView = values_buffer_view;
-  accessor->sparse.values.byteOffset = values_byte_offset;
+  sparse->count = count;
+  sparse->indices.bufferView = indices_buffer_view;
+  sparse->indices.byteOffset = indices_byte_offset;
+  sparse->indices.componentType = component_type;
+  ParseExtrasAndExtensions(&sparse->indices, err, indices_obj,
+      store_original_json_for_extras_and_extensions);
 
-  // TODO(agnat): Parse extras and extensions of the sparse object
+  sparse->values.bufferView = values_buffer_view;
+  sparse->values.byteOffset = values_byte_offset;
+  ParseExtrasAndExtensions(&sparse->values, err, values_obj,
+      store_original_json_for_extras_and_extensions);
+
   return true;
 }
 
@@ -4582,7 +4605,8 @@ static bool ParseAccessor(Accessor *accessor, std::string *err, const detail::js
   detail::json_const_iterator iterator;
   if (detail::FindMember(o, "sparse", iterator)) {
     // here this accessor has a "sparse" subobject
-    return ParseSparseAccessor(accessor, err, detail::GetValue(iterator));
+    return ParseSparseAccessor(&accessor->sparse, err, detail::GetValue(iterator),
+        store_original_json_for_extras_and_extensions);
   }
 
   return true;
@@ -5081,13 +5105,21 @@ static bool ParseAnimationChannel(
       return false;
     }
     ParseExtensionsProperty(&channel->target_extensions, err, target_object);
+    ParseExtrasProperty(&channel->target_extras, target_object);
     if (store_original_json_for_extras_and_extensions) {
-      detail::json_const_iterator it;
-      if (detail::FindMember(target_object, "extensions", it)) {
-        channel->target_extensions_json_string = detail::JsonToString(detail::GetValue(it));
+      {
+        detail::json_const_iterator it;
+        if (detail::FindMember(target_object, "extensions", it)) {
+          channel->target_extensions_json_string = detail::JsonToString(detail::GetValue(it));
+        }
+      }
+      {
+        detail::json_const_iterator it;
+        if (detail::FindMember(target_object, "extras", it)) {
+          channel->target_extras_json_string = detail::JsonToString(detail::GetValue(it));
+        }
       }
     }
-    // TODO(agnat): Parse target extras
   }
 
   channel->sampler = samplerIndex;
