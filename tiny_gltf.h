@@ -5775,6 +5775,24 @@ static bool ParseLight(Light *light, std::string *err, const detail::json &o,
   return true;
 }
 
+namespace detail {
+
+template <typename Callback>
+bool ForEachInArray(const detail::json &_v, const char *member, Callback && cb) {
+  detail::json_const_iterator itm;
+  if (detail::FindMember(_v, member, itm) && detail::IsArray(detail::GetValue(itm))) {
+    const detail::json &root = detail::GetValue(itm);
+    auto it = detail::ArrayBegin(root);
+    auto end = detail::ArrayEnd(root);
+    for (; it != end; ++it) {
+      if (!cb(*it)) return false;
+    }
+  }
+  return true;
+};
+
+} // end of namespace detail
+
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
                               const char *json_str,
                               unsigned int json_str_length,
@@ -5924,28 +5942,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
   }
 
-#ifdef TINYGLTF_USE_CPP14
-  auto ForEachInArray = [](const detail::json &_v, const char *member,
-                           const auto &cb) -> bool
-#else
-  // The std::function<> implementation can be less efficient because it will
-  // allocate heap when the size of the captured lambda is above 16 bytes with
-  // clang and gcc, but it does not require C++14.
-  auto ForEachInArray = [](const detail::json &_v, const char *member,
-                           const std::function<bool(const detail::json &)> &cb) -> bool
-#endif
-  {
-    detail::json_const_iterator itm;
-    if (detail::FindMember(_v, member, itm) && detail::IsArray(detail::GetValue(itm))) {
-      const detail::json &root = detail::GetValue(itm);
-      auto it = detail::ArrayBegin(root);
-      auto end = detail::ArrayEnd(root);
-      for (; it != end; ++it) {
-        if (!cb(*it)) return false;
-      }
-    }
-    return true;
-  };
+  using detail::ForEachInArray;
 
   // 2. Parse extensionUsed
   {
