@@ -5098,8 +5098,10 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
     if (light_ext.Has("light")) {
       light = light_ext.Get("light").GetNumberAsInt();
     } else {
-      *err += "Node has extension KHR_lights_punctual, but does not reference "
-        "a light source.\n";
+      if (err) {
+        *err += "Node has extension KHR_lights_punctual, but does not reference "
+          "a light source.\n";
+      }
       return false;
     }
   }
