@@ -7283,12 +7283,7 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       detail::JsonAddMember(extensions, "KHR_lights_punctual", std::move(lights_punctual));
       detail::FindMember(o, "KHR_lights_punctual", it);
     }
-    auto & lights_punctual = detail::GetValue(it);
-    if (detail::FindMember(lights_punctual, "light", it)) {
-      detail::JsonAssign(detail::GetValue(it), detail::json(node.light));
-    } else {
-      SerializeNumberProperty("light", node.light, lights_punctual);
-    }
+    SerializeNumberProperty("light", node.light, detail::GetValue(it));
   } else {
     // node has no light ref (any longer)... so we clean up
     detail::json_iterator ext_it;
