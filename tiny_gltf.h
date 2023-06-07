@@ -3426,7 +3426,7 @@ void Erase(detail::json & o, detail::json_iterator &it) {
 
 bool IsEmpty(const detail::json & o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
-  return o.ObjectEmpty():
+  return o.ObjectEmpty();
 #else
   return o.empty();
 #endif
