@@ -38,7 +38,7 @@
 #define TINY_GLTF_H_
 
 #include <array>
-#include <cassert>
+//#include <cassert>
 #include <cmath>  // std::fabs
 #include <cstdint>
 #include <cstdlib>
@@ -341,19 +341,28 @@ class Value {
   T &Get();
 
   // Lookup value from an array
+  // TODO: Deprecate this API
   const Value &Get(int idx) const {
     static Value null_value;
-    assert(IsArray());
-    assert(idx >= 0);
+    if (!IsArray()) {
+      return null_value;
+    }
+
+    if (idx < 0) {
+      return null_value;
+    }
     return (static_cast<size_t>(idx) < array_value_.size())
                ? array_value_[static_cast<size_t>(idx)]
                : null_value;
   }
 
   // Lookup value from a key-value pair
+  // TODO: Deprecate this API
   const Value &Get(const std::string &key) const {
     static Value null_value;
-    assert(IsObject());
+    if (!IsObject()) {
+      return null_value;
+    }
     Object::const_iterator it = object_value_.find(key);
     return (it != object_value_.end()) ? it->second : null_value;
   }
@@ -1361,7 +1370,7 @@ class TinyGLTF {
 
   ///
   /// Loads glTF ASCII asset from a file.
-  /// Set warning message to `warn` for example it fails to load asserts.
+  /// Set warning message to `warn` for example it fails to load assets.
   /// Returns false and set error string to `err` if there's an error.
   ///
   bool LoadASCIIFromFile(Model *model, std::string *err, std::string *warn,
@@ -1373,7 +1382,7 @@ class TinyGLTF {
   /// `length` = strlen(str);
   /// `base_dir` is a search path of glTF asset(e.g. images). Path Must be an
   /// expanded path (e.g. no tilde(`~`), no environment variables). Set warning
-  /// message to `warn` for example it fails to load asserts. Returns false and
+  /// message to `warn` for example it fails to load assets. Returns false and
   /// set error string to `err` if there's an error.
   ///
   bool LoadASCIIFromString(Model *model, std::string *err, std::string *warn,
@@ -1383,7 +1392,7 @@ class TinyGLTF {
 
   ///
   /// Loads glTF binary asset from a file.
-  /// Set warning message to `warn` for example it fails to load asserts.
+  /// Set warning message to `warn` for example it fails to load assets.
   /// Returns false and set error string to `err` if there's an error.
   ///
   bool LoadBinaryFromFile(Model *model, std::string *err, std::string *warn,
@@ -1395,7 +1404,7 @@ class TinyGLTF {
   /// `length` = strlen(str);
   /// `base_dir` is a search path of glTF asset(e.g. images). Path Must be an
   /// expanded path (e.g. no tilde(`~`), no environment variables).
-  /// Set warning message to `warn` for example it fails to load asserts.
+  /// Set warning message to `warn` for example it fails to load assets.
   /// Returns false and set error string to `err` if there's an error.
   ///
   bool LoadBinaryFromMemory(Model *model, std::string *err, std::string *warn,
@@ -1497,7 +1506,7 @@ class TinyGLTF {
   ///
   /// Loads glTF asset from string(memory).
   /// `length` = strlen(str);
-  /// Set warning message to `warn` for example it fails to load asserts
+  /// Set warning message to `warn` for example it fails to load assets
   /// Returns false and set error string to `err` if there's an error.
   ///
   bool LoadFromString(Model *model, std::string *err, std::string *warn,
@@ -4027,7 +4036,7 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
 template <typename GltfType>
 static bool ParseExtrasAndExtensions(GltfType * target, std::string *err,
     const detail::json & o, bool store_json_strings) {
-  
+
   ParseExtensionsProperty(&target->extensions, err, o);
   ParseExtrasProperty(&target->extras, o);
 
@@ -4936,7 +4945,7 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
     }
   }
   node->light = light;
-  
+
   return true;
 }
 
@@ -6708,7 +6717,7 @@ static void SerializeExtensionMap(const ExtensionMap &extensions, detail::json &
 }
 
 static void SerializeExtras(const Value & extras, detail::json & o) {
-  if (extras.Type() != NULL_TYPE) 
+  if (extras.Type() != NULL_TYPE)
     SerializeValue("extras", extras, o);
 }
 
