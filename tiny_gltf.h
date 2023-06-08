@@ -53,10 +53,6 @@
 #define TINYGLTF_USE_CPP14
 #endif
 
-#ifndef TINYGLTF_USE_CPP14
-#include <functional>
-#endif
-
 #ifdef __ANDROID__
 #ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
 #include <android/asset_manager.h>
@@ -1736,6 +1732,7 @@ namespace detail {
 // documents may be active at once.
 using json =
     rapidjson::GenericValue<rapidjson::UTF8<>, rapidjson::CrtAllocator>;
+using json_iterator = json::MemberIterator;
 using json_const_iterator = json::ConstMemberIterator;
 using json_const_array_iterator = json const *;
 using JsonDocument =
@@ -1747,6 +1744,7 @@ rapidjson::CrtAllocator &GetAllocator() { return s_CrtAllocator; }
 // not thread safe. Only a single JsonDocument may be active at any one time,
 // meaning only a single gltf load/save can be active any one time.
 using json = rapidjson::Value;
+using json_iterator = json::MemberIterator;
 using json_const_iterator = json::ConstMemberIterator;
 using json_const_array_iterator = json const *;
 rapidjson::Document *s_pActiveDocument = nullptr;
@@ -1793,6 +1791,7 @@ struct JsonDocument : public rapidjson::Document {
 
 #else
 using nlohmann::json;
+using json_iterator = json::iterator;
 using json_const_iterator = json::const_iterator;
 using json_const_array_iterator = json_const_iterator;
 using JsonDocument = json;
@@ -3404,7 +3403,44 @@ bool FindMember(const detail::json &o, const char *member, detail::json_const_it
 #endif
 }
 
+bool FindMember(detail::json &o, const char *member, detail::json_iterator &it) {
+#ifdef TINYGLTF_USE_RAPIDJSON
+  if (!o.IsObject()) {
+    return false;
+  }
+  it = o.FindMember(member);
+  return it != o.MemberEnd();
+#else
+  it = o.find(member);
+  return it != o.end();
+#endif
+}
+
+void Erase(detail::json & o, detail::json_iterator &it) {
+#ifdef TINYGLTF_USE_RAPIDJSON
+  o.EraseMember(it);
+#else
+  o.erase(it);
+#endif
+}
+
+bool IsEmpty(const detail::json & o) {
+#ifdef TINYGLTF_USE_RAPIDJSON
+  return o.ObjectEmpty();
+#else
+  return o.empty();
+#endif
+}
+
 const detail::json &GetValue(detail::json_const_iterator &it) {
+#ifdef TINYGLTF_USE_RAPIDJSON
+  return it->value;
+#else
+  return it.value();
+#endif
+}
+
+detail::json &GetValue(detail::json_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->value;
 #else
@@ -7226,6 +7262,42 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
   }
 
   SerializeExtrasAndExtensions(node, o);
+
+  // Note(agnat): If the asset was loaded from disk, the node may already
+  // contain the KHR_lights_punctual extension. If it was constructed in
+  // memory it does not. In any case we update the JSON property using
+  // the value from the struct. Last, if the node does not have a light
+  // reference but the extension is still present, we remove it.
+  if (node.light != -1) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto & extensions = detail::GetValue(it);
+    if ( ! detail::FindMember(extensions, "KHR_lights_punctual", it)) {
+      detail::json lights_punctual;
+      detail::JsonSetObject(lights_punctual);
+      detail::JsonAddMember(extensions, "KHR_lights_punctual", std::move(lights_punctual));
+      detail::FindMember(o, "KHR_lights_punctual", it);
+    }
+    SerializeNumberProperty("light", node.light, detail::GetValue(it));
+  } else {
+    // node has no light ref (any longer)... so we clean up
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto & extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "KHR_lights_punctual", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
 
   if (!node.name.empty()) SerializeStringProperty("name", node.name, o);
   SerializeNumberArrayProperty<int>("children", node.children, o);
