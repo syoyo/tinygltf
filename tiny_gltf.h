@@ -5556,7 +5556,7 @@ bool ForEachInArray(const detail::json &_v, const char *member, Callback && cb) 
 
 template <typename GltfType, typename ... Arg>
 bool ParseSection(const detail::json & v, const char * name, std::string * err,
-                  TinyGLTF & ctx, std::vector<GltfType> & out, Arg && ... arg) {
+                  const TinyGLTF & ctx, std::vector<GltfType> & out, Arg && ... arg) {
   return ForEachInArray(v, name, [&](const detail::json &o) {
     if (!detail::IsObject(o)) {
       if (err) {
