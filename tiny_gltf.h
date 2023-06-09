@@ -4329,13 +4329,6 @@ static bool ParseOcclusionTextureInfo(
 
 static bool ParseObject(Buffer *buffer, std::string *err, const TinyGLTF & ctx,
                         const detail::json &o, const std::string & basedir) {
-                        /*
-                        bool store_original_json_for_extras_and_extensions,
-                        FsCallbacks *fs, const URICallbacks *uri_cb,
-                        const std::string &basedir, const size_t max_buffer_size, bool is_binary = false,
-                        const unsigned char *bin_data = nullptr,
-                        size_t bin_size = 0) {
-  */
   auto uri_cb = ctx.GetURICallbacksPtr();
   auto fs = ctx.GetFsCallbacksPtr();
   auto max_buffer_size = ctx.GetMaxExternalFileSize();
