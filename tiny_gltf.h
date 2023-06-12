@@ -1051,6 +1051,7 @@ class Node {
   int skin;
   int mesh;
   int light;  // light source index (KHR_lights_punctual)
+  int emitter; // audio emitter index (KHR_audio)
   std::vector<int> children;
   std::vector<double> rotation;     // length must be 0 or 4
   std::vector<double> scale;        // length must be 0 or 3
@@ -1154,6 +1155,69 @@ struct Light {
   std::string extensions_json_string;
 };
 
+struct PositionalEmitter {
+  double coneInnerAngle{6.283185307179586};
+  double coneOuterAngle{6.283185307179586};
+  double coneOuterGain{0.0};
+  double maxDistance{100.0};
+  double refDistance{1.0};
+  double rolloffFactor{1.0};
+
+  PositionalEmitter() : coneInnerAngle(6.283185307179586), coneOuterAngle(6.283185307179586) {}
+  DEFAULT_METHODS(PositionalEmitter)
+  bool operator==(const PositionalEmitter &) const;
+
+  ExtensionMap extensions;
+  Value extras;
+
+  // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
+  std::string extras_json_string;
+  std::string extensions_json_string;
+};
+
+struct AudioEmitter {
+    std::string name;
+    double gain{1.0};
+    bool loop{false};
+    bool playing{false};
+    std::string type; // global/positional
+    std::string distanceModel; 
+    PositionalEmitter positional;
+    int source{-1};
+
+    AudioEmitter() : gain(1.0), loop(false), playing(false), type("global"), distanceModel("linear") {}
+    DEFAULT_METHODS(AudioEmitter)
+
+    bool operator==(const AudioEmitter &) const;
+
+    ExtensionMap extensions;
+    Value extras;
+
+    // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
+    std::string extras_json_string;
+    std::string extensions_json_string;
+};
+
+struct AudioSource {
+    std::string name;
+    std::string uri;
+    int bufferView{-1};        // (required if no uri)
+    std::string mimeType;  // (required if no uri) ["audio/mp3", "audio/ogg",
+                           // "audio/wav", "audio/m4a"]
+
+    AudioSource() {}
+    DEFAULT_METHODS(AudioSource)
+
+    bool operator==(const AudioSource &) const;
+
+    Value extras;
+    ExtensionMap extensions;
+
+    // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
+    std::string extras_json_string;
+    std::string extensions_json_string;
+};
+
 class Model {
  public:
   Model() = default;
@@ -1175,6 +1239,8 @@ class Model {
   std::vector<Camera> cameras;
   std::vector<Scene> scenes;
   std::vector<Light> lights;
+  std::vector<AudioEmitter> audioEmitters;
+  std::vector<AudioSource> audioSources;
 
   int defaultScene = -1;
   std::vector<std::string> extensionsUsed;
@@ -1950,6 +2016,15 @@ bool Light::operator==(const Light &other) const {
   return Equals(this->color, other.color) && this->name == other.name &&
          this->type == other.type;
 }
+bool AudioEmitter::operator==(const AudioEmitter &other) const {
+  return this->name == other.name && TINYGLTF_DOUBLE_EQUAL(this->gain, other.gain) &&
+         this->loop == other.loop && this->playing == other.playing &&
+         this->type == other.type && this->distanceModel == other.distanceModel &&
+         this->source == other.source;
+}
+bool AudioSource::operator == (const AudioSource &other) const {
+  return this->name == other.name && this->uri == other.uri;
+}
 bool Material::operator==(const Material &other) const {
   return (this->pbrMetallicRoughness == other.pbrMetallicRoughness) &&
          (this->normalTexture == other.normalTexture) &&
@@ -1998,6 +2073,15 @@ bool SpotLight::operator==(const SpotLight &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
          TINYGLTF_DOUBLE_EQUAL(this->innerConeAngle, other.innerConeAngle) &&
          TINYGLTF_DOUBLE_EQUAL(this->outerConeAngle, other.outerConeAngle);
+}
+bool PositionalEmitter::operator == (const PositionalEmitter& other) const {
+    return this->extensions == other.extensions && this->extras == other.extras &&
+        TINYGLTF_DOUBLE_EQUAL(this->coneInnerAngle, other.coneInnerAngle) &&
+        TINYGLTF_DOUBLE_EQUAL(this->coneOuterAngle, other.coneOuterAngle) &&
+        TINYGLTF_DOUBLE_EQUAL(this->coneOuterGain, other.coneOuterGain) &&
+        TINYGLTF_DOUBLE_EQUAL(this->maxDistance, other.maxDistance) &&
+        TINYGLTF_DOUBLE_EQUAL(this->refDistance, other.refDistance) &&
+        TINYGLTF_DOUBLE_EQUAL(this->rolloffFactor, other.rolloffFactor);
 }
 bool OrthographicCamera::operator==(const OrthographicCamera &other) const {
   return this->extensions == other.extensions && this->extras == other.extras &&
@@ -4972,6 +5056,23 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
     }
   }
   node->light = light;
+
+  // KHR_audio: parse audio source reference
+  int emitter = -1;
+  if (node->extensions.count("KHR_audio") != 0) {
+    auto const &audio_ext = node->extensions["KHR_audio"];
+    if (audio_ext.Has("emitter")) {
+      emitter = audio_ext.Get("emitter").GetNumberAsInt();
+    } else {
+      if (err) {
+        *err +=
+            "Node has extension KHR_audio, but does not reference "
+            "a audio emitter.\n";
+      }
+      return false;
+    }
+  }
+  node->emitter = emitter;
   
   return true;
 }
@@ -5497,6 +5598,85 @@ static bool ParseLight(Light *light, std::string *err, const detail::json &o,
   ParseNumberProperty(&light->intensity, err, o, "intensity", false);
 
   ParseExtrasAndExtensions(light, err, o, store_original_json_for_extras_and_extensions);
+
+  return true;
+}
+
+static bool ParsePositionalEmitter(
+    PositionalEmitter *positional, std::string *err, const detail::json &o,
+    bool store_original_json_for_extras_and_extensions) {
+  ParseNumberProperty(&positional->coneInnerAngle, err, o, "coneInnerAngle", false);
+  ParseNumberProperty(&positional->coneOuterAngle, err, o, "coneOuterAngle", false);
+  ParseNumberProperty(&positional->coneOuterGain, err, o, "coneOuterGain", false);
+  ParseNumberProperty(&positional->maxDistance, err, o, "maxDistance", false);
+  ParseNumberProperty(&positional->refDistance, err, o, "refDistance", false);
+  ParseNumberProperty(&positional->rolloffFactor, err, o, "rolloffFactor", false);
+
+  ParseExtrasAndExtensions(positional, err, o, store_original_json_for_extras_and_extensions);
+
+  return true;
+}
+
+static bool ParseAudioEmitter(
+    AudioEmitter *emitter, std::string *err, const detail::json &o,
+    bool store_original_json_for_extras_and_extensions) {
+  if (!ParseStringProperty(&emitter->type, err, o, "type", true)) {
+    return false;
+  }
+
+  if (emitter->type == "positional") {
+    detail::json_const_iterator positionalIt;
+    if (!detail::FindMember(o, "positional", positionalIt)) {
+      if (err) {
+        std::stringstream ss;
+        ss << "Positional emitter description not found." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
+
+    const detail::json &v = detail::GetValue(positionalIt);
+    if (!detail::IsObject(v)) {
+      if (err) {
+        std::stringstream ss;
+        ss << "\"positional\" is not a JSON object." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
+
+    if (!ParsePositionalEmitter(&emitter->positional, err, v,
+                        store_original_json_for_extras_and_extensions)) {
+      return false;
+    }
+  }
+
+  ParseStringProperty(&emitter->name, err, o, "name", false);
+  ParseNumberProperty(&emitter->gain, err, o, "gain", false);
+  ParseBooleanProperty(&emitter->loop, err, o, "loop", false);
+  ParseBooleanProperty(&emitter->playing, err, o, "playing", false);
+  ParseStringProperty(&emitter->distanceModel, err, o, "distanceModel", false);
+  ParseIntegerProperty(&emitter->source, err, o, "source", true);
+
+  ParseExtrasAndExtensions(emitter, err, o,
+                           store_original_json_for_extras_and_extensions);
+
+  return true;
+}
+
+static bool ParseAudioSource(
+    AudioSource *source, std::string *err, const detail::json &o,
+    bool store_original_json_for_extras_and_extensions) {
+  ParseStringProperty(&source->name, err, o, "name", false);
+  ParseStringProperty(&source->uri, err, o, "uri", false);
+
+  if (source->uri.empty()) {
+    ParseIntegerProperty(&source->bufferView, err, o, "bufferView", true);
+    ParseStringProperty(&source->mimeType, err, o, "mimeType", true);
+  }
+
+  ParseExtrasAndExtensions(source, err, o,
+                           store_original_json_for_extras_and_extensions);
 
   return true;
 }
@@ -6163,6 +6343,48 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
                 return false;
               }
               model->lights.emplace_back(std::move(light));
+            }
+          }
+        }
+        // parse KHR_audio extension
+        if ((key == "KHR_audio") &&
+                   detail::IsObject(detail::GetValue(it))) {
+          const detail::json &object = detail::GetValue(it);
+          detail::json_const_iterator itKhrAudio;
+          if (detail::FindMember(object, "emitters", itKhrAudio)) {
+            const detail::json &emitters = detail::GetValue(itKhrAudio);
+            if (!detail::IsArray(emitters)) {
+              continue;
+            }
+
+            auto arrayIt(detail::ArrayBegin(emitters));
+            auto arrayItEnd(detail::ArrayEnd(emitters));
+            for (; arrayIt != arrayItEnd; ++arrayIt) {
+              AudioEmitter emitter;
+              if (!ParseAudioEmitter(&emitter, err, *arrayIt,
+                              store_original_json_for_extras_and_extensions_)) {
+                return false;
+              }
+              model->audioEmitters.emplace_back(std::move(emitter));
+            }
+          }
+
+          if (detail::FindMember(object, "sources", itKhrAudio)) {
+            const detail::json &sources = detail::GetValue(itKhrAudio);
+            if (!detail::IsArray(sources)) {
+              continue;
+            }
+
+            auto arrayIt(detail::ArrayBegin(sources));
+            auto arrayItEnd(detail::ArrayEnd(sources));
+            for (; arrayIt != arrayItEnd; ++arrayIt) {
+              AudioSource source;
+              if (!ParseAudioSource(
+                      &source, err, *arrayIt,
+                      store_original_json_for_extras_and_extensions_)) {
+                return false;
+              }
+              model->audioSources.emplace_back(std::move(source));
             }
           }
         }
@@ -7232,6 +7454,61 @@ static void SerializeGltfLight(const Light &light, detail::json &o) {
   SerializeExtrasAndExtensions(light, o);
 }
 
+static void SerializeGltfPositionalEmitter(const PositionalEmitter &positional,
+                                           detail::json &o) {
+  if (!TINYGLTF_DOUBLE_EQUAL(positional.coneInnerAngle, 6.283185307179586))
+    SerializeNumberProperty("coneInnerAngle", positional.coneInnerAngle, o);
+  if (!TINYGLTF_DOUBLE_EQUAL(positional.coneOuterAngle, 6.283185307179586))
+    SerializeNumberProperty("coneOuterAngle", positional.coneOuterAngle, o);
+  if (positional.coneOuterGain > 0.0)
+    SerializeNumberProperty("coneOuterGain", positional.coneOuterGain, o);
+  if (!TINYGLTF_DOUBLE_EQUAL(positional.maxDistance, 100.0))
+    SerializeNumberProperty("maxDistance", positional.maxDistance, o);
+  if (!TINYGLTF_DOUBLE_EQUAL(positional.refDistance, 1.0))
+    SerializeNumberProperty("refDistance", positional.refDistance, o);
+  if (!TINYGLTF_DOUBLE_EQUAL(positional.rolloffFactor, 1.0))
+    SerializeNumberProperty("rolloffFactor", positional.rolloffFactor, o);
+
+  SerializeExtrasAndExtensions(positional, o);
+}
+
+static void SerializeGltfAudioEmitter(const AudioEmitter &emitter,
+                                      detail::json &o) {
+  if (!emitter.name.empty()) SerializeStringProperty("name", emitter.name, o);
+  if (!TINYGLTF_DOUBLE_EQUAL(emitter.gain, 1.0))
+    SerializeNumberProperty("gain", emitter.gain, o);
+  if (emitter.loop) SerializeNumberProperty("loop", emitter.loop, o);
+  if (emitter.playing) SerializeNumberProperty("playing", emitter.playing, o);
+  if (!emitter.type.empty()) SerializeStringProperty("type", emitter.type, o);
+  if (!emitter.distanceModel.empty())
+    SerializeStringProperty("distanceModel", emitter.distanceModel, o);
+  if (emitter.type == "positional") {
+    detail::json positional;
+    SerializeGltfPositionalEmitter(emitter.positional, positional);
+    detail::JsonAddMember(o, "positional", std::move(positional));
+  }
+  SerializeNumberProperty("source", emitter.source, o);
+  SerializeExtrasAndExtensions(emitter, o);
+}
+
+static void SerializeGltfAudioSource(const AudioSource& source, detail::json& o) {
+  std::string name;
+  std::string uri;
+  int bufferView;        // (required if no uri)
+  std::string mimeType;  // (required if no uri) ["audio/mp3", "audio/ogg",
+                         // "audio/wav", "audio/m4a"]
+
+  if (!source.name.empty()) SerializeStringProperty("name", source.name, o);
+  if (source.uri.empty()) {
+    SerializeStringProperty("mimeType", source.mimeType, o);
+    SerializeNumberProperty<int>("bufferView", source.bufferView, o);
+  }
+  else {
+      SerializeStringProperty("uri", source.uri, o);
+  }
+  SerializeExtrasAndExtensions(source, o);
+}
+
 static void SerializeGltfNode(const Node &node, detail::json &o) {
   if (node.translation.size() > 0) {
     SerializeNumberArrayProperty<double>("translation", node.translation, o);
@@ -7291,6 +7568,37 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       auto & extensions = detail::GetValue(ext_it);
       detail::json_iterator lp_it;
       if (detail::FindMember(extensions, "KHR_lights_punctual", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
+
+  // KHR_audio
+  if (node.emitter != -1) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto &extensions = detail::GetValue(it);
+    if (!detail::FindMember(extensions, "KHR_audio", it)) {
+      detail::json audio;
+      detail::JsonSetObject(audio);
+      detail::JsonAddMember(extensions, "KHR_audio", std::move(audio));
+      detail::FindMember(o, "KHR_audio", it);
+    }
+    SerializeNumberProperty("emitter", node.emitter, detail::GetValue(it));
+  } else {
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto &extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "KHR_audio", lp_it)) {
         detail::Erase(extensions, lp_it);
       }
       if (detail::IsEmpty(extensions)) {
@@ -7613,6 +7921,40 @@ static void SerializeGltfModel(const Model *model, detail::json &o) {
         extensionsUsed.push_back("KHR_lights_punctual");
       }
     }
+  }
+
+  // KHR_audio
+  if (!model->audioEmitters.empty() || !model->audioSources.empty()) {
+    detail::json emitters;
+    detail::JsonReserveArray(emitters, model->audioEmitters.size());
+    for (unsigned int i = 0; i < model->audioEmitters.size(); ++i) {
+      detail::json emitter;
+      SerializeGltfAudioEmitter(model->audioEmitters[i], emitter);
+      detail::JsonPushBack(emitters, std::move(emitter));
+    }
+    detail::json khr_audio_cmn;
+    detail::JsonAddMember(khr_audio_cmn, "emitters", std::move(emitters));
+
+    detail::json sources;
+    detail::JsonReserveArray(sources, model->audioSources.size());
+    for (unsigned int i = 0; i < model->audioSources.size(); ++i) {
+      detail::json source;
+      SerializeGltfAudioSource(model->audioSources[i], source);
+      detail::JsonPushBack(sources, std::move(source));
+    }
+    detail::JsonAddMember(khr_audio_cmn, "sources", std::move(sources));
+
+    detail::json ext_j;
+    {
+      detail::json_const_iterator it;
+      if (detail::FindMember(o, "extensions", it)) {
+        detail::JsonAssign(ext_j, detail::GetValue(it));
+      }
+    }
+
+    detail::JsonAddMember(ext_j, "KHR_audio", std::move(khr_audio_cmn));
+
+    detail::JsonAddMember(o, "extensions", std::move(ext_j));
   }
 
   // Extensions used
