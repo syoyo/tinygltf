@@ -24,6 +24,7 @@ premake5.tar.gz
 #binary directories
 bin/
 obj/
+out/
 
 #runtime gui config
 imgui.ini
