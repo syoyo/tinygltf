@@ -7955,6 +7955,19 @@ static void SerializeGltfModel(const Model *model, detail::json &o) {
     detail::JsonAddMember(ext_j, "KHR_audio", std::move(khr_audio_cmn));
 
     detail::JsonAddMember(o, "extensions", std::move(ext_j));
+
+    // Also add "KHR_audio" to `extensionsUsed`
+    {
+      auto has_khr_audio =
+          std::find_if(extensionsUsed.begin(), extensionsUsed.end(),
+                       [](const std::string &s) {
+                         return (s.compare("KHR_audio") == 0);
+                       });
+
+      if (has_khr_audio == extensionsUsed.end()) {
+        extensionsUsed.push_back("KHR_audio");
+      }
+    }
   }
 
   // Extensions used
