@@ -1105,6 +1105,7 @@ struct Asset {
 struct Scene {
   std::string name;
   std::vector<int> nodes;
+  std::vector<int> audioEmitters; // KHR_audio global emitters
 
   ExtensionMap extensions;
   Value extras;
@@ -1176,34 +1177,58 @@ struct PositionalEmitter {
 };
 
 struct AudioEmitter {
-    std::string name;
-    double gain{1.0};
-    bool loop{false};
-    bool playing{false};
-    std::string type; // global/positional
-    std::string distanceModel; 
-    PositionalEmitter positional;
-    int source{-1};
+  std::string name;
+  double gain{1.0};
+  bool loop{false};
+  bool playing{false};
+  std::string
+      type;  // positional - Positional audio emitters. Using sound cones, the
+             // orientation is +Z having the same front side for a glTF asset.
+             // global - Global audio emitters are not affected by the position
+             // of audio listeners. coneInnerAngle, coneOuterAngle,
+             // coneOuterGain, distanceModel, maxDistance, refDistance, and
+             // rolloffFactor should all be ignored when set.
+  std::string
+      distanceModel;  // linear - A linear distance model calculating the
+                      // gain induced by the distance according to: 1.0
+                      // - rolloffFactor * (distance - refDistance) /
+                      // (maxDistance - refDistance)
+                      // inverse - (default) An inverse distance model
+                      // calculating the gain induced by the distance according
+                      // to: refDistance / (refDistance + rolloffFactor *
+                      // (Math.max(distance, refDistance) - refDistance))
+                      // exponential - An exponential distance model calculating
+                      // the gain induced by the distance according to:
+                      // pow((Math.max(distance, refDistance) / refDistance,
+                      // -rolloffFactor))
+  PositionalEmitter positional;
+  int source{-1};
 
-    AudioEmitter() : gain(1.0), loop(false), playing(false), type("global"), distanceModel("linear") {}
-    DEFAULT_METHODS(AudioEmitter)
+  AudioEmitter()
+      : gain(1.0),
+        loop(false),
+        playing(false),
+        type("global"),
+        distanceModel("inverse") {}
+  DEFAULT_METHODS(AudioEmitter)
 
-    bool operator==(const AudioEmitter &) const;
+  bool operator==(const AudioEmitter &) const;
 
-    ExtensionMap extensions;
-    Value extras;
+  ExtensionMap extensions;
+  Value extras;
 
-    // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
-    std::string extras_json_string;
-    std::string extensions_json_string;
+  // Filled when SetStoreOriginalJSONForExtrasAndExtensions is enabled.
+  std::string extras_json_string;
+  std::string extensions_json_string;
 };
 
 struct AudioSource {
     std::string name;
     std::string uri;
-    int bufferView{-1};        // (required if no uri)
-    std::string mimeType;  // (required if no uri) ["audio/mp3", "audio/ogg",
-                           // "audio/wav", "audio/m4a"]
+    int bufferView{-1};  // (required if no uri)
+    std::string mimeType;  // (required if no uri) The audio's MIME type. Required if
+                   // bufferView is defined. Unless specified by another
+                   // extension, the only supported mimeType is audio/mpeg.
 
     AudioSource() {}
     DEFAULT_METHODS(AudioSource)
@@ -5077,6 +5102,35 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
   return true;
 }
 
+static bool ParseScene(Scene *scene, std::string *err, const detail::json &o,
+                       bool store_original_json_for_extras_and_extensions) {
+  ParseStringProperty(&scene->name, err, o, "name", false);
+  ParseIntegerArrayProperty(&scene->nodes, err, o, "nodes", false);
+
+  ParseExtrasAndExtensions(scene, err, o,
+                           store_original_json_for_extras_and_extensions);
+
+  // Parse KHR_audio global emitters
+  if (scene->extensions.count("KHR_audio") != 0) {
+    auto const &audio_ext = scene->extensions["KHR_audio"];
+    if (audio_ext.Has("emitters")) {
+      auto emittersArr = audio_ext.Get("emitters");
+      for (size_t i = 0; i < emittersArr.ArrayLen(); ++i) {
+        scene->audioEmitters.emplace_back(emittersArr.Get(i).GetNumberAsInt());
+      }
+    } else {
+      if (err) {
+        *err +=
+            "Node has extension KHR_audio, but does not reference "
+            "a audio emitter.\n";
+      }
+      return false;
+    }
+  }
+
+  return true;
+}
+
 static bool ParsePbrMetallicRoughness(
     PbrMetallicRoughness *pbr, std::string *err, const detail::json &o,
     bool store_original_json_for_extras_and_extensions) {
@@ -6057,15 +6111,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         }
         return false;
       }
-      std::vector<int> nodes;
-      ParseIntegerArrayProperty(&nodes, err, o, "nodes", false);
 
       Scene scene;
-      scene.nodes = std::move(nodes);
+      if (!ParseScene(&scene, err, o,
+                      store_original_json_for_extras_and_extensions_)) {
+        return false;
+      }
 
-      ParseStringProperty(&scene.name, err, o, "name", false);
-
-      ParseExtrasAndExtensions(&scene, err, o, store_original_json_for_extras_and_extensions_);
       model->scenes.emplace_back(std::move(scene));
       return true;
     });
@@ -7681,6 +7733,37 @@ static void SerializeGltfScene(const Scene &scene, detail::json &o) {
     SerializeStringProperty("name", scene.name, o);
   }
   SerializeExtrasAndExtensions(scene, o);
+
+  // KHR_audio
+  if (!scene.audioEmitters.empty()) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto &extensions = detail::GetValue(it);
+    if (!detail::FindMember(extensions, "KHR_audio", it)) {
+      detail::json audio;
+      detail::JsonSetObject(audio);
+      detail::JsonAddMember(extensions, "KHR_audio", std::move(audio));
+      detail::FindMember(o, "KHR_audio", it);
+    }
+    SerializeNumberArrayProperty("emitters", scene.audioEmitters, detail::GetValue(it));
+  } else {
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto &extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "KHR_audio", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
 }
 
 static void SerializeGltfSkin(const Skin &skin, detail::json &o) {
