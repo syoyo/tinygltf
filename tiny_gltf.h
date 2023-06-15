@@ -1180,6 +1180,9 @@ struct Camera {
   std::string type;  // required. "perspective" or "orthographic"
   std::string name;
 
+  int viewport_height = -1;
+  int viewport_width = -1;
+
   PerspectiveCamera perspective;
   OrthographicCamera orthographic;
 
