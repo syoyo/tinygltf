@@ -1039,19 +1039,19 @@ struct Mesh {
 
 class Node {
  public:
-  Node() : camera(-1), skin(-1), mesh(-1) {}
+  Node() : camera(-1), skin(-1), mesh(-1), light(-1), emitter(-1) {}
 
   DEFAULT_METHODS(Node)
 
   bool operator==(const Node &) const;
 
-  int camera;  // the index of the camera referenced by this node
+  int camera{-1};  // the index of the camera referenced by this node
 
   std::string name;
-  int skin;
-  int mesh;
-  int light;  // light source index (KHR_lights_punctual)
-  int emitter; // audio emitter index (KHR_audio)
+  int skin{-1};
+  int mesh{-1};
+  int light{-1};  // light source index (KHR_lights_punctual)
+  int emitter{-1}; // audio emitter index (KHR_audio)
   std::vector<int> children;
   std::vector<double> rotation;     // length must be 0 or 4
   std::vector<double> scale;        // length must be 0 or 3
@@ -2089,6 +2089,8 @@ bool Node::operator==(const Node &other) const {
   return this->camera == other.camera && this->children == other.children &&
          this->extensions == other.extensions && this->extras == other.extras &&
          Equals(this->matrix, other.matrix) && this->mesh == other.mesh &&
+         (this->light == other.light) &&
+         (this->emitter == other.emitter) &&
          this->name == other.name && Equals(this->rotation, other.rotation) &&
          Equals(this->scale, other.scale) && this->skin == other.skin &&
          Equals(this->translation, other.translation) &&
@@ -4172,7 +4174,7 @@ static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
 template <typename GltfType>
 static bool ParseExtrasAndExtensions(GltfType * target, std::string *err,
     const detail::json & o, bool store_json_strings) {
-  
+
   ParseExtensionsProperty(&target->extensions, err, o);
   ParseExtrasProperty(&target->extras, o);
 
@@ -5098,7 +5100,7 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
     }
   }
   node->emitter = emitter;
-  
+
   return true;
 }
 
@@ -7018,7 +7020,7 @@ static void SerializeExtensionMap(const ExtensionMap &extensions, detail::json &
 }
 
 static void SerializeExtras(const Value & extras, detail::json & o) {
-  if (extras.Type() != NULL_TYPE) 
+  if (extras.Type() != NULL_TYPE)
     SerializeValue("extras", extras, o);
 }
 
