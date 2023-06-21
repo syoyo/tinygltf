@@ -8185,7 +8185,7 @@ bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
     for (unsigned int i = 0; i < model->images.size(); ++i) {
       detail::json image;
 
-      std::string dummystring = "";
+      std::string dummystring;
       // UpdateImageObject need baseDir but only uses it if embeddedImages is
       // enabled, since we won't write separate images when writing to a stream
       // we
