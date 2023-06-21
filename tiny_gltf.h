@@ -257,10 +257,8 @@ class Value {
   typedef std::map<std::string, Value> Object;
 
   Value()
-      : type_(NULL_TYPE),
-        int_value_(0),
-        real_value_(0.0),
-        boolean_value_(false) {}
+      
+        {}
 
   explicit Value(bool b) : type_(BOOL_TYPE) { boolean_value_ = b; }
   explicit Value(int i) : type_(INT_TYPE) {
@@ -521,8 +519,8 @@ typedef std::map<std::string, Parameter> ParameterMap;
 typedef std::map<std::string, Value> ExtensionMap;
 
 struct AnimationChannel {
-  int sampler;              // required
-  int target_node;          // optional index of the node to target (alternative
+  int sampler{-1};              // required
+  int target_node{-1};          // optional index of the node to target (alternative
                             // target should be provided by extension)
   std::string target_path;  // required with standard values of ["translation",
                             // "rotation", "scale", "weights"]
@@ -537,14 +535,14 @@ struct AnimationChannel {
   std::string target_extras_json_string;
   std::string target_extensions_json_string;
 
-  AnimationChannel() : sampler(-1), target_node(-1) {}
+  AnimationChannel()  {}
   DEFAULT_METHODS(AnimationChannel)
   bool operator==(const AnimationChannel &) const;
 };
 
 struct AnimationSampler {
-  int input;                  // required
-  int output;                 // required
+  int input{-1};                  // required
+  int output{-1};                 // required
   std::string interpolation;  // "LINEAR", "STEP","CUBICSPLINE" or user defined
                               // string. default "LINEAR"
   Value extras;
@@ -554,7 +552,7 @@ struct AnimationSampler {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  AnimationSampler() : input(-1), output(-1), interpolation("LINEAR") {}
+  AnimationSampler() :  interpolation("LINEAR") {}
   DEFAULT_METHODS(AnimationSampler)
   bool operator==(const AnimationSampler &) const;
 };
@@ -623,10 +621,8 @@ struct Sampler {
   std::string extensions_json_string;
 
   Sampler()
-      : minFilter(-1),
-        magFilter(-1),
-        wrapS(TINYGLTF_TEXTURE_WRAP_REPEAT),
-        wrapT(TINYGLTF_TEXTURE_WRAP_REPEAT) {}
+      
+        {}
   DEFAULT_METHODS(Sampler)
   bool operator==(const Sampler &) const;
 };
@@ -658,9 +654,9 @@ struct Image {
   // parsing) Default parser for Image does not provide as-is loading feature at
   // the moment. (You can manipulate this by providing your own LoadImageData
   // function)
-  bool as_is;
+  bool as_is{false};
 
-  Image() : as_is(false) {
+  Image()  {
     bufferView = -1;
     width = -1;
     height = -1;
@@ -676,8 +672,8 @@ struct Image {
 struct Texture {
   std::string name;
 
-  int sampler;
-  int source;
+  int sampler{-1};
+  int source{-1};
   Value extras;
   ExtensionMap extensions;
 
@@ -685,7 +681,7 @@ struct Texture {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  Texture() : sampler(-1), source(-1) {}
+  Texture()  {}
   DEFAULT_METHODS(Texture)
 
   bool operator==(const Texture &) const;
@@ -693,7 +689,7 @@ struct Texture {
 
 struct TextureInfo {
   int index = -1;  // required.
-  int texCoord;    // The set index of texture's TEXCOORD attribute used for
+  int texCoord{0};    // The set index of texture's TEXCOORD attribute used for
                    // texture coordinate mapping.
 
   Value extras;
@@ -703,16 +699,16 @@ struct TextureInfo {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  TextureInfo() : index(-1), texCoord(0) {}
+  TextureInfo()  {}
   DEFAULT_METHODS(TextureInfo)
   bool operator==(const TextureInfo &) const;
 };
 
 struct NormalTextureInfo {
   int index = -1;  // required
-  int texCoord;    // The set index of texture's TEXCOORD attribute used for
+  int texCoord{0};    // The set index of texture's TEXCOORD attribute used for
                    // texture coordinate mapping.
-  double scale;    // scaledNormal = normalize((<sampled normal texture value>
+  double scale{1.0};    // scaledNormal = normalize((<sampled normal texture value>
                    // * 2.0 - 1.0) * vec3(<normal scale>, <normal scale>, 1.0))
 
   Value extras;
@@ -722,16 +718,16 @@ struct NormalTextureInfo {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  NormalTextureInfo() : index(-1), texCoord(0), scale(1.0) {}
+  NormalTextureInfo()  {}
   DEFAULT_METHODS(NormalTextureInfo)
   bool operator==(const NormalTextureInfo &) const;
 };
 
 struct OcclusionTextureInfo {
   int index = -1;   // required
-  int texCoord;     // The set index of texture's TEXCOORD attribute used for
+  int texCoord{0};     // The set index of texture's TEXCOORD attribute used for
                     // texture coordinate mapping.
-  double strength;  // occludedColor = lerp(color, color * <sampled occlusion
+  double strength{1.0};  // occludedColor = lerp(color, color * <sampled occlusion
                     // texture value>, <occlusion strength>)
 
   Value extras;
@@ -741,7 +737,7 @@ struct OcclusionTextureInfo {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  OcclusionTextureInfo() : index(-1), texCoord(0), strength(1.0) {}
+  OcclusionTextureInfo()  {}
   DEFAULT_METHODS(OcclusionTextureInfo)
   bool operator==(const OcclusionTextureInfo &) const;
 };
@@ -750,8 +746,8 @@ struct OcclusionTextureInfo {
 struct PbrMetallicRoughness {
   std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
   TextureInfo baseColorTexture;
-  double metallicFactor;   // default 1
-  double roughnessFactor;  // default 1
+  double metallicFactor{1.0};   // default 1
+  double roughnessFactor{1.0};  // default 1
   TextureInfo metallicRoughnessTexture;
 
   Value extras;
@@ -762,9 +758,8 @@ struct PbrMetallicRoughness {
   std::string extensions_json_string;
 
   PbrMetallicRoughness()
-      : baseColorFactor(std::vector<double>{1.0, 1.0, 1.0, 1.0}),
-        metallicFactor(1.0),
-        roughnessFactor(1.0) {}
+      : baseColorFactor(std::vector<double>{1.0, 1.0, 1.0, 1.0})
+        {}
   DEFAULT_METHODS(PbrMetallicRoughness)
   bool operator==(const PbrMetallicRoughness &) const;
 };
@@ -777,8 +772,8 @@ struct Material {
 
   std::vector<double> emissiveFactor;  // length 3. default [0, 0, 0]
   std::string alphaMode;               // default "OPAQUE"
-  double alphaCutoff;                  // default 0.5
-  bool doubleSided;                    // default false;
+  double alphaCutoff{0.5};                  // default 0.5
+  bool doubleSided{false};                    // default false;
 
   PbrMetallicRoughness pbrMetallicRoughness;
 
@@ -798,7 +793,7 @@ struct Material {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  Material() : alphaMode("OPAQUE"), alphaCutoff(0.5), doubleSided(false) {}
+  Material() : alphaMode("OPAQUE") {}
   DEFAULT_METHODS(Material)
 
   bool operator==(const Material &) const;
@@ -823,25 +818,21 @@ struct BufferView {
   bool dracoDecoded{false};  // Flag indicating this has been draco decoded
 
   BufferView()
-      : buffer(-1),
-        byteOffset(0),
-        byteLength(0),
-        byteStride(0),
-        target(0),
-        dracoDecoded(false) {}
+      
+        {}
   DEFAULT_METHODS(BufferView)
   bool operator==(const BufferView &) const;
 };
 
 struct Accessor {
-  int bufferView;  // optional in spec but required here since sparse accessor
+  int bufferView{-1};  // optional in spec but required here since sparse accessor
                    // are not supported
   std::string name;
-  size_t byteOffset;
-  bool normalized;    // optional.
-  int componentType;  // (required) One of TINYGLTF_COMPONENT_TYPE_***
-  size_t count;       // required
-  int type;           // (required) One of TINYGLTF_TYPE_***   ..
+  size_t byteOffset{0};
+  bool normalized{false};    // optional.
+  int componentType{-1};  // (required) One of TINYGLTF_COMPONENT_TYPE_***
+  size_t count{0};       // required
+  int type{-1};           // (required) One of TINYGLTF_TYPE_***   ..
   Value extras;
   ExtensionMap extensions;
 
@@ -920,12 +911,8 @@ struct Accessor {
   }
 
   Accessor()
-      : bufferView(-1),
-        byteOffset(0),
-        normalized(false),
-        componentType(-1),
-        count(0),
-        type(-1) {
+      
+        {
     sparse.isSparse = false;
   }
   DEFAULT_METHODS(Accessor)
@@ -933,17 +920,14 @@ struct Accessor {
 };
 
 struct PerspectiveCamera {
-  double aspectRatio;  // min > 0
-  double yfov;         // required. min > 0
-  double zfar;         // min > 0
-  double znear;        // required. min > 0
+  double aspectRatio{0.0};  // min > 0
+  double yfov{0.0};         // required. min > 0
+  double zfar{0.0};         // min > 0
+  double znear{0.0};        // required. min > 0
 
   PerspectiveCamera()
-      : aspectRatio(0.0),
-        yfov(0.0),
-        zfar(0.0)  // 0 = use infinite projection matrix
-        ,
-        znear(0.0) {}
+      
+        {}
   DEFAULT_METHODS(PerspectiveCamera)
   bool operator==(const PerspectiveCamera &) const;
 
@@ -956,12 +940,12 @@ struct PerspectiveCamera {
 };
 
 struct OrthographicCamera {
-  double xmag;   // required. must not be zero.
-  double ymag;   // required. must not be zero.
-  double zfar;   // required. `zfar` must be greater than `znear`.
-  double znear;  // required
+  double xmag{0.0};   // required. must not be zero.
+  double ymag{0.0};   // required. must not be zero.
+  double zfar{0.0};   // required. `zfar` must be greater than `znear`.
+  double znear{0.0};  // required
 
-  OrthographicCamera() : xmag(0.0), ymag(0.0), zfar(0.0), znear(0.0) {}
+  OrthographicCamera()  {}
   DEFAULT_METHODS(OrthographicCamera)
   bool operator==(const OrthographicCamera &) const;
 
@@ -1039,7 +1023,7 @@ struct Mesh {
 
 class Node {
  public:
-  Node() : camera(-1), skin(-1), mesh(-1), light(-1), emitter(-1) {}
+  Node()  {}
 
   DEFAULT_METHODS(Node)
 
@@ -1120,10 +1104,10 @@ struct Scene {
 };
 
 struct SpotLight {
-  double innerConeAngle;
-  double outerConeAngle;
+  double innerConeAngle{0.0};
+  double outerConeAngle{0.7853981634};
 
-  SpotLight() : innerConeAngle(0.0), outerConeAngle(0.7853981634) {}
+  SpotLight()  {}
   DEFAULT_METHODS(SpotLight)
   bool operator==(const SpotLight &) const;
 
@@ -1143,7 +1127,7 @@ struct Light {
   double range{0.0};  // 0.0 = infinite
   SpotLight spot;
 
-  Light() : intensity(1.0), range(0.0) {}
+  Light()  {}
   DEFAULT_METHODS(Light)
 
   bool operator==(const Light &) const;
@@ -1164,7 +1148,7 @@ struct PositionalEmitter {
   double refDistance{1.0};
   double rolloffFactor{1.0};
 
-  PositionalEmitter() : coneInnerAngle(6.283185307179586), coneOuterAngle(6.283185307179586) {}
+  PositionalEmitter()  {}
   DEFAULT_METHODS(PositionalEmitter)
   bool operator==(const PositionalEmitter &) const;
 
@@ -1205,9 +1189,7 @@ struct AudioEmitter {
   int source{-1};
 
   AudioEmitter()
-      : gain(1.0),
-        loop(false),
-        playing(false),
+      : 
         type("global"),
         distanceModel("inverse") {}
   DEFAULT_METHODS(AudioEmitter)
@@ -1438,7 +1420,7 @@ class TinyGLTF {
 #pragma clang diagnostic ignored "-Wc++98-compat"
 #endif
 
-  TinyGLTF() : bin_data_(nullptr), bin_size_(0), is_binary_(false) {}
+  TinyGLTF()  {}
 
 #ifdef __clang__
 #pragma clang diagnostic pop
