@@ -572,9 +572,9 @@ struct Animation {
 
 struct Skin {
   std::string name;
-  int inverseBindMatrices;  // required here but not in the spec
-  int skeleton;             // The index of the node used as a skeleton root
-  std::vector<int> joints;  // Indices of skeleton nodes
+  int inverseBindMatrices{-1};  // required here but not in the spec
+  int skeleton{-1};             // The index of the node used as a skeleton root
+  std::vector<int> joints;      // Indices of skeleton nodes
 
   Value extras;
   ExtensionMap extensions;
@@ -583,10 +583,7 @@ struct Skin {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  Skin() {
-    inverseBindMatrices = -1;
-    skeleton = -1;
-  }
+  Skin() = default;
   DEFAULT_METHODS(Skin)
   bool operator==(const Skin &) const;
 };
@@ -624,14 +621,14 @@ struct Sampler {
 
 struct Image {
   std::string name;
-  int width;
-  int height;
-  int component;
-  int bits;        // bit depth per channel. 8(byte), 16 or 32.
-  int pixel_type;  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
-                   // UBYTE(bits = 8) or USHORT(bits = 16)
+  int width{-1};
+  int height{-1};
+  int component{-1};
+  int bits{-1};        // bit depth per channel. 8(byte), 16 or 32.
+  int pixel_type{-1};  // pixel type(TINYGLTF_COMPONENT_TYPE_***). usually
+                       // UBYTE(bits = 8) or USHORT(bits = 16)
   std::vector<unsigned char> image;
-  int bufferView;        // (required if no uri)
+  int bufferView{-1};    // (required if no uri)
   std::string mimeType;  // (required if no uri) ["image/jpeg", "image/png",
                          // "image/bmp", "image/gif"]
   std::string uri;       // (required if no mimeType) uri is not decoded(e.g.
@@ -651,14 +648,7 @@ struct Image {
   // function)
   bool as_is{false};
 
-  Image() {
-    bufferView = -1;
-    width = -1;
-    height = -1;
-    component = -1;
-    bits = -1;
-    pixel_type = -1;
-  }
+  Image() = default;
   DEFAULT_METHODS(Image)
 
   bool operator==(const Image &) const;
@@ -972,10 +962,10 @@ struct Primitive {
                                           // integer, where each integer
                                           // is the index of the accessor
                                           // containing an attribute.
-  int material;  // The index of the material to apply to this primitive
-                 // when rendering.
-  int indices;   // The index of the accessor that contains the indices.
-  int mode;      // one of TINYGLTF_MODE_***
+  int material{-1};  // The index of the material to apply to this primitive
+                     // when rendering.
+  int indices{-1};   // The index of the accessor that contains the indices.
+  int mode{-1};      // one of TINYGLTF_MODE_***
   std::vector<std::map<std::string, int> > targets;  // array of morph targets,
   // where each target is a dict with attributes in ["POSITION, "NORMAL",
   // "TANGENT"] pointing
@@ -987,11 +977,7 @@ struct Primitive {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  Primitive() {
-    material = -1;
-    indices = -1;
-    mode = -1;
-  }
+  Primitive() = default;
   DEFAULT_METHODS(Primitive)
   bool operator==(const Primitive &) const;
 };
@@ -1238,7 +1224,7 @@ class Model {
   std::vector<AudioEmitter> audioEmitters;
   std::vector<AudioSource> audioSources;
 
-  int defaultScene = -1;
+  int defaultScene{-1};
   std::vector<std::string> extensionsUsed;
   std::vector<std::string> extensionsRequired;
 
@@ -7629,7 +7615,6 @@ static void SerializeGltfAudioSource(const AudioSource &source,
                                      detail::json &o) {
   std::string name;
   std::string uri;
-  int bufferView;        // (required if no uri)
   std::string mimeType;  // (required if no uri) ["audio/mp3", "audio/ogg",
                          // "audio/wav", "audio/m4a"]
 
