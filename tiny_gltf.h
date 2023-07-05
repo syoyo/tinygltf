@@ -2851,7 +2851,7 @@ bool FileExists(const std::string &abs_filename, void *) {
   }
 #else
 #ifdef _WIN32
-#if defined(_MSC_VER) || defined(__GLIBCXX__) || defined(_LIBCPP_VERSION)
+#if defined(_MSC_VER) || defined(_LIBCPP_VERSION)
 
   // First check if a file is a directory.
   DWORD result = GetFileAttributesW(UTF8ToWchar(abs_filename).c_str());
@@ -2865,6 +2865,11 @@ bool FileExists(const std::string &abs_filename, void *) {
   FILE *fp = nullptr;
   errno_t err = _wfopen_s(&fp, UTF8ToWchar(abs_filename).c_str(), L"rb");
   if (err != 0) {
+    return false;
+  }
+#elif defined(__GLIBCXX__)
+  FILE *fp = fopen(abs_filename.c_str(), "rb");
+  if (!fp) {
     return false;
   }
 #else
