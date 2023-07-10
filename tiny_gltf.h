@@ -7473,7 +7473,7 @@ static void SerializeGltfMesh(const Mesh &mesh, detail::json &o) {
       detail::JsonAddMember(primitive, "targets", std::move(targets));
     }
 
-    SerializeExtrasAndExtensions(gltfPrimitive, o);
+    SerializeExtrasAndExtensions(gltfPrimitive, primitive);
 
     detail::JsonPushBack(primitives, std::move(primitive));
   }
