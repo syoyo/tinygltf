@@ -196,8 +196,8 @@ typedef enum {
 } Type;
 
 typedef enum {
-  PERMISSIVE,
-  STRICT
+  Permissive,
+  Strict
 } ParseStrictness;
 
 static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
@@ -1562,7 +1562,7 @@ class TinyGLTF {
   size_t bin_size_ = 0;
   bool is_binary_ = false;
 
-  ParseStrictness strictness_ = ParseStrictness::STRICT;
+  ParseStrictness strictness_ = ParseStrictness::Strict;
 
   bool serialize_default_values_ = false;  ///< Serialize default values?
 
@@ -5254,7 +5254,7 @@ static bool ParseMaterial(Material *material, std::string *err, std::string *war
   if (ParseNumberArrayProperty(&material->emissiveFactor, err, o,
                                "emissiveFactor",
                                /* required */ false)) {
-    if (strictness==ParseStrictness::PERMISSIVE && material->emissiveFactor.size() == 4) {
+    if (strictness==ParseStrictness::Permissive && material->emissiveFactor.size() == 4) {
       if (warn) {
         (*warn) +=
             "Array length of `emissiveFactor` parameter in "
