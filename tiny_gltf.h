@@ -837,7 +837,7 @@ struct Accessor {
     int count;
     bool isSparse;
     struct {
-      int byteOffset;
+      size_t byteOffset;
       int bufferView;
       int componentType;  // a TINYGLTF_COMPONENT_TYPE_ value
       Value extras;
@@ -847,7 +847,7 @@ struct Accessor {
     } indices;
     struct {
       int bufferView;
-      int byteOffset;
+      size_t byteOffset;
       Value extras;
       ExtensionMap extensions;
       std::string extras_json_string;
@@ -4648,24 +4648,26 @@ static bool ParseSparseAccessor(
   const detail::json &indices_obj = detail::GetValue(indices_iterator);
   const detail::json &values_obj = detail::GetValue(values_iterator);
 
-  int indices_buffer_view = 0, indices_byte_offset = 0, component_type = 0;
+  int indices_buffer_view = 0, component_type = 0;
+  size_t indices_byte_offset = 0;
   if (!ParseIntegerProperty(&indices_buffer_view, err, indices_obj,
                             "bufferView", true, "SparseAccessor")) {
     return false;
   }
-  ParseIntegerProperty(&indices_byte_offset, err, indices_obj, "byteOffset",
+  ParseUnsignedProperty(&indices_byte_offset, err, indices_obj, "byteOffset",
                        false);
   if (!ParseIntegerProperty(&component_type, err, indices_obj, "componentType",
                             true, "SparseAccessor")) {
     return false;
   }
 
-  int values_buffer_view = 0, values_byte_offset = 0;
+  int values_buffer_view = 0;
+  size_t values_byte_offset = 0;
   if (!ParseIntegerProperty(&values_buffer_view, err, values_obj, "bufferView",
                             true, "SparseAccessor")) {
     return false;
   }
-  ParseIntegerProperty(&values_byte_offset, err, values_obj, "byteOffset",
+  ParseUnsignedProperty(&values_byte_offset, err, values_obj, "byteOffset",
                        false);
 
   sparse->count = count;
@@ -7159,7 +7161,7 @@ static void SerializeGltfAccessor(const Accessor &accessor, detail::json &o) {
     SerializeNumberProperty<int>("bufferView", accessor.bufferView, o);
 
   if (accessor.byteOffset != 0)
-    SerializeNumberProperty<int>("byteOffset", int(accessor.byteOffset), o);
+    SerializeNumberProperty<size_t>("byteOffset", accessor.byteOffset, o);
 
   SerializeNumberProperty<int>("componentType", accessor.componentType, o);
   SerializeNumberProperty<size_t>("count", accessor.count, o);
@@ -7230,7 +7232,7 @@ static void SerializeGltfAccessor(const Accessor &accessor, detail::json &o) {
       detail::json indices;
       SerializeNumberProperty<int>("bufferView",
                                    accessor.sparse.indices.bufferView, indices);
-      SerializeNumberProperty<int>("byteOffset",
+      SerializeNumberProperty<size_t>("byteOffset",
                                    accessor.sparse.indices.byteOffset, indices);
       SerializeNumberProperty<int>(
           "componentType", accessor.sparse.indices.componentType, indices);
@@ -7241,7 +7243,7 @@ static void SerializeGltfAccessor(const Accessor &accessor, detail::json &o) {
       detail::json values;
       SerializeNumberProperty<int>("bufferView",
                                    accessor.sparse.values.bufferView, values);
-      SerializeNumberProperty<int>("byteOffset",
+      SerializeNumberProperty<size_t>("byteOffset",
                                    accessor.sparse.values.byteOffset, values);
       SerializeExtrasAndExtensions(accessor.sparse.values, values);
       detail::JsonAddMember(sparse, "values", std::move(values));
