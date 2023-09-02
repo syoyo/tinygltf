@@ -5059,6 +5059,7 @@ static bool ParsePrimitive(Primitive *primitive, Model *model,
 #else
   (void)model;
   (void)warn;
+  (void)strictness;
 #endif
 
   return true;
