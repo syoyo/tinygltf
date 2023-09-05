@@ -1,0 +1,45 @@
+name: MSYS2 MinGW-w64 Windows 64bit Build
+
+on:
+  push:
+    branches:
+      - release
+      - devel
+    paths:
+    - 'tiny_gltf.*'
+    - 'CMakeLists.txt'
+    - '.github/workflows/mingw-w64-msys2.yml'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  mingw-w64-msys2-build:
+    name: MSYS2 MinGW-w64 Windows Build
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install core & build dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: base-devel
+          pacboy: >-
+            cc:p cmake:p ninja:p
+          update: true
+          release: false
+
+      - name: Configure
+        run: |
+          cmake \
+            -G"Ninja" \
+            -S . \
+            -B build
+
+      - name: Build
+        run: |
+          cmake --build build
+
