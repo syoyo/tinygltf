@@ -4909,7 +4909,7 @@ static bool ParseDracoExtension(Primitive *primitive, Model *model,
 
   // create new bufferView for indices
   if (primitive->indices >= 0) {
-    if (strictness == ParseStrictness::PERMISSIVE) {
+    if (strictness == ParseStrictness::Permissive) {
       const draco::PointIndex::ValueType numPoint = mesh->num_points();
       // handle the situation where the stored component type does not match the
       // required type for the actual number of stored points
