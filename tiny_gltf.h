@@ -6768,10 +6768,6 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
     bin_size_ = size_t(chunk1_length);
   }
 
-  // Extract JSON string.
-  std::string jsonString(reinterpret_cast<const char *>(&bytes[20]),
-                         chunk0_length);
-
   is_binary_ = true;
 
   bool ret = LoadFromString(model, err, warn,
