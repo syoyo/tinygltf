@@ -6145,20 +6145,22 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
 
-        auto bufferView =
+        const auto bufferView =
             model->accessors[size_t(primitive.indices)].bufferView;
-        if (bufferView < 0 || size_t(bufferView) >= model->bufferViews.size()) {
+        if (bufferView < 0) {
+          // skip, bufferView could be null(-1) for certain extensions
+        } else if (size_t(bufferView) >= model->bufferViews.size()) { 
           if (err) {
             (*err) += "accessor[" + std::to_string(primitive.indices) +
                       "] invalid bufferView";
           }
           return false;
+        } else {
+          model->bufferViews[size_t(bufferView)].target =
+              TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
+          // we could optionally check if accessors' bufferView type is Scalar, as
+          // it should be
         }
-
-        model->bufferViews[size_t(bufferView)].target =
-            TINYGLTF_TARGET_ELEMENT_ARRAY_BUFFER;
-        // we could optionally check if accessors' bufferView type is Scalar, as
-        // it should be
       }
 
       for (auto &attribute : primitive.attributes) {
