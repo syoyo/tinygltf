@@ -735,7 +735,7 @@ struct OcclusionTextureInfo {
 
 // pbrMetallicRoughness class defined in glTF 2.0 spec.
 struct PbrMetallicRoughness {
-  std::vector<double> baseColorFactor;  // len = 4. default [1,1,1,1]
+  std::vector<double> baseColorFactor{1.0, 1.0, 1.0, 1.0};  // len = 4. default [1,1,1,1]
   TextureInfo baseColorTexture;
   double metallicFactor{1.0};   // default 1
   double roughnessFactor{1.0};  // default 1
@@ -748,9 +748,9 @@ struct PbrMetallicRoughness {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  PbrMetallicRoughness()
-      : baseColorFactor(std::vector<double>{1.0, 1.0, 1.0, 1.0}) {}
+  PbrMetallicRoughness() = default;
   DEFAULT_METHODS(PbrMetallicRoughness)
+
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
@@ -760,10 +760,10 @@ struct PbrMetallicRoughness {
 struct Material {
   std::string name;
 
-  std::vector<double> emissiveFactor;  // length 3. default [0, 0, 0]
-  std::string alphaMode;               // default "OPAQUE"
-  double alphaCutoff{0.5};             // default 0.5
-  bool doubleSided{false};             // default false;
+  std::vector<double> emissiveFactor{0.0, 0.0, 0.0};  // length 3. default [0, 0, 0]
+  std::string alphaMode{"OPAQUE"}; // default "OPAQUE"
+  double alphaCutoff{0.5};        // default 0.5
+  bool doubleSided{false};        // default false
 
   PbrMetallicRoughness pbrMetallicRoughness;
 
@@ -783,7 +783,7 @@ struct Material {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  Material() : alphaMode("OPAQUE") {}
+  Material() = default;
   DEFAULT_METHODS(Material)
 
   bool operator==(const Material &) const;
