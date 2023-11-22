@@ -783,7 +783,9 @@ struct Material {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  Material() : alphaMode("OPAQUE") {}
+  Material()
+    : emissiveFactor(std::vector<double>{0.0, 0.0, 0.0}), alphaMode("OPAQUE")
+  {}
   DEFAULT_METHODS(Material)
 
   bool operator==(const Material &) const;
