@@ -494,25 +494,23 @@ TEST_CASE("image-uri-spaces", "[issue-236]") {
 }
 
 TEST_CASE("serialize-empty-material", "[issue-294]") {
-
   tinygltf::Model m;
-
-  tinygltf::Material mat;
-  mat.pbrMetallicRoughness.baseColorFactor = {1.0f, 1.0f, 1.0f, 1.0f}; // default baseColorFactor
-  m.materials.push_back(mat);
-
+  // Add default constructed material to model
+  m.materials.push_back({});
+  // Serialize model to output stream
   std::stringstream os;
-
   tinygltf::TinyGLTF ctx;
   bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
   REQUIRE(true == ret);
-
-  // use nlohmann json
+  // Parse serialized model
   nlohmann::json j = nlohmann::json::parse(os.str());
-
+  // Serialized materials shall hold an empty object that
+  // represents the default constructed material
+  REQUIRE(j.find("materials") != j.end());
+  REQUIRE(j["materials"].is_array());
   REQUIRE(1 == j["materials"].size());
-  REQUIRE(j["materials"][0].is_object());
-
+  CHECK(j["materials"][0].is_object());
+  CHECK(j["materials"][0].empty());
 }
 
 TEST_CASE("empty-skeleton-id", "[issue-321]") {
@@ -756,4 +754,28 @@ TEST_CASE("load-issue-416-model", "[issue-416]") {
 
   // external file load fails, but reading glTF itself is ok.
   REQUIRE(true == ret);
+}
+
+TEST_CASE("default-material", "[issue-459]") {
+  const std::vector<double> default_emissive_factor{ 0.0, 0.0, 0.0 };
+  const std::vector<double> default_base_color_factor{ 1.0, 1.0, 1.0, 1.0 };
+  const std::string default_alpha_mode = "OPAQUE";
+  const double default_alpha_cutoff = 0.5;
+  const bool default_double_sided = false;
+  const double default_metallic_factor = 1.0;
+  const double default_roughness_factor = 1.0;
+  // Check that default constructed material
+  // holds actual default GLTF material properties
+  tinygltf::Material mat;
+  CHECK(mat.alphaMode == default_alpha_mode);
+  CHECK(mat.alphaCutoff == default_alpha_cutoff);
+  CHECK(mat.doubleSided == default_double_sided);
+  CHECK(mat.emissiveFactor == default_emissive_factor);
+  CHECK(mat.pbrMetallicRoughness.baseColorFactor == default_base_color_factor);
+  CHECK(mat.pbrMetallicRoughness.metallicFactor == default_metallic_factor);
+  CHECK(mat.pbrMetallicRoughness.roughnessFactor == default_roughness_factor);
+  // None of the textures should be set
+  CHECK(mat.normalTexture.index == -1);
+  CHECK(mat.occlusionTexture.index == -1);
+  CHECK(mat.emissiveTexture.index == -1);
 }
