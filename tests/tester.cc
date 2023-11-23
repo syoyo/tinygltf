@@ -756,6 +756,52 @@ TEST_CASE("load-issue-416-model", "[issue-416]") {
   REQUIRE(true == ret);
 }
 
+TEST_CASE("serialize-light-index", "[issue-457]") {
+  tinygltf::Model model;
+  tinygltf::Scene scene;
+
+  // Create the light
+  tinygltf::Light light;
+  light.type = "point";
+  light.intensity = 0.75;
+  light.color = std::vector<double>{1.0, 0.8, 0.95};
+  // Add the light to the model
+  model.lights.push_back(light);
+  // Create a node that uses the light
+  tinygltf::Node node;
+  node.light = 0;
+  // Add the node to the model
+  model.nodes.push_back(node);
+  // Add the node to the scene
+  scene.nodes.push_back(0);
+  // Add the scene to the model
+  model.scenes.push_back(scene);
+
+  // Stream to serialize to
+  std::stringstream os;
+
+  {
+    // Serialize model to output stream
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&model, os, false, false);
+    REQUIRE(true == ret);
+  }
+
+  {
+    tinygltf::Model m;
+    tinygltf::TinyGLTF ctx;
+    // Parse the serialized model
+    bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
+    REQUIRE(true == ok);
+    // Check if the light was correctly serialized
+    REQUIRE(1 == model.lights.size());
+    CHECK(model.lights[0] == light);
+    // Check that the node properly references the light
+    REQUIRE(1 == model.nodes.size());
+    CHECK(model.nodes[0].light == 0);
+  }
+}
+
 TEST_CASE("default-material", "[issue-459]") {
   const std::vector<double> default_emissive_factor{ 0.0, 0.0, 0.0 };
   const std::vector<double> default_base_color_factor{ 1.0, 1.0, 1.0, 1.0 };
