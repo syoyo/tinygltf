@@ -8036,6 +8036,16 @@ static void SerializeGltfModel(const Model *model, detail::json &o) {
     for (unsigned int i = 0; i < model->nodes.size(); ++i) {
       detail::json node;
       SerializeGltfNode(model->nodes[i], node);
+
+      if (detail::JsonIsNull(node)) {
+        // Issue 457.
+        // `node` does not have any required parameters,
+        // so the result may be null(unmodified) when all node parameters
+        // have default value.
+        //
+        // null is not allowed thus we create an empty JSON object.
+        detail::JsonSetObject(node);
+      }
       detail::JsonPushBack(nodes, std::move(node));
     }
     detail::JsonAddMember(o, "nodes", std::move(nodes));

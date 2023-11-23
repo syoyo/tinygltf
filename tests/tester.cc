@@ -779,3 +779,52 @@ TEST_CASE("default-material", "[issue-459]") {
   CHECK(mat.occlusionTexture.index == -1);
   CHECK(mat.emissiveTexture.index == -1);
 }
+
+TEST_CASE("serialize-empty-node", "[issue-457]") {
+  tinygltf::Model m;
+  // Add default constructed node to model
+  m.nodes.push_back({});
+  // Add scene to model
+  m.scenes.push_back({});
+  // The scene's only node is the empty node
+  m.scenes.front().nodes.push_back(0);
+
+  // Serialize model to output stream
+  std::stringstream os;
+  tinygltf::TinyGLTF ctx;
+  bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+  REQUIRE(true == ret);
+
+  // Parse serialized model
+  nlohmann::json j = nlohmann::json::parse(os.str());
+
+  // Serialized nodes shall hold an empty object that
+  // represents the default constructed node
+  REQUIRE(j.find("nodes") != j.end());
+  REQUIRE(j["nodes"].is_array());
+  REQUIRE(1 == j["nodes"].size());
+  CHECK(j["nodes"][0].is_object());
+  CHECK(j["nodes"][0].empty());
+
+  // We also want to make sure that the serialized scene
+  // is referencing the empty node.
+
+  // There shall be a single serialized scene
+  auto scenes = j.find("scenes");
+  REQUIRE(scenes != j.end());
+  REQUIRE(scenes->is_array());
+  REQUIRE(1 == scenes->size());
+  auto scene = scenes->at(0);
+  REQUIRE(scene.is_object());
+  // The scene's nodes array shall hold a reference
+  // to the single node
+  auto nodes = scene.find("nodes");
+  REQUIRE(nodes != scene.end());
+  REQUIRE(nodes->is_array());
+  REQUIRE(1 == nodes->size());
+  auto node = nodes->at(0);
+  CHECK(node.is_number_integer());
+  int idx = -1;
+  node.get_to(idx);
+  CHECK(0 == idx);
+}
