@@ -7752,7 +7752,7 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       detail::JsonSetObject(lights_punctual);
       detail::JsonAddMember(extensions, "KHR_lights_punctual",
                             std::move(lights_punctual));
-      detail::FindMember(o, "KHR_lights_punctual", it);
+      detail::FindMember(extensions, "KHR_lights_punctual", it);
     }
     SerializeNumberProperty("light", node.light, detail::GetValue(it));
   } else {
