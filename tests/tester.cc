@@ -756,76 +756,6 @@ TEST_CASE("load-issue-416-model", "[issue-416]") {
   REQUIRE(true == ret);
 }
 
-TEST_CASE("serialize-light-index", "[issue-457]") {
-  tinygltf::Model model;
-  tinygltf::Scene scene;
-
-  // Create the light
-  tinygltf::Light light;
-  light.type = "point";
-  light.intensity = 0.75;
-  light.color = std::vector<double>{1.0, 0.8, 0.95};
-  // Add the light to the model
-  model.lights.push_back(light);
-  // Create a node that uses the light
-  tinygltf::Node node;
-  node.light = 0;
-  // Add the node to the model
-  model.nodes.push_back(node);
-  // Add the node to the scene
-  scene.nodes.push_back(0);
-  // Add the scene to the model
-  model.scenes.push_back(scene);
-
-  // Stream to serialize to
-  std::stringstream os;
-
-  {
-    // Serialize model to output stream
-    tinygltf::TinyGLTF ctx;
-    bool ret = ctx.WriteGltfSceneToStream(&model, os, false, false);
-    REQUIRE(true == ret);
-  }
-
-  {
-    tinygltf::Model m;
-    tinygltf::TinyGLTF ctx;
-    // Parse the serialized model
-    bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
-    REQUIRE(true == ok);
-    // Check if the light was correctly serialized
-    REQUIRE(1 == model.lights.size());
-    CHECK(model.lights[0] == light);
-    // Check that the node properly references the light
-    REQUIRE(1 == model.nodes.size());
-    CHECK(model.nodes[0].light == 0);
-  }
-}
-
-TEST_CASE("default-material", "[issue-459]") {
-  const std::vector<double> default_emissive_factor{ 0.0, 0.0, 0.0 };
-  const std::vector<double> default_base_color_factor{ 1.0, 1.0, 1.0, 1.0 };
-  const std::string default_alpha_mode = "OPAQUE";
-  const double default_alpha_cutoff = 0.5;
-  const bool default_double_sided = false;
-  const double default_metallic_factor = 1.0;
-  const double default_roughness_factor = 1.0;
-  // Check that default constructed material
-  // holds actual default GLTF material properties
-  tinygltf::Material mat;
-  CHECK(mat.alphaMode == default_alpha_mode);
-  CHECK(mat.alphaCutoff == default_alpha_cutoff);
-  CHECK(mat.doubleSided == default_double_sided);
-  CHECK(mat.emissiveFactor == default_emissive_factor);
-  CHECK(mat.pbrMetallicRoughness.baseColorFactor == default_base_color_factor);
-  CHECK(mat.pbrMetallicRoughness.metallicFactor == default_metallic_factor);
-  CHECK(mat.pbrMetallicRoughness.roughnessFactor == default_roughness_factor);
-  // None of the textures should be set
-  CHECK(mat.normalTexture.index == -1);
-  CHECK(mat.occlusionTexture.index == -1);
-  CHECK(mat.emissiveTexture.index == -1);
-}
-
 TEST_CASE("serialize-empty-node", "[issue-457]") {
   tinygltf::Model m;
   // Add default constructed node to model
@@ -873,4 +803,102 @@ TEST_CASE("serialize-empty-node", "[issue-457]") {
   int idx = -1;
   node.get_to(idx);
   CHECK(0 == idx);
+}
+
+TEST_CASE("serialize-light-index", "[issue-458]") {
+
+  // Create the light
+  tinygltf::Light light;
+  light.type = "point";
+  light.intensity = 0.75;
+  light.color = std::vector<double>{1.0, 0.8, 0.95};
+
+  // Stream to serialize to
+  std::stringstream os;
+
+  {
+    tinygltf::Model m;
+    tinygltf::Scene scene;
+    // Add the light to the model
+    m.lights.push_back(light);
+    // Create a node that uses the light
+    tinygltf::Node node;
+    node.light = 0;
+    // Add the node to the model
+    m.nodes.push_back(node);
+    // Add the node to the scene
+    scene.nodes.push_back(0);
+    // Add the scene to the model
+    m.scenes.push_back(scene);
+    // Serialize model to output stream
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+    REQUIRE(true == ret);
+  }
+
+  {
+    tinygltf::Model m;
+    tinygltf::TinyGLTF ctx;
+    // Parse the serialized model
+    bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
+    REQUIRE(true == ok);
+    // Check if the light was correctly serialized
+    REQUIRE(1 == m.lights.size());
+    CHECK(m.lights[0] == light);
+    // Check that the node properly references the light
+    REQUIRE(1 == m.nodes.size());
+    CHECK(m.nodes[0].light == 0);
+  }
+}
+
+TEST_CASE("default-material", "[issue-459]") {
+  const std::vector<double> default_emissive_factor{ 0.0, 0.0, 0.0 };
+  const std::vector<double> default_base_color_factor{ 1.0, 1.0, 1.0, 1.0 };
+  const std::string default_alpha_mode = "OPAQUE";
+  const double default_alpha_cutoff = 0.5;
+  const bool default_double_sided = false;
+  const double default_metallic_factor = 1.0;
+  const double default_roughness_factor = 1.0;
+  // Check that default constructed material
+  // holds actual default GLTF material properties
+  tinygltf::Material mat;
+  CHECK(mat.alphaMode == default_alpha_mode);
+  CHECK(mat.alphaCutoff == default_alpha_cutoff);
+  CHECK(mat.doubleSided == default_double_sided);
+  CHECK(mat.emissiveFactor == default_emissive_factor);
+  CHECK(mat.pbrMetallicRoughness.baseColorFactor == default_base_color_factor);
+  CHECK(mat.pbrMetallicRoughness.metallicFactor == default_metallic_factor);
+  CHECK(mat.pbrMetallicRoughness.roughnessFactor == default_roughness_factor);
+  // None of the textures should be set
+  CHECK(mat.normalTexture.index == -1);
+  CHECK(mat.occlusionTexture.index == -1);
+  CHECK(mat.emissiveTexture.index == -1);
+}
+
+TEST_CASE("serialize-empty-scene", "[issue-464]") {
+  // Stream to serialize to
+  std::stringstream os;
+
+  {
+    tinygltf::Model m;
+    // Add empty scene to the model
+    m.scenes.push_back({});
+    // Serialize model to output stream
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+    REQUIRE(true == ret);
+  }
+
+  {
+    tinygltf::Model m;
+    tinygltf::TinyGLTF ctx;
+    // Parse the serialized model
+    bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
+    REQUIRE(true == ok);
+    // Make sure the empty scene is there
+    REQUIRE(1 == m.scenes.size());
+    tinygltf::Scene scene{};
+    // Check that the scene is empty
+    CHECK(m.scenes[0] == scene);
+  }
 }
