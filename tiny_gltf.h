@@ -6149,7 +6149,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
             model->accessors[size_t(primitive.indices)].bufferView;
         if (bufferView < 0) {
           // skip, bufferView could be null(-1) for certain extensions
-        } else if (size_t(bufferView) >= model->bufferViews.size()) { 
+        } else if (size_t(bufferView) >= model->bufferViews.size()) {
           if (err) {
             (*err) += "accessor[" + std::to_string(primitive.indices) +
                       "] invalid bufferView";
@@ -6671,7 +6671,10 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
 
   if (header_and_json_size > sizeof(uint64_t)) {
     // Do not allow 4GB or more GLB data.
-    (*err) = "Invalid glTF binary. GLB data exceeds 4GB.";
+    if (err) {
+      (*err) = "Invalid glTF binary. GLB data exceeds 4GB.";
+    }
+    return false;
   }
 
   if ((header_and_json_size > uint64_t(size)) || (chunk0_length < 1) ||
@@ -6690,6 +6693,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
     if (err) {
       (*err) = "JSON Chunk end does not aligned to a 4-byte boundary.";
     }
+    return false;
   }
 
   // std::cout << "header_and_json_size = " << header_and_json_size << "\n";
