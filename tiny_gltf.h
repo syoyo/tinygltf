@@ -6669,7 +6669,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
   // Use 64bit uint to avoid integer overflow.
   uint64_t header_and_json_size = 20ull + uint64_t(chunk0_length);
 
-  if (header_and_json_size > std::numeric_limits<uint32_t>::max()) {
+  if (header_and_json_size > sizeof(uint64_t)) {
     // Do not allow 4GB or more GLB data.
     (*err) = "Invalid glTF binary. GLB data exceeds 4GB.";
   }
