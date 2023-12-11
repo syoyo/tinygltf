@@ -26,8 +26,6 @@ Currently TinyGLTF is stable and maintenance mode. No drastic changes and featur
 
 ## Builds
 
-[![Build Status](https://travis-ci.org/syoyo/tinygltf.svg?branch=devel)](https://travis-ci.org/syoyo/tinygltf)
-
 [![Build status](https://ci.appveyor.com/api/projects/status/warngenu9wjjhlm8?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltf)
 
 ![C/C++ CI](https://github.com/syoyo/tinygltf/workflows/C/C++%20CI/badge.svg)
@@ -109,7 +107,7 @@ WASI build example is located in [wasm](wasm) .
 * [SanityEngine](https://github.com/DethRaid/SanityEngine) - A C++/D3D12 renderer focused on the personal and professional development of its developer
 * [Open3D](http://www.open3d.org/) - A Modern Library for 3D Data Processing
 * [Supernova Engine](https://github.com/supernovaengine/supernova) - Game engine for 2D and 3D projects with Lua or C++ in data oriented design.
-* [Wicked Engine<img src="https://github.com/turanszkij/WickedEngine/blob/master/Content/logo_small.png" width="28px" align="center"/>](https://github.com/turanszkij/WickedEngine) - 3D engine with modern graphics 
+* [Wicked Engine<img src="https://github.com/turanszkij/WickedEngine/blob/master/Content/logo_small.png" width="28px" align="center"/>](https://github.com/turanszkij/WickedEngine) - 3D engine with modern graphics
 * Your projects here! (Please send PR)
 
 ## TODOs
