@@ -902,3 +902,27 @@ TEST_CASE("serialize-empty-scene", "[issue-464]") {
     CHECK(m.scenes[0] == scene);
   }
 }
+
+TEST_CASE("zero-sized-bin-chunk-glb", "[issue-440]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  // Input glb has zero-sized data in bin chunk(8 bytes for BIN chunk, and chunksize == 0)
+  // The spec https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#binary-buffer says
+  //
+  // When the binary buffer is empty or when it is stored by other means, this chunk SHOULD be omitted.
+  //
+  // 'SHOULD' mean 'RECOMMENDED', so we'll need to allow such zero-sized bin chunk is NOT omitted.
+  bool ret = ctx.LoadBinaryFromFile(&model, &err, &warn, "../models/regression/zero-sized-bin-chunk-issue-440.glb");
+  if (!warn.empty()) {
+    std::cout << "WARN: " << warn << "\n";
+  }
+  if (!err.empty()) {
+    std::cerr << err << std::endl;
+  }
+
+  REQUIRE(true == ret);
+}
