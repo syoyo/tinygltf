@@ -3460,6 +3460,14 @@ detail::json_const_array_iterator ArrayEnd(const detail::json &o) {
 #endif
 }
 
+size_t ArraySize(const detail::json &o) {
+#ifdef TINYGLTF_USE_RAPIDJSON
+  return o.Size();
+#else
+  return o.size();
+#endif
+}
+
 bool IsObject(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.IsObject();
@@ -3971,6 +3979,57 @@ static bool ParseIntegerArrayProperty(std::vector<int> *ret, std::string *err,
       return false;
     }
     ret->push_back(numberValue);
+  }
+
+  return true;
+}
+
+static bool ParseStringArrayProperty(std::vector<std::string> *ret, std::string *err,
+                                      const detail::json &o,
+                                      const std::string &property,
+                                      bool required,
+                                      const std::string &parent_node = "") {
+  detail::json_const_iterator it;
+  if (!detail::FindMember(o, property.c_str(), it)) {
+    if (required && err) {
+      (*err) += "'" + property + "' property is missing";
+      if (!parent_node.empty()) {
+        (*err) += " in " + parent_node;
+      }
+      (*err) += ".\n";
+    }
+    return false;
+  }
+
+  const detail::json & arr = detail::GetValue(it);
+  if (!detail::IsArray(arr)) {
+    if (required && err) {
+      (*err) += "'" + property + "' property is not an array";
+      if (!parent_node.empty()) {
+        (*err) += " in " + parent_node;
+      }
+      (*err) += ".\n";
+    }
+    return false;
+  }
+
+  auto size = detail::ArraySize(arr);
+  ret->clear(), ret->resize(size);
+
+  auto ret_i = ret->begin();
+  auto i = detail::ArrayBegin(arr);
+  auto end = detail::ArrayEnd(arr);
+  while (i != end) {
+    if (not detail::GetString(*i++, *ret_i++)) {
+      if (required && err) {
+        (*err) += "'" + property + "' property is not a string.\n";
+        if (!parent_node.empty()) {
+          (*err) += " in " + parent_node;
+        }
+        (*err) += ".\n";
+      }
+      return false;
+    }
   }
 
   return true;
@@ -5867,7 +5926,7 @@ static bool ParseAudioSource(
 namespace detail {
 
 template <typename Callback>
-bool ForEachInArray(const detail::json &_v, const char *member, Callback &&cb) {
+bool ForEachObjInArray(const detail::json &_v, const char *member, std::string * err, Callback &&cb) {
   detail::json_const_iterator itm;
   if (detail::FindMember(_v, member, itm) &&
       detail::IsArray(detail::GetValue(itm))) {
@@ -5878,8 +5937,27 @@ bool ForEachInArray(const detail::json &_v, const char *member, Callback &&cb) {
       if (!cb(*it)) return false;
     }
   }
+  if (not detail::FindMember(_v, member, itm)) return true;
+
+  const detail::json &arr = detail::GetValue(itm);
+  if (not detail::IsArray(arr)) return true;
+
+  auto it = detail::ArrayBegin(arr);
+  auto end = detail::ArrayEnd(arr);
+  int idx = 0;
+  for (; it != end; ++it) {
+    if (not detail::IsObject(*it)) {
+      if (err) {
+        (*err) += member;
+        (*err) += "[" + std::to_string(idx) + "] is not a JSON object.";
+      }
+      return false;
+    }
+    if (!cb(*it, idx++)) return false;
+  }
+
   return true;
-};
+}
 
 }  // end of namespace detail
 
@@ -6036,36 +6114,17 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
   }
 
-  using detail::ForEachInArray;
+  using detail::ForEachObjInArray;
 
-  // 2. Parse extensionUsed
+  // 2. Parse extensionUsed & extensionUsed
   {
-    ForEachInArray(v, "extensionsUsed", [&](const detail::json &o) {
-      std::string str;
-      detail::GetString(o, str);
-      model->extensionsUsed.emplace_back(std::move(str));
-      return true;
-    });
-  }
-
-  {
-    ForEachInArray(v, "extensionsRequired", [&](const detail::json &o) {
-      std::string str;
-      detail::GetString(o, str);
-      model->extensionsRequired.emplace_back(std::move(str));
-      return true;
-    });
+    ParseStringArrayProperty(&model->extensionsUsed, err, v, "extensionsUsed", false);
+    ParseStringArrayProperty(&model->extensionsRequired, err, v, "extensionsRequired", false);
   }
 
   // 3. Parse Buffer
   {
-    bool success = ForEachInArray(v, "buffers", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`buffers' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "buffers", err, [&](const detail::json &o, int idx) {
       Buffer buffer;
       if (!ParseBuffer(&buffer, err, o,
                        store_original_json_for_extras_and_extensions_, &fs,
@@ -6084,14 +6143,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
   // 4. Parse BufferView
   {
-    int idx = 0;
-    bool success = ForEachInArray(v, "bufferViews", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`bufferViews' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "bufferViews", err, [&](const detail::json &o, int idx) {
       BufferView bufferView;
       if (!ParseBufferView(&bufferView, err, o, idx, model->buffers.size(),
                            store_original_json_for_extras_and_extensions_)) {
@@ -6099,7 +6151,6 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       }
 
       model->bufferViews.emplace_back(std::move(bufferView));
-      idx++;
       return true;
     });
 
@@ -6110,13 +6161,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 5. Parse Accessor
   {
-    bool success = ForEachInArray(v, "accessors", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`accessors' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "accessors", err, [&](const detail::json &o, int idx) {
       Accessor accessor;
       if (!ParseAccessor(&accessor, err, o,
                          store_original_json_for_extras_and_extensions_)) {
@@ -6134,13 +6179,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 6. Parse Mesh
   {
-    bool success = ForEachInArray(v, "meshes", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`meshes' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "meshes", err, [&](const detail::json &o, int idx) {
       Mesh mesh;
       if (!ParseMesh(&mesh, model, err, warn, o,
                      store_original_json_for_extras_and_extensions_,
@@ -6221,13 +6260,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 7. Parse Node
   {
-    bool success = ForEachInArray(v, "nodes", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`nodes' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "nodes", err, [&](const detail::json &o, int idx) {
       Node node;
       if (!ParseNode(&node, err, o,
                      store_original_json_for_extras_and_extensions_)) {
@@ -6245,14 +6278,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 8. Parse scenes.
   {
-    bool success = ForEachInArray(v, "scenes", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`scenes' does not contain an JSON object.";
-        }
-        return false;
-      }
-
+    bool success = ForEachObjInArray(v, "scenes", err, [&](const detail::json &o, int idx) {
       Scene scene;
       if (!ParseScene(&scene, err, o,
                       store_original_json_for_extras_and_extensions_)) {
@@ -6280,13 +6306,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 10. Parse Material
   {
-    bool success = ForEachInArray(v, "materials", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`materials' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "materials", err, [&](const detail::json &o, int idx) {
       Material material;
       ParseStringProperty(&material.name, err, o, "name", false);
 
@@ -6319,14 +6339,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   {
-    int idx = 0;
-    bool success = ForEachInArray(v, "images", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "image[" + std::to_string(idx) + "] is not a JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "images", err, [&](const detail::json &o, int idx) {
       Image image;
       if (!ParseImage(&image, idx, err, warn, o,
                       store_original_json_for_extras_and_extensions_, base_dir,
@@ -6348,13 +6361,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 12. Parse Texture
   {
-    bool success = ForEachInArray(v, "textures", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`textures' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "textures", err, [&](const detail::json &o, int idx) {
       Texture texture;
       if (!ParseTexture(&texture, err, o,
                         store_original_json_for_extras_and_extensions_,
@@ -6373,13 +6380,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 13. Parse Animation
   {
-    bool success = ForEachInArray(v, "animations", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`animations' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "animations", err, [&](const detail::json &o, int idx) {
       Animation animation;
       if (!ParseAnimation(&animation, err, o,
                           store_original_json_for_extras_and_extensions_)) {
@@ -6397,13 +6398,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 14. Parse Skin
   {
-    bool success = ForEachInArray(v, "skins", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`skins' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "skins", err, [&](const detail::json &o, int idx) {
       Skin skin;
       if (!ParseSkin(&skin, err, o,
                      store_original_json_for_extras_and_extensions_)) {
@@ -6421,13 +6416,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 15. Parse Sampler
   {
-    bool success = ForEachInArray(v, "samplers", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`samplers' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "samplers", err, [&](const detail::json &o, int idx) {
       Sampler sampler;
       if (!ParseSampler(&sampler, err, o,
                         store_original_json_for_extras_and_extensions_)) {
@@ -6445,13 +6434,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 16. Parse Camera
   {
-    bool success = ForEachInArray(v, "cameras", [&](const detail::json &o) {
-      if (!detail::IsObject(o)) {
-        if (err) {
-          (*err) += "`cameras' does not contain an JSON object.";
-        }
-        return false;
-      }
+    bool success = ForEachObjInArray(v, "cameras", err, [&](const detail::json &o, int idx) {
       Camera camera;
       if (!ParseCamera(&camera, err, o,
                        store_original_json_for_extras_and_extensions_)) {
