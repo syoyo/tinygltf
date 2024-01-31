@@ -3875,58 +3875,69 @@ static bool ParseNumberProperty(double *ret, std::string *err,
   return true;
 }
 
+template<typename Func, typename Result>
+static bool ParseArrayProperty(std::vector<Result> *ret, std::string *err,
+                               const detail::json &o,
+                               const std::string &property,
+                               bool required,
+                               const char * err_name, Func parse,
+                               const std::string &parent_node = "") {
+  // TODO(bekorn): How I treated the "required" argument is not compatible with
+  //   other Parse*Property functions. Currently it is the wanted behaviour for the
+  //   LoadFromString usecases, but other usecases are broken now. Ask the author?
+
+  detail::json_const_iterator it;
+  if (not detail::FindMember(o, property.c_str(), it)) {
+    if (not required) return true; // Absence is OK, member was not required.
+    if (err) {
+      (*err) += "'" + property + "' property is missing";
+      if (not parent_node.empty()) (*err) += " in " + parent_node;
+      (*err) += ".\n";
+    }
+    return false;
+  }
+
+  const detail::json & arr = detail::GetValue(it);
+  if (not detail::IsArray(arr)) {
+    // Type mismatch is always an error.
+    if (err) {
+      (*err) += "'" + property + "' property is not an array";
+      if (not parent_node.empty()) (*err) += " in " + parent_node;
+      (*err) += ".\n";
+    }
+    return false;
+  }
+
+  size_t arr_size = detail::ArraySize(arr);
+  ret->clear(), ret->resize(arr_size);
+
+  int idx = 0;
+  auto ret_i = ret->begin();
+  auto i = detail::ArrayBegin(arr);
+  auto end = detail::ArrayEnd(arr);
+  for (; i != end; ++i, ++ret_i, ++idx) {
+    if (not parse(*i, *ret_i, idx)) {
+      if (err) {
+        (*err) += "'" + property + "' property is not an " + err_name + " type.\n";
+        if (not parent_node.empty()) (*err) += " in " + parent_node;
+        (*err) += ".\n";
+      }
+      return false;
+    }
+  }
+
+  return true;
+}
+
 static bool ParseNumberArrayProperty(std::vector<double> *ret, std::string *err,
                                      const detail::json &o,
                                      const std::string &property, bool required,
                                      const std::string &parent_node = "") {
-  detail::json_const_iterator it;
-  if (!detail::FindMember(o, property.c_str(), it)) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is missing";
-        if (!parent_node.empty()) {
-          (*err) += " in " + parent_node;
-        }
-        (*err) += ".\n";
-      }
-    }
-    return false;
-  }
-
-  if (!detail::IsArray(detail::GetValue(it))) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is not an array";
-        if (!parent_node.empty()) {
-          (*err) += " in " + parent_node;
-        }
-        (*err) += ".\n";
-      }
-    }
-    return false;
-  }
-
-  ret->clear();
-  auto end = detail::ArrayEnd(detail::GetValue(it));
-  for (auto i = detail::ArrayBegin(detail::GetValue(it)); i != end; ++i) {
-    double numberValue;
-    const bool isNumber = detail::GetNumber(*i, numberValue);
-    if (!isNumber) {
-      if (required) {
-        if (err) {
-          (*err) += "'" + property + "' property is not a number.\n";
-          if (!parent_node.empty()) {
-            (*err) += " in " + parent_node;
-          }
-          (*err) += ".\n";
-        }
-      }
-      return false;
-    }
-    ret->push_back(numberValue);
-  }
-
-  return true;
+  return ParseArrayProperty(
+    ret, err, o, property, required, "number",
+    [](const detail::json & o, double & v, int idx)
+    { return detail::GetNumber(o, v); },
+    parent_node);
 }
 
 static bool ParseIntegerArrayProperty(std::vector<int> *ret, std::string *err,
@@ -3934,105 +3945,45 @@ static bool ParseIntegerArrayProperty(std::vector<int> *ret, std::string *err,
                                       const std::string &property,
                                       bool required,
                                       const std::string &parent_node = "") {
-  detail::json_const_iterator it;
-  if (!detail::FindMember(o, property.c_str(), it)) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is missing";
-        if (!parent_node.empty()) {
-          (*err) += " in " + parent_node;
-        }
-        (*err) += ".\n";
-      }
-    }
-    return false;
-  }
-
-  if (!detail::IsArray(detail::GetValue(it))) {
-    if (required) {
-      if (err) {
-        (*err) += "'" + property + "' property is not an array";
-        if (!parent_node.empty()) {
-          (*err) += " in " + parent_node;
-        }
-        (*err) += ".\n";
-      }
-    }
-    return false;
-  }
-
-  ret->clear();
-  auto end = detail::ArrayEnd(detail::GetValue(it));
-  for (auto i = detail::ArrayBegin(detail::GetValue(it)); i != end; ++i) {
-    int numberValue;
-    bool isNumber = detail::GetInt(*i, numberValue);
-    if (!isNumber) {
-      if (required) {
-        if (err) {
-          (*err) += "'" + property + "' property is not an integer type.\n";
-          if (!parent_node.empty()) {
-            (*err) += " in " + parent_node;
-          }
-          (*err) += ".\n";
-        }
-      }
-      return false;
-    }
-    ret->push_back(numberValue);
-  }
-
-  return true;
+  return ParseArrayProperty(
+    ret, err, o, property, required, "integer",
+    [](const detail::json & o, int & v, int idx)
+    { return detail::GetInt(o, v); },
+    parent_node);
 }
 
 static bool ParseStringArrayProperty(std::vector<std::string> *ret, std::string *err,
-                                      const detail::json &o,
-                                      const std::string &property,
-                                      bool required,
-                                      const std::string &parent_node = "") {
-  detail::json_const_iterator it;
-  if (!detail::FindMember(o, property.c_str(), it)) {
-    if (required && err) {
-      (*err) += "'" + property + "' property is missing";
-      if (!parent_node.empty()) {
-        (*err) += " in " + parent_node;
-      }
-      (*err) += ".\n";
-    }
-    return false;
-  }
+                                     const detail::json &o,
+                                     const std::string &property,
+                                     bool required,
+                                     const std::string &parent_node = "") {
+  return ParseArrayProperty(
+    ret, err, o, property, required, "string",
+    [](const detail::json & o, std::string & v, int idx)
+    { return detail::GetString(o, v); },
+    parent_node);
+}
 
-  const detail::json & arr = detail::GetValue(it);
-  if (!detail::IsArray(arr)) {
-    if (required && err) {
-      (*err) += "'" + property + "' property is not an array";
-      if (!parent_node.empty()) {
-        (*err) += " in " + parent_node;
-      }
-      (*err) += ".\n";
-    }
-    return false;
-  }
-
-  auto size = detail::ArraySize(arr);
-  ret->clear(), ret->resize(size);
-
-  auto ret_i = ret->begin();
-  auto i = detail::ArrayBegin(arr);
-  auto end = detail::ArrayEnd(arr);
-  while (i != end) {
-    if (not detail::GetString(*i++, *ret_i++)) {
-      if (required && err) {
-        (*err) += "'" + property + "' property is not a string.\n";
-        if (!parent_node.empty()) {
-          (*err) += " in " + parent_node;
+template<typename Func, typename Result>
+static bool ParseObjectArrayProperty(std::vector<Result> *ret, std::string *err,
+                                     const detail::json &o,
+                                     const std::string &property,
+                                     bool required,
+                                     const char * err_name, Func parse,
+                                     const std::string &parent_node = "") {
+  return ParseArrayProperty(
+    ret, err, o, property, required, err_name,
+    [&](const detail::json & o, Result & v, int idx)
+    {
+      if (not detail::IsObject(o)) {
+        if (err) {
+          (*err) += property + "[" + std::to_string(idx) + "] is not a JSON object.";
         }
-        (*err) += ".\n";
+        return false;
       }
-      return false;
-    }
-  }
-
-  return true;
+      return parse(o, v, idx);
+    },
+    parent_node);
 }
 
 static bool ParseStringProperty(
@@ -5923,44 +5874,6 @@ static bool ParseAudioSource(
   return true;
 }
 
-namespace detail {
-
-template <typename Callback>
-bool ForEachObjInArray(const detail::json &_v, const char *member, std::string * err, Callback &&cb) {
-  detail::json_const_iterator itm;
-  if (detail::FindMember(_v, member, itm) &&
-      detail::IsArray(detail::GetValue(itm))) {
-    const detail::json &root = detail::GetValue(itm);
-    auto it = detail::ArrayBegin(root);
-    auto end = detail::ArrayEnd(root);
-    for (; it != end; ++it) {
-      if (!cb(*it)) return false;
-    }
-  }
-  if (not detail::FindMember(_v, member, itm)) return true;
-
-  const detail::json &arr = detail::GetValue(itm);
-  if (not detail::IsArray(arr)) return true;
-
-  auto it = detail::ArrayBegin(arr);
-  auto end = detail::ArrayEnd(arr);
-  int idx = 0;
-  for (; it != end; ++it) {
-    if (not detail::IsObject(*it)) {
-      if (err) {
-        (*err) += member;
-        (*err) += "[" + std::to_string(idx) + "] is not a JSON object.";
-      }
-      return false;
-    }
-    if (!cb(*it, idx++)) return false;
-  }
-
-  return true;
-}
-
-}  // end of namespace detail
-
 bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
                               const char *json_str,
                               unsigned int json_str_length,
@@ -6035,6 +5948,10 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   // scene is not mandatory.
   // FIXME Maybe a better way to handle it than removing the code
 
+  // TODO(bekorn): these json member checks can be done with the new
+  // ParseObjectArrayProperty's required argument. Delaying this check
+  // will increas the error detection latency but is it important?
+
   auto IsArrayMemberPresent = [](const detail::json &_v,
                                  const char *name) -> bool {
     detail::json_const_iterator it;
@@ -6053,7 +5970,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 
   {
-    if ((check_sections & REQUIRE_NODES) && !IsArrayMemberPresent(v, "nodes")) {
+    if ((check_sections & REQUIRE_NODES) &&
+      !IsArrayMemberPresent(v, "nodes")) {
       if (err) {
         (*err) += "\"nodes\" object not found in .gltf\n";
       }
@@ -6091,17 +6009,6 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     }
   }
 
-  model->buffers.clear();
-  model->bufferViews.clear();
-  model->accessors.clear();
-  model->meshes.clear();
-  model->cameras.clear();
-  model->nodes.clear();
-  model->extensionsUsed.clear();
-  model->extensionsRequired.clear();
-  model->extensions.clear();
-  model->defaultScene = -1;
-
   // 1. Parse Asset
   {
     detail::json_const_iterator it;
@@ -6110,11 +6017,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       const detail::json &root = detail::GetValue(it);
 
       ParseAsset(&model->asset, err, root,
-                 store_original_json_for_extras_and_extensions_);
+        store_original_json_for_extras_and_extensions_);
     }
   }
-
-  using detail::ForEachObjInArray;
 
   // 2. Parse extensionUsed & extensionUsed
   {
@@ -6124,76 +6029,48 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 3. Parse Buffer
   {
-    bool success = ForEachObjInArray(v, "buffers", err, [&](const detail::json &o, int idx) {
-      Buffer buffer;
-      if (!ParseBuffer(&buffer, err, o,
-                       store_original_json_for_extras_and_extensions_, &fs,
-                       &uri_cb, base_dir, max_external_file_size_, is_binary_,
-                       bin_data_, bin_size_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->buffers, err, v, "buffers", false,
+      "buffer", [&](const detail::json & o, Buffer & buffer, int idx) {
+        return ParseBuffer(&buffer, err, o,
+          store_original_json_for_extras_and_extensions_, &fs,
+          &uri_cb, base_dir, max_external_file_size_, is_binary_,
+          bin_data_, bin_size_);
+      });
 
-      model->buffers.emplace_back(std::move(buffer));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
+
   // 4. Parse BufferView
   {
-    bool success = ForEachObjInArray(v, "bufferViews", err, [&](const detail::json &o, int idx) {
-      BufferView bufferView;
-      if (!ParseBufferView(&bufferView, err, o, idx, model->buffers.size(),
-                           store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->bufferViews, err, v, "bufferViews", false,
+      "bufferView", [&](const detail::json & o, BufferView & bufferView, int idx) {
+        return ParseBufferView(&bufferView, err, o, idx, model->buffers.size(),
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->bufferViews.emplace_back(std::move(bufferView));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 5. Parse Accessor
   {
-    bool success = ForEachObjInArray(v, "accessors", err, [&](const detail::json &o, int idx) {
-      Accessor accessor;
-      if (!ParseAccessor(&accessor, err, o,
-                         store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->accessors, err, v, "accessors", false,
+      "accessor", [&](const detail::json & o, Accessor & accessor, int idx) {
+        return ParseAccessor(&accessor, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->accessors.emplace_back(std::move(accessor));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 6. Parse Mesh
   {
-    bool success = ForEachObjInArray(v, "meshes", err, [&](const detail::json &o, int idx) {
-      Mesh mesh;
-      if (!ParseMesh(&mesh, model, err, warn, o,
-                     store_original_json_for_extras_and_extensions_,
-                     strictness_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->meshes, err, v, "meshes", false,
+      "meshe", [&](const detail::json & o, Mesh & mesh, int idx) {
+        return ParseMesh(&mesh, model, err, warn, o,
+          store_original_json_for_extras_and_extensions_, strictness_);
+      });
 
-      model->meshes.emplace_back(std::move(mesh));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // Assign missing bufferView target types
@@ -6260,194 +6137,122 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // 7. Parse Node
   {
-    bool success = ForEachObjInArray(v, "nodes", err, [&](const detail::json &o, int idx) {
-      Node node;
-      if (!ParseNode(&node, err, o,
-                     store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->nodes, err, v, "nodes", false,
+      "node", [&](const detail::json & o, Node & node, int idx) {
+        return ParseNode(&node, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->nodes.emplace_back(std::move(node));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 8. Parse scenes.
   {
-    bool success = ForEachObjInArray(v, "scenes", err, [&](const detail::json &o, int idx) {
-      Scene scene;
-      if (!ParseScene(&scene, err, o,
-                      store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->scenes, err, v, "scenes", false,
+      "scene", [&](const detail::json & o, Scene & scene, int idx) {
+        return ParseScene(&scene, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->scenes.emplace_back(std::move(scene));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 9. Parse default scenes.
   {
-    detail::json_const_iterator rootIt;
-    int iVal;
-    if (detail::FindMember(v, "scene", rootIt) &&
-        detail::GetInt(detail::GetValue(rootIt), iVal)) {
-      model->defaultScene = iVal;
-    }
+    model->defaultScene = -1;
+    ParseIntegerProperty(&model->defaultScene, err, v, "scene", false);
   }
 
   // 10. Parse Material
   {
-    bool success = ForEachObjInArray(v, "materials", err, [&](const detail::json &o, int idx) {
-      Material material;
-      ParseStringProperty(&material.name, err, o, "name", false);
+    bool success = ParseObjectArrayProperty(&model->materials, err, v, "materials", false,
+      "material", [&](const detail::json & o, Material & material, int idx) {
+        return ParseMaterial(&material, err, warn, o,
+          store_original_json_for_extras_and_extensions_, strictness_);
+      });
 
-      if (!ParseMaterial(&material, err, warn, o,
-                         store_original_json_for_extras_and_extensions_,
-                         strictness_)) {
-        return false;
-      }
-
-      model->materials.emplace_back(std::move(material));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 11. Parse Image
-  void *load_image_user_data{nullptr};
-
-  LoadImageDataOption load_image_option;
-
-  if (user_image_loader_) {
-    // Use user supplied pointer
-    load_image_user_data = load_image_user_data_;
-  } else {
-    load_image_option.preserve_channels = preserve_image_channels_;
-    load_image_user_data = reinterpret_cast<void *>(&load_image_option);
-  }
-
   {
-    bool success = ForEachObjInArray(v, "images", err, [&](const detail::json &o, int idx) {
-      Image image;
-      if (!ParseImage(&image, idx, err, warn, o,
-                      store_original_json_for_extras_and_extensions_, base_dir,
-                      max_external_file_size_, &fs, &uri_cb,
-                      model->buffers, model->bufferViews,
-                      &this->LoadImageData, load_image_user_data)) {
-        return false;
-      }
+    void *load_image_user_data{nullptr};
 
-      model->images.emplace_back(std::move(image));
-      ++idx;
-      return true;
-    });
+    LoadImageDataOption load_image_option;
 
-    if (!success) {
-      return false;
+    if (user_image_loader_) {
+      // Use user supplied pointer
+      load_image_user_data = load_image_user_data_;
+    } else {
+      load_image_option.preserve_channels = preserve_image_channels_;
+      load_image_user_data = reinterpret_cast<void *>(&load_image_option);
     }
+
+    bool success = ParseObjectArrayProperty(&model->images, err, v, "images", false,
+      "image", [&](const detail::json & o, Image & image, int idx) {
+        return ParseImage(&image, idx, err, warn, o,
+          store_original_json_for_extras_and_extensions_, base_dir,
+          max_external_file_size_, &fs, &uri_cb,
+          model->buffers, model->bufferViews,
+          &this->LoadImageData, load_image_user_data);
+      });
+
+    if (!success) return false;
   }
 
   // 12. Parse Texture
   {
-    bool success = ForEachObjInArray(v, "textures", err, [&](const detail::json &o, int idx) {
-      Texture texture;
-      if (!ParseTexture(&texture, err, o,
-                        store_original_json_for_extras_and_extensions_,
-                        base_dir)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->textures, err, v, "textures", false,
+      "texture", [&](const detail::json & o, Texture & texture, int idx) {
+        return ParseTexture(&texture, err, o,
+          store_original_json_for_extras_and_extensions_, base_dir);
+      });
 
-      model->textures.emplace_back(std::move(texture));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 13. Parse Animation
   {
-    bool success = ForEachObjInArray(v, "animations", err, [&](const detail::json &o, int idx) {
-      Animation animation;
-      if (!ParseAnimation(&animation, err, o,
-                          store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->animations, err, v, "animations", false,
+      "animation", [&](const detail::json & o, Animation & animation, int idx) {
+        return ParseAnimation(&animation, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->animations.emplace_back(std::move(animation));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 14. Parse Skin
   {
-    bool success = ForEachObjInArray(v, "skins", err, [&](const detail::json &o, int idx) {
-      Skin skin;
-      if (!ParseSkin(&skin, err, o,
-                     store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->skins, err, v, "skins", false,
+      "skin", [&](const detail::json & o, Skin & skin, int idx) {
+        return ParseSkin(&skin, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->skins.emplace_back(std::move(skin));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 15. Parse Sampler
   {
-    bool success = ForEachObjInArray(v, "samplers", err, [&](const detail::json &o, int idx) {
-      Sampler sampler;
-      if (!ParseSampler(&sampler, err, o,
-                        store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->samplers, err, v, "samplers", false,
+      "sampler", [&](const detail::json & o, Sampler & sampler, int idx) {
+        return ParseSampler(&sampler, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->samplers.emplace_back(std::move(sampler));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 16. Parse Camera
   {
-    bool success = ForEachObjInArray(v, "cameras", err, [&](const detail::json &o, int idx) {
-      Camera camera;
-      if (!ParseCamera(&camera, err, o,
-                       store_original_json_for_extras_and_extensions_)) {
-        return false;
-      }
+    bool success = ParseObjectArrayProperty(&model->cameras, err, v, "cameras", false,
+      "camera", [&](const detail::json & o, Camera & camera, int idx) {
+        return ParseCamera(&camera, err, o,
+          store_original_json_for_extras_and_extensions_);
+      });
 
-      model->cameras.emplace_back(std::move(camera));
-      return true;
-    });
-
-    if (!success) {
-      return false;
-    }
+    if (!success) return false;
   }
 
   // 17. Parse Extras & Extensions
