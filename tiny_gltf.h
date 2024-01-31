@@ -4213,6 +4213,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
                        bool store_original_json_for_extras_and_extensions,
                        const std::string &basedir, const size_t max_file_size,
                        FsCallbacks *fs, const URICallbacks *uri_cb,
+                       std::vector<Buffer> const & buffers,
+                       std::vector<BufferView> const & bufferViews,
                        LoadImageDataFunction *LoadImageData = nullptr,
                        void *load_image_user_data = nullptr) {
   // A glTF image must either reference a bufferView or an image uri
@@ -4249,8 +4251,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
                            store_original_json_for_extras_and_extensions);
 
   if (hasBufferView) {
-    int bufferView = -1;
-    if (!ParseIntegerProperty(&bufferView, err, o, "bufferView", true)) {
+    image->bufferView = -1;
+    if (!ParseIntegerProperty(&image->bufferView, err, o, "bufferView", true)) {
       if (err) {
         (*err) += "Failed to parse `bufferView` for image[" +
                   std::to_string(image_idx) + "] name = \"" + image->name +
@@ -4258,24 +4260,38 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
       }
       return false;
     }
+    if (size_t(image->bufferView) >= bufferViews.size()) {
+      if (err) {
+        std::stringstream ss;
+        ss << "image[" << image_idx << "] bufferView \"" << image->bufferView
+           << "\" not found in the scene." << std::endl;
+        (*err) += ss.str();
+      }
+      return false;
+    }
 
-    std::string mime_type;
-    ParseStringProperty(&mime_type, err, o, "mimeType", false);
+    ParseStringProperty(&image->mimeType, err, o, "mimeType", false);
 
-    int width = 0;
-    ParseIntegerProperty(&width, err, o, "width", false);
+    image->width = 0;
+    ParseIntegerProperty(&image->width, err, o, "width", false);
 
-    int height = 0;
-    ParseIntegerProperty(&height, err, o, "height", false);
+    image->height = 0;
+    ParseIntegerProperty(&image->height, err, o, "height", false);
 
-    // Just only save some information here. Loading actual image data from
-    // bufferView is done after this `ParseImage` function.
-    image->bufferView = bufferView;
-    image->mimeType = mime_type;
-    image->width = width;
-    image->height = height;
+    // Load image from the buffer view.
+    const BufferView &bufferView = bufferViews[size_t(image->bufferView)];
+    const Buffer &buffer = buffers[size_t(bufferView.buffer)];
 
-    return true;
+    if (*LoadImageData == nullptr) {
+      if (err) {
+        (*err) += "No LoadImageData callback specified.\n";
+      }
+      return false;
+    }
+    return (*LoadImageData)(
+        image, image_idx, err, warn, image->width, image->height,
+        &buffer.data[bufferView.byteOffset],
+        static_cast<int>(bufferView.byteLength), load_image_user_data);
   }
 
   // Parse URI & Load image data.
@@ -4560,10 +4576,19 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
 }
 
 static bool ParseBufferView(
-    BufferView *bufferView, std::string *err, const detail::json &o,
-    bool store_original_json_for_extras_and_extensions) {
+    BufferView *bufferView, std::string *err, const detail::json &o, int idx,
+    size_t buffers_size, bool store_original_json_for_extras_and_extensions) {
   int buffer = -1;
   if (!ParseIntegerProperty(&buffer, err, o, "buffer", true, "BufferView")) {
+    return false;
+  }
+  if (size_t(buffer) >= buffers_size) {
+    if (err) {
+      std::stringstream ss;
+      ss << "bufferView[" << idx << "] buffer \"" << buffer
+         << "\" not found in the scene." << std::endl;
+      (*err) += ss.str();
+    }
     return false;
   }
 
@@ -6059,6 +6084,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
   // 4. Parse BufferView
   {
+    int idx = 0;
     bool success = ForEachInArray(v, "bufferViews", [&](const detail::json &o) {
       if (!detail::IsObject(o)) {
         if (err) {
@@ -6067,12 +6093,13 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
         return false;
       }
       BufferView bufferView;
-      if (!ParseBufferView(&bufferView, err, o,
+      if (!ParseBufferView(&bufferView, err, o, idx, model->buffers.size(),
                            store_original_json_for_extras_and_extensions_)) {
         return false;
       }
 
       model->bufferViews.emplace_back(std::move(bufferView));
+      idx++;
       return true;
     });
 
@@ -6304,48 +6331,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       if (!ParseImage(&image, idx, err, warn, o,
                       store_original_json_for_extras_and_extensions_, base_dir,
                       max_external_file_size_, &fs, &uri_cb,
+                      model->buffers, model->bufferViews,
                       &this->LoadImageData, load_image_user_data)) {
         return false;
-      }
-
-      if (image.bufferView != -1) {
-        // Load image from the buffer view.
-        if (size_t(image.bufferView) >= model->bufferViews.size()) {
-          if (err) {
-            std::stringstream ss;
-            ss << "image[" << idx << "] bufferView \"" << image.bufferView
-               << "\" not found in the scene." << std::endl;
-            (*err) += ss.str();
-          }
-          return false;
-        }
-
-        const BufferView &bufferView =
-            model->bufferViews[size_t(image.bufferView)];
-        if (size_t(bufferView.buffer) >= model->buffers.size()) {
-          if (err) {
-            std::stringstream ss;
-            ss << "image[" << idx << "] buffer \"" << bufferView.buffer
-               << "\" not found in the scene." << std::endl;
-            (*err) += ss.str();
-          }
-          return false;
-        }
-        const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
-
-        if (*LoadImageData == nullptr) {
-          if (err) {
-            (*err) += "No LoadImageData callback specified.\n";
-          }
-          return false;
-        }
-        bool ret = LoadImageData(
-            &image, idx, err, warn, image.width, image.height,
-            &buffer.data[bufferView.byteOffset],
-            static_cast<int>(bufferView.byteLength), load_image_user_data);
-        if (!ret) {
-          return false;
-        }
       }
 
       model->images.emplace_back(std::move(image));
