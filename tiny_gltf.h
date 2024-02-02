@@ -1534,6 +1534,8 @@ class TinyGLTF {
     preserve_image_channels_ = onoff;
   }
 
+  bool GetPreserveImageChannels() const { return preserve_image_channels_; }
+
   ///
   /// Set maximum allowed external file size in bytes.
   /// Default: 2GB
@@ -1545,7 +1547,16 @@ class TinyGLTF {
 
   size_t GetMaxExternalFileSize() const { return max_external_file_size_; }
 
-  bool GetPreserveImageChannels() const { return preserve_image_channels_; }
+  ///
+  /// Set whether the images should be loaded and decoded multithreaded.
+  /// Default: false
+  /// This is useful when you want you load a single file with low latency.
+  ///
+  void SetParseImagesMultithreaded(bool enabled) {
+    parse_images_multithreaded_ = enabled;
+  }
+
+  bool GetParseImagesMultithreaded() const { return parse_images_multithreaded_; }
 
  private:
   ///
@@ -1570,6 +1581,8 @@ class TinyGLTF {
 
   bool preserve_image_channels_ = false;  /// Default false(expand channels to
                                           /// RGBA) for backward compatibility.
+
+  bool parse_images_multithreaded_ = false;
 
   size_t max_external_file_size_{
       size_t((std::numeric_limits<int32_t>::max)())};  // Default 2GB
@@ -1631,6 +1644,7 @@ class TinyGLTF {
 
 #if defined(TINYGLTF_IMPLEMENTATION) || defined(__INTELLISENSE__)
 #include <algorithm>
+#include <thread>
 // #include <cassert>
 #ifndef TINYGLTF_NO_FS
 #include <sys/stat.h>  // for is_directory check
@@ -3986,6 +4000,136 @@ static bool ParseObjectArrayProperty(std::vector<Result> *ret, std::string *err,
     parent_node);
 }
 
+template<typename Func, typename Result>
+static bool ParseArrayPropertyPar(std::vector<Result> *ret, std::string *err,
+                                  const detail::json &o,
+                                  const std::string &property,
+                                  bool required,
+                                  const char * err_name, Func parse,
+                                  const std::string &parent_node = "") {
+  // TODO(bekorn): How I treated the "required" argument is not compatible with
+  //   other Parse*Property functions. Currently it is the wanted behaviour for the
+  //   LoadFromString usecases, but other usecases are broken now. Ask the author?
+
+  detail::json_const_iterator it;
+  if (not detail::FindMember(o, property.c_str(), it)) {
+    if (not required) return true; // Absence is OK, member was not required.
+    if (err) {
+      (*err) += "'" + property + "' property is missing";
+      if (not parent_node.empty()) (*err) += " in " + parent_node;
+      (*err) += ".\n";
+    }
+    return false;
+  }
+
+  const detail::json & arr = detail::GetValue(it);
+  if (not detail::IsArray(arr)) {
+    // Type mismatch is always an error.
+    if (err) {
+      (*err) += "'" + property + "' property is not an array";
+      if (not parent_node.empty()) (*err) += " in " + parent_node;
+      (*err) += ".\n";
+    }
+    return false;
+  }
+
+  int arr_size = detail::ArraySize(arr);
+  ret->clear(), ret->resize(arr_size);
+
+  auto parse_success = std::make_unique<bool[]>(arr_size);
+
+  using json_iter = detail::json_const_array_iterator;
+  using vector_iter = typename std::vector<Result>::iterator;
+
+#if false // OS handles threads
+
+  auto thread_count = arr_size;
+  auto threads = std::make_unique<std::thread[]>(thread_count);
+
+  auto work = [&thread_success, &parse]
+  (json_iter src, vector_iter dst, int idx) {
+    parse_success[idx] = parse(*src, *dst, idx);
+  };
+
+  auto src = detail::ArrayBegin(arr);
+  auto dst = ret->begin();
+  int idx = 0;
+  for (int i = 0; i < thread_count; ++i) {
+    threads[i] = std::thread(work, src, dst, idx);
+    ++src, ++dst, ++idx;
+  }
+  for (int i = 0; i < thread_count; ++i) {
+    threads[i].join();
+  }
+
+#else // Distribute the work among N threads
+
+  auto thread_count = std::min(unsigned(arr_size), std::thread::hardware_concurrency());
+  auto threads = std::make_unique<std::thread[]>(thread_count);
+  int item_per_thread = (arr_size + thread_count - 1) / thread_count;
+
+  auto work = [&parse, &parse_success]
+  (json_iter src, vector_iter dst, int idx, int work_size) {
+    for (int i = 0; i < work_size; ++i) {
+      parse_success[idx] = parse(*src, *dst, idx);
+      ++src, ++dst, ++idx;
+    }
+  };
+
+  auto src = detail::ArrayBegin(arr);
+  auto dst = ret->begin();
+  int idx = 0;
+  for (int i = 0; i < thread_count; ++i) {
+    int work_size = std::min(arr_size - idx, item_per_thread);
+    threads[i] = std::thread(work, src, dst, idx, work_size);
+
+    // skip the items the thread will do
+    for (int _ = 0; _ < work_size; ++_)
+      ++src, ++dst, ++idx;
+  }
+
+  for (int i = 0; i < thread_count; ++i) {
+    threads[i].join();
+  }
+
+#endif
+
+  for (int i = 0; i < arr_size; ++i) {
+    if (not parse_success[i]) {
+      if (err) {
+        (*err) += "'" + property + "' property is not an " + err_name + " type.\n";
+        if (not parent_node.empty()) (*err) += " in " + parent_node;
+        (*err) += ".\n";
+      }
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template<typename Func, typename Return>
+static bool ParseObjectArrayPropertyPar(std::vector<Return> *ret, std::string *err,
+                                        const detail::json &o,
+                                        const std::string &property,
+                                        bool required,
+                                        const char * err_name, Func parse,
+                                        const std::string &parent_node = "") {
+  return ParseArrayPropertyPar(
+    ret, err, o, property, required, err_name,
+    [&](const detail::json & o, Return & v, int idx)
+    {
+      if (not detail::IsObject(o)) {
+        if (err) {
+          (*err) += property + "[" + std::to_string(idx) + "] is not a JSON object.";
+        }
+        return false;
+      }
+      return parse(o, v, idx);
+    },
+    parent_node);
+}
+
 static bool ParseStringProperty(
     std::string *ret, std::string *err, const detail::json &o,
     const std::string &property, bool required,
@@ -6188,14 +6332,24 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       load_image_user_data = reinterpret_cast<void *>(&load_image_option);
     }
 
-    bool success = ParseObjectArrayProperty(&model->images, err, v, "images", false,
-      "image", [&](const detail::json & o, Image & image, int idx) {
-        return ParseImage(&image, idx, err, warn, o,
-          store_original_json_for_extras_and_extensions_, base_dir,
-          max_external_file_size_, &fs, &uri_cb,
-          model->buffers, model->bufferViews,
-          &this->LoadImageData, load_image_user_data);
-      });
+    const auto process = [&](const detail::json & o, Image & image, int idx) {
+      return ParseImage(&image, idx, err, warn, o,
+        store_original_json_for_extras_and_extensions_, base_dir,
+        max_external_file_size_, &fs, &uri_cb,
+        model->buffers, model->bufferViews,
+        &this->LoadImageData, load_image_user_data);
+    };
+
+    bool success;
+
+    if (parse_images_multithreaded_) {
+      success = ParseObjectArrayPropertyPar(
+        &model->images, err, v, "images", false, "image", process);
+    }
+    else {
+      success = ParseObjectArrayProperty(
+        &model->images, err, v, "images", false, "image", process);
+    }
 
     if (!success) return false;
   }
