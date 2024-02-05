@@ -7617,11 +7617,40 @@ static void SerializeGltfMaterial(const Material &material, detail::json &o) {
   }
 
   SerializeParameterMap(material.additionalValues, o);
-#else
-
 #endif
 
   SerializeExtrasAndExtensions(material, o);
+
+  // MSFT_lod
+  if (!material.lods.empty()) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto &extensions = detail::GetValue(it);
+    if (!detail::FindMember(extensions, "MSFT_lod", it)) {
+      detail::json lod;
+      detail::JsonSetObject(lod);
+      detail::JsonAddMember(extensions, "MSFT_lod", std::move(lod));
+      detail::FindMember(extensions, "MSFT_lod", it);
+    }
+    SerializeNumberArrayProperty<int>("ids", material.lods, detail::GetValue(it));
+  } else {
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto &extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "MSFT_lod", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
 }
 
 static void SerializeGltfMesh(const Mesh &mesh, detail::json &o) {
@@ -7844,7 +7873,7 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       detail::json audio;
       detail::JsonSetObject(audio);
       detail::JsonAddMember(extensions, "KHR_audio", std::move(audio));
-      detail::FindMember(o, "KHR_audio", it);
+      detail::FindMember(extensions, "KHR_audio", it);
     }
     SerializeNumberProperty("emitter", node.emitter, detail::GetValue(it));
   } else {
@@ -7853,6 +7882,37 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       auto &extensions = detail::GetValue(ext_it);
       detail::json_iterator lp_it;
       if (detail::FindMember(extensions, "KHR_audio", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
+
+  // MSFT_lod
+  if (!node.lods.empty()) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto &extensions = detail::GetValue(it);
+    if (!detail::FindMember(extensions, "MSFT_lod", it)) {
+      detail::json lod;
+      detail::JsonSetObject(lod);
+      detail::JsonAddMember(extensions, "MSFT_lod", std::move(lod));
+      detail::FindMember(extensions, "MSFT_lod", it);
+    }
+    SerializeNumberArrayProperty<int>("ids", node.lods, detail::GetValue(it));
+  } else {
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto &extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "MSFT_lod", lp_it)) {
         detail::Erase(extensions, lp_it);
       }
       if (detail::IsEmpty(extensions)) {
