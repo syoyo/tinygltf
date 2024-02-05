@@ -926,3 +926,64 @@ TEST_CASE("zero-sized-bin-chunk-glb", "[issue-440]") {
 
   REQUIRE(true == ret);
 }
+
+TEST_CASE("serialize-lods", "[issue-xxx]") {
+  // Stream to serialize to
+  std::stringstream os;
+
+  {
+    tinygltf::Model m;
+
+    m.nodes.resize(3);
+    // Add Node 1 and Node 2 as lods to Node 0
+    m.nodes[0].lods.push_back(1);
+    m.nodes[0].lods.push_back(2);
+
+    // Add Material 1 and Material 2 as lods to Material 0
+    m.materials.resize(3);
+    m.materials[0].lods.push_back(1);
+    m.materials[0].lods.push_back(2);
+
+    tinygltf::Scene scene;
+    // Scene uses Node 0 as root node
+    scene.nodes.push_back(0);
+    // Add scene to the model
+    m.scenes.push_back(scene);
+
+    // Serialize model to output stream
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+    REQUIRE(true == ret);
+  }
+
+  {
+    tinygltf::Model m;
+    tinygltf::TinyGLTF ctx;
+    // Parse the serialized model
+    bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
+    REQUIRE(true == ok);
+
+    // Make sure all three materials are there
+    REQUIRE(3 == m.materials.size());
+    // Make sure the first material has both lod materials
+    REQUIRE(2 == m.materials[0].lods.size());
+    // Make sure the order is still the same after serialization and deserialization
+    CHECK(1 == m.materials[0].lods[0]);
+    CHECK(2 == m.materials[0].lods[1]);
+
+    // Make sure the single scene is there
+    REQUIRE(1 == m.scenes.size());
+    // Make sure all three nodes are there
+    REQUIRE(3 == m.nodes.size());
+    // Make sure the single root node of the scene is there
+    REQUIRE(1 == m.scenes[0].nodes.size());
+    REQUIRE(0 == m.scenes[0].nodes[0]);
+    // Retrieve the scene root node
+    const tinygltf::Node& node = m.nodes[m.scenes[0].nodes[0]];
+    // Make sure the single root node has both lod nodes
+    REQUIRE(2 == node.lods.size());
+    // Make sure the order is still the same after serialization and deserialization
+    CHECK(1 == node.lods[0]);
+    CHECK(2 == node.lods[1]);
+  }
+}
