@@ -927,7 +927,51 @@ TEST_CASE("zero-sized-bin-chunk-glb", "[issue-440]") {
   REQUIRE(true == ret);
 }
 
-TEST_CASE("serialize-lods", "[issue-xxx]") {
+TEST_CASE("serialize-node-emitter", "[KHR_audio]") {
+  // Stream to serialize to
+  std::stringstream os;
+
+  {
+    tinygltf::Model m;
+    // Create a default audio emitter
+    m.audioEmitters.resize(1);
+    // Create a single node
+    m.nodes.resize(1);
+    // The node references the single emitter
+    m.nodes[0].emitter = 0;
+    // Create a single scene
+    m.scenes.resize(1);
+    // Make the scene reference the single node
+    m.scenes[0].nodes.push_back(0);
+
+    // Serialize model to output stream
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+    REQUIRE(true == ret);
+  }
+
+  {
+    tinygltf::Model m;
+    tinygltf::TinyGLTF ctx;
+    // Parse the serialized model
+    bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
+    REQUIRE(true == ok);
+
+    // Make sure the single scene is there
+    REQUIRE(1 == m.scenes.size());
+    // Make sure all three nodes are there
+    REQUIRE(1 == m.nodes.size());
+    // Make sure the single root node of the scene is there
+    REQUIRE(1 == m.scenes[0].nodes.size());
+    REQUIRE(0 == m.scenes[0].nodes[0]);
+    // Retrieve the scene root node
+    const tinygltf::Node& node = m.nodes[m.scenes[0].nodes[0]];
+    // Make sure the single root node has both lod nodes
+    REQUIRE(0 == node.emitter);
+  }
+}
+
+TEST_CASE("serialize-lods", "[lods]") {
   // Stream to serialize to
   std::stringstream os;
 
