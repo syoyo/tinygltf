@@ -764,6 +764,7 @@ struct Material {
   std::string alphaMode{"OPAQUE"}; // default "OPAQUE"
   double alphaCutoff{0.5};        // default 0.5
   bool doubleSided{false};        // default false
+  std::vector<int> lods;          // level of detail materials (MSFT_lod)
 
   PbrMetallicRoughness pbrMetallicRoughness;
 
@@ -1018,6 +1019,7 @@ class Node {
   int mesh{-1};
   int light{-1};    // light source index (KHR_lights_punctual)
   int emitter{-1};  // audio emitter index (KHR_audio)
+  std::vector<int> lods; // level of detail nodes (MSFT_lod)
   std::vector<int> children;
   std::vector<double> rotation;     // length must be 0 or 4
   std::vector<double> scale;        // length must be 0 or 3
@@ -5165,6 +5167,24 @@ static bool ParseNode(Node *node, std::string *err, const detail::json &o,
   }
   node->emitter = emitter;
 
+  node->lods.clear();
+  if (node->extensions.count("MSFT_lod") != 0) {
+    auto const &msft_lod_ext = node->extensions["MSFT_lod"];
+    if (msft_lod_ext.Has("ids")) {
+      auto idsArr = msft_lod_ext.Get("ids");
+      for (size_t i = 0; i < idsArr.ArrayLen(); ++i) {
+        node->lods.emplace_back(idsArr.Get(i).GetNumberAsInt());
+      }
+    } else {
+      if (err) {
+        *err +=
+            "Node has extension MSFT_lod, but does not reference "
+            "other nodes via their ids.\n";
+      }
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -5363,6 +5383,24 @@ static bool ParseMaterial(Material *material, std::string *err, std::string *war
   material->extensions.clear();  // Note(agnat): Why?
   ParseExtrasAndExtensions(material, err, o,
                            store_original_json_for_extras_and_extensions);
+
+  material->lods.clear();
+  if (material->extensions.count("MSFT_lod") != 0) {
+    auto const &msft_lod_ext = material->extensions["MSFT_lod"];
+    if (msft_lod_ext.Has("ids")) {
+      auto idsArr = msft_lod_ext.Get("ids");
+      for (size_t i = 0; i < idsArr.ArrayLen(); ++i) {
+        material->lods.emplace_back(idsArr.Get(i).GetNumberAsInt());
+      }
+    } else {
+      if (err) {
+        *err +=
+            "Material has extension MSFT_lod, but does not reference "
+            "other materials via their ids.\n";
+      }
+      return false;
+    }
+  }
 
   return true;
 }
@@ -7579,11 +7617,40 @@ static void SerializeGltfMaterial(const Material &material, detail::json &o) {
   }
 
   SerializeParameterMap(material.additionalValues, o);
-#else
-
 #endif
 
   SerializeExtrasAndExtensions(material, o);
+
+  // MSFT_lod
+  if (!material.lods.empty()) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto &extensions = detail::GetValue(it);
+    if (!detail::FindMember(extensions, "MSFT_lod", it)) {
+      detail::json lod;
+      detail::JsonSetObject(lod);
+      detail::JsonAddMember(extensions, "MSFT_lod", std::move(lod));
+      detail::FindMember(extensions, "MSFT_lod", it);
+    }
+    SerializeNumberArrayProperty<int>("ids", material.lods, detail::GetValue(it));
+  } else {
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto &extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "MSFT_lod", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
 }
 
 static void SerializeGltfMesh(const Mesh &mesh, detail::json &o) {
@@ -7806,7 +7873,7 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       detail::json audio;
       detail::JsonSetObject(audio);
       detail::JsonAddMember(extensions, "KHR_audio", std::move(audio));
-      detail::FindMember(o, "KHR_audio", it);
+      detail::FindMember(extensions, "KHR_audio", it);
     }
     SerializeNumberProperty("emitter", node.emitter, detail::GetValue(it));
   } else {
@@ -7815,6 +7882,37 @@ static void SerializeGltfNode(const Node &node, detail::json &o) {
       auto &extensions = detail::GetValue(ext_it);
       detail::json_iterator lp_it;
       if (detail::FindMember(extensions, "KHR_audio", lp_it)) {
+        detail::Erase(extensions, lp_it);
+      }
+      if (detail::IsEmpty(extensions)) {
+        detail::Erase(o, ext_it);
+      }
+    }
+  }
+
+  // MSFT_lod
+  if (!node.lods.empty()) {
+    detail::json_iterator it;
+    if (!detail::FindMember(o, "extensions", it)) {
+      detail::json extensions;
+      detail::JsonSetObject(extensions);
+      detail::JsonAddMember(o, "extensions", std::move(extensions));
+      detail::FindMember(o, "extensions", it);
+    }
+    auto &extensions = detail::GetValue(it);
+    if (!detail::FindMember(extensions, "MSFT_lod", it)) {
+      detail::json lod;
+      detail::JsonSetObject(lod);
+      detail::JsonAddMember(extensions, "MSFT_lod", std::move(lod));
+      detail::FindMember(extensions, "MSFT_lod", it);
+    }
+    SerializeNumberArrayProperty<int>("ids", node.lods, detail::GetValue(it));
+  } else {
+    detail::json_iterator ext_it;
+    if (detail::FindMember(o, "extensions", ext_it)) {
+      auto &extensions = detail::GetValue(ext_it);
+      detail::json_iterator lp_it;
+      if (detail::FindMember(extensions, "MSFT_lod", lp_it)) {
         detail::Erase(extensions, lp_it);
       }
       if (detail::IsEmpty(extensions)) {
