@@ -788,8 +788,10 @@ static void QuatToAngleAxis(const std::vector<double> quaternion,
     return;
   }
 
+  constexpr double pi = 3.14159265358979323846;
+
   double denom = sqrt(1-qw*qw);
-  outAngleDegrees = angleRadians * 180.0 / M_PI;
+  outAngleDegrees = angleRadians * 180.0 / pi;
   axis[0] = qx / denom;
   axis[1] = qy / denom;
   axis[2] = qz / denom;
