@@ -978,19 +978,20 @@ TEST_CASE("serialize-lods", "[lods]") {
   {
     tinygltf::Model m;
 
-    m.nodes.resize(3);
+    m.nodes.resize(4);
     // Add Node 1 and Node 2 as lods to Node 0
     m.nodes[0].lods.push_back(1);
     m.nodes[0].lods.push_back(2);
 
     // Add Material 1 and Material 2 as lods to Material 0
-    m.materials.resize(3);
+    m.materials.resize(4);
     m.materials[0].lods.push_back(1);
     m.materials[0].lods.push_back(2);
 
     tinygltf::Scene scene;
-    // Scene uses Node 0 as root node
+    // Scene uses Node 0 and 3 as root node
     scene.nodes.push_back(0);
+    scene.nodes.push_back(3);
     // Add scene to the model
     m.scenes.push_back(scene);
 
@@ -1006,28 +1007,52 @@ TEST_CASE("serialize-lods", "[lods]") {
     // Parse the serialized model
     bool ok = ctx.LoadASCIIFromString(&m, nullptr, nullptr, os.str().c_str(), os.str().size(), "");
     REQUIRE(true == ok);
+    // Make sure the model's used extensions hold MSFT_lod
+    CHECK(m.extensionsUsed.size() == 1);
+    CHECK(m.extensionsUsed[0].compare("MSFT_lod") == 0);
+    // MSFT_lod is not a required extension
+    CHECK(m.extensionsRequired.size() == 0);
 
-    // Make sure all three materials are there
-    REQUIRE(3 == m.materials.size());
+    // Make sure all four materials are there
+    REQUIRE(4 == m.materials.size());
     // Make sure the first material has both lod materials
     REQUIRE(2 == m.materials[0].lods.size());
     // Make sure the order is still the same after serialization and deserialization
     CHECK(1 == m.materials[0].lods[0]);
     CHECK(2 == m.materials[0].lods[1]);
+    // Make sure the material with lods exposes the MSFT_lod extension
+    CHECK(m.materials[0].extensions.size() == 1);
+    CHECK(m.materials[0].extensions.count("MSFT_lod") == 1);
+    // Make sure the last material has no lod materials
+    CHECK(0 == m.materials[3].lods.size());
+    // Make sure the material without lods does not exposes the MSFT_lod extension
+    CHECK(m.materials[3].extensions.size() == 0);
+    CHECK(m.materials[3].extensions.count("MSFT_lod") == 0);
 
     // Make sure the single scene is there
     REQUIRE(1 == m.scenes.size());
-    // Make sure all three nodes are there
-    REQUIRE(3 == m.nodes.size());
-    // Make sure the single root node of the scene is there
-    REQUIRE(1 == m.scenes[0].nodes.size());
+    // Make sure all four nodes are there
+    REQUIRE(4 == m.nodes.size());
+    // Make sure the two root nodes of the scene are there
+    REQUIRE(2 == m.scenes[0].nodes.size());
     REQUIRE(0 == m.scenes[0].nodes[0]);
-    // Retrieve the scene root node
-    const tinygltf::Node& node = m.nodes[m.scenes[0].nodes[0]];
-    // Make sure the single root node has both lod nodes
-    REQUIRE(2 == node.lods.size());
+    REQUIRE(3 == m.scenes[0].nodes[1]);
+    // Retrieve the node with lods
+    const tinygltf::Node& nodeWithLods = m.nodes[m.scenes[0].nodes[0]];
+    // Make sure the node has both lod nodes
+    REQUIRE(2 == nodeWithLods.lods.size());
     // Make sure the order is still the same after serialization and deserialization
-    CHECK(1 == node.lods[0]);
-    CHECK(2 == node.lods[1]);
+    CHECK(1 == nodeWithLods.lods[0]);
+    CHECK(2 == nodeWithLods.lods[1]);
+    // Make sure the node with lods exposes the MSFT_lod extension
+    CHECK(nodeWithLods.extensions.size() == 1);
+    CHECK(nodeWithLods.extensions.count("MSFT_lod") == 1);
+    // Retrieve the node without lods
+    const tinygltf::Node& nodeWithoutLods = m.nodes[m.scenes[0].nodes[1]];
+    // Make sure the node has no lod nodes
+    CHECK(0 == nodeWithoutLods.lods.size());
+    // Make sure the node without lods does not exposes the MSFT_lod extension
+    CHECK(nodeWithoutLods.extensions.size() == 0);
+    CHECK(nodeWithoutLods.extensions.count("MSFT_lod") == 0);
   }
 }
