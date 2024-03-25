@@ -337,12 +337,11 @@ class Value {
   T &Get();
 
   // Lookup value from an array
-  const Value &Get(int idx) const {
+  const Value &Get(size_t idx) const {
     static Value null_value;
     assert(IsArray());
-    assert(idx >= 0);
-    return (static_cast<size_t>(idx) < array_value_.size())
-               ? array_value_[static_cast<size_t>(idx)]
+    return (idx < array_value_.size())
+               ? array_value_[idx]
                : null_value;
   }
 
@@ -1927,7 +1926,7 @@ static bool Equals(const tinygltf::Value &one, const tinygltf::Value &other) {
     }
     case ARRAY_TYPE: {
       if (one.Size() != other.Size()) return false;
-      for (int i = 0; i < int(one.Size()); ++i)
+      for (size_t i = 0; i < one.Size(); ++i)
         if (!Equals(one.Get(i), other.Get(i))) return false;
       return true;
     }
@@ -7070,10 +7069,10 @@ static bool ValueToJson(const Value &value, detail::json *ret) {
       obj = detail::json(value.Get<std::string>());
       break;
     case ARRAY_TYPE: {
-      for (unsigned int i = 0; i < value.ArrayLen(); ++i) {
-        Value elementValue = value.Get(int(i));
+      for (size_t i = 0; i < value.ArrayLen(); ++i) {
+        Value elementValue = value.Get(i);
         detail::json elementJson;
-        if (ValueToJson(value.Get(int(i)), &elementJson))
+        if (ValueToJson(value.Get(i), &elementJson))
           obj.push_back(elementJson);
       }
       break;
