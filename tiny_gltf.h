@@ -419,105 +419,9 @@ TINYGLTF_VALUE_GET(Value::Object, object_value_)
 
 #ifdef __clang__
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wc++98-compat"
 #pragma clang diagnostic ignored "-Wpadded"
 #endif
 
-/// Aggregate object for representing a color
-using ColorValue = std::array<double, 4>;
-
-// === legacy interface ====
-// TODO(syoyo): Deprecate `Parameter` class.
-struct Parameter {
-  bool bool_value = false;
-  bool has_number_value = false;
-  std::string string_value;
-  std::vector<double> number_array;
-  std::map<std::string, double> json_double_value;
-  double number_value = 0.0;
-
-  // context sensitive methods. depending the type of the Parameter you are
-  // accessing, these are either valid or not
-  // If this parameter represent a texture map in a material, will return the
-  // texture index
-
-  /// Return the index of a texture if this Parameter is a texture map.
-  /// Returned value is only valid if the parameter represent a texture from a
-  /// material
-  int TextureIndex() const {
-    const auto it = json_double_value.find("index");
-    if (it != std::end(json_double_value)) {
-      return int(it->second);
-    }
-    return -1;
-  }
-
-  /// Return the index of a texture coordinate set if this Parameter is a
-  /// texture map. Returned value is only valid if the parameter represent a
-  /// texture from a material
-  int TextureTexCoord() const {
-    const auto it = json_double_value.find("texCoord");
-    if (it != std::end(json_double_value)) {
-      return int(it->second);
-    }
-    // As per the spec, if texCoord is omitted, this parameter is 0
-    return 0;
-  }
-
-  /// Return the scale of a texture if this Parameter is a normal texture map.
-  /// Returned value is only valid if the parameter represent a normal texture
-  /// from a material
-  double TextureScale() const {
-    const auto it = json_double_value.find("scale");
-    if (it != std::end(json_double_value)) {
-      return it->second;
-    }
-    // As per the spec, if scale is omitted, this parameter is 1
-    return 1;
-  }
-
-  /// Return the strength of a texture if this Parameter is a an occlusion map.
-  /// Returned value is only valid if the parameter represent an occlusion map
-  /// from a material
-  double TextureStrength() const {
-    const auto it = json_double_value.find("strength");
-    if (it != std::end(json_double_value)) {
-      return it->second;
-    }
-    // As per the spec, if strength is omitted, this parameter is 1
-    return 1;
-  }
-
-  /// Material factor, like the roughness or metalness of a material
-  /// Returned value is only valid if the parameter represent a texture from a
-  /// material
-  double Factor() const { return number_value; }
-
-  /// Return the color of a material
-  /// Returned value is only valid if the parameter represent a texture from a
-  /// material
-  ColorValue ColorFactor() const {
-    return {
-        {// this aggregate initialize the std::array object, and uses C++11 RVO.
-         number_array[0], number_array[1], number_array[2],
-         (number_array.size() > 3 ? number_array[3] : 1.0)}};
-  }
-
-  Parameter() = default;
-  DEFAULT_METHODS(Parameter)
-  bool operator==(const Parameter &) const;
-};
-
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wpadded"
-#endif
-
-typedef std::map<std::string, Parameter> ParameterMap;
 typedef std::map<std::string, Value> ExtensionMap;
 
 struct AnimationChannel {
@@ -754,9 +658,7 @@ struct PbrMetallicRoughness {
   bool operator==(const PbrMetallicRoughness &) const;
 };
 
-// Each extension should be stored in a ParameterMap.
-// members not in the values could be included in the ParameterMap
-// to keep a single material model
+// material class defined in glTF 2.0 spec.
 struct Material {
   std::string name;
 
@@ -771,11 +673,6 @@ struct Material {
   NormalTextureInfo normalTexture;
   OcclusionTextureInfo occlusionTexture;
   TextureInfo emissiveTexture;
-
-  // For backward compatibility
-  // TODO(syoyo): Remove `values` and `additionalValues` in the next release.
-  ParameterMap values;
-  ParameterMap additionalValues;
 
   ExtensionMap extensions;
   Value extras;
@@ -2038,8 +1935,7 @@ bool Material::operator==(const Material &other) const {
          TINYGLTF_DOUBLE_EQUAL(this->alphaCutoff, other.alphaCutoff) &&
          (this->doubleSided == other.doubleSided) &&
          (this->extensions == other.extensions) &&
-         (this->extras == other.extras) && (this->values == other.values) &&
-         (this->additionalValues == other.additionalValues) &&
+         (this->extras == other.extras) &&
          (this->name == other.name);
 }
 bool Mesh::operator==(const Mesh &other) const {
@@ -2093,29 +1989,6 @@ bool OrthographicCamera::operator==(const OrthographicCamera &other) const {
          TINYGLTF_DOUBLE_EQUAL(this->ymag, other.ymag) &&
          TINYGLTF_DOUBLE_EQUAL(this->zfar, other.zfar) &&
          TINYGLTF_DOUBLE_EQUAL(this->znear, other.znear);
-}
-bool Parameter::operator==(const Parameter &other) const {
-  if (this->bool_value != other.bool_value ||
-      this->has_number_value != other.has_number_value)
-    return false;
-
-  if (!TINYGLTF_DOUBLE_EQUAL(this->number_value, other.number_value))
-    return false;
-
-  if (this->json_double_value.size() != other.json_double_value.size())
-    return false;
-  for (auto &it : this->json_double_value) {
-    auto otherIt = other.json_double_value.find(it.first);
-    if (otherIt == other.json_double_value.end()) return false;
-
-    if (!TINYGLTF_DOUBLE_EQUAL(it.second, otherIt->second)) return false;
-  }
-
-  if (!Equals(this->number_array, other.number_array)) return false;
-
-  if (this->string_value != other.string_value) return false;
-
-  return true;
 }
 bool PerspectiveCamera::operator==(const PerspectiveCamera &other) const {
   return TINYGLTF_DOUBLE_EQUAL(this->aspectRatio, other.aspectRatio) &&
@@ -4105,39 +3978,6 @@ static bool ParseJSONProperty(std::map<std::string, double> *ret,
   return true;
 }
 
-static bool ParseParameterProperty(Parameter *param, std::string *err,
-                                   const detail::json &o,
-                                   const std::string &prop, bool required) {
-  // A parameter value can either be a string or an array of either a boolean or
-  // a number. Booleans of any kind aren't supported here. Granted, it
-  // complicates the Parameter structure and breaks it semantically in the sense
-  // that the client probably works off the assumption that if the string is
-  // empty the vector is used, etc. Would a tagged union work?
-  if (ParseStringProperty(&param->string_value, err, o, prop, false)) {
-    // Found string property.
-    return true;
-  } else if (ParseNumberArrayProperty(&param->number_array, err, o, prop,
-                                      false)) {
-    // Found a number array.
-    return true;
-  } else if (ParseNumberProperty(&param->number_value, err, o, prop, false)) {
-    param->has_number_value = true;
-    return true;
-  } else if (ParseJSONProperty(&param->json_double_value, err, o, prop,
-                               false)) {
-    return true;
-  } else if (ParseBooleanProperty(&param->bool_value, err, o, prop, false)) {
-    return true;
-  } else {
-    if (required) {
-      if (err) {
-        (*err) += "parameter must be a string or number / number array.\n";
-      }
-    }
-    return false;
-  }
-}
-
 static bool ParseExtensionsProperty(ExtensionMap *ret, std::string *err,
                                     const detail::json &o) {
   (void)err;
@@ -5335,48 +5175,6 @@ static bool ParseMaterial(Material *material, std::string *err, std::string *war
     if (detail::FindMember(o, "emissiveTexture", it)) {
       ParseTextureInfo(&material->emissiveTexture, err, detail::GetValue(it),
                        store_original_json_for_extras_and_extensions);
-    }
-  }
-
-  // Old code path. For backward compatibility, we still store material values
-  // as Parameter. This will create duplicated information for
-  // example(pbrMetallicRoughness), but should be negligible in terms of memory
-  // consumption.
-  // TODO(syoyo): Remove in the next major release.
-  material->values.clear();
-  material->additionalValues.clear();
-
-  detail::json_const_iterator it(detail::ObjectBegin(o));
-  detail::json_const_iterator itEnd(detail::ObjectEnd(o));
-
-  for (; it != itEnd; ++it) {
-    std::string key(detail::GetKey(it));
-    if (key == "pbrMetallicRoughness") {
-      if (detail::IsObject(detail::GetValue(it))) {
-        const detail::json &values_object = detail::GetValue(it);
-
-        detail::json_const_iterator itVal(detail::ObjectBegin(values_object));
-        detail::json_const_iterator itValEnd(detail::ObjectEnd(values_object));
-
-        for (; itVal != itValEnd; ++itVal) {
-          Parameter param;
-          if (ParseParameterProperty(&param, err, values_object,
-                                     detail::GetKey(itVal), false)) {
-            material->values.emplace(detail::GetKey(itVal), std::move(param));
-          }
-        }
-      }
-    } else if (key == "extensions" || key == "extras") {
-      // done later, skip, otherwise poorly parsed contents will be saved in the
-      // parametermap and serialized again later
-    } else {
-      Parameter param;
-      if (ParseParameterProperty(&param, err, o, key, false)) {
-        // names of materials have already been parsed. Putting it in this map
-        // doesn't correctly reflect the glTF specification
-        if (key != "name")
-          material->additionalValues.emplace(std::move(key), std::move(param));
-      }
     }
   }
 
@@ -7154,37 +6952,6 @@ static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
   return true;
 }
 
-#if 0  // FIXME(syoyo): not used. will be removed in the future release.
-static void SerializeParameterMap(ParameterMap &param, detail::json &o) {
-  for (ParameterMap::iterator paramIt = param.begin(); paramIt != param.end();
-       ++paramIt) {
-    if (paramIt->second.number_array.size()) {
-      SerializeNumberArrayProperty<double>(paramIt->first,
-                                           paramIt->second.number_array, o);
-    } else if (paramIt->second.json_double_value.size()) {
-      detail::json json_double_value;
-      for (std::map<std::string, double>::iterator it =
-               paramIt->second.json_double_value.begin();
-           it != paramIt->second.json_double_value.end(); ++it) {
-        if (it->first == "index") {
-          json_double_value[it->first] = paramIt->second.TextureIndex();
-        } else {
-          json_double_value[it->first] = it->second;
-        }
-      }
-
-      o[paramIt->first] = json_double_value;
-    } else if (!paramIt->second.string_value.empty()) {
-      SerializeStringProperty(paramIt->first, paramIt->second.string_value, o);
-    } else if (paramIt->second.has_number_value) {
-      o[paramIt->first] = paramIt->second.number_value;
-    } else {
-      o[paramIt->first] = paramIt->second.bool_value;
-    }
-  }
-}
-#endif
-
 static void SerializeExtensionMap(const ExtensionMap &extensions,
                                   detail::json &o) {
   if (!extensions.size()) return;
@@ -7608,16 +7375,6 @@ static void SerializeGltfMaterial(const Material &material, detail::json &o) {
                             std::move(pbrMetallicRoughness));
     }
   }
-
-#if 0  // legacy way. just for the record.
-  if (material.values.size()) {
-    detail::json pbrMetallicRoughness;
-    SerializeParameterMap(material.values, pbrMetallicRoughness);
-    detail::JsonAddMember(o, "pbrMetallicRoughness", std::move(pbrMetallicRoughness));
-  }
-
-  SerializeParameterMap(material.additionalValues, o);
-#endif
 
   SerializeExtrasAndExtensions(material, o);
 
