@@ -3019,18 +3019,18 @@ bool GetFileSizeInBytes(size_t *filesize_out, std::string *err,
   }
 
   f.seekg(0, f.end);
-  size_t sz = static_cast<size_t>(f.tellg());
+  const auto sz = f.tellg();
 
   // std::cout << "sz = " << sz << "\n";
   f.seekg(0, f.beg);
 
-  if (int64_t(sz) < 0) {
+  if (sz < 0) {
     if (err) {
       (*err) += "Invalid file size : " + filepath +
                 " (does the path point to a directory?)";
     }
     return false;
-  } else if (sz == 0) {
+  } else if (sz == std::streamoff(0)) {
     if (err) {
       (*err) += "File is empty : " + filepath + "\n";
     }
@@ -3114,18 +3114,18 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
   }
 
   f.seekg(0, f.end);
-  size_t sz = static_cast<size_t>(f.tellg());
+  const auto sz = f.tellg();
 
   // std::cout << "sz = " << sz << "\n";
   f.seekg(0, f.beg);
 
-  if (int64_t(sz) < 0) {
+  if (sz < 0) {
     if (err) {
       (*err) += "Invalid file size : " + filepath +
                 " (does the path point to a directory?)";
     }
     return false;
-  } else if (sz == 0) {
+  } else if (sz == std::streamoff(0)) {
     if (err) {
       (*err) += "File is empty : " + filepath + "\n";
     }
