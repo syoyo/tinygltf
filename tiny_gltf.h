@@ -3030,7 +3030,7 @@ bool GetFileSizeInBytes(size_t *filesize_out, std::string *err,
                 " (does the path point to a directory?)";
     }
     return false;
-  } else if (sz == 0) {
+  } else if (sz == std::streamoff(0)) {
     if (err) {
       (*err) += "File is empty : " + filepath + "\n";
     }
@@ -3125,7 +3125,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
                 " (does the path point to a directory?)";
     }
     return false;
-  } else if (sz == 0) {
+  } else if (sz == std::streamoff(0)) {
     if (err) {
       (*err) += "File is empty : " + filepath + "\n";
     }
