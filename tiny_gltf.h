@@ -3042,7 +3042,7 @@ bool GetFileSizeInBytes(size_t *filesize_out, std::string *err,
     return false;
   }
 
-  (*filesize_out) = sz;
+  (*filesize_out) = static_cast<size_t>(sz);
   return true;
 #endif
 }
@@ -3067,7 +3067,7 @@ bool ReadWholeFile(std::vector<unsigned char> *out, std::string *err,
       }
       return false;
     }
-    out->resize(size);
+    out->resize(static_cast<size_t>(size));
     AAsset_read(asset, reinterpret_cast<char *>(&out->at(0)), size);
     AAsset_close(asset);
     return true;
