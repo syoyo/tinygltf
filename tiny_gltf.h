@@ -2245,7 +2245,7 @@ static std::string GetFilePathExtension(const std::string &FileName) {
 
 static std::string GetBaseDir(const std::string &filepath) {
   if (filepath.find_last_of("/\\") != std::string::npos)
-    return filepath.substr(0, filepath.find_last_of("/\\"));
+    return filepath.substr(0, filepath.find_last_of("/\\") + 1);
   return "";
 }
 
