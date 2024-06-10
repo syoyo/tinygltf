@@ -1478,7 +1478,8 @@ class TinyGLTF {
   void SetParseStrictness(ParseStrictness strictness);
 
   ///
-  /// Set callback to use for loading image data
+  /// Set callback to use for loading image data. Passing the nullptr is akin to
+  /// calling RemoveImageLoader().
   ///
   void SetImageLoader(LoadImageDataFunction LoadImageData, void *user_data);
 
@@ -1493,14 +1494,18 @@ class TinyGLTF {
   void SetImageWriter(WriteImageDataFunction WriteImageData, void *user_data);
 
   ///
-  /// Set callbacks to use for URI encoding and decoding and their user data
+  /// Set callbacks to use for URI encoding and decoding and their user data.
+  /// Returns false if there is an error with the callbacks. If err is not
+  /// nullptr, explanation will be written there.
   ///
-  void SetURICallbacks(URICallbacks callbacks);
+  bool SetURICallbacks(URICallbacks callbacks, std::string* err = nullptr);
 
   ///
-  /// Set callbacks to use for filesystem (fs) access and their user data
+  /// Set callbacks to use for filesystem (fs) access and their user data.
+  /// Returns false if there is an error with the callbacks. If err is not
+  /// nullptr, explanation will be written there.
   ///
-  void SetFsCallbacks(FsCallbacks callbacks);
+  bool SetFsCallbacks(FsCallbacks callbacks, std::string* err = nullptr);
 
   ///
   /// Set serializing default values(default = false).
@@ -2574,6 +2579,10 @@ void TinyGLTF::SetParseStrictness(ParseStrictness strictness) {
 }
 
 void TinyGLTF::SetImageLoader(LoadImageDataFunction func, void *user_data) {
+  if (func == nullptr) {
+    RemoveImageLoader();
+    return;
+  }
   LoadImageData = std::move(func);
   load_image_user_data_ = user_data;
   user_image_loader_ = true;
@@ -2778,7 +2787,6 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
     } else {
       // Throw error?
     }
-    assert(uri_cb != nullptr);
     if (uri_cb->encode) {
       if (!uri_cb->encode(*filename, "image", out_uri, uri_cb->user_data)) {
         return false;
@@ -2792,21 +2800,35 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
 }
 #endif
 
-void TinyGLTF::SetURICallbacks(URICallbacks callbacks) {
-  assert(callbacks.decode);
+bool TinyGLTF::SetURICallbacks(URICallbacks callbacks, std::string* err) {
+  if (callbacks.decode == nullptr) {
+    if (err != nullptr) {
+      *err = "URI Callback require a non-null decode function.";
+    }
+    return false;
+  }
+
   if (callbacks.decode) {
     uri_cb = std::move(callbacks);
   }
+  return true;
 }
 
-void TinyGLTF::SetFsCallbacks(FsCallbacks callbacks) {
+bool TinyGLTF::SetFsCallbacks(FsCallbacks callbacks, std::string *err) {
   // If callbacks are defined at all, they must all be defined.
-  assert(callbacks.FileExists != nullptr);
-  assert(callbacks.ExpandFilePath != nullptr);
-  assert(callbacks.ReadWholeFile != nullptr);
-  assert(callbacks.WriteWholeFile != nullptr);
-  assert(callbacks.GetFileSizeInBytes != nullptr);
+  if (callbacks.FileExists == nullptr || callbacks.ExpandFilePath == nullptr ||
+      callbacks.ReadWholeFile == nullptr ||
+      callbacks.WriteWholeFile == nullptr ||
+      callbacks.GetFileSizeInBytes == nullptr) {
+    if (err != nullptr) {
+      *err =
+          "FS Callbacks must be completely defined. At least one callback is "
+          "null.";
+    }
+    return false;
+  }
   fs = std::move(callbacks);
+  return true;
 }
 
 #ifdef _WIN32
@@ -3218,7 +3240,6 @@ static bool UpdateImageObject(const Image &image, std::string &baseDir,
   std::string ext;
   // If image has uri, use it as a filename
   if (image.uri.size()) {
-    assert(uri_cb != nullptr);
     std::string decoded_uri;
     if (!uri_cb->decode(image.uri, &decoded_uri, uri_cb->user_data)) {
       // A decode failure results in a failure to write the gltf.
@@ -4323,7 +4344,6 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     return true;
 #else
     std::string decoded_uri;
-    assert(uri_cb != nullptr);
     if (!uri_cb->decode(uri, &decoded_uri, uri_cb->user_data)) {
       if (warn) {
         (*warn) += "Failed to decode 'uri' for image[" +
@@ -4504,7 +4524,6 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
       } else {
         // External .bin file.
         std::string decoded_uri;
-        assert(uri_cb != nullptr);
         if (!uri_cb->decode(buffer->uri, &decoded_uri, uri_cb->user_data)) {
           return false;
         }
@@ -4555,7 +4574,6 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
     } else {
       // Assume external .bin file.
       std::string decoded_uri;
-      assert(uri_cb != nullptr);
       if (!uri_cb->decode(buffer->uri, &decoded_uri, uri_cb->user_data)) {
         return false;
       }
