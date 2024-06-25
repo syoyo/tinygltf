@@ -1293,39 +1293,6 @@ struct URICallbacks {
 };
 
 ///
-/// LoadImageDataFunction type. Signature for custom image loading callbacks.
-///
-using LoadImageDataFunction = std::function<bool(
-    Image * /* image */, const int /* image_idx */, std::string * /* err */,
-    std::string * /* warn */, int /* req_width */, int /* req_height */,
-    const unsigned char * /* bytes */, int /* size */, void * /*user_data */)>;
-
-///
-/// WriteImageDataFunction type. Signature for custom image writing callbacks.
-/// The out_uri parameter becomes the URI written to the gltf and may reference
-/// a file or contain a data URI.
-///
-using WriteImageDataFunction = std::function<bool(
-    const std::string * /* basepath */, const std::string * /* filename */,
-    const Image *image, bool /* embedImages */,
-    const URICallbacks * /* uri_cb */, std::string * /* out_uri */,
-    void * /* user_pointer */)>;
-
-#ifndef TINYGLTF_NO_STB_IMAGE
-// Declaration of default image loader callback
-bool LoadImageData(Image *image, const int image_idx, std::string *err,
-                   std::string *warn, int req_width, int req_height,
-                   const unsigned char *bytes, int size, void *);
-#endif
-
-#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
-// Declaration of default image writer callback
-bool WriteImageData(const std::string *basepath, const std::string *filename,
-                    const Image *image, bool embedImages,
-                    const URICallbacks *uri_cb, std::string *out_uri, void *);
-#endif
-
-///
 /// FileExistsFunction type. Signature for custom filesystem callbacks.
 ///
 using FileExistsFunction = std::function<bool(
@@ -1394,6 +1361,40 @@ bool WriteWholeFile(std::string *err, const std::string &filepath,
 
 bool GetFileSizeInBytes(size_t *filesize_out, std::string *err,
                         const std::string &filepath, void *);
+#endif
+
+///
+/// LoadImageDataFunction type. Signature for custom image loading callbacks.
+///
+using LoadImageDataFunction = std::function<bool(
+    Image * /* image */, const int /* image_idx */, std::string * /* err */,
+    std::string * /* warn */, int /* req_width */, int /* req_height */,
+    const unsigned char * /* bytes */, int /* size */, void * /*user_data */)>;
+
+///
+/// WriteImageDataFunction type. Signature for custom image writing callbacks.
+/// The out_uri parameter becomes the URI written to the gltf and may reference
+/// a file or contain a data URI.
+///
+using WriteImageDataFunction = std::function<bool(
+    const std::string * /* basepath */, const std::string * /* filename */,
+    const Image *image, bool /* embedImages */,
+    const FsCallbacks * /* fs_cb */, const URICallbacks * /* uri_cb */,
+    std::string * /* out_uri */, void * /* user_pointer */)>;
+
+#ifndef TINYGLTF_NO_STB_IMAGE
+// Declaration of default image loader callback
+bool LoadImageData(Image *image, const int image_idx, std::string *err,
+                   std::string *warn, int req_width, int req_height,
+                   const unsigned char *bytes, int size, void *);
+#endif
+
+#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+// Declaration of default image writer callback
+bool WriteImageData(const std::string *basepath, const std::string *filename,
+                    const Image *image, bool embedImages,
+                    const FsCallbacks* fs_cb, const URICallbacks *uri_cb,
+                    std::string *out_uri, void *);
 #endif
 
 ///
@@ -2725,8 +2726,8 @@ static void WriteToMemory_stbi(void *context, void *data, int size) {
 
 bool WriteImageData(const std::string *basepath, const std::string *filename,
                     const Image *image, bool embedImages,
-                    const URICallbacks *uri_cb, std::string *out_uri,
-                    void *fsPtr) {
+                    const FsCallbacks* fs_cb, const URICallbacks *uri_cb,
+                    std::string *out_uri, void *) {
   const std::string ext = GetFilePathExtension(*filename);
 
   // Write image to temporary buffer
@@ -2775,12 +2776,11 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
     }
   } else {
     // Write image to disc
-    FsCallbacks *fs = reinterpret_cast<FsCallbacks *>(fsPtr);
-    if ((fs != nullptr) && (fs->WriteWholeFile != nullptr)) {
+    if ((fs_cb != nullptr) && (fs_cb->WriteWholeFile != nullptr)) {
       const std::string imagefilepath = JoinPath(*basepath, *filename);
       std::string writeError;
-      if (!fs->WriteWholeFile(&writeError, imagefilepath, data,
-                              fs->user_data)) {
+      if (!fs_cb->WriteWholeFile(&writeError, imagefilepath, data,
+                              fs_cb->user_data)) {
         // Could not write image file to disc; Throw error ?
         return false;
       }
@@ -3233,6 +3233,7 @@ static std::string MimeToExt(const std::string &mimeType) {
 
 static bool UpdateImageObject(const Image &image, std::string &baseDir,
                               int index, bool embedImages,
+                              const FsCallbacks *fs_cb,
                               const URICallbacks *uri_cb,
                               const WriteImageDataFunction& WriteImageData,
                               void *user_data, std::string *out_uri) {
@@ -3266,7 +3267,7 @@ static bool UpdateImageObject(const Image &image, std::string &baseDir,
   bool imageWritten = false;
   if (WriteImageData != nullptr && !filename.empty() && !image.image.empty()) {
     imageWritten = WriteImageData(&baseDir, &filename, &image, embedImages,
-                                  uri_cb, out_uri, user_data);
+                                  fs_cb, uri_cb, out_uri, user_data);
     if (!imageWritten) {
       return false;
     }
@@ -8547,7 +8548,7 @@ bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
       // we
       std::string uri;
       if (!UpdateImageObject(model->images[i], dummystring, int(i), true,
-                             &uri_cb, this->WriteImageData,
+                             &fs, &uri_cb, this->WriteImageData,
                              this->write_image_user_data_, &uri)) {
         return false;
       }
@@ -8655,7 +8656,7 @@ bool TinyGLTF::WriteGltfSceneToFile(const Model *model,
 
       std::string uri;
       if (!UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
-                             &uri_cb, this->WriteImageData,
+                             &fs, &uri_cb, this->WriteImageData,
                              this->write_image_user_data_, &uri)) {
         return false;
       }
