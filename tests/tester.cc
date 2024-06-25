@@ -474,7 +474,7 @@ TEST_CASE("image-uri-spaces", "[issue-236]") {
     }
     REQUIRE(true == ret);
     REQUIRE(err.empty());
-    REQUIRE(!warn.empty());  // relative image path won't exist in tests/
+    REQUIRE(warn.empty());
     REQUIRE(saved.images.size() == model.images.size());
 
     // The image uri in CubeImageUriMultipleSpaces.gltf is not encoded and
@@ -662,10 +662,11 @@ TEST_CASE("serialize-image-callback", "[issue-394]") {
 
   auto writer = [](const std::string *basepath, const std::string *filename,
                    const tinygltf::Image *image, bool embedImages,
-                   const tinygltf::URICallbacks *uri_cb, std::string *out_uri,
-                   void *user_pointer) -> bool {
+                   const tinygltf::FsCallbacks* fs, const tinygltf::URICallbacks *uri_cb,
+                   std::string *out_uri, void *user_pointer) -> bool {
     (void)basepath;
     (void)image;
+    (void)fs;
     (void)uri_cb;
     REQUIRE(*filename == "foo");
     REQUIRE(embedImages == true);
@@ -699,12 +700,13 @@ TEST_CASE("serialize-image-failure", "[issue-394]") {
 
   auto writer = [](const std::string *basepath, const std::string *filename,
                    const tinygltf::Image *image, bool embedImages,
-                   const tinygltf::URICallbacks *uri_cb, std::string *out_uri,
-                   void *user_pointer) -> bool {
+                   const tinygltf::FsCallbacks* fs, const tinygltf::URICallbacks *uri_cb,
+                   std::string *out_uri, void *user_pointer) -> bool {
     (void)basepath;
     (void)filename;
     (void)image;
     (void)embedImages;
+    (void)fs;
     (void)uri_cb;
     (void)out_uri;
     (void)user_pointer;
@@ -1054,5 +1056,33 @@ TEST_CASE("serialize-lods", "[lods]") {
     // Make sure the node without lods does not exposes the MSFT_lod extension
     CHECK(nodeWithoutLods.extensions.size() == 0);
     CHECK(nodeWithoutLods.extensions.count("MSFT_lod") == 0);
+  }
+}
+
+TEST_CASE("write-image-issue", "[issue-473]") {
+
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+  bool ok = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/Cube/Cube.gltf");
+  REQUIRE(ok);
+  REQUIRE(err.empty());
+  REQUIRE(warn.empty());
+
+  REQUIRE(model.images.size() == 2);
+  REQUIRE(model.images[0].uri == "Cube_BaseColor.png");
+  REQUIRE(model.images[1].uri == "Cube_MetallicRoughness.png");
+
+  REQUIRE_FALSE(model.images[0].image.empty());
+  REQUIRE_FALSE(model.images[1].image.empty());
+
+  ok = ctx.WriteGltfSceneToFile(&model, "Cube.gltf", false, true);
+  REQUIRE(ok);
+
+  for (const auto& image : model.images)
+  {
+    std::fstream file(image.uri);
+    CHECK(file.good());
   }
 }
