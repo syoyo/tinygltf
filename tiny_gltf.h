@@ -649,9 +649,7 @@ struct Image {
   // When this flag is true, data is stored to `image` in as-is format(e.g. jpeg
   // compressed for "image/jpeg" mime) This feature is good if you use custom
   // image loader function. (e.g. delayed decoding of images for faster glTF
-  // parsing) Default parser for Image does not provide as-is loading feature at
-  // the moment. (You can manipulate this by providing your own LoadImageData
-  // function)
+  // parsing).
   bool as_is{false};
 
   Image() = default;
@@ -1544,6 +1542,17 @@ class TinyGLTF {
     preserve_image_channels_ = onoff;
   }
 
+  bool GetPreserveImageChannels() const { return preserve_image_channels_; }
+
+  ///
+  /// Specifiy whether image data is decoded/decompressed during load, or left as is
+  ///
+  void SetImagesAsIs(bool onoff) {
+      images_as_is_ = onoff;
+  }
+
+  bool GetImagesAsIs() const { return images_as_is_; }
+
   ///
   /// Set maximum allowed external file size in bytes.
   /// Default: 2GB
@@ -1554,8 +1563,6 @@ class TinyGLTF {
   }
 
   size_t GetMaxExternalFileSize() const { return max_external_file_size_; }
-
-  bool GetPreserveImageChannels() const { return preserve_image_channels_; }
 
  private:
   ///
@@ -1580,6 +1587,8 @@ class TinyGLTF {
 
   bool preserve_image_channels_ = false;  /// Default false(expand channels to
                                           /// RGBA) for backward compatibility.
+
+  bool images_as_is_ = false; /// Default false (decode/decompress images)
 
   size_t max_external_file_size_{
       size_t((std::numeric_limits<int32_t>::max)())};  // Default 2GB
@@ -1906,6 +1915,9 @@ struct LoadImageDataOption {
   // channels) default `false`(channels are expanded to RGBA for backward
   // compatibility).
   bool preserve_channels{false};
+  // true: do not decode/decompress image data.
+  // default `false`: decode/decompress image data.
+  bool as_is{false};
 };
 
 // Equals function for Value, for recursivity
@@ -2614,48 +2626,65 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
 
   int w = 0, h = 0, comp = 0, req_comp = 0;
 
-  unsigned char *data = nullptr;
+  // Try to decode image header
+  if (!stbi_info_from_memory(bytes, size, &w, &h, &comp)) {
+    // On failure, if we load images as is, we just warn.
+    std::string* msgOut = option.as_is ? warn : err;
+    if (msgOut) {
+      (*msgOut) +=
+        "Unknown image format. STB cannot decode image header for image[" +
+        std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
+    }
+    if (!option.as_is) {
+      // If we decode images, error out.
+      return false;
+    } else {
+      // If we load images as is, we copy the image data,
+      // set all image properties to invalid, and report success.
+      image->width = image->height = image->component = -1;
+      image->bits = image->pixel_type = -1;
+      image->image.resize(static_cast<size_t>(size));
+      std::copy(bytes, bytes + size, image->image.begin());
+      return true;
+    }
+  }
+
+  int bits = 8;
+  int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+
+  if (stbi_is_16_bit_from_memory(bytes, size)) {
+    bits = 16;
+    pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+  }
 
   // preserve_channels true: Use channels stored in the image file.
   // false: force 32-bit textures for common Vulkan compatibility. It appears
   // that some GPU drivers do not support 24-bit images for Vulkan
-  req_comp = option.preserve_channels ? 0 : 4;
-  int bits = 8;
-  int pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
+  req_comp = (option.preserve_channels || option.as_is) ? 0 : 4;
 
-  // It is possible that the image we want to load is a 16bit per channel image
-  // We are going to attempt to load it as 16bit per channel, and if it worked,
-  // set the image data accordingly. We are casting the returned pointer into
-  // unsigned char, because we are representing "bytes". But we are updating
-  // the Image metadata to signal that this image uses 2 bytes (16bits) per
-  // channel:
-  if (stbi_is_16_bit_from_memory(bytes, size)) {
-    data = reinterpret_cast<unsigned char *>(
-        stbi_load_16_from_memory(bytes, size, &w, &h, &comp, req_comp));
-    if (data) {
-      bits = 16;
-      pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT;
+  unsigned char* data = nullptr;
+  // Perform image decoding if requested
+  if (!option.as_is) {
+    // If the image is marked as 16 bit per channel, attempt to decode it as such first.
+    // If that fails, we are going to attempt to load it as 8 bit per channel image.
+    if (bits == 16) {
+      data = reinterpret_cast<unsigned char *>(stbi_load_16_from_memory(bytes, size, &w, &h, &comp, req_comp));
     }
-  }
-
-  // at this point, if data is still NULL, it means that the image wasn't
-  // 16bit per channel, we are going to load it as a normal 8bit per channel
-  // image as we used to do:
-  // if image cannot be decoded, ignore parsing and keep it by its path
-  // don't break in this case
-  // FIXME we should only enter this function if the image is embedded. If
-  // image->uri references
-  // an image file, it should be left as it is. Image loading should not be
-  // mandatory (to support other formats)
-  if (!data) data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
-  if (!data) {
-    // NOTE: you can use `warn` instead of `err`
-    if (err) {
-      (*err) +=
-          "Unknown image format. STB cannot decode image data for image[" +
-          std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
+    // Load as 8 bit per channel data
+    if (!data) {
+      data = stbi_load_from_memory(bytes, size, &w, &h, &comp, req_comp);
+      if (!data) {
+        if (err) {
+          (*err) +=
+            "Unknown image format. STB cannot decode image data for image[" +
+            std::to_string(image_idx) + "] name = \"" + image->name + "\".\n";
+        }
+        return false;
+      }
+      // If we were succesful, mark as 8 bit
+      bits = 8;
+      pixel_type = TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE;
     }
-    return false;
   }
 
   if ((w < 1) || (h < 1)) {
@@ -2701,10 +2730,20 @@ bool LoadImageData(Image *image, const int image_idx, std::string *err,
   image->component = comp;
   image->bits = bits;
   image->pixel_type = pixel_type;
-  image->image.resize(static_cast<size_t>(w * h * comp) * size_t(bits / 8));
-  std::copy(data, data + w * h * comp * (bits / 8), image->image.begin());
-  stbi_image_free(data);
+  image->as_is = option.as_is;
 
+  if (option.as_is) {
+    // Store the original image data
+    image->image.resize(static_cast<size_t>(size));
+    std::copy(bytes, bytes + size, image->image.begin());
+  }
+  else {
+    // Store the decoded image data
+    image->image.resize(static_cast<size_t>(w * h * comp) * size_t(bits / 8));
+    std::copy(data, data + w * h * comp * (bits / 8), image->image.begin());
+  }
+
+  stbi_image_free(data);
   return true;
 }
 #endif
@@ -2734,28 +2773,37 @@ bool WriteImageData(const std::string *basepath, const std::string *filename,
   std::string header;
   std::vector<unsigned char> data;
 
-  if (ext == "png") {
-    if ((image->bits != 8) ||
-        (image->pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)) {
-      // Unsupported pixel format
-      return false;
-    }
+  // If the image data is already encoded, take it as is
+  if (image->as_is) {
+      data = image->image;
+  }
 
-    if (!stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
-                                image->height, image->component,
-                                &image->image[0], 0)) {
-      return false;
+  if (ext == "png") {
+    if (!image->as_is) {
+      if ((image->bits != 8) ||
+          (image->pixel_type != TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE)) {
+          // Unsupported pixel format
+          return false;
+      }
+
+      if (!stbi_write_png_to_func(WriteToMemory_stbi, &data, image->width,
+                                  image->height, image->component,
+                                  &image->image[0], 0)) {
+        return false;
+      }
     }
     header = "data:image/png;base64,";
   } else if (ext == "jpg") {
-    if (!stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
+    if (!image->as_is &&
+        !stbi_write_jpg_to_func(WriteToMemory_stbi, &data, image->width,
                                 image->height, image->component,
                                 &image->image[0], 100)) {
       return false;
     }
     header = "data:image/jpeg;base64,";
   } else if (ext == "bmp") {
-    if (!stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
+    if (!image->as_is &&
+        !stbi_write_bmp_to_func(WriteToMemory_stbi, &data, image->width,
                                 image->height, image->component,
                                 &image->image[0])) {
       return false;
@@ -6360,6 +6408,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
     load_image_user_data = load_image_user_data_;
   } else {
     load_image_option.preserve_channels = preserve_image_channels_;
+    load_image_option.as_is = images_as_is_;
     load_image_user_data = reinterpret_cast<void *>(&load_image_option);
   }
 
