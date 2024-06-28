@@ -25,7 +25,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Version: - v2.8.10
+// Version: - v2.9.*
 // See https://github.com/syoyo/tinygltf/releases for release history.
 //
 // Tiny glTF loader is using following third party libraries:
@@ -6834,7 +6834,7 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
     // 'SHOULD' in glTF spec means 'RECOMMENDED',
     // So there is a situation that Chunk1(BIN) is composed of zero-sized BIN data
     // (chunksize(0) + binformat(BIN) = 8bytes).
-    // 
+    //
     if ((header_and_json_size + 8ull) > uint64_t(length)) {
       if (err) {
         (*err) =
