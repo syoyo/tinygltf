@@ -1200,3 +1200,32 @@ TEST_CASE("inverse-bind-matrices-optional", "[issue-492]") {
   REQUIRE(true == ret);
   REQUIRE(err.empty());
 }
+
+TEST_CASE("external-images") {
+    std::string err;
+    std::string warn;
+    tinygltf::Model model;
+    tinygltf::TinyGLTF ctx;
+    ctx.SetLoadImages(false);
+
+    const std::string basePath = "../models/Cube/";
+    bool ok = ctx.LoadASCIIFromFile(&model, &err, &warn, basePath + "Cube.gltf");
+    REQUIRE(ok);
+    REQUIRE(err.empty());
+    REQUIRE(warn.empty());
+
+    for (const auto& image : model.images) {
+      CHECK(image.image.empty());
+      std::fstream file(basePath + image.uri);
+      CHECK(file.good());
+    }
+
+    ok = ctx.WriteGltfSceneToFile(&model, "Cube.gltf");
+    REQUIRE(ok);
+
+    // External images should be found in basedir of written model
+    for (const auto& image : model.images) {
+      std::fstream file(image.uri);
+      CHECK(file.good());
+    }
+}

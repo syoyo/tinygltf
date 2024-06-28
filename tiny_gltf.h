@@ -1213,6 +1213,9 @@ class Model {
 
   bool operator==(const Model &) const;
 
+  // The base directory of the glTF model file
+  std::string baseDir;
+
   std::vector<Accessor> accessors;
   std::vector<Animation> animations;
   std::vector<Buffer> buffers;
@@ -1554,6 +1557,15 @@ class TinyGLTF {
   bool GetImagesAsIs() const { return images_as_is_; }
 
   ///
+  /// Specify whether image data is loaded into memory during parsing
+  ///
+  void SetLoadImages(bool onoff) {
+      load_images_ = onoff;
+  }
+
+  bool GetLoadImages() const { return load_images_; }
+
+  ///
   /// Set maximum allowed external file size in bytes.
   /// Default: 2GB
   /// Only effective for built-in ReadWholeFileFunction FS function.
@@ -1589,6 +1601,8 @@ class TinyGLTF {
                                           /// RGBA) for backward compatibility.
 
   bool images_as_is_ = false; /// Default false (decode/decompress images)
+
+  bool load_images_ = true; /// Default true (load images)
 
   size_t max_external_file_size_{
       size_t((std::numeric_limits<int32_t>::max)())};  // Default 2GB
@@ -1655,6 +1669,7 @@ class TinyGLTF {
 #include <sys/stat.h>  // for is_directory check
 
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #endif
 #include <sstream>
@@ -2228,8 +2243,57 @@ static std::string JoinPath(const std::string &path0,
   }
 }
 
+static std::string GetForwardPath(const std::string& path) {
+  std::string result = path;
+  std::replace(result.begin(), result.end(), '\\', '/');
+  return result;
+}
+
+static std::string GetFullPath(const std::string& path) {
+#if defined(_WIN32)
+    std::string result;
+    char *full = _fullpath(nullptr, path.c_str(), 0);
+    if (full != nullptr) {
+        result = full;
+        ::free(full);
+    }
+    return result;
+#elif defined(__APPLE__)
+    // Apple platforms onyl have the outdated variant of the
+    // realpath() function.
+    char buffer[PATH_MAX] = {0};
+    // Note that realpath() fails for paths that do not exist.
+    // Still, that is sufficient for our use case.
+    char *result = realpath(path.c_str(), buffer);
+    return (result != nullptr) ? std::string(buffer) : "";
+#else
+    std::string result;
+    char *full = realpath(path.c_str(), nullptr);
+    if (full != nullptr) {
+        result = full;
+        ::free(full);
+    }
+    return result;
+#endif
+}
+
+static bool EqualPath(const std::string& path0, const std::string& path1) {
+    // Empty paths are not valid paths, always return false
+    if (path0.empty() || path1.empty()) {
+        return false;
+    }
+
+    std::string path0Full = GetFullPath(GetForwardPath(path0));
+    std::string path1Full = GetFullPath(GetForwardPath(path1));
+    if (path0Full.empty() || path1Full.empty()) {
+        return false;
+    }
+
+    return path0Full == path1Full;
+}
+
 static std::string FindFile(const std::vector<std::string> &paths,
-                            const std::string &filepath, FsCallbacks *fs) {
+                            const std::string &filepath, const FsCallbacks *fs) {
   if (fs == nullptr || fs->ExpandFilePath == nullptr ||
       fs->FileExists == nullptr) {
     // Error, fs callback[s] missing
@@ -2492,11 +2556,11 @@ bool URIDecode(const std::string &in_uri, std::string *out_uri,
   return true;
 }
 
-static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
-                             std::string *warn, const std::string &filename,
-                             const std::string &basedir, bool required,
-                             size_t reqBytes, bool checkSize,
-                             size_t maxFileSize, FsCallbacks *fs) {
+static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *foundFile,
+                             std::string *err, std::string *warn,
+                             const std::string &filename, const std::string &basedir,
+                             bool required, size_t reqBytes,
+                             bool checkSize, size_t maxFileSize, const FsCallbacks *fs) {
   if (fs == nullptr || fs->FileExists == nullptr ||
       fs->ExpandFilePath == nullptr || fs->ReadWholeFile == nullptr) {
     // This is a developer error, assert() ?
@@ -2520,6 +2584,10 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
       (*failMsgOut) += "File not found : " + filename + "\n";
     }
     return false;
+  }
+
+  if (foundFile) {
+    *foundFile = filepath;
   }
 
   // Check file size
@@ -3279,23 +3347,26 @@ static std::string MimeToExt(const std::string &mimeType) {
   return "";
 }
 
-static bool UpdateImageObject(const Image &image, std::string &baseDir,
+static bool UpdateImageObject(const Image &image,
+                              const std::string &sourceBaseDir, const std::string &targetBaseDir,
                               int index, bool embedImages,
-                              const FsCallbacks *fs_cb,
+                              size_t maxFileSize, const FsCallbacks *fs_cb,
                               const URICallbacks *uri_cb,
                               const WriteImageDataFunction& WriteImageData,
                               void *user_data, std::string *out_uri) {
   std::string filename;
   std::string ext;
-  // If image has uri, use it as a filename
-  if (image.uri.size()) {
-    std::string decoded_uri;
-    if (!uri_cb->decode(image.uri, &decoded_uri, uri_cb->user_data)) {
-      // A decode failure results in a failure to write the gltf.
-      return false;
+  std::string decoded_uri;
+  if (!image.uri.empty()) {
+    // If image has uri, use it as a filename if it is not a data uri
+    if (!IsDataURI(image.uri)) {
+      if (!uri_cb->decode(image.uri, &decoded_uri, uri_cb->user_data)) {
+        // A decode failure results in a failure to write the gltf.
+        return false;
+      }
+      filename = GetBaseFilename(decoded_uri);
+      ext = GetFilePathExtension(filename);
     }
-    filename = GetBaseFilename(decoded_uri);
-    ext = GetFilePathExtension(filename);
   } else if (image.bufferView != -1) {
     // If there's no URI and the data exists in a buffer,
     // don't change properties or write images
@@ -3313,12 +3384,35 @@ static bool UpdateImageObject(const Image &image, std::string &baseDir,
   // image data does not exist, this is not considered a failure and the
   // original uri should be maintained.
   bool imageWritten = false;
-  if (WriteImageData != nullptr && !filename.empty() && !image.image.empty()) {
-    imageWritten = WriteImageData(&baseDir, &filename, &image, embedImages,
-                                  fs_cb, uri_cb, out_uri, user_data);
-    if (!imageWritten) {
-      return false;
-    }
+  if (WriteImageData != nullptr && !filename.empty()) {
+      Image imageToWrite = image;
+      // If the image references an external source, but holds no data,
+      // external image was disabled for this image, or the image failed
+      // to load during parsing. Try to load the image file from the
+      // external file, and if successful, mark the image "as is" for
+      // writing.
+      bool sourceIsTarget = false;
+      if (!decoded_uri.empty() && imageToWrite.image.empty()) {
+          std::string sourceFilePath;
+          if (LoadExternalFile(&imageToWrite.image, &sourceFilePath, nullptr, nullptr, decoded_uri, sourceBaseDir,
+                               /* required */ false, /* required bytes */ 0,
+                               /* checksize */ false,
+                               /* max file size */ maxFileSize, fs_cb)) {
+            imageToWrite.as_is = true;
+          }
+
+          if (EqualPath(sourceFilePath, JoinPath(targetBaseDir, filename))) {
+              sourceIsTarget = true;
+          }
+      }
+
+      if (!sourceIsTarget && !imageToWrite.image.empty()) {
+        imageWritten = WriteImageData(&targetBaseDir, &filename, &imageToWrite, embedImages,
+                                      fs_cb, uri_cb, out_uri, user_data);
+        if (!imageWritten) {
+          return false;
+        }
+      }
   }
 
   // Use the original uri if the image was not written.
@@ -4295,8 +4389,9 @@ static bool ParseAsset(Asset *asset, std::string *err, const detail::json &o,
 static bool ParseImage(Image *image, const int image_idx, std::string *err,
                        std::string *warn, const detail::json &o,
                        bool store_original_json_for_extras_and_extensions,
-                       const std::string &basedir, const size_t max_file_size,
-                       FsCallbacks *fs, const URICallbacks *uri_cb,
+                       bool load_images, const std::string &basedir,
+                       const size_t max_file_size, FsCallbacks *fs,
+                       const URICallbacks *uri_cb,
                        const LoadImageDataFunction& LoadImageData = nullptr,
                        void *load_image_user_data = nullptr) {
   // A glTF image must either reference a bufferView or an image uri
@@ -4374,6 +4469,12 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     return false;
   }
 
+  // Early out if do not want to load or decode image data
+  if (!load_images) {
+    image->uri = uri;
+    return true;
+  }
+
   std::vector<unsigned char> img;
 
   if (IsDataURI(uri)) {
@@ -4404,7 +4505,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
       return true;
     }
 
-    if (!LoadExternalFile(&img, err, warn, decoded_uri, basedir,
+    if (!LoadExternalFile(&img, nullptr, err, warn, decoded_uri, basedir,
                           /* required */ false, /* required bytes */ 0,
                           /* checksize */ false,
                           /* max file size */ max_file_size, fs)) {
@@ -4576,7 +4677,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
         if (!uri_cb->decode(buffer->uri, &decoded_uri, uri_cb->user_data)) {
           return false;
         }
-        if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr,
+        if (!LoadExternalFile(&buffer->data, nullptr, err, /* warn */ nullptr,
                               decoded_uri, basedir, /* required */ true,
                               byteLength, /* checkSize */ true,
                               /* max_file_size */ max_buffer_size, fs)) {
@@ -4626,7 +4727,7 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
       if (!uri_cb->decode(buffer->uri, &decoded_uri, uri_cb->user_data)) {
         return false;
       }
-      if (!LoadExternalFile(&buffer->data, err, /* warn */ nullptr, decoded_uri,
+      if (!LoadExternalFile(&buffer->data, nullptr, err, /* warn */ nullptr, decoded_uri,
                             basedir, /* required */ true, byteLength,
                             /* checkSize */ true,
                             /* max file size */ max_buffer_size, fs)) {
@@ -6118,6 +6219,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   model->extensionsRequired.clear();
   model->extensions.clear();
   model->defaultScene = -1;
+  model->baseDir = base_dir;
+
 
   // 1. Parse Asset
   {
@@ -6423,7 +6526,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       }
       Image image;
       if (!ParseImage(&image, idx, err, warn, o,
-                      store_original_json_for_extras_and_extensions_, base_dir,
+                      store_original_json_for_extras_and_extensions_,
+                      load_images_, base_dir,
                       max_external_file_size_, &fs, &uri_cb,
                       this->LoadImageData, load_image_user_data)) {
         return false;
@@ -6452,20 +6556,23 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           }
           return false;
         }
-        const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
 
-        if (LoadImageData == nullptr) {
-          if (err) {
-            (*err) += "No LoadImageData callback specified.\n";
+        if (load_images_) {
+          const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
+
+          if (LoadImageData == nullptr) {
+            if (err) {
+              (*err) += "No LoadImageData callback specified.\n";
+            }
+            return false;
           }
-          return false;
-        }
-        bool ret = LoadImageData(
-            &image, idx, err, warn, image.width, image.height,
-            &buffer.data[bufferView.byteOffset],
-            static_cast<int>(bufferView.byteLength), load_image_user_data);
-        if (!ret) {
-          return false;
+
+          bool ret = LoadImageData(&image, idx, err, warn, image.width, image.height,
+                                   &buffer.data[bufferView.byteOffset],
+                                   static_cast<int>(bufferView.byteLength), load_image_user_data);
+          if (!ret) {
+            return false;
+          }
         }
       }
 
@@ -8591,13 +8698,12 @@ bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
     for (unsigned int i = 0; i < model->images.size(); ++i) {
       detail::json image;
 
-      std::string dummystring;
       // UpdateImageObject need baseDir but only uses it if embeddedImages is
       // enabled, since we won't write separate images when writing to a stream
       // we
       std::string uri;
-      if (!UpdateImageObject(model->images[i], dummystring, int(i), true,
-                             &fs, &uri_cb, this->WriteImageData,
+      if (!UpdateImageObject(model->images[i], {}, {}, int(i), true,
+                             max_external_file_size_, &fs, &uri_cb, this->WriteImageData,
                              this->write_image_user_data_, &uri)) {
         return false;
       }
@@ -8704,8 +8810,8 @@ bool TinyGLTF::WriteGltfSceneToFile(const Model *model,
       detail::json image;
 
       std::string uri;
-      if (!UpdateImageObject(model->images[i], baseDir, int(i), embedImages,
-                             &fs, &uri_cb, this->WriteImageData,
+      if (!UpdateImageObject(model->images[i], model->baseDir, baseDir, int(i), embedImages,
+                             max_external_file_size_, &fs, &uri_cb, this->WriteImageData,
                              this->write_image_user_data_, &uri)) {
         return false;
       }
