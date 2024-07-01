@@ -5660,7 +5660,7 @@ static bool ParseSkin(Skin *skin, std::string *err, const detail::json &o,
   skin->skeleton = skeleton;
 
   int invBind = -1;
-  ParseIntegerProperty(&invBind, err, o, "inverseBindMatrices", true, "Skin");
+  ParseIntegerProperty(&invBind, err, o, "inverseBindMatrices", false, "Skin");
   skin->inverseBindMatrices = invBind;
 
   ParseExtrasAndExtensions(skin, err, o,
