@@ -1182,3 +1182,21 @@ TEST_CASE("images-as-is", "[issue-487]") {
     }
   }
 }
+
+TEST_CASE("inverse-bind-matrices-optional", "[issue-492]") {
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  std::string err;
+  std::string warn;
+
+  bool ret = ctx.LoadBinaryFromFile(&model, &err, &warn, "issue-492.glb");
+  if (!warn.empty()) {
+    std::cout << "WARN:" << warn << std::endl;
+  }
+  if (!err.empty()) {
+    std::cerr << "ERR:" << err << std::endl;
+  }
+
+  REQUIRE(true == ret);
+  REQUIRE(err.empty());
+}
