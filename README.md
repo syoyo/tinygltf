@@ -9,7 +9,7 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch (b
 ## Status
 
 Currently TinyGLTF is stable and maintenance mode. No drastic changes and feature additions planned.
-
+ - v2.9.0 Various fixes and improvements. Filesystem callback API change.
  - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image. PR#397
  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393
  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
