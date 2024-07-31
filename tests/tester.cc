@@ -1247,3 +1247,48 @@ TEST_CASE("empty-images-not-written", "[issue-495]") {
   // WriteImageData should be invoked for both images
   CHECK(counter == 2);
 }
+
+TEST_CASE("images-data-uri-lost", "[issue-497]") {
+  std::string err;
+  std::string warn;
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+
+  // First, load a model that has images
+  tinygltf::Model modelWithExternalURIs;
+  bool ok = ctx.LoadASCIIFromFile(&modelWithExternalURIs, &err, &warn, "../models/Cube/Cube.gltf");
+  REQUIRE(ok);
+  REQUIRE(err.empty());
+  REQUIRE(warn.empty());
+
+  // Write as GLB and embed the images as data URIs
+  ok = ctx.WriteGltfSceneToFile(&modelWithExternalURIs, "issue-497.glb", true, true, false, true);
+  REQUIRE(ok);
+
+  // Now load the GLB with the data URI images.
+  // Use a custom image loader that does not load any image data.
+  ctx.SetImageLoader(LoadImageData, nullptr);
+  ok = ctx.LoadBinaryFromFile(&model, &err, &warn, "issue-497.glb");
+  REQUIRE(ok);
+  REQUIRE(err.empty());
+  REQUIRE(warn.empty());
+
+  // Now check the images of the model
+  CHECK(model.images.size() == 2);
+  for (const auto& image : model.images) {
+    // No data loaded or decoded
+    CHECK(image.image.empty());
+    // The URI is kept
+    CHECK_FALSE(image.uri.empty());
+    // The URI should be a data URI
+    CHECK(image.uri.find("data:") == 0);
+  }
+
+  // Now write the model with the data URIs
+  int counter = 0;
+  ctx.SetImageWriter(WriteImageData, &counter);
+  ok = ctx.WriteGltfSceneToFile(&model, "issue-497-data-uris.gltf");
+  CHECK(ok);
+  // WriteImageData should not have been invoked for the data URIs
+  CHECK(counter == 0);
+}

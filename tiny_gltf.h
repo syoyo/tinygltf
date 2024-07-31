@@ -3293,15 +3293,17 @@ static bool UpdateImageObject(const Image &image, std::string &baseDir,
                               void *user_data, std::string *out_uri) {
   std::string filename;
   std::string ext;
-  // If image has uri, use it as a filename
-  if (image.uri.size()) {
-    std::string decoded_uri;
-    if (!uri_cb->decode(image.uri, &decoded_uri, uri_cb->user_data)) {
-      // A decode failure results in a failure to write the gltf.
-      return false;
+  // If image has a uri, and it is not a data uri, use it as filename
+  if (!image.uri.empty()) {
+    if (!IsDataURI(image.uri)) {
+      std::string decoded_uri;
+      if (!uri_cb->decode(image.uri, &decoded_uri, uri_cb->user_data)) {
+        // A decode failure results in a failure to write the gltf.
+        return false;
+      }
+      filename = GetBaseFilename(decoded_uri);
+      ext = GetFilePathExtension(filename);
     }
-    filename = GetBaseFilename(decoded_uri);
-    ext = GetFilePathExtension(filename);
   } else if (image.bufferView != -1) {
     // If there's no URI and the data exists in a buffer,
     // don't change properties or write images
@@ -4442,8 +4444,17 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     return false;
   }
 
-  return LoadImageData(image, image_idx, err, warn, 0, 0, &img.at(0),
-                       static_cast<int>(img.size()), load_image_user_data);
+  bool ok = LoadImageData(image, image_idx, err, warn, 0, 0, &img.at(0),
+                          static_cast<int>(img.size()), load_image_user_data);
+
+  // If the image is encoded as data URI, and the actual image data was
+  // not extracted, then we keep the original data URI that holds all
+  // the data.
+  if (IsDataURI(uri) && ok && image->image.empty()) {
+    image->uri = uri;
+  }
+
+  return ok;
 }
 
 static bool ParseTexture(Texture *texture, std::string *err,
