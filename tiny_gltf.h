@@ -1213,6 +1213,9 @@ class Model {
 
   bool operator==(const Model &) const;
 
+  // The base directory of the glTF model file
+  std::string baseDir;
+
   std::vector<Accessor> accessors;
   std::vector<Animation> animations;
   std::vector<Buffer> buffers;
@@ -2068,7 +2071,8 @@ bool Mesh::operator==(const Mesh &other) const {
          this->primitives == other.primitives;
 }
 bool Model::operator==(const Model &other) const {
-  return this->accessors == other.accessors &&
+  return this->baseDir == other.baseDir &&
+         this->accessors == other.accessors &&
          this->animations == other.animations && this->asset == other.asset &&
          this->buffers == other.buffers &&
          this->bufferViews == other.bufferViews &&
@@ -6118,6 +6122,9 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
 
   // Reset the model
   (*model) = Model();
+
+  // Store the base directory from which the model is loaded
+  model->baseDir = base_dir;
 
   // 1. Parse Asset
   {
