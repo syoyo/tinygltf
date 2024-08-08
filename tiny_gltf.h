@@ -5605,7 +5605,7 @@ static bool ParseAnimation(Animation *animation, std::string *err,
         }
         sampler.input = inputIndex;
         sampler.output = outputIndex;
-        ParseExtrasAndExtensions(&sampler, err, o,
+        ParseExtrasAndExtensions(&sampler, err, s,
                                  store_original_json_for_extras_and_extensions);
 
         animation->samplers.emplace_back(std::move(sampler));
