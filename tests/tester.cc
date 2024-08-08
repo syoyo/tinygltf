@@ -1200,3 +1200,50 @@ TEST_CASE("inverse-bind-matrices-optional", "[issue-492]") {
   REQUIRE(true == ret);
   REQUIRE(err.empty());
 }
+
+bool LoadImageData(tinygltf::Image * /* image */, const int /* image_idx */, std::string * /* err */,
+                   std::string * /* warn */, int /* req_width */, int /* req_height */,
+                   const unsigned char * /* bytes */, int /* size */, void * /*user_data */) {
+    return true;
+}
+
+bool WriteImageData(const std::string * /* basepath */, const std::string * /* filename */,
+                    const tinygltf::Image *image, bool /* embedImages */,
+                    const tinygltf::FsCallbacks * /* fs_cb */, const tinygltf::URICallbacks * /* uri_cb */,
+                    std::string * /* out_uri */, void * user_pointer) {
+    REQUIRE(user_pointer != nullptr);
+    auto counter = static_cast<int*>(user_pointer);
+    *counter = *counter + 1;
+    return true;
+}
+
+TEST_CASE("empty-images-not-written", "[issue-495]") {
+  std::string err;
+  std::string warn;
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+
+  ctx.SetImageLoader(LoadImageData, nullptr);
+  bool ok = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/Cube/Cube.gltf");
+  REQUIRE(ok);
+  REQUIRE(err.empty());
+  REQUIRE(warn.empty());
+
+  CHECK(model.images.size() == 2);
+  for (const auto& image : model.images) {
+    // No data loaded or decoded
+    CHECK(image.image.empty());
+    // The URI is kept
+    CHECK_FALSE(image.uri.empty());
+    // The URI should not be a data URI
+    CHECK(image.uri.find("data:") != 0);
+  }
+
+  // Now write the loaded model
+  int counter = 0;
+  ctx.SetImageWriter(WriteImageData, &counter);
+  ok = ctx.WriteGltfSceneToFile(&model, "issue-495-external.gltf");
+  CHECK(ok);
+  // WriteImageData should be invoked for both images
+  CHECK(counter == 2);
+}
