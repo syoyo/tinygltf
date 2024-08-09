@@ -384,6 +384,29 @@ class Value {
 
   bool operator==(const tinygltf::Value &other) const;
 
+  Value & operator[](const std::string &key) {
+    assert(type_ == OBJECT_TYPE);
+    return object_value_[key];
+  }
+
+  void Push(const Value &val) {
+    assert(type_ == ARRAY_TYPE);
+    array_value_.push_back(val);
+  }
+
+  Value & operator[](size_t index) {
+    assert(type_ == ARRAY_TYPE);
+    assert(index < array_value_.size());
+    return array_value_[index];
+  }
+
+  const Value & operator[](size_t index) const {
+    assert(type_ == ARRAY_TYPE);
+    assert(index < array_value_.size());
+    return array_value_[index];
+  }
+
+
  protected:
   int type_ = NULL_TYPE;
 
