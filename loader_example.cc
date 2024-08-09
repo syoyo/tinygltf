@@ -212,27 +212,6 @@ static std::string Indent(const int indent) {
   return s;
 }
 
-static std::string PrintParameterValue(const tinygltf::Parameter &param) {
-  if (!param.number_array.empty()) {
-    return PrintFloatArray(param.number_array);
-  } else {
-    return param.string_value;
-  }
-}
-
-#if 0
-static std::string PrintParameterMap(const tinygltf::ParameterMap &pmap) {
-  std::stringstream ss;
-
-  ss << pmap.size() << std::endl;
-  for (auto &kv : pmap) {
-    ss << kv.first << " : " << PrintParameterValue(kv.second) << std::endl;
-  }
-
-  return ss.str();
-}
-#endif
-
 static std::string PrintValue(const std::string &name,
                               const tinygltf::Value &value, const int indent,
                               const bool tag = true) {
@@ -642,17 +621,6 @@ static void Dump(const tinygltf::Model &model) {
 
       std::cout << Indent(1) << "emissiveTexture      :\n";
       DumpTextureInfo(material.emissiveTexture, 2);
-
-      std::cout << Indent(1) << "----  legacy material parameter  ----\n";
-      std::cout << Indent(1) << "values(items=" << material.values.size() << ")"
-                << std::endl;
-      tinygltf::ParameterMap::const_iterator p(material.values.begin());
-      tinygltf::ParameterMap::const_iterator pEnd(material.values.end());
-      for (; p != pEnd; p++) {
-        std::cout << Indent(2) << p->first << ": "
-                  << PrintParameterValue(p->second) << std::endl;
-      }
-      std::cout << Indent(1) << "-------------------------------------\n";
 
       DumpExtensions(material.extensions, 1);
       std::cout << PrintValue("extras", material.extras, 2) << std::endl;
