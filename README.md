@@ -211,6 +211,11 @@ set(TINYGLTF_INSTALL OFF CACHE INTERNAL "" FORCE)
 add_subdirectory(/path/to/tinygltf)
 ```
 
+NOTE: Using tinygltf as a submodule doesn't automatically add the headers to your include path (as standard for many libraries). To get this functionality, add the following to the CMakeLists.txt file from above:
+
+```
+target_include_directories(${PROJECT_NAME} PRIVATE "/path/to/tinygltf")
+```
 
 ### Saving gltTF 2.0 model
 
