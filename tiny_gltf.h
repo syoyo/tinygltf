@@ -7207,6 +7207,7 @@ static void SerializeGltfBufferData(const std::vector<unsigned char> &data,
 
 static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
                                     const std::string &binFilename) {
+#ifndef TINYGLTF_NO_FS
 #ifdef _WIN32
 #if defined(__GLIBCXX__)  // mingw
   int file_descriptor = _wopen(UTF8ToWchar(binFilename).c_str(),
@@ -7235,6 +7236,9 @@ static bool SerializeGltfBufferData(const std::vector<unsigned char> &data,
     // write empty file.
   }
   return true;
+#else
+  return false;
+#endif
 }
 
 #if 0  // FIXME(syoyo): not used. will be removed in the future release.
@@ -8456,6 +8460,7 @@ static bool WriteGltfStream(std::ostream &stream, const std::string &content) {
 
 static bool WriteGltfFile(const std::string &output,
                           const std::string &content) {
+#ifndef TINYGLTF_NO_FS
 #ifdef _WIN32
 #if defined(_MSC_VER)
   std::ofstream gltfFile(UTF8ToWchar(output).c_str());
@@ -8475,6 +8480,9 @@ static bool WriteGltfFile(const std::string &output,
   if (!gltfFile.is_open()) return false;
 #endif
   return WriteGltfStream(gltfFile, content);
+#else
+    return false;
+#endif
 }
 
 static bool WriteBinaryGltfStream(std::ostream &stream,
@@ -8541,6 +8549,7 @@ static bool WriteBinaryGltfStream(std::ostream &stream,
 static bool WriteBinaryGltfFile(const std::string &output,
                                 const std::string &content,
                                 const std::vector<unsigned char> &binBuffer) {
+#ifndef TINYGLTF_NO_FS
 #ifdef _WIN32
 #if defined(_MSC_VER)
   std::ofstream gltfFile(UTF8ToWchar(output).c_str(), std::ios::binary);
@@ -8557,6 +8566,9 @@ static bool WriteBinaryGltfFile(const std::string &output,
   std::ofstream gltfFile(output.c_str(), std::ios::binary);
 #endif
   return WriteBinaryGltfStream(gltfFile, content, binBuffer);
+#else
+    return false;
+#endif
 }
 
 bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
