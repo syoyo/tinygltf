@@ -6453,6 +6453,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
           return false;
         }
         const Buffer &buffer = model->buffers[size_t(bufferView.buffer)];
+        if (bufferView.byteOffset >= buffer.data.size()) {
+          if (err) {
+            std::stringstream ss;
+            ss << "image[" << idx << "] bufferView \"" << image.bufferView
+               << "\" indexed out of bounds of its buffer." << std::endl;
+            (*err) += ss.str();
+          }
+          return false;
+        }
 
         if (LoadImageData == nullptr) {
           if (err) {
