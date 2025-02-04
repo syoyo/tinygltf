@@ -44,6 +44,7 @@ imgui.ini
 # Precompiled Headers
 *.gch
 *.pch
+*.pcm
 
 # Compiled Dynamic libraries
 *.so

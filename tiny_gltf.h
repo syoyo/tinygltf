@@ -37,8 +37,9 @@
 #ifndef TINY_GLTF_H_
 #define TINY_GLTF_H_
 
+#ifndef TINYGLTF_USE_MODULE
 #include <array>
-#include <cassert>
+// #include <cassert>
 #include <cmath>  // std::fabs
 #include <cstdint>
 #include <cstdlib>
@@ -50,6 +51,7 @@
 #include <utility>
 #include <vector>
 
+#endif // TINYGLTF_USE_MODULE
 // Auto-detect C++14 standard version
 #if !defined(TINYGLTF_USE_CPP14) && defined(__cplusplus) && \
     (__cplusplus >= 201402L)
@@ -202,7 +204,7 @@ typedef enum {
   Strict
 } ParseStrictness;
 
-static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
+static inline std::int32_t GetComponentSizeInBytes(std::uint32_t componentType) {
   if (componentType == TINYGLTF_COMPONENT_TYPE_BYTE) {
     return 1;
   } else if (componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
@@ -225,7 +227,7 @@ static inline int32_t GetComponentSizeInBytes(uint32_t componentType) {
   }
 }
 
-static inline int32_t GetNumComponentsInType(uint32_t ty) {
+static inline std::int32_t GetNumComponentsInType(std::uint32_t ty) {
   if (ty == TINYGLTF_TYPE_SCALAR) {
     return 1;
   } else if (ty == TINYGLTF_TYPE_VEC2) {
@@ -280,7 +282,7 @@ class Value {
   explicit Value(const char *s) : type_(STRING_TYPE) { string_value_ = s; }
   explicit Value(const unsigned char *p, size_t n) : type_(BINARY_TYPE) {
     binary_value_.resize(n);
-    memcpy(binary_value_.data(), p, n);
+    std::memcpy(binary_value_.data(), p, n);
   }
   explicit Value(std::vector<unsigned char> &&v) noexcept
       : type_(BINARY_TYPE),
@@ -869,12 +871,12 @@ struct Accessor {
     if (bufferViewObject.byteStride == 0) {
       // Assume data is tightly packed.
       int componentSizeInBytes =
-          GetComponentSizeInBytes(static_cast<uint32_t>(componentType));
+          GetComponentSizeInBytes(static_cast<std::uint32_t>(componentType));
       if (componentSizeInBytes <= 0) {
         return -1;
       }
 
-      int numComponents = GetNumComponentsInType(static_cast<uint32_t>(type));
+      int numComponents = GetNumComponentsInType(static_cast<std::uint32_t>(type));
       if (numComponents <= 0) {
         return -1;
       }
@@ -884,12 +886,12 @@ struct Accessor {
       // Check if byteStride is a multiple of the size of the accessor's
       // component type.
       int componentSizeInBytes =
-          GetComponentSizeInBytes(static_cast<uint32_t>(componentType));
+          GetComponentSizeInBytes(static_cast<std::uint32_t>(componentType));
       if (componentSizeInBytes <= 0) {
         return -1;
       }
 
-      if ((bufferViewObject.byteStride % uint32_t(componentSizeInBytes)) != 0) {
+      if ((bufferViewObject.byteStride % std::uint32_t(componentSizeInBytes)) != 0) {
         return -1;
       }
       return static_cast<int>(bufferViewObject.byteStride);
@@ -1591,7 +1593,7 @@ class TinyGLTF {
   bool images_as_is_ = false; /// Default false (decode/decompress images)
 
   size_t max_external_file_size_{
-      size_t((std::numeric_limits<int32_t>::max)())};  // Default 2GB
+      size_t((std::numeric_limits<std::int32_t>::max)())};  // Default 2GB
 
   // Warning & error messages
   std::string warn_;
@@ -1649,16 +1651,22 @@ class TinyGLTF {
 #endif  // TINY_GLTF_H_
 
 #if defined(TINYGLTF_IMPLEMENTATION) || defined(__INTELLISENSE__)
+#ifndef TINYGLTF_USE_MODULE
 #include <algorithm>
+#endif // TINYGLTF_USE_MODULE
 // #include <cassert>
 #ifndef TINYGLTF_NO_FS
-#include <sys/stat.h>  // for is_directory check
+// #include <sys/stat.h>  // for is_directory check
 
+#ifndef TINYGLTF_USE_MODULE
 #include <cstdio>
 #include <fstream>
+#endif // TINYGLTF_USE_MODULE
 #endif
+#ifndef TINYGLTF_USE_MODULE
 #include <sstream>
 
+#endif // TINYGLTF_USE_MODULE
 #ifdef __clang__
 // Disable some warnings for external files.
 #pragma clang diagnostic push
@@ -1739,17 +1747,17 @@ class TinyGLTF {
 #include "draco/core/decoder_buffer.h"
 #endif
 
-#ifndef TINYGLTF_NO_STB_IMAGE
-#ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE
-#include "stb_image.h"
-#endif
-#endif
+// #ifndef TINYGLTF_NO_STB_IMAGE
+// #ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE
+// #include "stb_image.h"
+// #endif
+// #endif
 
-#ifndef TINYGLTF_NO_STB_IMAGE_WRITE
-#ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
-#include "stb_image_write.h"
-#endif
-#endif
+// #ifndef TINYGLTF_NO_STB_IMAGE_WRITE
+// #ifndef TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
+// #include "stb_image_write.h"
+// #endif
+// #endif
 
 #ifdef __clang__
 #pragma clang diagnostic pop
@@ -1759,45 +1767,45 @@ class TinyGLTF {
 #pragma GCC diagnostic pop
 #endif
 
-#ifdef _WIN32
+// #ifdef _WIN32
 
-// issue 143.
-// Define NOMINMAX to avoid min/max defines,
-// but undef it after included Windows.h
-#ifndef NOMINMAX
-#define TINYGLTF_INTERNAL_NOMINMAX
-#define NOMINMAX
-#endif
+// // issue 143.
+// // Define NOMINMAX to avoid min/max defines,
+// // but undef it after included Windows.h
+// #ifndef NOMINMAX
+// #define TINYGLTF_INTERNAL_NOMINMAX
+// #define NOMINMAX
+// #endif
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#define TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
-#endif
-#ifndef __MINGW32__
-#include <Windows.h>  // include API for expanding a file path
-#else
-#include <windows.h>
-#endif
+// #ifndef WIN32_LEAN_AND_MEAN
+// #define WIN32_LEAN_AND_MEAN
+// #define TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
+// #endif
+// #ifndef __MINGW32__
+// #include <Windows.h>  // include API for expanding a file path
+// #else
+// #include <windows.h>
+// #endif
 
-#ifdef TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
-#undef WIN32_LEAN_AND_MEAN
-#endif
+// #ifdef TINYGLTF_INTERNAL_WIN32_LEAN_AND_MEAN
+// #undef WIN32_LEAN_AND_MEAN
+// #endif
 
-#if defined(TINYGLTF_INTERNAL_NOMINMAX)
-#undef NOMINMAX
-#endif
+// #if defined(TINYGLTF_INTERNAL_NOMINMAX)
+// #undef NOMINMAX
+// #endif
 
-#if defined(__GLIBCXX__)  // mingw
+// #if defined(__GLIBCXX__)  // mingw
 
-#include <fcntl.h>  // _O_RDONLY
+// #include <fcntl.h>  // _O_RDONLY
 
-#include <ext/stdio_filebuf.h>  // fstream (all sorts of IO stuff) + stdio_filebuf (=streambuf)
+// #include <ext/stdio_filebuf.h>  // fstream (all sorts of IO stuff) + stdio_filebuf (=streambuf)
 
-#endif
+// #endif
 
-#elif !defined(__ANDROID__) && !defined(__OpenBSD__)
-// #include <wordexp.h>
-#endif
+// #elif !defined(__ANDROID__) && !defined(__OpenBSD__)
+// // #include <wordexp.h>
+// #endif
 
 #if defined(__sparcv9) || defined(__powerpc__)
 // Big endian
