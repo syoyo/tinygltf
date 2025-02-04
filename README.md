@@ -6,6 +6,11 @@
 (Also, you can use RadpidJSON as an JSON backend)
 If you are looking for old, C++03 version, please use `devel-picojson` branch (but not maintained anymore).
 
+## ⚠️Differences between upstream
+ - Add tiny_gltf.cppm to compile as module.
+ - Macro TINYGLTF_USE_MODULE to control whether includes std headers.
+ - Force to use nlohmann/json as JSON backend. See my [fork](https://github.com/ymyh/json)
+
 ## Status
 
 Currently TinyGLTF is stable and maintenance mode. No drastic changes and feature additions planned.
