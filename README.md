@@ -8,8 +8,8 @@ If you are looking for old, C++03 version, please use `devel-picojson` branch (b
 
 ## ⚠️Differences between upstream
  - Add tiny_gltf.cppm to compile as module.
- - Macro TINYGLTF_USE_MODULE to control whether includes std headers.
- - Force to use nlohmann/json as JSON backend. See my [fork](https://github.com/ymyh/json)
+ - The macro TINYGLTF_USE_MODULE controls whether standard headers are included.
+ - Force to use nlohmann/json as JSON backend. See my [fork](https://github.com/ymyh/json).
 
 ## Status
 
