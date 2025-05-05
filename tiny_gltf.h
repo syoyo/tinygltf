@@ -834,20 +834,20 @@ struct Accessor {
       maxValues;  // optional. integer value is promoted to double
 
   struct Sparse {
-    int count;
-    bool isSparse;
+    int count{0};
+    bool isSparse{false};
     struct {
-      size_t byteOffset;
-      int bufferView;
-      int componentType;  // a TINYGLTF_COMPONENT_TYPE_ value
+      size_t byteOffset{0};
+      int bufferView{-1};
+      int componentType{-1};  // a TINYGLTF_COMPONENT_TYPE_ value
       Value extras;
       ExtensionMap extensions;
       std::string extras_json_string;
       std::string extensions_json_string;
     } indices;
     struct {
-      int bufferView;
-      size_t byteOffset;
+      int bufferView{-1};
+      size_t byteOffset{0};
       Value extras;
       ExtensionMap extensions;
       std::string extras_json_string;
@@ -898,11 +898,7 @@ struct Accessor {
     // unreachable return 0;
   }
 
-  Accessor()
-
-  {
-    sparse.isSparse = false;
-  }
+  Accessor() = default;
   DEFAULT_METHODS(Accessor)
   bool operator==(const tinygltf::Accessor &) const;
 };
