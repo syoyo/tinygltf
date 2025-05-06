@@ -898,6 +898,7 @@ struct Accessor {
     // unreachable return 0;
   }
 
+  Accessor() = default;
   DEFAULT_METHODS(Accessor)
   bool operator==(const tinygltf::Accessor &) const;
 };
