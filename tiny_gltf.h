@@ -50,12 +50,6 @@
 #include <utility>
 #include <vector>
 
-// Auto-detect C++14 standard version
-#if !defined(TINYGLTF_USE_CPP14) && defined(__cplusplus) && \
-    (__cplusplus >= 201402L)
-#define TINYGLTF_USE_CPP14
-#endif
-
 #ifdef __ANDROID__
 #ifdef TINYGLTF_ANDROID_LOAD_FROM_ASSETS
 #include <android/asset_manager.h>
