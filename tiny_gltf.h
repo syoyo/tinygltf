@@ -3290,7 +3290,7 @@ static bool UpdateImageObject(const Image &image, std::string &baseDir,
       // A decode failure results in a failure to write the gltf.
       return false;
     }
-    filename = GetBaseFilename(decoded_uri);
+    filename = decoded_uri;
     ext = GetFilePathExtension(filename);
   } else if (image.bufferView != -1) {
     // If there's no URI and the data exists in a buffer,
