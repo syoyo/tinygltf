@@ -1247,3 +1247,50 @@ TEST_CASE("empty-images-not-written", "[issue-495]") {
   // WriteImageData should be invoked for both images
   CHECK(counter == 2);
 }
+
+TEST_CASE("image-uri-path-preservation", "[image-uri-fix]") {
+  std::string err;
+  std::string warn;
+  tinygltf::Model model;
+  tinygltf::TinyGLTF ctx;
+  bool ok = ctx.LoadASCIIFromFile(&model, &err, &warn, "../models/CubeWithSubDir/Cube.gltf");
+  REQUIRE(ok);
+  REQUIRE(err.empty());
+  REQUIRE(warn.empty());
+
+  REQUIRE(model.images.size() == 2);
+  REQUIRE(model.images[0].uri == "images/Cube_BaseColor.png");
+  REQUIRE(model.images[1].uri == "images/Cube_MetallicRoughness.png");
+
+  REQUIRE_FALSE(model.images[0].image.empty());
+  REQUIRE_FALSE(model.images[1].image.empty());
+
+  ok = ctx.WriteGltfSceneToFile(&model, "Cube.gltf");
+  REQUIRE(ok);
+
+  for (const auto& image : model.images) {
+    std::fstream file(image.uri);
+    CHECK(file.good());
+  }
+  
+  // Load the model back
+  tinygltf::Model loaded_model;
+  ok = ctx.LoadASCIIFromFile(&loaded_model, &err, &warn, "Cube.gltf");
+  REQUIRE(ok);
+  REQUIRE(loaded_model.images.size() == 2);
+  
+  // The key test: verify that the URI paths with subdirectories are preserved
+  // Before the fix, "images/Cube_BaseColor.png" would become "Cube_BaseColor.png"
+  // After the fix, the full relative path should be preserved
+  CHECK(loaded_model.images[0].uri == "images/Cube_BaseColor.png");
+  CHECK(loaded_model.images[1].uri == "images/Cube_MetallicRoughness.png");
+  
+  // Also verify that the image files were written to the correct subdirectory paths
+  std::ifstream file1("images/Cube_BaseColor.png", std::ios::binary);
+  CHECK(file1.good());
+  file1.close();
+  
+  std::ifstream file2("images/Cube_MetallicRoughness.png", std::ios::binary);
+  CHECK(file2.good());
+  file2.close();
+}
