@@ -176,6 +176,8 @@ int main(int /* argc */, char *argv[]){
     printf("Failed to parse glTF\n");
     return -1;
   }
+
+  return 0;
 }
 ```
 
