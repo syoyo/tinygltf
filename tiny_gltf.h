@@ -4352,7 +4352,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
     // Just only save some information here. Loading actual image data from
     // bufferView is done after this `ParseImage` function.
     image->bufferView = bufferView;
-    image->mimeType = mime_type;
+    image->mimeType = std::move( mime_type );
     image->width = width;
     image->height = height;
 
@@ -5316,7 +5316,7 @@ static bool ParsePbrMetallicRoughness(
       }
       return false;
     }
-    pbr->baseColorFactor = baseColorFactor;
+    pbr->baseColorFactor = std::move( baseColorFactor );
   }
 
   {
