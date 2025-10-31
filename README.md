@@ -153,7 +153,7 @@ Copy `stb_image.h`, `stb_image_write.h`, `json.hpp` and `tiny_gltf.h` to your pr
 // #define TINYGLTF_NOEXCEPTION // optional. disable exception handling.
 #include "tiny_gltf.h"
 
-int main(int /* argc */, char *argv[]){
+int main(int /* argc */, char *argv[]) {
   using namespace tinygltf;
 
   Model model;
