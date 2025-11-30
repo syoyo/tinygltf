@@ -1670,6 +1670,15 @@ class TinyGLTF {
 #include <fstream>
 #endif
 #include <sstream>
+#ifdef TINYGLTF_USE_INTERNAL_JSON
+#include <cmath>
+#include <cctype>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <iomanip>
+#include <type_traits>
+#endif
 
 #ifdef __clang__
 // Disable some warnings for external files.
@@ -1732,10 +1741,12 @@ class TinyGLTF {
 #pragma GCC diagnostic ignored "-Wtype-limits"
 #endif  // __GNUC__
 
+#if defined(TINYGLTF_USE_RAPIDJSON) && defined(TINYGLTF_USE_INTERNAL_JSON)
+#error "TINYGLTF_USE_RAPIDJSON and TINYGLTF_USE_INTERNAL_JSON cannot both be defined."
+#endif
+
 #ifndef TINYGLTF_NO_INCLUDE_JSON
-#ifndef TINYGLTF_USE_RAPIDJSON
-#include "json.hpp"
-#else
+#if defined(TINYGLTF_USE_RAPIDJSON)
 #ifndef TINYGLTF_NO_INCLUDE_RAPIDJSON
 #include "document.h"
 #include "prettywriter.h"
@@ -1743,6 +1754,8 @@ class TinyGLTF {
 #include "stringbuffer.h"
 #include "writer.h"
 #endif
+#elif !defined(TINYGLTF_USE_INTERNAL_JSON)
+#include "json.hpp"
 #endif
 #endif
 
@@ -1885,6 +1898,949 @@ struct JsonDocument : public rapidjson::Document {
 
 #endif  // TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
 
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+// Minimal built-in JSON backend that avoids RTTI and exceptions.
+class MiniJsonValue {
+ public:
+  enum class value_t {
+    null,
+    object,
+    array,
+    string,
+    boolean,
+    number_integer,
+    number_unsigned,
+    number_float,
+    binary,
+    discarded
+  };
+
+  class iterator;
+  class const_iterator;
+  class const_array_iterator;
+
+  MiniJsonValue()
+      : type_(value_t::null),
+        bool_value_(false),
+        number_value_(0.0),
+        int_value_(0),
+        uint_value_(0),
+        parse_error_(false) {}
+
+  MiniJsonValue(double v)
+      : type_(value_t::number_float),
+        bool_value_(false),
+        number_value_(v),
+        int_value_(static_cast<int64_t>(v)),
+        uint_value_(v < 0.0 ? 0 : static_cast<uint64_t>(v)),
+        parse_error_(false) {}
+
+  MiniJsonValue(bool v)
+      : type_(value_t::boolean),
+        bool_value_(v),
+        number_value_(v ? 1.0 : 0.0),
+        int_value_(v ? 1 : 0),
+        uint_value_(v ? 1 : 0),
+        parse_error_(false) {}
+
+  MiniJsonValue(const char *s)
+      : type_(value_t::string),
+        bool_value_(false),
+        number_value_(0.0),
+        int_value_(0),
+        uint_value_(0),
+        string_value_(s ? s : ""),
+        parse_error_(false) {}
+
+  MiniJsonValue(const std::string &s)
+      : type_(value_t::string),
+        bool_value_(false),
+        number_value_(0.0),
+        int_value_(0),
+        uint_value_(0),
+        string_value_(s),
+        parse_error_(false) {}
+
+  template <typename T,
+            typename std::enable_if<std::is_integral<T>::value &&
+                                        !std::is_same<T, bool>::value,
+                                    int>::type = 0>
+  MiniJsonValue(T v)
+      : type_((std::is_signed<T>::value && (v < 0))
+                  ? value_t::number_integer
+                  : value_t::number_unsigned),
+        bool_value_(false),
+        number_value_(static_cast<double>(v)),
+        int_value_(static_cast<int64_t>(v)),
+        uint_value_((std::is_signed<T>::value && (v < 0))
+                        ? 0
+                        : static_cast<uint64_t>(v)),
+        parse_error_(false) {}
+
+  MiniJsonValue(const MiniJsonValue &) = default;
+  MiniJsonValue(MiniJsonValue &&) noexcept = default;
+  MiniJsonValue &operator=(const MiniJsonValue &) = default;
+  MiniJsonValue &operator=(MiniJsonValue &&) noexcept = default;
+
+  value_t type() const { return type_; }
+
+  bool is_null() const { return type_ == value_t::null; }
+  bool is_object() const { return type_ == value_t::object; }
+  bool is_array() const { return type_ == value_t::array; }
+  bool is_boolean() const { return type_ == value_t::boolean; }
+  bool is_string() const { return type_ == value_t::string; }
+  bool is_number() const {
+    return (type_ == value_t::number_integer) ||
+           (type_ == value_t::number_unsigned) ||
+           (type_ == value_t::number_float);
+  }
+  bool is_number_integer() const { return type_ == value_t::number_integer; }
+  bool is_number_unsigned() const { return type_ == value_t::number_unsigned; }
+
+  size_t size() const {
+    if (is_array()) {
+      return array_value_.size();
+    }
+    if (is_object()) {
+      return object_value_.size();
+    }
+    return 0;
+  }
+
+  bool empty() const { return size() == 0; }
+
+  iterator begin();
+  iterator end();
+  const_iterator begin() const;
+  const_iterator end() const;
+  const_iterator cbegin() const;
+  const_iterator cend() const;
+
+  MiniJsonValue &operator[](const std::string &key) {
+    EnsureObject();
+    for (size_t i = 0; i < object_value_.size(); ++i) {
+      if (object_value_[i].first == key) {
+        return object_value_[i].second;
+      }
+    }
+    object_value_.push_back(std::make_pair(key, MiniJsonValue()));
+    return object_value_.back().second;
+  }
+
+  MiniJsonValue &operator[](const char *key) {
+    return (*this)[std::string(key ? key : "")];
+  }
+
+  iterator find(const std::string &key) {
+    if (!is_object()) {
+      return end();
+    }
+    for (size_t i = 0; i < object_value_.size(); ++i) {
+      if (object_value_[i].first == key) {
+        return iterator::Object(this, i);
+      }
+    }
+    return end();
+  }
+
+  const_iterator find(const std::string &key) const {
+    if (!is_object()) {
+      return end();
+    }
+    for (size_t i = 0; i < object_value_.size(); ++i) {
+      if (object_value_[i].first == key) {
+        return const_iterator::Object(this, i);
+      }
+    }
+    return end();
+  }
+
+  void erase(iterator it) {
+    if (!is_object()) {
+      return;
+    }
+    if (it.owner_ != this || !it.is_object_) {
+      return;
+    }
+    if (it.index_ < object_value_.size()) {
+      object_value_.erase(object_value_.begin() + static_cast<long>(it.index_));
+    }
+  }
+
+  void push_back(const MiniJsonValue &v) {
+    EnsureArray();
+    array_value_.push_back(v);
+  }
+
+  void push_back(MiniJsonValue &&v) {
+    EnsureArray();
+    array_value_.push_back(std::move(v));
+  }
+
+  void SetObject() {
+    type_ = value_t::object;
+    array_value_.clear();
+  }
+
+  void SetArray() {
+    type_ = value_t::array;
+    object_value_.clear();
+  }
+
+  void ReserveArray(size_t s) {
+    EnsureArray();
+    array_value_.reserve(s);
+  }
+
+  template <typename T>
+  T get() const;
+
+  bool HasParseError() const { return parse_error_; }
+  void ClearParseError() {
+    parse_error_ = false;
+    parse_error_message_.clear();
+  }
+  void SetParseError(const std::string &msg) {
+    parse_error_ = true;
+    parse_error_message_ = msg;
+  }
+  const std::string &ParseErrorMessage() const { return parse_error_message_; }
+
+  std::string dump(int spacing = -1, int indent = 0) const {
+    return DumpImpl(spacing, indent);
+  }
+
+  class iterator {
+   public:
+    iterator() : owner_(nullptr), index_(0), is_object_(false) {}
+
+    static iterator Object(MiniJsonValue *owner, size_t index) {
+      iterator it;
+      it.owner_ = owner;
+      it.index_ = index;
+      it.is_object_ = true;
+      return it;
+    }
+
+    static iterator Array(MiniJsonValue *owner, size_t index) {
+      iterator it;
+      it.owner_ = owner;
+      it.index_ = index;
+      it.is_object_ = false;
+      return it;
+    }
+
+    static iterator Invalid(MiniJsonValue *owner) {
+      iterator it;
+      it.owner_ = owner;
+      return it;
+    }
+
+    MiniJsonValue &value() const {
+      return is_object_ ? owner_->object_value_[index_].second
+                        : owner_->array_value_[index_];
+    }
+
+    const std::string &key() const {
+      return owner_->object_value_[index_].first;
+    }
+
+    MiniJsonValue &operator*() const { return value(); }
+
+    iterator &operator++() {
+      ++index_;
+      return *this;
+    }
+
+    bool operator!=(const iterator &rhs) const {
+      return (owner_ != rhs.owner_) || (index_ != rhs.index_) ||
+             (is_object_ != rhs.is_object_);
+    }
+
+   private:
+    MiniJsonValue *owner_;
+    size_t index_;
+    bool is_object_;
+    friend class MiniJsonValue;
+  };
+
+  class const_iterator {
+   public:
+    const_iterator() : owner_(nullptr), index_(0), is_object_(false) {}
+
+    static const_iterator Object(const MiniJsonValue *owner, size_t index) {
+      const_iterator it;
+      it.owner_ = owner;
+      it.index_ = index;
+      it.is_object_ = true;
+      return it;
+    }
+
+    static const_iterator Array(const MiniJsonValue *owner, size_t index) {
+      const_iterator it;
+      it.owner_ = owner;
+      it.index_ = index;
+      it.is_object_ = false;
+      return it;
+    }
+
+    static const_iterator Invalid(const MiniJsonValue *owner) {
+      const_iterator it;
+      it.owner_ = owner;
+      return it;
+    }
+
+    const MiniJsonValue &value() const {
+      return is_object_ ? owner_->object_value_[index_].second
+                        : owner_->array_value_[index_];
+    }
+
+    const std::string &key() const {
+      return owner_->object_value_[index_].first;
+    }
+
+    const MiniJsonValue &operator*() const { return value(); }
+
+    const_iterator &operator++() {
+      ++index_;
+      return *this;
+    }
+
+    bool operator!=(const const_iterator &rhs) const {
+      return (owner_ != rhs.owner_) || (index_ != rhs.index_) ||
+             (is_object_ != rhs.is_object_);
+    }
+
+   private:
+    const MiniJsonValue *owner_;
+    size_t index_;
+    bool is_object_;
+    friend class MiniJsonValue;
+  };
+
+ using const_array_iterator = const_iterator;
+
+ private:
+  friend class MiniJsonParser;
+  void EnsureObject() {
+    if (!is_object()) {
+      type_ = value_t::object;
+      object_value_.clear();
+      array_value_.clear();
+    }
+  }
+
+  void EnsureArray() {
+    if (!is_array()) {
+      type_ = value_t::array;
+      array_value_.clear();
+      object_value_.clear();
+    }
+  }
+
+  static void DumpString(const std::string &s, std::string &out) {
+    out.push_back('"');
+    for (size_t i = 0; i < s.size(); ++i) {
+      const unsigned char c = static_cast<unsigned char>(s[i]);
+      switch (c) {
+        case '\\':
+          out += "\\\\";
+          break;
+        case '"':
+          out += "\\\"";
+          break;
+        case '\b':
+          out += "\\b";
+          break;
+        case '\f':
+          out += "\\f";
+          break;
+        case '\n':
+          out += "\\n";
+          break;
+        case '\r':
+          out += "\\r";
+          break;
+        case '\t':
+          out += "\\t";
+          break;
+        default: {
+          if (c < 0x20) {
+            char buf[7];
+            std::snprintf(buf, sizeof(buf), "\\u%04x",
+                          static_cast<unsigned int>(c));
+            out += buf;
+          } else {
+            out.push_back(static_cast<char>(c));
+          }
+        } break;
+      }
+    }
+    out.push_back('"');
+  }
+
+  std::string DumpImpl(int spacing, int indent) const {
+    (void)indent;
+    if (type_ == value_t::null) {
+      return "null";
+    }
+    if (type_ == value_t::boolean) {
+      return bool_value_ ? "true" : "false";
+    }
+    if (type_ == value_t::number_integer) {
+      return std::to_string(int_value_);
+    }
+    if (type_ == value_t::number_unsigned) {
+      return std::to_string(uint_value_);
+    }
+    if (type_ == value_t::number_float) {
+      std::ostringstream ss;
+      ss.setf(std::ios::fmtflags(0), std::ios::floatfield);
+      ss << std::setprecision(17) << number_value_;
+      return ss.str();
+    }
+    if (type_ == value_t::string) {
+      std::string out;
+      DumpString(string_value_, out);
+      return out;
+    }
+    const bool pretty = spacing >= 0;
+    const int next_indent = pretty ? indent + spacing : 0;
+    std::string out;
+    if (type_ == value_t::array) {
+      out.push_back('[');
+      if (pretty && !array_value_.empty()) {
+        out.push_back('\n');
+      }
+      for (size_t i = 0; i < array_value_.size(); ++i) {
+        if (pretty) out.append(static_cast<size_t>(next_indent), ' ');
+        out += array_value_[i].DumpImpl(spacing, next_indent);
+        if (i + 1 < array_value_.size()) {
+          out.push_back(',');
+        }
+        if (pretty) out.push_back('\n');
+      }
+      if (pretty && !array_value_.empty()) {
+        out.append(static_cast<size_t>(indent), ' ');
+      }
+      out.push_back(']');
+      return out;
+    }
+    if (type_ == value_t::object) {
+      out.push_back('{');
+      if (pretty && !object_value_.empty()) {
+        out.push_back('\n');
+      }
+      for (size_t i = 0; i < object_value_.size(); ++i) {
+        if (pretty) out.append(static_cast<size_t>(next_indent), ' ');
+        DumpString(object_value_[i].first, out);
+        out += pretty ? ": " : ":";
+        out += object_value_[i].second.DumpImpl(spacing, next_indent);
+        if (i + 1 < object_value_.size()) {
+          out.push_back(',');
+        }
+        if (pretty) out.push_back('\n');
+      }
+      if (pretty && !object_value_.empty()) {
+        out.append(static_cast<size_t>(indent), ' ');
+      }
+      out.push_back('}');
+      return out;
+    }
+    return "null";
+  }
+
+  value_t type_;
+  bool bool_value_;
+  double number_value_;
+  int64_t int_value_;
+  uint64_t uint_value_;
+  std::string string_value_;
+  std::vector<MiniJsonValue> array_value_;
+  std::vector<std::pair<std::string, MiniJsonValue> > object_value_;
+  bool parse_error_;
+  std::string parse_error_message_;
+};
+
+inline MiniJsonValue::iterator MiniJsonValue::begin() {
+  if (is_object()) {
+    return iterator::Object(this, 0);
+  }
+  if (is_array()) {
+    return iterator::Array(this, 0);
+  }
+  return iterator::Invalid(this);
+}
+
+inline MiniJsonValue::iterator MiniJsonValue::end() {
+  if (is_object()) {
+    return iterator::Object(this, object_value_.size());
+  }
+  if (is_array()) {
+    return iterator::Array(this, array_value_.size());
+  }
+  return iterator::Invalid(this);
+}
+
+inline MiniJsonValue::const_iterator MiniJsonValue::begin() const {
+  if (is_object()) {
+    return const_iterator::Object(this, 0);
+  }
+  if (is_array()) {
+    return const_iterator::Array(this, 0);
+  }
+  return const_iterator::Invalid(this);
+}
+
+inline MiniJsonValue::const_iterator MiniJsonValue::end() const {
+  if (is_object()) {
+    return const_iterator::Object(this, object_value_.size());
+  }
+  if (is_array()) {
+    return const_iterator::Array(this, array_value_.size());
+  }
+  return const_iterator::Invalid(this);
+}
+
+inline MiniJsonValue::const_iterator MiniJsonValue::cbegin() const {
+  return begin();
+}
+
+inline MiniJsonValue::const_iterator MiniJsonValue::cend() const {
+  return end();
+}
+
+template <>
+inline int64_t MiniJsonValue::get<int64_t>() const {
+  if (type_ == value_t::number_integer) {
+    return int_value_;
+  }
+  if (type_ == value_t::number_unsigned) {
+    return static_cast<int64_t>(uint_value_);
+  }
+  if (type_ == value_t::number_float) {
+    return static_cast<int64_t>(number_value_);
+  }
+  return 0;
+}
+
+template <>
+inline size_t MiniJsonValue::get<size_t>() const {
+  if (type_ == value_t::number_unsigned) {
+    return static_cast<size_t>(uint_value_);
+  }
+  if (type_ == value_t::number_integer && int_value_ >= 0) {
+    return static_cast<size_t>(int_value_);
+  }
+  if (type_ == value_t::number_float && number_value_ >= 0.0) {
+    return static_cast<size_t>(number_value_);
+  }
+  return 0;
+}
+
+template <>
+inline double MiniJsonValue::get<double>() const {
+  if (type_ == value_t::number_float) {
+    return number_value_;
+  }
+  if (type_ == value_t::number_integer) {
+    return static_cast<double>(int_value_);
+  }
+  if (type_ == value_t::number_unsigned) {
+    return static_cast<double>(uint_value_);
+  }
+  return 0.0;
+}
+
+template <>
+inline std::string MiniJsonValue::get<std::string>() const {
+  return string_value_;
+}
+
+template <>
+inline bool MiniJsonValue::get<bool>() const {
+  if (type_ == value_t::boolean) {
+    return bool_value_;
+  }
+  return false;
+}
+
+class MiniJsonParser {
+ public:
+  MiniJsonParser(const char *str, size_t length)
+      : cur_(str), end_(str + length), depth_(0) {}
+
+  bool Parse(MiniJsonValue &out) {
+    out = MiniJsonValue();
+    out.ClearParseError();
+    depth_ = 0;
+    SkipWhitespace();
+    if (!ParseValue(out)) {
+      out.SetParseError(err_);
+      return false;
+    }
+    SkipWhitespace();
+    if (cur_ != end_) {
+      SetError("Trailing characters after JSON document");
+      out.SetParseError(err_);
+      return false;
+    }
+    return true;
+  }
+
+  const std::string &GetError() const { return err_; }
+
+ private:
+  static bool IsHex(char c) {
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F');
+  }
+
+  bool ParseValue(MiniJsonValue &out) {
+    if (depth_ > 512) {
+      return SetError("Exceeded maximum JSON nesting depth");
+    }
+    if (cur_ == end_) {
+      return SetError("Unexpected end of JSON input");
+    }
+
+    ++depth_;
+    const char c = *cur_;
+    bool result = false;
+    if (c == '{') {
+      result = ParseObject(out);
+    } else if (c == '[') {
+      result = ParseArray(out);
+    } else if (c == '"') {
+      std::string s;
+      result = ParseString(s);
+      if (result) {
+        out = MiniJsonValue(s);
+      }
+    } else if ((c == '-') || (c >= '0' && c <= '9')) {
+      result = ParseNumber(out);
+    } else if (MatchLiteral("true", 4)) {
+      out = MiniJsonValue(true);
+      result = true;
+    } else if (MatchLiteral("false", 5)) {
+      out = MiniJsonValue(false);
+      result = true;
+    } else if (MatchLiteral("null", 4)) {
+      out = MiniJsonValue();
+      result = true;
+    } else {
+      result = SetError("Invalid JSON value");
+    }
+    --depth_;
+    return result;
+  }
+
+  bool ParseObject(MiniJsonValue &out) {
+    if (!Consume('{')) {
+      return SetError("Expected '{' to start object");
+    }
+    out.SetObject();
+    SkipWhitespace();
+    if (Consume('}')) {
+      return true;
+    }
+    while (cur_ < end_) {
+      SkipWhitespace();
+      std::string key;
+      if (!ParseString(key)) {
+        return SetError("Expected string for object key");
+      }
+      SkipWhitespace();
+      if (!Consume(':')) {
+        return SetError("Expected ':' after object key");
+      }
+      SkipWhitespace();
+      MiniJsonValue value;
+      if (!ParseValue(value)) {
+        return false;
+      }
+      out.object_value_.push_back(
+          std::make_pair(std::move(key), std::move(value)));
+      SkipWhitespace();
+      if (Consume('}')) {
+        return true;
+      }
+      if (!Consume(',')) {
+        return SetError("Expected ',' between object entries");
+      }
+      SkipWhitespace();
+    }
+    return SetError("Unterminated object");
+  }
+
+  bool ParseArray(MiniJsonValue &out) {
+    if (!Consume('[')) {
+      return SetError("Expected '[' to start array");
+    }
+    out.SetArray();
+    SkipWhitespace();
+    if (Consume(']')) {
+      return true;
+    }
+    while (cur_ < end_) {
+      MiniJsonValue value;
+      if (!ParseValue(value)) {
+        return false;
+      }
+      out.push_back(std::move(value));
+      SkipWhitespace();
+      if (Consume(']')) {
+        return true;
+      }
+      if (!Consume(',')) {
+        return SetError("Expected ',' between array entries");
+      }
+      SkipWhitespace();
+    }
+    return SetError("Unterminated array");
+  }
+
+  bool ParseString(std::string &out) {
+    if (!Consume('"')) {
+      return SetError("Expected '\"' to start string");
+    }
+    while (cur_ < end_) {
+      const unsigned char c = static_cast<unsigned char>(*cur_++);
+      if (c == '"') {
+        return true;
+      }
+      if (c == '\\') {
+        if (cur_ >= end_) {
+          return SetError("Bad escape sequence");
+        }
+        const char esc = *cur_++;
+        switch (esc) {
+          case '"':
+            out.push_back('"');
+            break;
+          case '\\':
+            out.push_back('\\');
+            break;
+          case '/':
+            out.push_back('/');
+            break;
+          case 'b':
+            out.push_back('\b');
+            break;
+          case 'f':
+            out.push_back('\f');
+            break;
+          case 'n':
+            out.push_back('\n');
+            break;
+          case 'r':
+            out.push_back('\r');
+            break;
+          case 't':
+            out.push_back('\t');
+            break;
+          case 'u': {
+            uint32_t codepoint = 0;
+            if (!ParseUnicodeEscape(codepoint)) {
+              return false;
+            }
+            AppendCodepoint(codepoint, out);
+            break;
+          }
+          default:
+            return SetError("Unknown escape sequence");
+        }
+      } else {
+        out.push_back(static_cast<char>(c));
+      }
+    }
+    return SetError("Unterminated string");
+  }
+
+  bool ParseNumber(MiniJsonValue &out) {
+    const char *start = cur_;
+    bool negative = false;
+    if (*cur_ == '-') {
+      negative = true;
+      ++cur_;
+      if (cur_ == end_) {
+        return SetError("Invalid number");
+      }
+    }
+
+    if (*cur_ == '0') {
+      ++cur_;
+    } else {
+      if (!std::isdigit(static_cast<unsigned char>(*cur_))) {
+        return SetError("Invalid number");
+      }
+      while (cur_ < end_ &&
+             std::isdigit(static_cast<unsigned char>(*cur_))) {
+        ++cur_;
+      }
+    }
+
+    bool is_float = false;
+    if (cur_ < end_ && *cur_ == '.') {
+      is_float = true;
+      ++cur_;
+      if (cur_ == end_ ||
+          !std::isdigit(static_cast<unsigned char>(*cur_))) {
+        return SetError("Invalid fractional number");
+      }
+      while (cur_ < end_ &&
+             std::isdigit(static_cast<unsigned char>(*cur_))) {
+        ++cur_;
+      }
+    }
+
+    if (cur_ < end_ && (*cur_ == 'e' || *cur_ == 'E')) {
+      is_float = true;
+      ++cur_;
+      if (cur_ < end_ && (*cur_ == '+' || *cur_ == '-')) {
+        ++cur_;
+      }
+      if (cur_ == end_ ||
+          !std::isdigit(static_cast<unsigned char>(*cur_))) {
+        return SetError("Invalid exponent");
+      }
+      while (cur_ < end_ &&
+             std::isdigit(static_cast<unsigned char>(*cur_))) {
+        ++cur_;
+      }
+    }
+
+    const std::string number_str(start, static_cast<size_t>(cur_ - start));
+    if (is_float) {
+      char *end_ptr = nullptr;
+      double v = std::strtod(number_str.c_str(), &end_ptr);
+      if (end_ptr != (number_str.c_str() + number_str.size()) ||
+          !std::isfinite(v)) {
+        return SetError("Invalid floating point number");
+      }
+      out = MiniJsonValue(v);
+      return true;
+    }
+
+    if (negative) {
+      char *end_ptr = nullptr;
+      const long long v = std::strtoll(number_str.c_str(), &end_ptr, 10);
+      if (end_ptr != (number_str.c_str() + number_str.size())) {
+        return SetError("Invalid signed integer");
+      }
+      out = MiniJsonValue(static_cast<int64_t>(v));
+      return true;
+    }
+
+    char *end_ptr = nullptr;
+    const unsigned long long v =
+        std::strtoull(number_str.c_str(), &end_ptr, 10);
+    if (end_ptr != (number_str.c_str() + number_str.size())) {
+      return SetError("Invalid unsigned integer");
+    }
+    out = MiniJsonValue(static_cast<uint64_t>(v));
+    return true;
+  }
+
+  bool ParseUnicodeEscape(uint32_t &codepoint) {
+    if ((end_ - cur_) < 4) {
+      return SetError("Truncated unicode escape");
+    }
+    uint32_t value = 0;
+    for (int i = 0; i < 4; ++i) {
+      const char c = cur_[i];
+      if (!IsHex(c)) {
+        return SetError("Invalid unicode escape");
+      }
+      value = (value << 4) |
+              static_cast<uint32_t>(std::isdigit(static_cast<unsigned char>(c))
+                                        ? (c - '0')
+                                        : ((std::tolower(static_cast<unsigned char>(c)) - 'a') +
+                                           10));
+    }
+    cur_ += 4;
+    if (value >= 0xD800 && value <= 0xDBFF) {
+      // High surrogate, expect another \uXXXX sequence
+      if ((end_ - cur_) < 6 || cur_[0] != '\\' || cur_[1] != 'u') {
+        return SetError("Invalid unicode surrogate pair");
+      }
+      cur_ += 2;  // Skip "\u"
+      uint32_t low = 0;
+      if (!ParseUnicodeEscape(low)) {
+        return false;
+      }
+      if (low < 0xDC00 || low > 0xDFFF) {
+        return SetError("Invalid unicode surrogate pair");
+      }
+      value = 0x10000 + (((value - 0xD800) << 10) | (low - 0xDC00));
+    }
+    codepoint = value;
+    return true;
+  }
+
+  static void AppendCodepoint(uint32_t cp, std::string &out) {
+    if (cp <= 0x7F) {
+      out.push_back(static_cast<char>(cp));
+    } else if (cp <= 0x7FF) {
+      out.push_back(static_cast<char>(0xC0 | ((cp >> 6) & 0x1F)));
+      out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp <= 0xFFFF) {
+      out.push_back(static_cast<char>(0xE0 | ((cp >> 12) & 0x0F)));
+      out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+      out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+      out.push_back(static_cast<char>(0xF0 | ((cp >> 18) & 0x07)));
+      out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+      out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+      out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+  }
+
+  bool MatchLiteral(const char *literal, size_t len) {
+    if (static_cast<size_t>(end_ - cur_) < len) {
+      return false;
+    }
+    if (std::strncmp(cur_, literal, len) != 0) {
+      return false;
+    }
+    cur_ += len;
+    return true;
+  }
+
+  bool Consume(char expected) {
+    if (cur_ >= end_ || *cur_ != expected) {
+      return false;
+    }
+    ++cur_;
+    return true;
+  }
+
+  void SkipWhitespace() {
+    while (cur_ < end_ &&
+           std::isspace(static_cast<unsigned char>(*cur_)) != 0) {
+      ++cur_;
+    }
+  }
+
+  bool SetError(const std::string &msg) {
+    if (err_.empty()) {
+      err_ = msg;
+    }
+    return false;
+  }
+
+  const char *cur_;
+  const char *end_;
+  std::string err_;
+  size_t depth_;
+};
+
+using json = MiniJsonValue;
+using json_iterator = json::iterator;
+using json_const_iterator = json::const_iterator;
+using json_const_array_iterator = json::const_array_iterator;
+using JsonDocument = json;
+
 #else
 using nlohmann::json;
 using json_iterator = json::iterator;
@@ -1898,6 +2854,13 @@ void JsonParse(JsonDocument &doc, const char *str, size_t length,
 #ifdef TINYGLTF_USE_RAPIDJSON
   (void)throwExc;
   doc.Parse(str, length);
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  (void)throwExc;
+  MiniJsonParser parser(str, length);
+  doc.ClearParseError();
+  if (!parser.Parse(doc)) {
+    doc.SetParseError(parser.GetError());
+  }
 #else
   doc = detail::json::parse(str, str + length, nullptr, throwExc);
 #endif
@@ -3533,6 +4496,16 @@ bool GetInt(const detail::json &o, int &val) {
   }
 
   return false;
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  auto type = o.type();
+
+  if ((type == detail::json::value_t::number_integer) ||
+      (type == detail::json::value_t::number_unsigned)) {
+    val = static_cast<int>(o.get<int64_t>());
+    return true;
+  }
+
+  return false;
 #else
   auto type = o.type();
 
@@ -3565,6 +4538,13 @@ bool GetNumber(const detail::json &o, double &val) {
   }
 
   return false;
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  if (o.is_number()) {
+    val = o.get<double>();
+    return true;
+  }
+
+  return false;
 #else
   if (o.is_number()) {
     val = o.get<double>();
@@ -3583,6 +4563,13 @@ bool GetString(const detail::json &o, std::string &val) {
   }
 
   return false;
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  if (o.type() == detail::json::value_t::string) {
+    val = o.get<std::string>();
+    return true;
+  }
+
+  return false;
 #else
   if (o.type() == detail::json::value_t::string) {
     val = o.get<std::string>();
@@ -3596,6 +4583,8 @@ bool GetString(const detail::json &o, std::string &val) {
 bool IsArray(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.IsArray();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.is_array();
 #else
   return o.is_array();
 #endif
@@ -3604,6 +4593,8 @@ bool IsArray(const detail::json &o) {
 detail::json_const_array_iterator ArrayBegin(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.Begin();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.cbegin();
 #else
   return o.begin();
 #endif
@@ -3612,6 +4603,8 @@ detail::json_const_array_iterator ArrayBegin(const detail::json &o) {
 detail::json_const_array_iterator ArrayEnd(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.End();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.cend();
 #else
   return o.end();
 #endif
@@ -3620,6 +4613,8 @@ detail::json_const_array_iterator ArrayEnd(const detail::json &o) {
 bool IsObject(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.IsObject();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.is_object();
 #else
   return o.is_object();
 #endif
@@ -3628,6 +4623,8 @@ bool IsObject(const detail::json &o) {
 detail::json_const_iterator ObjectBegin(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.MemberBegin();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.cbegin();
 #else
   return o.begin();
 #endif
@@ -3636,6 +4633,8 @@ detail::json_const_iterator ObjectBegin(const detail::json &o) {
 detail::json_const_iterator ObjectEnd(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.MemberEnd();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.cend();
 #else
   return o.end();
 #endif
@@ -3646,6 +4645,8 @@ detail::json_const_iterator ObjectEnd(const detail::json &o) {
 std::string GetKey(detail::json_const_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->name.GetString();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return it.key();
 #else
   return it.key().c_str();
 #endif
@@ -3659,6 +4660,9 @@ bool FindMember(const detail::json &o, const char *member,
   }
   it = o.FindMember(member);
   return it != o.MemberEnd();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  it = o.find(member);
+  return it != o.end();
 #else
   it = o.find(member);
   return it != o.end();
@@ -3673,6 +4677,9 @@ bool FindMember(detail::json &o, const char *member,
   }
   it = o.FindMember(member);
   return it != o.MemberEnd();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  it = o.find(member);
+  return it != o.end();
 #else
   it = o.find(member);
   return it != o.end();
@@ -3682,6 +4689,8 @@ bool FindMember(detail::json &o, const char *member,
 void Erase(detail::json &o, detail::json_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   o.EraseMember(it);
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  o.erase(it);
 #else
   o.erase(it);
 #endif
@@ -3690,6 +4699,8 @@ void Erase(detail::json &o, detail::json_iterator &it) {
 bool IsEmpty(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.ObjectEmpty();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.empty();
 #else
   return o.empty();
 #endif
@@ -3698,6 +4709,8 @@ bool IsEmpty(const detail::json &o) {
 const detail::json &GetValue(detail::json_const_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->value;
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return it.value();
 #else
   return it.value();
 #endif
@@ -3706,6 +4719,8 @@ const detail::json &GetValue(detail::json_const_iterator &it) {
 detail::json &GetValue(detail::json_iterator &it) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return it->value;
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return it.value();
 #else
   return it.value();
 #endif
@@ -3730,6 +4745,8 @@ std::string JsonToString(const detail::json &o, int spacing = -1) {
     }
   }
   return buffer.GetString();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.dump(spacing);
 #else
   return o.dump(spacing);
 #endif
@@ -6109,6 +7126,15 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
   }
 #endif
 
+#ifdef TINYGLTF_USE_INTERNAL_JSON
+  if (v.HasParseError()) {
+    if (err) {
+      (*err) = v.ParseErrorMessage();
+    }
+    return false;
+  }
+#endif
+
   if (!detail::IsObject(v)) {
     // root is not an object.
     if (err) {
@@ -7171,6 +8197,8 @@ namespace detail {
 detail::json JsonFromString(const char *s) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return detail::json(s, detail::GetAllocator());
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return detail::json(s ? s : "");
 #else
   return detail::json(s);
 #endif
@@ -7179,6 +8207,9 @@ detail::json JsonFromString(const char *s) {
 void JsonAssign(detail::json &dest, const detail::json &src) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   dest.CopyFrom(src, detail::GetAllocator());
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  dest = src;
+  dest.ClearParseError();
 #else
   dest = src;
 #endif
@@ -7209,6 +8240,8 @@ void JsonAddMember(detail::json &o, const char *key, detail::json &&value) {
 void JsonPushBack(detail::json &o, detail::json &&value) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   o.PushBack(std::move(value), detail::GetAllocator());
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  o.push_back(std::move(value));
 #else
   o.push_back(std::move(value));
 #endif
@@ -7217,6 +8250,8 @@ void JsonPushBack(detail::json &o, detail::json &&value) {
 bool JsonIsNull(const detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   return o.IsNull();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  return o.is_null();
 #else
   return o.is_null();
 #endif
@@ -7225,8 +8260,10 @@ bool JsonIsNull(const detail::json &o) {
 void JsonSetObject(detail::json &o) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   o.SetObject();
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  o.SetObject();
 #else
-  o = o.object({});
+  o = detail::json::object();
 #endif
 }
 
@@ -7234,6 +8271,9 @@ void JsonReserveArray(detail::json &o, size_t s) {
 #ifdef TINYGLTF_USE_RAPIDJSON
   o.SetArray();
   o.Reserve(static_cast<rapidjson::SizeType>(s), detail::GetAllocator());
+#elif defined(TINYGLTF_USE_INTERNAL_JSON)
+  o.SetArray();
+  o.ReserveArray(s);
 #endif
   (void)(o);
   (void)(s);

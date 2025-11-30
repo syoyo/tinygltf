@@ -4,7 +4,9 @@
 #include "tiny_gltf.h"
 
 // Nlohmann json(include ../json.hpp)
+#if !defined(TINYGLTF_USE_INTERNAL_JSON) && !defined(TINYGLTF_USE_RAPIDJSON)
 #include "json.hpp"
+#endif
 
 #define CATCH_CONFIG_MAIN  // This tells Catch to provide a main() - only do this in one cpp file
 #include "catch.hpp"
