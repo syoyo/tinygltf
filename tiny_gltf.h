@@ -249,7 +249,10 @@ static inline int32_t GetNumComponentsInType(uint32_t ty) {
 // TODO(syoyo): Move these functions to TinyGLTF class
 bool IsDataURI(const std::string &in);
 bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
-                   const std::string &in, size_t reqBytes, bool checkSize);
+                   const std::string &in, size_t reqBytes, bool checkSize,
+                   size_t maxSize);
+
+static const size_t kDefaultMaxDataUriSize = size_t(100) * 1024 * 1024;  // 100 MB
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -1564,6 +1567,14 @@ class TinyGLTF {
 
   size_t GetMaxExternalFileSize() const { return max_external_file_size_; }
 
+  ///
+  /// Set maximum allowed decoded Data URI size in bytes.
+  /// Default: 100MB
+  ///
+  void SetMaxDataURISize(size_t max_bytes) { max_data_uri_size_ = max_bytes; }
+
+  size_t GetMaxDataURISize() const { return max_data_uri_size_; }
+
  private:
   ///
   /// Loads glTF asset from string(memory).
@@ -1592,6 +1603,7 @@ class TinyGLTF {
 
   size_t max_external_file_size_{
       size_t((std::numeric_limits<int32_t>::max)())};  // Default 2GB
+  size_t max_data_uri_size_{kDefaultMaxDataUriSize};    // Default 100MB
 
   // Warning & error messages
   std::string warn_;
@@ -2228,6 +2240,40 @@ static std::string JoinPath(const std::string &path0,
   }
 }
 
+// Reject absolute or parent-relative paths so external resources cannot escape
+// the asset root.
+static bool IsAbsolutePath(const std::string &path) {
+  if (path.empty()) {
+    return false;
+  }
+  if (path[0] == '/' || path[0] == '\\') {
+    return true;
+  }
+  if (path.size() > 1 &&
+      ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) &&
+      path[1] == ':') {
+    return true;  // Windows drive letter.
+  }
+  return false;
+}
+
+static bool ContainsParentReference(const std::string &path) {
+  size_t start = 0;
+  while (start < path.size()) {
+    size_t end = path.find_first_of("/\\", start);
+    size_t len = (end == std::string::npos) ? std::string::npos : end - start;
+    std::string segment = path.substr(start, len);
+    if (segment == "..") {
+      return true;
+    }
+    if (end == std::string::npos) {
+      break;
+    }
+    start = end + 1;
+  }
+  return false;
+}
+
 static std::string FindFile(const std::vector<std::string> &paths,
                             const std::string &filepath, FsCallbacks *fs) {
   if (fs == nullptr || fs->ExpandFilePath == nullptr ||
@@ -2497,6 +2543,15 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
                              const std::string &basedir, bool required,
                              size_t reqBytes, bool checkSize,
                              size_t maxFileSize, FsCallbacks *fs) {
+  if (IsAbsolutePath(filename) || ContainsParentReference(filename)) {
+    if (required && err) {
+      (*err) += "Rejected unsafe filename: " + filename + "\n";
+    } else if (!required && warn) {
+      (*warn) += "Rejected unsafe filename: " + filename + "\n";
+    }
+    return false;
+  }
+
   if (fs == nullptr || fs->FileExists == nullptr ||
       fs->ExpandFilePath == nullptr || fs->ReadWholeFile == nullptr) {
     // This is a developer error, assert() ?
@@ -2561,6 +2616,14 @@ static bool LoadExternalFile(std::vector<unsigned char> *out, std::string *err,
   }
 
   size_t sz = buf.size();
+  if (sz > maxFileSize) {
+    if (failMsgOut) {
+      (*failMsgOut) += "File size " + std::to_string(sz) +
+                       " exceeds maximum allowed file size " +
+                       std::to_string(maxFileSize) + " : " + filepath + "\n";
+    }
+    return false;
+  }
   if (sz == 0) {
     if (failMsgOut) {
       (*failMsgOut) += "File is empty : " + filepath + "\n";
@@ -3376,62 +3439,65 @@ bool IsDataURI(const std::string &in) {
 }
 
 bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
-                   const std::string &in, size_t reqBytes, bool checkSize) {
-  std::string header = "data:application/octet-stream;base64,";
-  std::string data;
-  if (in.find(header) == 0) {
-    data = base64_decode(in.substr(header.size()));  // cut mime string.
+                   const std::string &in, size_t reqBytes, bool checkSize,
+                   size_t maxSize) {
+  auto exceeds_limit = [&](size_t payload_len) {
+    // Base64 inflates by roughly 4/3; use a ceiling bound to short-circuit
+    // obviously oversized payloads without decoding.
+    if (payload_len > (std::numeric_limits<size_t>::max)() - 3) {
+      return true;
+    }
+    size_t estimated = ((payload_len + 3) / 4) * 3;
+    return (estimated > maxSize);
+  };
+
+  auto try_decode = [&](const std::string &header,
+                        const char *mime) -> std::string {
+    if (in.find(header) != 0) {
+      return std::string();
+    }
+    size_t payload_len = in.size() - header.size();
+    if (exceeds_limit(payload_len)) {
+      return std::string();
+    }
+    if (mime) {
+      mime_type = mime;
+    }
+    return base64_decode(in.substr(header.size()));  // cut mime string.
+  };
+
+  std::string data = try_decode("data:application/octet-stream;base64,", nullptr);
+
+  if (data.empty()) {
+    data = try_decode("data:image/jpeg;base64,", "image/jpeg");
   }
 
   if (data.empty()) {
-    header = "data:image/jpeg;base64,";
-    if (in.find(header) == 0) {
-      mime_type = "image/jpeg";
-      data = base64_decode(in.substr(header.size()));  // cut mime string.
-    }
+    data = try_decode("data:image/png;base64,", "image/png");
   }
 
   if (data.empty()) {
-    header = "data:image/png;base64,";
-    if (in.find(header) == 0) {
-      mime_type = "image/png";
-      data = base64_decode(in.substr(header.size()));  // cut mime string.
-    }
+    data = try_decode("data:image/bmp;base64,", "image/bmp");
   }
 
   if (data.empty()) {
-    header = "data:image/bmp;base64,";
-    if (in.find(header) == 0) {
-      mime_type = "image/bmp";
-      data = base64_decode(in.substr(header.size()));  // cut mime string.
-    }
+    data = try_decode("data:image/gif;base64,", "image/gif");
   }
 
   if (data.empty()) {
-    header = "data:image/gif;base64,";
-    if (in.find(header) == 0) {
-      mime_type = "image/gif";
-      data = base64_decode(in.substr(header.size()));  // cut mime string.
-    }
+    data = try_decode("data:text/plain;base64,", "text/plain");
   }
 
   if (data.empty()) {
-    header = "data:text/plain;base64,";
-    if (in.find(header) == 0) {
-      mime_type = "text/plain";
-      data = base64_decode(in.substr(header.size()));
-    }
-  }
-
-  if (data.empty()) {
-    header = "data:application/gltf-buffer;base64,";
-    if (in.find(header) == 0) {
-      data = base64_decode(in.substr(header.size()));
-    }
+    data = try_decode("data:application/gltf-buffer;base64,", nullptr);
   }
 
   // TODO(syoyo): Allow empty buffer? #229
   if (data.empty()) {
+    return false;
+  }
+
+  if (data.size() > maxSize) {
     return false;
   }
 
@@ -4303,6 +4369,7 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
                        std::string *warn, const detail::json &o,
                        bool store_original_json_for_extras_and_extensions,
                        const std::string &basedir, const size_t max_file_size,
+                       const size_t max_data_uri_size,
                        FsCallbacks *fs, const URICallbacks *uri_cb,
                        const LoadImageDataFunction& LoadImageData = nullptr,
                        void *load_image_user_data = nullptr) {
@@ -4384,7 +4451,8 @@ static bool ParseImage(Image *image, const int image_idx, std::string *err,
   std::vector<unsigned char> img;
 
   if (IsDataURI(uri)) {
-    if (!DecodeDataURI(&img, image->mimeType, uri, 0, false)) {
+    if (!DecodeDataURI(&img, image->mimeType, uri, 0, false,
+                       max_data_uri_size)) {
       if (err) {
         (*err) += "Failed to decode 'uri' for image[" +
                   std::to_string(image_idx) + "] name = \"" + image->name +
@@ -4534,7 +4602,8 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
                         bool store_original_json_for_extras_and_extensions,
                         FsCallbacks *fs, const URICallbacks *uri_cb,
                         const std::string &basedir,
-                        const size_t max_buffer_size, bool is_binary = false,
+                        const size_t max_buffer_size,
+                        const size_t max_data_uri_size, bool is_binary = false,
                         const unsigned char *bin_data = nullptr,
                         size_t bin_size = 0) {
   size_t byteLength;
@@ -4569,9 +4638,16 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
     if (!buffer->uri.empty()) {
       // First try embedded data URI.
       if (IsDataURI(buffer->uri)) {
+        if (byteLength > max_data_uri_size) {
+          if (err) {
+            (*err) += "Data URI for buffer exceeds maximum allowed size (" +
+                      std::to_string(max_data_uri_size) + " bytes).\n";
+          }
+          return false;
+        }
         std::string mime_type;
         if (!DecodeDataURI(&buffer->data, mime_type, buffer->uri, byteLength,
-                           true)) {
+                           true, max_data_uri_size)) {
           if (err) {
             (*err) +=
                 "Failed to decode 'uri' : " + buffer->uri + " in Buffer\n";
@@ -4620,9 +4696,16 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
 
   } else {
     if (IsDataURI(buffer->uri)) {
+      if (byteLength > max_data_uri_size) {
+        if (err) {
+          (*err) += "Data URI for buffer exceeds maximum allowed size (" +
+                    std::to_string(max_data_uri_size) + " bytes).\n";
+        }
+        return false;
+      }
       std::string mime_type;
       if (!DecodeDataURI(&buffer->data, mime_type, buffer->uri, byteLength,
-                         true)) {
+                         true, max_data_uri_size)) {
         if (err) {
           (*err) += "Failed to decode 'uri' : " + buffer->uri + " in Buffer\n";
         }
@@ -6164,8 +6247,8 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       Buffer buffer;
       if (!ParseBuffer(&buffer, err, o,
                        store_original_json_for_extras_and_extensions_, &fs,
-                       &uri_cb, base_dir, max_external_file_size_, is_binary_,
-                       bin_data_, bin_size_)) {
+                       &uri_cb, base_dir, max_external_file_size_,
+                       max_data_uri_size_, is_binary_, bin_data_, bin_size_)) {
         return false;
       }
 
@@ -6424,7 +6507,7 @@ bool TinyGLTF::LoadFromString(Model *model, std::string *err, std::string *warn,
       Image image;
       if (!ParseImage(&image, idx, err, warn, o,
                       store_original_json_for_extras_and_extensions_, base_dir,
-                      max_external_file_size_, &fs, &uri_cb,
+                      max_external_file_size_, max_data_uri_size_, &fs, &uri_cb,
                       this->LoadImageData, load_image_user_data)) {
         return false;
       }
@@ -6701,6 +6784,14 @@ bool TinyGLTF::LoadASCIIFromString(Model *model, std::string *err,
                                    unsigned int length,
                                    const std::string &base_dir,
                                    unsigned int check_sections) {
+  if (length > max_external_file_size_) {
+    if (err) {
+      (*err) = "Input size exceeds maximum allowed file size " +
+               std::to_string(max_external_file_size_) + ".";
+    }
+    return false;
+  }
+
   is_binary_ = false;
   bin_data_ = nullptr;
   bin_size_ = 0;
@@ -6724,6 +6815,30 @@ bool TinyGLTF::LoadASCIIFromFile(Model *model, std::string *err,
     return false;
   }
 
+  if (fs.GetFileSizeInBytes) {
+    size_t file_size{0};
+    std::string file_size_err;
+    bool ok = fs.GetFileSizeInBytes(&file_size, &file_size_err, filename,
+                                    fs.user_data);
+    if (!ok) {
+      ss << "Failed to stat file: " << filename << ": " << file_size_err
+         << std::endl;
+      if (err) {
+        (*err) = ss.str();
+      }
+      return false;
+    }
+    if (file_size > max_external_file_size_) {
+      ss << "File size " << file_size
+         << " exceeds maximum allowed file size " << max_external_file_size_
+         << " : " << filename << std::endl;
+      if (err) {
+        (*err) = ss.str();
+      }
+      return false;
+    }
+  }
+
   std::vector<unsigned char> data;
   std::string fileerr;
   bool fileread = fs.ReadWholeFile(&data, &fileerr, filename, fs.user_data);
@@ -6739,6 +6854,14 @@ bool TinyGLTF::LoadASCIIFromFile(Model *model, std::string *err,
   if (sz == 0) {
     if (err) {
       (*err) = "Empty file.";
+    }
+    return false;
+  }
+  if (sz > max_external_file_size_) {
+    if (err) {
+      (*err) = "File size " + std::to_string(sz) +
+               " exceeds maximum allowed file size " +
+               std::to_string(max_external_file_size_) + " : " + filename;
     }
     return false;
   }
@@ -6758,6 +6881,14 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
                                     unsigned int size,
                                     const std::string &base_dir,
                                     unsigned int check_sections) {
+  if (size > max_external_file_size_) {
+    if (err) {
+      (*err) = "Input size exceeds maximum allowed file size " +
+               std::to_string(max_external_file_size_) + ".";
+    }
+    return false;
+  }
+
   if (size < 20) {
     if (err) {
       (*err) = "Too short data size for glTF Binary.";
@@ -6812,6 +6943,29 @@ bool TinyGLTF::LoadBinaryFromMemory(Model *model, std::string *err,
       (chunk0_format != 0x4E4F534A)) {  // 0x4E4F534A = JSON format.
     if (err) {
       (*err) = "Invalid glTF binary.";
+    }
+    return false;
+  }
+
+  if (length != size) {
+    if (strictness_ == ParseStrictness::Permissive) {
+      if (warn) {
+        (*warn) +=
+            "GLB length field does not match actual data size. Trailing data "
+            "will be ignored.\n";
+      }
+    } else {
+      if (err) {
+        (*err) = "Invalid glTF binary. Length field does not match data size.";
+      }
+      return false;
+    }
+  }
+
+  if (chunk0_length > max_external_file_size_) {
+    if (err) {
+      (*err) = "JSON chunk size exceeds maximum allowed file size " +
+               std::to_string(max_external_file_size_) + ".";
     }
     return false;
   }
@@ -6950,6 +7104,30 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
     return false;
   }
 
+  if (fs.GetFileSizeInBytes) {
+    size_t file_size{0};
+    std::string file_size_err;
+    bool ok = fs.GetFileSizeInBytes(&file_size, &file_size_err, filename,
+                                    fs.user_data);
+    if (!ok) {
+      ss << "Failed to stat file: " << filename << ": " << file_size_err
+         << std::endl;
+      if (err) {
+        (*err) = ss.str();
+      }
+      return false;
+    }
+    if (file_size > max_external_file_size_) {
+      ss << "File size " << file_size
+         << " exceeds maximum allowed file size " << max_external_file_size_
+         << " : " << filename << std::endl;
+      if (err) {
+        (*err) = ss.str();
+      }
+      return false;
+    }
+  }
+
   std::vector<unsigned char> data;
   std::string fileerr;
   bool fileread = fs.ReadWholeFile(&data, &fileerr, filename, fs.user_data);
@@ -6957,6 +7135,22 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
     ss << "Failed to read file: " << filename << ": " << fileerr << std::endl;
     if (err) {
       (*err) = ss.str();
+    }
+    return false;
+  }
+
+  size_t sz = data.size();
+  if (sz == 0) {
+    if (err) {
+      (*err) = "Empty file.";
+    }
+    return false;
+  }
+  if (sz > max_external_file_size_) {
+    if (err) {
+      (*err) = "File size " + std::to_string(sz) +
+               " exceeds maximum allowed file size " +
+               std::to_string(max_external_file_size_) + " : " + filename;
     }
     return false;
   }

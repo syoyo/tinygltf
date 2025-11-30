@@ -758,6 +758,194 @@ TEST_CASE("load-issue-416-model", "[issue-416]") {
   REQUIRE(true == ret);
 }
 
+TEST_CASE("reject-unsafe-paths", "[security]") {
+  tinygltf::TinyGLTF ctx;
+
+  SECTION("parent-directory reference is rejected") {
+    tinygltf::Model model;
+    std::string err;
+    std::string warn;
+
+    const std::string gltf = R"({
+      "asset": {"version": "2.0"},
+      "buffers": [
+        {"uri": "../secret.bin", "byteLength": 4}
+      ]
+    })";
+
+    bool ret = ctx.LoadASCIIFromString(&model, &err, &warn, gltf.c_str(),
+                                       static_cast<unsigned int>(gltf.size()),
+                                       ".");
+    REQUIRE_FALSE(ret);
+    REQUIRE_THAT(err, Catch::Contains("Rejected unsafe filename"));
+  }
+
+  SECTION("absolute path is rejected") {
+    tinygltf::Model model;
+    std::string err;
+    std::string warn;
+
+    const std::string gltf = R"({
+      "asset": {"version": "2.0"},
+      "buffers": [
+        {"uri": "/tmp/secret.bin", "byteLength": 4}
+      ]
+    })";
+
+    bool ret = ctx.LoadASCIIFromString(&model, &err, &warn, gltf.c_str(),
+                                       static_cast<unsigned int>(gltf.size()),
+                                       ".");
+    REQUIRE_FALSE(ret);
+    REQUIRE_THAT(err, Catch::Contains("Rejected unsafe filename"));
+  }
+}
+
+TEST_CASE("data-uri-size-limit", "[security]") {
+  tinygltf::TinyGLTF ctx;
+  ctx.SetMaxDataURISize(16);  // small limit to exercise rejection path.
+
+  const std::string payload(24, 'A');  // decodes to 18 bytes.
+  const std::string data_uri =
+      "data:application/octet-stream;base64," + payload;
+  const std::string gltf = R"({
+    "asset": {"version": "2.0"},
+    "buffers": [
+      {"uri": ")" + data_uri + R"(", "byteLength": 18}
+    ]
+  })";
+
+  tinygltf::Model model;
+  std::string err;
+  std::string warn;
+
+  bool ret = ctx.LoadASCIIFromString(&model, &err, &warn, gltf.c_str(),
+                                     static_cast<unsigned int>(gltf.size()),
+                                     ".");
+  REQUIRE_FALSE(ret);
+  REQUIRE_THAT(err,
+               Catch::Contains("Data URI for buffer exceeds maximum allowed"));
+
+  SECTION("ceiling estimation rejects near-limit payloads") {
+    tinygltf::TinyGLTF ctx2;
+    ctx2.SetMaxDataURISize(4);
+    // 8 chars base64 -> 6 decoded bytes, should be rejected by max size.
+    const std::string small_payload(8, 'A');
+    const std::string small_uri =
+        "data:application/octet-stream;base64," + small_payload;
+    const std::string gltf_small = R"({
+      "asset": {"version": "2.0"},
+      "buffers": [
+        {"uri": ")" + small_uri + R"(", "byteLength": 6}
+      ]
+    })";
+
+    tinygltf::Model m2;
+    std::string err2;
+    std::string warn2;
+    bool ok = ctx2.LoadASCIIFromString(
+        &m2, &err2, &warn2, gltf_small.c_str(),
+        static_cast<unsigned int>(gltf_small.size()), ".");
+    REQUIRE_FALSE(ok);
+    REQUIRE_THAT(err2,
+                 Catch::Contains("Data URI for buffer exceeds maximum allowed"));
+  }
+}
+
+TEST_CASE("max-external-file-size", "[security]") {
+  tinygltf::TinyGLTF ctx;
+  ctx.SetMaxExternalFileSize(16);  // small limit to force rejection.
+
+  const std::string gltf_path = "oversize.gltf";
+  {
+    std::ofstream ofs(gltf_path, std::ios::binary);
+    ofs << R"({"asset":{"version":"2.0"}})" << std::string(64, ' ');
+  }
+
+  tinygltf::Model model;
+  std::string err;
+  std::string warn;
+  bool ok = ctx.LoadASCIIFromFile(&model, &err, &warn, gltf_path);
+  REQUIRE_FALSE(ok);
+  REQUIRE_THAT(err,
+               Catch::Contains("exceeds maximum allowed file size"));
+  std::remove(gltf_path.c_str());
+
+  const std::string glb_path = "oversize.glb";
+  {
+    std::ofstream ofs(glb_path, std::ios::binary);
+    ofs << std::string(32, '\0');
+  }
+
+  err.clear();
+  warn.clear();
+  ok = ctx.LoadBinaryFromFile(&model, &err, &warn, glb_path);
+  REQUIRE_FALSE(ok);
+  REQUIRE_THAT(err,
+               Catch::Contains("exceeds maximum allowed file size"));
+  std::remove(glb_path.c_str());
+}
+
+TEST_CASE("max-size-in-memory", "[security]") {
+  tinygltf::TinyGLTF ctx;
+  ctx.SetMaxExternalFileSize(16);
+
+  // LoadASCIIFromString should reject oversized input.
+  {
+    tinygltf::Model model;
+    std::string err;
+    std::string warn;
+    std::string large_json(20, ' ');
+    bool ok = ctx.LoadASCIIFromString(
+        &model, &err, &warn, large_json.c_str(),
+        static_cast<unsigned int>(large_json.size()), ".");
+    REQUIRE_FALSE(ok);
+    REQUIRE_THAT(err, Catch::Contains("Input size exceeds maximum"));
+  }
+
+  // LoadBinaryFromMemory should reject oversized input even before parsing.
+  {
+    tinygltf::Model model;
+    std::string err;
+    std::string warn;
+    std::array<unsigned char, 32> bytes{};
+    // Craft minimal glTF header; size still exceeds limit and should be
+    // rejected early.
+    bytes[0] = 'g'; bytes[1] = 'l'; bytes[2] = 'T'; bytes[3] = 'F';
+    bytes[4] = 2; // version little-endian
+    bool ok = ctx.LoadBinaryFromMemory(&model, &err, &warn, bytes.data(),
+                                       static_cast<unsigned int>(bytes.size()),
+                                       ".");
+    REQUIRE_FALSE(ok);
+    REQUIRE_THAT(err, Catch::Contains("Input size exceeds maximum"));
+  }
+
+  SECTION("GLB length mismatch is rejected in strict mode") {
+    tinygltf::TinyGLTF ctx_strict;
+    ctx_strict.SetParseStrictness(tinygltf::ParseStrictness::Strict);
+
+    // Construct a minimal GLB with length field smaller than actual buffer.
+    std::array<unsigned char, 32> glb{};
+    glb[0] = 'g'; glb[1] = 'l'; glb[2] = 'T'; glb[3] = 'F';
+    glb[4] = 2; // version
+    uint32_t length = 24; // claimed length (smaller than actual buffer size)
+    memcpy(&glb[8], &length, 4);
+    uint32_t json_len = 4;
+    memcpy(&glb[12], &json_len, 4);
+    uint32_t json_fmt = 0x4E4F534A; // "JSON"
+    memcpy(&glb[16], &json_fmt, 4);
+
+    tinygltf::Model model;
+    std::string err;
+    std::string warn;
+    bool ok = ctx_strict.LoadBinaryFromMemory(
+        &model, &err, &warn, glb.data(),
+        static_cast<unsigned int>(glb.size()), ".");
+    REQUIRE_FALSE(ok);
+    REQUIRE_THAT(err,
+                 Catch::Contains("Length field does not match data size"));
+  }
+}
+
 TEST_CASE("serialize-empty-node", "[issue-457]") {
   tinygltf::Model m;
   // Add default constructed node to model
