@@ -2291,8 +2291,14 @@ static bool CreateDirectories(const std::string &filepath) {
       current_path = "/";
       start = 1;
     } else {
-      current_path = dirpath.substr(0, 3); // Drive letter + ":\"
-      start = 3;
+      // Handle "C:" or "C:\" or "C:/" correctly
+      if (dirpath.length() > 2 && (dirpath[2] == '\\' || dirpath[2] == '/')) {
+        current_path = dirpath.substr(0, 3); // "C:\" or "C:/"
+        start = 3;
+      } else {
+        current_path = dirpath.substr(0, 2); // "C:"
+        start = 2;
+      }
     }
   }
 
@@ -2309,19 +2315,20 @@ static bool CreateDirectories(const std::string &filepath) {
       }
       current_path += component;
       
-      // Create directory if it doesn't exist
-      struct stat st;
-      if (stat(current_path.c_str(), &st) != 0) {
+      // Attempt to create directory; ignore error if it already exists
 #ifdef _WIN32
-        if (_mkdir(current_path.c_str()) != 0) {
+      if (_mkdir(current_path.c_str()) != 0) {
+        if (errno != EEXIST) {
           return false;
         }
-#else
-        if (mkdir(current_path.c_str(), 0755) != 0) {
-          return false;
-        }
-#endif
       }
+#else
+      if (mkdir(current_path.c_str(), 0755) != 0) {
+        if (errno != EEXIST) {
+          return false;
+        }
+      }
+#endif
     }
     start = end + 1;
   }

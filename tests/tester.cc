@@ -1080,7 +1080,7 @@ TEST_CASE("write-image-issue", "[issue-473]") {
   REQUIRE(ok);
 
   for (const auto& image : model.images) {
-    std::fstream file(image.uri);
+    std::ifstream file(image.uri, std::ios::binary);
     CHECK(file.good());
   }
 }
@@ -1121,7 +1121,7 @@ TEST_CASE("images-as-is", "[issue-487]") {
     // All the images should have been written to disk with their original data
     for (const auto& image : model.images)  {
       // Make sure the image files exist
-      std::fstream file(image.uri);
+      std::ifstream file(image.uri, std::ios::binary);
       CHECK(file.good());
 #ifndef TINYGLTF_NO_STB_IMAGE
       // Make sure we can load the images
@@ -1269,7 +1269,7 @@ TEST_CASE("image-uri-path-preservation", "[image-uri-fix]") {
   REQUIRE(ok);
 
   for (const auto& image : model.images) {
-    std::fstream file(image.uri);
+    std::ifstream file(image.uri, std::ios::binary);
     CHECK(file.good());
   }
   
