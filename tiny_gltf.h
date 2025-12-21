@@ -2284,7 +2284,10 @@ static bool CreateDirectories(const std::string &filepath) {
   // Create directories recursively
   std::string current_path;
   size_t start = 0;
-  
+
+  if (dirpath.empty()) {
+    return true; // Nothing to create
+  }
   // Handle absolute paths
   if (dirpath[0] == '/' || (dirpath.length() > 1 && dirpath[1] == ':')) {
     if (dirpath[0] == '/') {
