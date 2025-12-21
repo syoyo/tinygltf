@@ -37,6 +37,9 @@ if (TINYGLTF_BUILD_BUILDER_EXAMPLE)
   add_subdirectory ( examples/build-gltf )
 endif (TINYGLTF_BUILD_BUILDER_EXAMPLE)
 
+# Add tests subdirectory
+add_subdirectory(tests)
+
 #
 # for add_subdirectory and standalone build
 #
