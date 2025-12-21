@@ -39,6 +39,7 @@
 
 #include <array>
 #include <cassert>
+#include <cerrno>
 #include <cmath>  // std::fabs
 #include <cstdint>
 #include <cstdlib>
