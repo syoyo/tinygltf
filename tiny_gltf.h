@@ -1037,10 +1037,10 @@ struct Buffer {
   std::string extras_json_string;
   std::string extensions_json_string;
 
-  // [CUSTOM] For placeholder buffers (e.g., EXT_meshopt_compression fallback):
-  // When data is empty but this is non-zero, serialize only byteLength without
-  // URI or data. This allows creating buffers that exist in the JSON but have
-  // no actual binary content in the GLB file.
+  // For placeholder buffers (e.g., EXT_meshopt_compression fallback):
+  // When data is empty but this is non-zero, use this value as the byteLength,
+  // but don't write out any data. This allows creating buffers that exist in
+  // the JSON but have no actual binary content in the GLB file.
   size_t placeholderByteLength{0};
 
   Buffer() = default;
@@ -7506,7 +7506,7 @@ static void SerializeGltfBufferBin(const Buffer &buffer, detail::json &o,
   SerializeExtrasAndExtensions(buffer, o);
 }
 
-// [CUSTOM] Serialize a placeholder buffer with only byteLength (no URI/data).
+// Serialize a placeholder buffer with only byteLength but no data.
 // Used for EXT_meshopt_compression fallback buffers that exist in the glTF JSON
 // but have no actual binary content stored in the GLB file.
 static void SerializeGltfBufferPlaceholder(const Buffer &buffer,
@@ -8603,9 +8603,7 @@ bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
     detail::JsonReserveArray(buffers, model->buffers.size());
     for (unsigned int i = 0; i < model->buffers.size(); ++i) {
       detail::json buffer;
-      // [CUSTOM] Check for placeholder buffer first (e.g., meshopt fallback)
-      if (model->buffers[i].placeholderByteLength > 0 &&
-          model->buffers[i].data.empty()) {
+      if (model->buffers[i].placeholderByteLength > 0 && model->buffers[i].data.empty()) {
         SerializeGltfBufferPlaceholder(model->buffers[i], buffer);
       } else if (writeBinary && i == 0 && model->buffers[i].uri.empty()) {
         SerializeGltfBufferBin(model->buffers[i], buffer, binBuffer);
@@ -8679,9 +8677,7 @@ bool TinyGLTF::WriteGltfSceneToFile(const Model *model,
     detail::JsonReserveArray(buffers, model->buffers.size());
     for (unsigned int i = 0; i < model->buffers.size(); ++i) {
       detail::json buffer;
-      // [CUSTOM] Check for placeholder buffer first (e.g., meshopt fallback)
-      if (model->buffers[i].placeholderByteLength > 0 &&
-          model->buffers[i].data.empty()) {
+      if (model->buffers[i].placeholderByteLength > 0 && model->buffers[i].data.empty()) {
         SerializeGltfBufferPlaceholder(model->buffers[i], buffer);
       } else if (writeBinary && i == 0 && model->buffers[i].uri.empty()) {
         SerializeGltfBufferBin(model->buffers[i], buffer, binBuffer);

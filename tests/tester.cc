@@ -1249,3 +1249,165 @@ TEST_CASE("empty-images-not-written", "[issue-495]") {
   // WriteImageData should be invoked for both images
   CHECK(counter == 2);
 }
+
+TEST_CASE("placeholder-buffer-gltf", "[placeholder-buffer]") {
+  // Test that placeholder buffers are serialized with only byteLength (no URI or data).
+  // This is needed for EXT_meshopt_compression fallback buffers.
+  //
+  // Placeholder buffers are a write-only feature: they allow serializing a buffer
+  // declaration with byteLength but without any actual data. When loaded back,
+  // such buffers would need the data provided via other means (e.g., the extension).
+  std::stringstream os;
+
+  const size_t placeholderSize = 12345;
+
+  {
+    tinygltf::Model m;
+
+    // Create a placeholder buffer (empty data, but with placeholderByteLength set)
+    tinygltf::Buffer placeholderBuffer;
+    placeholderBuffer.placeholderByteLength = placeholderSize;
+    placeholderBuffer.name = "placeholderBuffer";
+    // data is intentionally empty
+
+    // Set extras (arbitrary JSON data)
+    placeholderBuffer.extras = tinygltf::Value(tinygltf::Value::Object{
+        {"customField", tinygltf::Value(42)},
+        {"description", tinygltf::Value(std::string("test extras"))}
+    });
+
+    // Set an extension (e.g., EXT_meshopt_compression)
+    placeholderBuffer.extensions["EXT_meshopt_compression"] = tinygltf::Value(
+        tinygltf::Value::Object{
+            {"fallback", tinygltf::Value(true)}
+        });
+
+    m.buffers.push_back(placeholderBuffer);
+
+    // Create a minimal valid glTF structure
+    m.asset.version = "2.0";
+
+    // Serialize model to output stream (as glTF, not GLB)
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&m, os, false, false);
+    REQUIRE(true == ret);
+  }
+
+  // Verify the JSON output contains the placeholder buffer with correct byteLength
+  std::string jsonStr = os.str();
+
+  // Parse the raw JSON using nlohmann::json to verify the buffer structure
+  nlohmann::json j = nlohmann::json::parse(jsonStr);
+
+  // Should have buffers array
+  REQUIRE(j.contains("buffers"));
+  REQUIRE(j["buffers"].is_array());
+  REQUIRE(j["buffers"].size() == 1);
+
+  // The placeholder buffer should have byteLength and name, but NO uri
+  const auto& buffer = j["buffers"][0];
+  CHECK(buffer.contains("byteLength"));
+  CHECK(buffer["byteLength"] == placeholderSize);
+  CHECK(buffer.contains("name"));
+  CHECK(buffer["name"] == "placeholderBuffer");
+  CHECK_FALSE(buffer.contains("uri"));  // No URI for placeholder buffers
+
+  // Verify extras are serialized correctly
+  REQUIRE(buffer.contains("extras"));
+  CHECK(buffer["extras"].contains("customField"));
+  CHECK(buffer["extras"]["customField"] == 42);
+  CHECK(buffer["extras"].contains("description"));
+  CHECK(buffer["extras"]["description"] == "test extras");
+
+  // Verify extensions are serialized correctly
+  REQUIRE(buffer.contains("extensions"));
+  REQUIRE(buffer["extensions"].contains("EXT_meshopt_compression"));
+  CHECK(buffer["extensions"]["EXT_meshopt_compression"].contains("fallback"));
+  CHECK(buffer["extensions"]["EXT_meshopt_compression"]["fallback"] == true);
+}
+
+TEST_CASE("placeholder-buffer-glb", "[placeholder-buffer]") {
+  // Test that placeholder buffers are serialized correctly in GLB format.
+  std::stringstream os;
+
+  const size_t placeholderSize = 12345;
+
+  {
+    tinygltf::Model m;
+
+    // Create a placeholder buffer (empty data, but with placeholderByteLength set)
+    tinygltf::Buffer placeholderBuffer;
+    placeholderBuffer.placeholderByteLength = placeholderSize;
+    placeholderBuffer.name = "placeholderBuffer";
+
+    // Set extras
+    placeholderBuffer.extras = tinygltf::Value(tinygltf::Value::Object{
+        {"customField", tinygltf::Value(42)},
+        {"description", tinygltf::Value(std::string("test extras"))}
+    });
+
+    // Set an extension
+    placeholderBuffer.extensions["EXT_meshopt_compression"] = tinygltf::Value(
+        tinygltf::Value::Object{
+            {"fallback", tinygltf::Value(true)}
+        });
+
+    m.buffers.push_back(placeholderBuffer);
+    m.asset.version = "2.0";
+
+    // Serialize model to output stream as GLB
+    tinygltf::TinyGLTF ctx;
+    bool ret = ctx.WriteGltfSceneToStream(&m, os, false, true);
+    REQUIRE(true == ret);
+  }
+
+  // Extract JSON chunk from GLB
+  // GLB format: 12-byte header, then chunks
+  // Header: magic(4) + version(4) + length(4)
+  // JSON chunk: chunkLength(4) + chunkType(4) + chunkData(chunkLength)
+  std::string glbData = os.str();
+  REQUIRE(glbData.size() >= 20);  // At least header + chunk header
+
+  auto glbBytes = reinterpret_cast<const unsigned char*>(glbData.data());
+
+  // Verify GLB magic
+  CHECK(glbBytes[0] == 'g');
+  CHECK(glbBytes[1] == 'l');
+  CHECK(glbBytes[2] == 'T');
+  CHECK(glbBytes[3] == 'F');
+
+  // Read JSON chunk length (little-endian, at offset 12)
+  uint32_t jsonChunkLength = glbBytes[12] | (glbBytes[13] << 8) |
+                             (glbBytes[14] << 16) | (glbBytes[15] << 24);
+
+  // Verify JSON chunk type (0x4E4F534A = "JSON")
+  uint32_t jsonChunkType = glbBytes[16] | (glbBytes[17] << 8) |
+                           (glbBytes[18] << 16) | (glbBytes[19] << 24);
+  CHECK(jsonChunkType == 0x4E4F534A);
+
+  // Extract and parse JSON
+  std::string jsonStr(reinterpret_cast<const char*>(glbBytes + 20), jsonChunkLength);
+  nlohmann::json j = nlohmann::json::parse(jsonStr);
+
+  // Verify buffer structure in GLB
+  REQUIRE(j.contains("buffers"));
+  REQUIRE(j["buffers"].is_array());
+  REQUIRE(j["buffers"].size() == 1);
+
+  const auto& buffer = j["buffers"][0];
+  CHECK(buffer.contains("byteLength"));
+  CHECK(buffer["byteLength"] == placeholderSize);
+  CHECK(buffer.contains("name"));
+  CHECK(buffer["name"] == "placeholderBuffer");
+  CHECK_FALSE(buffer.contains("uri"));  // No URI for placeholder buffers in GLB
+
+  // Verify extras in GLB
+  REQUIRE(buffer.contains("extras"));
+  CHECK(buffer["extras"]["customField"] == 42);
+  CHECK(buffer["extras"]["description"] == "test extras");
+
+  // Verify extensions in GLB
+  REQUIRE(buffer.contains("extensions"));
+  REQUIRE(buffer["extensions"].contains("EXT_meshopt_compression"));
+  CHECK(buffer["extensions"]["EXT_meshopt_compression"]["fallback"] == true);
+}
