@@ -1311,6 +1311,7 @@ TEST_CASE("placeholder-buffer-gltf", "[placeholder-buffer]") {
   CHECK(buffer.contains("name"));
   CHECK(buffer["name"] == "placeholderBuffer");
   CHECK_FALSE(buffer.contains("uri"));  // No URI for placeholder buffers
+  CHECK_FALSE(buffer.contains("data")); // No embedded data
 
   // Verify extras are serialized correctly
   REQUIRE(buffer.contains("extras"));
@@ -1384,6 +1385,12 @@ TEST_CASE("placeholder-buffer-glb", "[placeholder-buffer]") {
   uint32_t jsonChunkType = glbBytes[16] | (glbBytes[17] << 8) |
                            (glbBytes[18] << 16) | (glbBytes[19] << 24);
   CHECK(jsonChunkType == 0x4E4F534A);
+
+  // Verify there is no binary chunk (placeholder buffer has no data)
+  // GLB total size should be: 12 (header) + 8 (JSON chunk header) + jsonChunkLength (padded to 4 bytes)
+  uint32_t paddedJsonLength = (jsonChunkLength + 3) & ~3u;
+  uint32_t expectedSize = 12 + 8 + paddedJsonLength;
+  CHECK(glbData.size() == expectedSize);  // No BIN chunk present
 
   // Extract and parse JSON
   std::string jsonStr(reinterpret_cast<const char*>(glbBytes + 20), jsonChunkLength);
