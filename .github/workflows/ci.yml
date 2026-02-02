@@ -13,6 +13,9 @@ on:
       - devel
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   # Linux x64 - GCC
   linux-gcc-x64:
