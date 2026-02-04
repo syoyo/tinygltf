@@ -14,6 +14,7 @@ option(TINYGLTF_BUILD_LOADER_EXAMPLE "Build loader_example(load glTF and dump in
 option(TINYGLTF_BUILD_GL_EXAMPLES "Build GL exampels(requires glfw, OpenGL, etc)" OFF)
 option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE "Build validator exampe" OFF)
 option(TINYGLTF_BUILD_BUILDER_EXAMPLE "Build glTF builder example" OFF)
+option(TINYGLTF_BUILD_TESTS "Build unit tests" OFF)
 option(TINYGLTF_HEADER_ONLY "On: header-only mode. Off: create tinygltf library(No TINYGLTF_IMPLEMENTATION required in your project)" OFF)
 option(TINYGLTF_INSTALL "Install tinygltf files during install step. Usually set to OFF if you include tinygltf through add_subdirectory()" ON)
 option(TINYGLTF_INSTALL_VENDOR "Install vendored nlohmann/json and nothings/stb headers" ON)
@@ -36,6 +37,16 @@ endif (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
 if (TINYGLTF_BUILD_BUILDER_EXAMPLE)
   add_subdirectory ( examples/build-gltf )
 endif (TINYGLTF_BUILD_BUILDER_EXAMPLE)
+
+if (TINYGLTF_BUILD_TESTS)
+  enable_testing()
+  add_executable(tester tests/tester.cc)
+  target_include_directories(tester PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  add_test(NAME tester COMMAND tester WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+endif (TINYGLTF_BUILD_TESTS)
 
 #
 # for add_subdirectory and standalone build

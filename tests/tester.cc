@@ -1121,8 +1121,10 @@ TEST_CASE("images-as-is", "[issue-487]") {
     // All the images should have been written to disk with their original data
     for (const auto& image : model.images)  {
       // Make sure the image files exist
-      std::fstream file(image.uri);
-      CHECK(file.good());
+      {
+        std::fstream file(image.uri);
+        CHECK(file.good());
+      } // Close file before stbi_load (Windows sharing violation fix)
 #ifndef TINYGLTF_NO_STB_IMAGE
       // Make sure we can load the images
       int w = -1, h = -1, component = -1;
