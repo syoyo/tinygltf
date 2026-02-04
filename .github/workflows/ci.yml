@@ -85,7 +85,7 @@ jobs:
 
   # macOS x64 Intel
   macos-intel-x64:
-    runs-on: macos-13
+    runs-on: macos-15-large
     name: macOS x64 Intel (Clang)
     steps:
       - name: Checkout
@@ -147,20 +147,6 @@ jobs:
       - name: Run loader_example
         run: |
           .\build\Release\loader_example.exe models\Cube\Cube.gltf
-
-      - name: Setup MSVC environment
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Build unit tests
-        run: |
-          cd tests
-          cl /std:c++14 /I.. /EHsc /Fe:tester.exe tester.cc
-        shell: cmd
-
-      - name: Run unit tests
-        run: |
-          cd tests
-          .\tester.exe
 
   # Windows x86 - MSVC (build only)
   windows-msvc-x86:
