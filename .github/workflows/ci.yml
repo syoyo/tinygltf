@@ -1,0 +1,330 @@
+name: Comprehensive CI
+
+on:
+  push:
+    branches:
+      - master
+      - release
+      - devel
+  pull_request:
+    branches:
+      - master
+      - release
+      - devel
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Linux x64 - GCC
+  linux-gcc-x64:
+    runs-on: ubuntu-latest
+    name: Linux x64 (GCC)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example
+        run: |
+          g++ -std=c++11 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests
+        run: |
+          cd tests
+          g++ -I../ -std=c++11 -g -O0 -o tester tester.cc
+          ./tester
+
+  # Linux x64 - Clang
+  linux-clang-x64:
+    runs-on: ubuntu-latest
+    name: Linux x64 (Clang)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example
+        run: |
+          clang++ -std=c++11 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests
+        run: |
+          cd tests
+          clang++ -I../ -std=c++11 -g -O0 -o tester tester.cc
+          ./tester
+
+  # Linux ARM64 - GCC (native)
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    name: Linux ARM64 (GCC)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example
+        run: |
+          g++ -std=c++11 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests
+        run: |
+          cd tests
+          g++ -I../ -std=c++11 -g -O0 -o tester tester.cc
+          ./tester
+
+  # macOS ARM64 Apple Silicon
+  macos-arm64:
+    runs-on: macos-14
+    name: macOS ARM64 Apple Silicon (Clang)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example
+        run: |
+          clang++ -std=c++11 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests
+        run: |
+          cd tests
+          clang++ -I../ -std=c++11 -g -O0 -o tester tester.cc
+          ./tester
+
+  # Windows x64 - MSVC
+  windows-msvc-x64:
+    runs-on: windows-latest
+    name: Windows x64 (MSVC)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off ..
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Run loader_example
+        run: |
+          .\build\Release\loader_example.exe models\Cube\Cube.gltf
+
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  # Windows x86 - MSVC
+  windows-msvc-x86:
+    runs-on: windows-latest
+    name: Windows x86 (MSVC)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -A Win32 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off ..
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  # Windows ARM64 - MSVC (cross-compile)
+  windows-msvc-arm64:
+    runs-on: windows-latest
+    name: Windows ARM64 (MSVC) - Cross-compile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -A ARM64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off ..
+
+      - name: Build
+        run: cmake --build build --config Release
+
+  # Windows MinGW - MSYS2
+  windows-mingw-msys2:
+    runs-on: windows-latest
+    name: Windows x64 (MinGW MSYS2)
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: base-devel
+          pacboy: >-
+            cc:p cmake:p ninja:p
+          update: true
+          release: false
+
+      - name: Build with CMake
+        run: |
+          cmake -G"Ninja" -S . -B build
+          cmake --build build
+
+      - name: Run loader_example
+        run: |
+          ./build/loader_example models/Cube/Cube.gltf
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  # Linux -> Windows MinGW Cross-compile
+  linux-mingw-cross:
+    runs-on: ubuntu-latest
+    name: Linux→Windows (MinGW Cross) - Build Only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MinGW
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential mingw-w64
+
+      - name: Build
+        run: |
+          x86_64-w64-mingw32-g++ -std=c++11 -o loader_example.exe loader_example.cc
+
+  # Special Configuration: No Exceptions
+  linux-noexception:
+    runs-on: ubuntu-latest
+    name: Linux x64 (GCC) - No Exceptions
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example
+        run: |
+          g++ -DTINYGLTF_NOEXCEPTION -std=c++11 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests
+        run: |
+          cd tests
+          g++ -DTINYGLTF_NOEXCEPTION -I../ -std=c++11 -g -O0 -o tester_noexcept tester.cc
+          ./tester_noexcept
+
+  # Special Configuration: Header-Only Mode
+  linux-header-only:
+    runs-on: ubuntu-latest
+    name: Linux x64 (GCC) - Header-Only Mode
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with CMake Header-Only
+        run: |
+          mkdir build
+          cmake -B build -DTINYGLTF_HEADER_ONLY=ON -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+          cmake --build build
+
+      - name: Run loader_example
+        run: |
+          ./build/loader_example models/Cube/Cube.gltf
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  # Special Configuration: RapidJSON Backend
+  linux-rapidjson:
+    runs-on: ubuntu-latest
+    name: Linux x64 (GCC) - RapidJSON Backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Clone RapidJSON
+        run: |
+          git clone https://github.com/Tencent/rapidjson
+
+      - name: Configure
+        run: |
+          cmake -B build -DTINYGLTF_USE_RAPIDJSON=ON -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DCMAKE_PREFIX_PATH=$PWD/rapidjson
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run loader_example
+        run: |
+          ./build/loader_example models/Cube/Cube.gltf
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
+
+  # Special Configuration: AddressSanitizer
+  linux-asan:
+    runs-on: ubuntu-latest
+    name: Linux x64 (Clang) - AddressSanitizer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example with ASan
+        run: |
+          clang++ -fsanitize=address -std=c++11 -g -O1 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests with ASan
+        run: |
+          cd tests
+          clang++ -fsanitize=address -I../ -std=c++11 -g -O1 -o tester tester.cc
+          ./tester
+
+  # Special Configuration: UndefinedBehaviorSanitizer
+  linux-ubsan:
+    runs-on: ubuntu-latest
+    name: Linux x64 (Clang) - UndefinedBehaviorSanitizer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build loader_example with UBSan
+        run: |
+          clang++ -fsanitize=undefined -std=c++11 -g -O1 -o loader_example loader_example.cc
+
+      - name: Run loader_example
+        run: |
+          ./loader_example models/Cube/Cube.gltf
+
+      - name: Build and run unit tests with UBSan
+        run: |
+          cd tests
+          clang++ -fsanitize=undefined -I../ -std=c++11 -g -O1 -o tester tester.cc
+          ./tester
