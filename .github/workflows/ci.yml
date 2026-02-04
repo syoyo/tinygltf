@@ -148,6 +148,9 @@ jobs:
         run: |
           .\build\Release\loader_example.exe models\Cube\Cube.gltf
 
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build unit tests
         run: |
           cd tests
