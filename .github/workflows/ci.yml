@@ -126,10 +126,13 @@ jobs:
         run: |
           .\build\Release\loader_example.exe models\Cube\Cube.gltf
 
-  # Windows x86 - MSVC (build only)
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  # Windows x86 - MSVC
   windows-msvc-x86:
     runs-on: windows-latest
-    name: Windows x86 (MSVC) - Build Only
+    name: Windows x86 (MSVC)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -142,6 +145,9 @@ jobs:
 
       - name: Build
         run: cmake --build build --config Release
+
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
 
   # Windows ARM64 - MSVC (cross-compile)
   windows-msvc-arm64:
@@ -186,19 +192,12 @@ jobs:
           cmake -G"Ninja" -S . -B build
           cmake --build build
 
-      - name: Build loader_example directly
-        run: |
-          g++ -std=c++11 -o loader_example loader_example.cc
-
       - name: Run loader_example
         run: |
-          ./loader_example models/Cube/Cube.gltf
+          ./build/loader_example models/Cube/Cube.gltf
 
-      - name: Build and run unit tests
-        run: |
-          cd tests
-          g++ -I../ -std=c++11 -g -O0 -o tester tester.cc
-          ./tester
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   # Linux -> Windows MinGW Cross-compile
   linux-mingw-cross:
@@ -257,11 +256,8 @@ jobs:
         run: |
           ./build/loader_example models/Cube/Cube.gltf
 
-      - name: Build and run unit tests (header-only)
-        run: |
-          cd tests
-          g++ -DTINYGLTF_HEADER_ONLY -I../ -std=c++11 -g -O0 -o tester tester.cc
-          ./tester
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   # Special Configuration: RapidJSON Backend
   linux-rapidjson:
