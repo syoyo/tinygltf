@@ -25,41 +25,45 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build loader_example
-        run: |
-          g++ -std=c++11 -o loader_example loader_example.cc
+      - name: Configure
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+
+      - name: Build
+        run: cmake --build build
 
       - name: Run loader_example
-        run: |
-          ./loader_example models/Cube/Cube.gltf
+        run: ./build/loader_example models/Cube/Cube.gltf
 
-      - name: Build and run unit tests
-        run: |
-          cd tests
-          g++ -I../ -std=c++11 -g -O0 -o tester tester.cc
-          ./tester
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
-  # Linux x64 - Clang
+  # Linux x64 - Clang 21
   linux-clang-x64:
-    runs-on: ubuntu-latest
-    name: Linux x64 (Clang)
+    runs-on: ubuntu-24.04
+    name: Linux x64 (Clang 21)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build loader_example
+      - name: Install Clang 21
         run: |
-          clang++ -std=c++11 -o loader_example loader_example.cc
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 21
+
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_C_COMPILER=clang-21 -DCMAKE_CXX_COMPILER=clang++-21 -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+
+      - name: Build
+        run: cmake --build build
 
       - name: Run loader_example
         run: |
-          ./loader_example models/Cube/Cube.gltf
+          ./build/loader_example models/Cube/Cube.gltf
 
-      - name: Build and run unit tests
-        run: |
-          cd tests
-          clang++ -I../ -std=c++11 -g -O0 -o tester tester.cc
-          ./tester
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   # Linux ARM64 - GCC (native)
   linux-arm64:
@@ -69,19 +73,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build loader_example
-        run: |
-          g++ -std=c++11 -o loader_example loader_example.cc
+      - name: Configure
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+
+      - name: Build
+        run: cmake --build build
 
       - name: Run loader_example
-        run: |
-          ./loader_example models/Cube/Cube.gltf
+        run: ./build/loader_example models/Cube/Cube.gltf
 
-      - name: Build and run unit tests
-        run: |
-          cd tests
-          g++ -I../ -std=c++11 -g -O0 -o tester tester.cc
-          ./tester
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   # macOS ARM64 Apple Silicon
   macos-arm64:
@@ -91,19 +93,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build loader_example
-        run: |
-          clang++ -std=c++11 -o loader_example loader_example.cc
+      - name: Configure
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+
+      - name: Build
+        run: cmake --build build
 
       - name: Run loader_example
-        run: |
-          ./loader_example models/Cube/Cube.gltf
+        run: ./build/loader_example models/Cube/Cube.gltf
 
-      - name: Build and run unit tests
-        run: |
-          cd tests
-          clang++ -I../ -std=c++11 -g -O0 -o tester tester.cc
-          ./tester
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure
 
   # Windows x64 - MSVC
   windows-msvc-x64:
