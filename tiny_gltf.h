@@ -2451,9 +2451,8 @@ inline unsigned char from_hex(unsigned char ch) {
 }
 
 static const std::string urldecode(const std::string &str) {
-  using namespace std;
-  string result;
-  string::size_type i;
+  std::string result;
+  std::string::size_type i;
   for (i = 0; i < str.size(); ++i) {
     if (str[i] == '+') {
       result += ' ';
