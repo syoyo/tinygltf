@@ -25,8 +25,21 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-// Version: - v2.9.*
-// See https://github.com/syoyo/tinygltf/releases for release history.
+// Version:
+//  - v2.9.0 Filesystem API has been changed.
+//  - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image.
+//  - v2.7.0 Change WriteImageDataFunction user callback function signature.
+//  - v2.6.0 Support serializing sparse accessor(Thanks to @fynv).
+//           Disable expanding file path for security(no use of awkward `wordexp` anymore).
+//  - v2.5.0 Add SetPreserveImageChannels() option to load image data as is.
+//  - v2.4.0 Experimental RapidJSON and C++14 support(Thanks to @jrkoone).
+//  - v2.3.0 Modified Material representation according to glTF 2.0 schema
+//           (and introduced TextureInfo class).
+//  - v2.2.0 Add loading 16bit PNG support. Add Sparse accessor support(Thanks to @Ybalrid)
+//  - v2.1.0 Add draco compression.
+//  - v2.0.0 glTF 2.0!
+//
+// See https://github.com/syoyo/tinygltf/releases for full release history.
 //
 // Tiny glTF loader is using following third party libraries:
 //
