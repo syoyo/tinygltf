@@ -26,8 +26,6 @@ Currently TinyGLTF is stable and maintenance mode. No drastic changes and featur
 
 ## Builds
 
-[![Build status](https://ci.appveyor.com/api/projects/status/warngenu9wjjhlm8?svg=true)](https://ci.appveyor.com/project/syoyo/tinygltf)
-
 ![C/C++ CI](https://github.com/syoyo/tinygltf/workflows/C/C++%20CI/badge.svg)
 
 ## Features
