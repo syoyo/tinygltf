@@ -1378,12 +1378,16 @@ TEST_CASE("placeholder-buffer-glb", "[placeholder-buffer]") {
   CHECK(glbBytes[3] == 'F');
 
   // Read JSON chunk length (little-endian, at offset 12)
-  uint32_t jsonChunkLength = glbBytes[12] | (glbBytes[13] << 8) |
-                             (glbBytes[14] << 16) | (glbBytes[15] << 24);
+  uint32_t jsonChunkLength = static_cast<uint32_t>(glbBytes[12]) |
+                             (static_cast<uint32_t>(glbBytes[13]) << 8) |
+                             (static_cast<uint32_t>(glbBytes[14]) << 16) |
+                             (static_cast<uint32_t>(glbBytes[15]) << 24);
 
   // Verify JSON chunk type (0x4E4F534A = "JSON")
-  uint32_t jsonChunkType = glbBytes[16] | (glbBytes[17] << 8) |
-                           (glbBytes[18] << 16) | (glbBytes[19] << 24);
+  uint32_t jsonChunkType = static_cast<uint32_t>(glbBytes[16]) |
+                           (static_cast<uint32_t>(glbBytes[17]) << 8) |
+                           (static_cast<uint32_t>(glbBytes[18]) << 16) |
+                           (static_cast<uint32_t>(glbBytes[19]) << 24);
   CHECK(jsonChunkType == 0x4E4F534A);
 
   // Verify there is no binary chunk (placeholder buffer has no data)

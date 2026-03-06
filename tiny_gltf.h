@@ -2005,7 +2005,8 @@ bool Asset::operator==(const Asset &other) const {
 bool Buffer::operator==(const Buffer &other) const {
   return this->data == other.data && this->extensions == other.extensions &&
          this->extras == other.extras && this->name == other.name &&
-         this->uri == other.uri;
+         this->uri == other.uri &&
+         this->placeholderByteLength == other.placeholderByteLength;
 }
 bool BufferView::operator==(const BufferView &other) const {
   return this->buffer == other.buffer && this->byteLength == other.byteLength &&
@@ -7506,9 +7507,10 @@ static void SerializeGltfBufferBin(const Buffer &buffer, detail::json &o,
   SerializeExtrasAndExtensions(buffer, o);
 }
 
-// Serialize a placeholder buffer with only byteLength but no data.
+// Serialize a placeholder buffer with byteLength (and optional name, extras,
+// and extensions) but without URI or binary data content.
 // Used for EXT_meshopt_compression fallback buffers that exist in the glTF JSON
-// but have no actual binary content stored in the GLB file.
+// but have no actual buffer payload stored in the GLB file.
 static void SerializeGltfBufferPlaceholder(const Buffer &buffer,
                                            detail::json &o) {
   SerializeNumberProperty("byteLength", buffer.placeholderByteLength, o);
@@ -8603,7 +8605,8 @@ bool TinyGLTF::WriteGltfSceneToStream(const Model *model, std::ostream &stream,
     detail::JsonReserveArray(buffers, model->buffers.size());
     for (unsigned int i = 0; i < model->buffers.size(); ++i) {
       detail::json buffer;
-      if (model->buffers[i].placeholderByteLength > 0 && model->buffers[i].data.empty()) {
+      if (model->buffers[i].placeholderByteLength > 0 &&
+          model->buffers[i].data.empty() && model->buffers[i].uri.empty()) {
         SerializeGltfBufferPlaceholder(model->buffers[i], buffer);
       } else if (writeBinary && i == 0 && model->buffers[i].uri.empty()) {
         SerializeGltfBufferBin(model->buffers[i], buffer, binBuffer);
@@ -8677,7 +8680,8 @@ bool TinyGLTF::WriteGltfSceneToFile(const Model *model,
     detail::JsonReserveArray(buffers, model->buffers.size());
     for (unsigned int i = 0; i < model->buffers.size(); ++i) {
       detail::json buffer;
-      if (model->buffers[i].placeholderByteLength > 0 && model->buffers[i].data.empty()) {
+      if (model->buffers[i].placeholderByteLength > 0 &&
+          model->buffers[i].data.empty() && model->buffers[i].uri.empty()) {
         SerializeGltfBufferPlaceholder(model->buffers[i], buffer);
       } else if (writeBinary && i == 0 && model->buffers[i].uri.empty()) {
         SerializeGltfBufferBin(model->buffers[i], buffer, binBuffer);
