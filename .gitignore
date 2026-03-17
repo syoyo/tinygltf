@@ -70,6 +70,19 @@ tests/tester
 tests/tester_noexcept
 tests/issue-97.gltf
 tests/issue-261.gltf
+# Test-generated output files (written by tester.cc during test run)
+tests/ *.gltf
+tests/ *.bin
+tests/ *.png
+tests/Cube.gltf
+tests/Cube.bin
+tests/Cube.glb
+tests/Cube_BaseColor.png
+tests/Cube_MetallicRoughness.png
+tests/Cube_with_embedded_images.gltf
+tests/Cube_with_image_files.gltf
+tests/issue-495-external.gltf
+tests/tmp.glb
 
 # unignore
 !Makefile
