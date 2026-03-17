@@ -19,6 +19,12 @@
  *     TINYGLTF_JSON_SIMD_SSE2   - Enable SSE2 (x86/x86-64)
  *     TINYGLTF_JSON_SIMD_AVX2   - Enable AVX2 (x86-64, implies SSE2)
  *     TINYGLTF_JSON_SIMD_NEON   - Enable ARM NEON
+ *
+ * Exception handling (default: exceptions disabled):
+ *   By default, parse errors silently return a null value.
+ *   Define TINYGLTF_JSON_USE_EXCEPTIONS before including this header to
+ *   allow tinygltf_json::parse() to throw std::invalid_argument on error
+ *   when its allow_exceptions parameter is true.
  */
 
 #ifndef TINYGLTF_JSON_H_
@@ -35,7 +41,15 @@
 
 /* C++ headers (minimal) */
 #include <string>
-#include <stdexcept>
+/* Exception opt-in: define TINYGLTF_JSON_USE_EXCEPTIONS to enable throws.
+ * TINYGLTF_JSON_NO_EXCEPTIONS is the internal guard derived from the absence
+ * of TINYGLTF_JSON_USE_EXCEPTIONS; users should not define it directly. */
+#ifndef TINYGLTF_JSON_USE_EXCEPTIONS
+#  define TINYGLTF_JSON_NO_EXCEPTIONS
+#endif
+#ifndef TINYGLTF_JSON_NO_EXCEPTIONS
+#  include <stdexcept>
+#endif
 
 /* ======================================================================
  * SIMD detection
@@ -622,9 +636,12 @@ public:
      * ------------------------------------------------------------------ */
     std::string dump(int indent = -1) const;
 
+    /* allow_exceptions is honoured only when TINYGLTF_JSON_USE_EXCEPTIONS is
+     * defined; otherwise it is accepted for API compatibility but has no
+     * effect — parse errors always return a null value silently. */
     static tinygltf_json parse(const char *first, const char *last,
                                std::nullptr_t = nullptr,
-                               bool allow_exceptions = true);
+                               bool allow_exceptions = false);
 };
 
 /* ======================================================================
@@ -1604,10 +1621,14 @@ inline tinygltf_json tinygltf_json::parse(const char *first, const char *last,
     cj_parse_json(&ctx, &result);
 
     if (ctx.err) {
+#ifndef TINYGLTF_JSON_NO_EXCEPTIONS
         if (allow_exceptions) {
             throw std::invalid_argument(
                 std::string("tinygltf_json::parse error: ") + ctx.errmsg);
         }
+#else
+        (void)allow_exceptions;
+#endif
         return tinygltf_json(); /* null on error */
     }
     return result;
