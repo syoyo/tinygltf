@@ -1112,17 +1112,28 @@ template<> inline std::string tinygltf_json::get<std::string>() const {
 }
 
 /* ======================================================================
- * PARSER (C-style recursive descent)
+ * PARSER (C-style iterative, explicit frame stack)
+ *
+ * Uses an explicit cj_frame stack instead of C recursion so that deeply
+ * nested JSON cannot overflow the call stack.  CJ_MAX_ITER limits both
+ * the container nesting depth (stack size) and serves as the iteration
+ * safety budget: a malformed input that keeps pushing containers without
+ * consuming content is rejected once the stack is full.
  * ====================================================================== */
 
-/* Maximum nesting depth (arrays/objects) to prevent stack overflow */
-#define CJ_MAX_DEPTH 512
+/* Maximum container nesting depth (size of the explicit frame stack) */
+#define CJ_MAX_ITER 512
+
+/* One entry per open container (array or object) on the explicit stack */
+struct cj_frame {
+    tinygltf_json *container;  /* The array or object being populated */
+    int            is_object;  /* 0 = array, 1 = object */
+};
 
 struct cj_parse_ctx {
     const char *cur;
     const char *end;
     int         err;
-    int         depth;   /* current nesting depth */
     char        errmsg[256];
 };
 
@@ -1133,9 +1144,6 @@ static void cj_ctx_error(cj_parse_ctx *ctx, const char *msg) {
         ctx->errmsg[sizeof(ctx->errmsg) - 1] = '\0';
     }
 }
-
-/* Forward declaration */
-static void cj_parse_value(cj_parse_ctx *ctx, tinygltf_json *out);
 
 /*
  * Parse a JSON string from the current position.
@@ -1196,168 +1204,229 @@ static void cj_parse_string_to(cj_parse_ctx *ctx, char **out_str,
     *out_str = NULL; *out_len = 0;
 }
 
-static void cj_parse_array(cj_parse_ctx *ctx, tinygltf_json *out) {
-    assert(*ctx->cur == '[');
-    if (ctx->depth >= CJ_MAX_DEPTH) {
-        cj_ctx_error(ctx, "nesting depth exceeded");
-        return;
-    }
-    ++ctx->cur;
-    ++ctx->depth;
-    out->make_array_();
-
-    ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-    if (ctx->cur < ctx->end && *ctx->cur == ']') {
-        ++ctx->cur;
-        --ctx->depth;
-        return;
-    }
-
-    for (;;) {
-        if (ctx->err || ctx->cur >= ctx->end) break;
-        ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-        if (ctx->cur >= ctx->end) { cj_ctx_error(ctx, "EOF in array"); break; }
-        if (*ctx->cur == ']')     { ++ctx->cur; break; }
-
-        tinygltf_json elem;
-        cj_parse_value(ctx, &elem);
-        if (ctx->err) break;
-        out->push_back(static_cast<tinygltf_json &&>(elem));
-
-        ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-        if (ctx->cur >= ctx->end) { cj_ctx_error(ctx, "EOF after array element"); break; }
-        if      (*ctx->cur == ',') ++ctx->cur;
-        else if (*ctx->cur == ']') { ++ctx->cur; break; }
-        else { cj_ctx_error(ctx, "expected ',' or ']'"); break; }
-    }
-    --ctx->depth;
-}
-
-static void cj_parse_object(cj_parse_ctx *ctx, tinygltf_json *out) {
-    assert(*ctx->cur == '{');
-    if (ctx->depth >= CJ_MAX_DEPTH) {
-        cj_ctx_error(ctx, "nesting depth exceeded");
-        return;
-    }
-    ++ctx->cur;
-    ++ctx->depth;
-    out->make_object_();
-
-    ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-    if (ctx->cur < ctx->end && *ctx->cur == '}') { ++ctx->cur; --ctx->depth; return; }
-
-    for (;;) {
-        if (ctx->err || ctx->cur >= ctx->end) break;
-        ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-        if (ctx->cur >= ctx->end) { cj_ctx_error(ctx, "EOF in object"); break; }
-        if (*ctx->cur == '}')     { ++ctx->cur; break; }
-
-        /* Parse key */
-        if (*ctx->cur != '"') { cj_ctx_error(ctx, "expected key string"); break; }
-        char  *key_str = NULL;
-        size_t key_len = 0;
-        cj_parse_string_to(ctx, &key_str, &key_len);
-        if (ctx->err || !key_str) { free(key_str); break; }
-
-        /* Parse colon */
-        ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-        if (ctx->cur >= ctx->end || *ctx->cur != ':') {
-            free(key_str);
-            cj_ctx_error(ctx, "expected ':'");
-            break;
-        }
-        ++ctx->cur;
-
-        /* Allocate member slot */
-        if (!out->obj_reserve_()) { free(key_str); cj_ctx_error(ctx, "OOM"); break; }
-        tinygltf_json_member *m = &out->obj_data_[out->obj_size_];
-        new (m) tinygltf_json_member();
-        m->key     = key_str;
-        m->key_len = key_len;
-        ++out->obj_size_;
-
-        /* Parse value directly into m->val */
-        cj_parse_value(ctx, &m->val);
-        if (ctx->err) break;
-
-        ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-        if (ctx->cur >= ctx->end) { cj_ctx_error(ctx, "EOF after value"); break; }
-        if      (*ctx->cur == ',') ++ctx->cur;
-        else if (*ctx->cur == '}') { ++ctx->cur; break; }
-        else { cj_ctx_error(ctx, "expected ',' or '}'"); break; }
-    }
-    --ctx->depth;
-}
-
-static void cj_parse_value(cj_parse_ctx *ctx, tinygltf_json *out) {
-    ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-    if (ctx->cur >= ctx->end) {
-        cj_ctx_error(ctx, "unexpected EOF");
-        out->destroy_();
-        out->init_null_();
-        return;
-    }
-
+/*
+ * Parse a scalar JSON value (string, number, bool, null) into *slot.
+ * ctx->cur must point to the first character of the value (whitespace
+ * already consumed).
+ */
+static void cj_parse_scalar(cj_parse_ctx *ctx, tinygltf_json *slot) {
     char c = *ctx->cur;
 
     if (c == '"') {
-        char  *s   = NULL;
-        size_t len = 0;
-        cj_parse_string_to(ctx, &s, &len);
-        if (ctx->err || !s) { free(s); out->destroy_(); out->init_null_(); return; }
-        out->destroy_();
-        out->init_null_();
-        out->type_    = CJ_STRING;
-        out->str_     = s;
-        out->str_len_ = len;
-    } else if (c == '{') {
-        cj_parse_object(ctx, out);
-    } else if (c == '[') {
-        cj_parse_array(ctx, out);
+        char *s = NULL; size_t slen = 0;
+        cj_parse_string_to(ctx, &s, &slen);
+        if (ctx->err || !s) { free(s); slot->destroy_(); slot->init_null_(); return; }
+        slot->destroy_(); slot->init_null_();
+        slot->type_ = CJ_STRING; slot->str_ = s; slot->str_len_ = slen;
     } else if (c == 't') {
         if (ctx->end - ctx->cur >= 4 && memcmp(ctx->cur, "true", 4) == 0) {
             ctx->cur += 4;
-            *out = tinygltf_json(true);
+            slot->destroy_(); slot->init_null_();
+            slot->type_ = CJ_BOOL; slot->b_ = 1;
         } else { cj_ctx_error(ctx, "invalid literal 'true'"); }
     } else if (c == 'f') {
         if (ctx->end - ctx->cur >= 5 && memcmp(ctx->cur, "false", 5) == 0) {
             ctx->cur += 5;
-            *out = tinygltf_json(false);
+            slot->destroy_(); slot->init_null_();
+            slot->type_ = CJ_BOOL; slot->b_ = 0;
         } else { cj_ctx_error(ctx, "invalid literal 'false'"); }
     } else if (c == 'n') {
         if (ctx->end - ctx->cur >= 4 && memcmp(ctx->cur, "null", 4) == 0) {
             ctx->cur += 4;
-            out->destroy_();
-            out->init_null_();
+            slot->destroy_(); slot->init_null_();
         } else { cj_ctx_error(ctx, "invalid literal 'null'"); }
     } else if (c == '-' || (c >= '0' && c <= '9')) {
-        int     is_int = 0;
-        int64_t ival   = 0;
-        double  dval   = 0.0;
-        const char *next = cj_parse_number(ctx->cur, ctx->end,
-                                            &is_int, &ival, &dval);
+        int is_int = 0; int64_t ival = 0; double dval = 0.0;
+        const char *next = cj_parse_number(ctx->cur, ctx->end, &is_int, &ival, &dval);
         if (!next) { cj_ctx_error(ctx, "invalid number"); return; }
         ctx->cur = next;
-        if (is_int) {
-            out->destroy_();
-            out->init_null_();
-            out->type_ = CJ_INT;
-            out->i_    = ival;
-        } else {
-            out->destroy_();
-            out->init_null_();
-            out->type_ = CJ_REAL;
-            out->d_    = dval;
-        }
+        slot->destroy_(); slot->init_null_();
+        if (is_int) { slot->type_ = CJ_INT;  slot->i_ = ival; }
+        else        { slot->type_ = CJ_REAL; slot->d_ = dval; }
     } else {
         char errbuf[64];
-        snprintf(errbuf, sizeof(errbuf),
-                 "unexpected character '%c' (0x%02X)",
-                 (unsigned char)c >= 0x20u ? c : '?',
-                 (unsigned char)c);
+        snprintf(errbuf, sizeof(errbuf), "unexpected character '%c' (0x%02X)",
+                 (unsigned char)c >= 0x20u ? c : '?', (unsigned char)c);
         cj_ctx_error(ctx, errbuf);
-        out->destroy_();
-        out->init_null_();
+        slot->destroy_(); slot->init_null_();
+    }
+}
+
+/*
+ * cj_parse_json -- iterative JSON parser.
+ *
+ * Parses one complete JSON value from ctx into *root using an explicit
+ * cj_frame[CJ_MAX_ITER] stack instead of C recursion.  No C stack frames
+ * are consumed for nesting; the only stack growth comes from the fixed-size
+ * cj_frame array declared as a local variable here.
+ *
+ * Loop structure:
+ *   after_val == 0  ->  parse the next JSON value into *slot
+ *   after_val == 1  ->  a value was just completed; handle ',' / ']' / '}'
+ *
+ * CJ_MAX_ITER caps the container nesting depth.  Each '{' or '[' increments
+ * depth; reaching the cap produces an error rather than an out-of-bounds
+ * write.
+ */
+static void cj_parse_json(cj_parse_ctx *ctx, tinygltf_json *root) {
+    cj_frame stack[CJ_MAX_ITER];
+    int depth     = 0; /* frames in use */
+    int after_val = 0; /* 0 = need value, 1 = value just finished */
+
+    /* Where to write the next parsed value */
+    tinygltf_json *slot = root;
+
+    for (;;) {
+        if (ctx->err) break;
+
+        /* ---------------------------------------------------------------
+         * POST-VALUE: handle separator / closing bracket
+         * ------------------------------------------------------------- */
+        if (after_val) {
+            after_val = 0;
+
+            if (depth == 0) break; /* root value complete */
+
+            cj_frame *f = &stack[depth - 1];
+            ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+            if (ctx->cur >= ctx->end) {
+                cj_ctx_error(ctx, "unexpected EOF after value"); break;
+            }
+
+            if (!f->is_object) {
+                /* ---- Array: expect ',' or ']' ---- */
+                if (*ctx->cur == ',') {
+                    ++ctx->cur;
+                    /* Allocate next element slot */
+                    tinygltf_json *cont = f->container;
+                    if (!cont->arr_reserve_()) { cj_ctx_error(ctx, "OOM"); break; }
+                    new (&cont->arr_data_[cont->arr_size_]) tinygltf_json();
+                    slot = &cont->arr_data_[cont->arr_size_];
+                    ++cont->arr_size_;
+                    /* Loop back to parse the element value */
+                } else if (*ctx->cur == ']') {
+                    ++ctx->cur;
+                    --depth;
+                    after_val = 1; /* the array itself is now the completed value */
+                } else {
+                    cj_ctx_error(ctx, "expected ',' or ']' in array"); break;
+                }
+            } else {
+                /* ---- Object: expect ',' or '}' ---- */
+                if (*ctx->cur == ',') {
+                    ++ctx->cur;
+                    ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+                    if (ctx->cur >= ctx->end) {
+                        cj_ctx_error(ctx, "unexpected EOF in object"); break;
+                    }
+                    if (*ctx->cur != '"') {
+                        cj_ctx_error(ctx, "expected object key after ','"); break;
+                    }
+                    /* Parse key and allocate member slot */
+                    char *k = NULL; size_t kl = 0;
+                    cj_parse_string_to(ctx, &k, &kl);
+                    if (ctx->err || !k) { free(k); break; }
+                    ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+                    if (ctx->cur >= ctx->end || *ctx->cur != ':') {
+                        free(k); cj_ctx_error(ctx, "expected ':' in object"); break;
+                    }
+                    ++ctx->cur;
+                    tinygltf_json *cont = f->container;
+                    if (!cont->obj_reserve_()) { free(k); cj_ctx_error(ctx, "OOM"); break; }
+                    tinygltf_json_member *m = &cont->obj_data_[cont->obj_size_];
+                    new (m) tinygltf_json_member();
+                    m->key = k; m->key_len = kl;
+                    ++cont->obj_size_;
+                    slot = &m->val;
+                    /* Loop back to parse the member value */
+                } else if (*ctx->cur == '}') {
+                    ++ctx->cur;
+                    --depth;
+                    after_val = 1; /* the object itself is now the completed value */
+                } else {
+                    cj_ctx_error(ctx, "expected ',' or '}' in object"); break;
+                }
+            }
+            continue;
+        }
+
+        /* ---------------------------------------------------------------
+         * PARSE VALUE: read *slot from ctx->cur
+         * ------------------------------------------------------------- */
+        ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+        if (ctx->cur >= ctx->end) {
+            if (depth == 0) break; /* trailing whitespace on root value is ok */
+            cj_ctx_error(ctx, "unexpected EOF"); break;
+        }
+
+        char c = *ctx->cur;
+
+        if (c == '{') {
+            /* ---- Begin object ---- */
+            if (depth >= CJ_MAX_ITER) {
+                cj_ctx_error(ctx, "nesting limit exceeded"); break;
+            }
+            ++ctx->cur;
+            slot->destroy_(); slot->init_null_(); slot->type_ = CJ_OBJECT;
+
+            stack[depth].container = slot;
+            stack[depth].is_object = 1;
+            ++depth;
+
+            ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+            if (ctx->cur >= ctx->end) { cj_ctx_error(ctx, "EOF in object"); break; }
+            if (*ctx->cur == '}') { ++ctx->cur; --depth; after_val = 1; continue; }
+
+            /* Parse first key */
+            if (*ctx->cur != '"') { cj_ctx_error(ctx, "expected key in object"); break; }
+            {
+                char *k = NULL; size_t kl = 0;
+                cj_parse_string_to(ctx, &k, &kl);
+                if (ctx->err || !k) { free(k); break; }
+                ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+                if (ctx->cur >= ctx->end || *ctx->cur != ':') {
+                    free(k); cj_ctx_error(ctx, "expected ':' in object"); break;
+                }
+                ++ctx->cur;
+                if (!slot->obj_reserve_()) { free(k); cj_ctx_error(ctx, "OOM"); break; }
+                tinygltf_json_member *m = &slot->obj_data_[slot->obj_size_];
+                new (m) tinygltf_json_member();
+                m->key = k; m->key_len = kl;
+                ++slot->obj_size_;
+                slot = &m->val; /* next iteration parses the first value */
+            }
+
+        } else if (c == '[') {
+            /* ---- Begin array ---- */
+            if (depth >= CJ_MAX_ITER) {
+                cj_ctx_error(ctx, "nesting limit exceeded"); break;
+            }
+            ++ctx->cur;
+            slot->destroy_(); slot->init_null_(); slot->type_ = CJ_ARRAY;
+
+            stack[depth].container = slot;
+            stack[depth].is_object = 0;
+            ++depth;
+
+            ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+            if (ctx->cur >= ctx->end) { cj_ctx_error(ctx, "EOF in array"); break; }
+            if (*ctx->cur == ']') { ++ctx->cur; --depth; after_val = 1; continue; }
+
+            /* Allocate first element slot */
+            {
+                tinygltf_json *cont = stack[depth - 1].container;
+                if (!cont->arr_reserve_()) { cj_ctx_error(ctx, "OOM"); break; }
+                new (&cont->arr_data_[cont->arr_size_]) tinygltf_json();
+                slot = &cont->arr_data_[cont->arr_size_];
+                ++cont->arr_size_;
+            }
+            /* next iteration parses the first element */
+
+        } else {
+            /* ---- Scalar value ---- */
+            cj_parse_scalar(ctx, slot);
+            after_val = 1;
+        }
     }
 }
 
@@ -1529,11 +1598,10 @@ inline tinygltf_json tinygltf_json::parse(const char *first, const char *last,
     ctx.cur       = first;
     ctx.end       = last;
     ctx.err       = 0;
-    ctx.depth     = 0;
     ctx.errmsg[0] = '\0';
 
     tinygltf_json result;
-    cj_parse_value(&ctx, &result);
+    cj_parse_json(&ctx, &result);
 
     if (ctx.err) {
         if (allow_exceptions) {
