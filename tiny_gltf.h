@@ -1711,7 +1711,11 @@ class TinyGLTF {
 #endif  // __GNUC__
 
 #ifndef TINYGLTF_NO_INCLUDE_JSON
-#ifndef TINYGLTF_USE_RAPIDJSON
+#ifdef TINYGLTF_USE_CUSTOM_JSON
+#ifndef TINYGLTF_NO_INCLUDE_CUSTOM_JSON
+#include "tinygltf_json.h"
+#endif
+#elif !defined(TINYGLTF_USE_RAPIDJSON)
 #include "json.hpp"
 #else
 #ifndef TINYGLTF_NO_INCLUDE_RAPIDJSON
@@ -1799,7 +1803,10 @@ class TinyGLTF {
 
 namespace tinygltf {
 namespace detail {
-#ifdef TINYGLTF_USE_RAPIDJSON
+#ifdef TINYGLTF_USE_CUSTOM_JSON
+// Types and JsonParse are provided by tinygltf_json.h (already included above)
+// via 'namespace tinygltf { namespace detail { ... } }' declarations.
+#elif defined(TINYGLTF_USE_RAPIDJSON)
 
 #ifdef TINYGLTF_USE_RAPIDJSON_CRTALLOCATOR
 // This uses the RapidJSON CRTAllocator.  It is thread safe and multiple
@@ -1871,6 +1878,7 @@ using json_const_array_iterator = json_const_iterator;
 using JsonDocument = json;
 #endif
 
+#ifndef TINYGLTF_USE_CUSTOM_JSON
 void JsonParse(JsonDocument &doc, const char *str, size_t length,
                bool throwExc = false) {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -1880,6 +1888,7 @@ void JsonParse(JsonDocument &doc, const char *str, size_t length,
   doc = detail::json::parse(str, str + length, nullptr, throwExc);
 #endif
 }
+#endif  // !TINYGLTF_USE_CUSTOM_JSON
 }  // namespace detail
 }  // namespace tinygltf
 
@@ -3436,6 +3445,7 @@ bool DecodeDataURI(std::vector<unsigned char> *out, std::string &mime_type,
   return true;
 }
 
+#ifndef TINYGLTF_USE_CUSTOM_JSON
 namespace detail {
 bool GetInt(const detail::json &o, int &val) {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -3659,6 +3669,7 @@ std::string JsonToString(const detail::json &o, int spacing = -1) {
 }
 
 }  // namespace detail
+#endif  // !TINYGLTF_USE_CUSTOM_JSON
 
 static bool ParseJsonAsValue(Value *ret, const detail::json &o) {
   Value val{};
@@ -6962,6 +6973,7 @@ bool TinyGLTF::LoadBinaryFromFile(Model *model, std::string *err,
 ///////////////////////
 // GLTF Serialization
 ///////////////////////
+#ifndef TINYGLTF_USE_CUSTOM_JSON
 namespace detail {
 detail::json JsonFromString(const char *s) {
 #ifdef TINYGLTF_USE_RAPIDJSON
@@ -7034,6 +7046,7 @@ void JsonReserveArray(detail::json &o, size_t s) {
   (void)(s);
 }
 }  // namespace detail
+#endif  // !TINYGLTF_USE_CUSTOM_JSON
 
 // typedef std::pair<std::string, detail::json> json_object_pair;
 

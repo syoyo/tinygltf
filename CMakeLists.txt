@@ -18,6 +18,11 @@ option(TINYGLTF_BUILD_TESTS "Build unit tests" OFF)
 option(TINYGLTF_HEADER_ONLY "On: header-only mode. Off: create tinygltf library(No TINYGLTF_IMPLEMENTATION required in your project)" OFF)
 option(TINYGLTF_INSTALL "Install tinygltf files during install step. Usually set to OFF if you include tinygltf through add_subdirectory()" ON)
 option(TINYGLTF_INSTALL_VENDOR "Install vendored nlohmann/json and nothings/stb headers" ON)
+option(TINYGLTF_USE_CUSTOM_JSON "Use the built-in fast JSON parser (tinygltf_json.h) instead of nlohmann/json" OFF)
+
+if (TINYGLTF_USE_CUSTOM_JSON)
+  add_definitions(-DTINYGLTF_USE_CUSTOM_JSON)
+endif (TINYGLTF_USE_CUSTOM_JSON)
 
 if (TINYGLTF_BUILD_LOADER_EXAMPLE)
   add_executable(loader_example
@@ -80,6 +85,7 @@ if (TINYGLTF_INSTALL)
 
   INSTALL ( FILES
     tiny_gltf.h
+    tinygltf_json.h
     ${TINYGLTF_EXTRA_SOUECES}
     DESTINATION
     include
