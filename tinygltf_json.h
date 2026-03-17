@@ -592,6 +592,8 @@ public:
      * ------------------------------------------------------------------ */
     void push_back(tinygltf_json &&v);
     void push_back(const tinygltf_json &v);
+    /* Ensure value is an array (no-op if already array). */
+    void set_array() { if (type_ != CJ_ARRAY) make_array_(); }
 
     /* ------------------------------------------------------------------
      * Object operations
@@ -829,6 +831,8 @@ inline tinygltf_json_member *tinygltf_json::find_member_(
     const char *key) const {
     size_t klen = strlen(key);
     for (size_t i = 0; i < obj_size_; ++i) {
+        /* Guard against NULL key (can occur if malloc failed during insert) */
+        if (obj_data_[i].key == NULL) continue;
         if (obj_data_[i].key_len == klen &&
             memcmp(obj_data_[i].key, key, klen) == 0)
             return &obj_data_[i];
@@ -839,6 +843,8 @@ inline tinygltf_json_member *tinygltf_json::find_member_(
 inline int tinygltf_json::obj_reserve_() {
     if (obj_size_ < obj_cap_) return 1;
     size_t new_cap = obj_cap_ ? obj_cap_ * 2 : 8;
+    /* Guard against allocation overflow */
+    if (new_cap > (size_t)0x7FFFFFFF / sizeof(tinygltf_json_member)) return 0;
     tinygltf_json_member *nd = (tinygltf_json_member *)malloc(
         new_cap * sizeof(tinygltf_json_member));
     if (!nd) return 0;
@@ -856,6 +862,8 @@ inline int tinygltf_json::obj_reserve_() {
 inline int tinygltf_json::arr_reserve_() {
     if (arr_size_ < arr_cap_) return 1;
     size_t new_cap = arr_cap_ ? arr_cap_ * 2 : 8;
+    /* Guard against allocation overflow */
+    if (new_cap > (size_t)0x7FFFFFFF / sizeof(tinygltf_json)) return 0;
     tinygltf_json *nd = (tinygltf_json *)malloc(
         new_cap * sizeof(tinygltf_json));
     if (!nd) return 0;
@@ -1107,10 +1115,14 @@ template<> inline std::string tinygltf_json::get<std::string>() const {
  * PARSER (C-style recursive descent)
  * ====================================================================== */
 
+/* Maximum nesting depth (arrays/objects) to prevent stack overflow */
+#define CJ_MAX_DEPTH 512
+
 struct cj_parse_ctx {
     const char *cur;
     const char *end;
     int         err;
+    int         depth;   /* current nesting depth */
     char        errmsg[256];
 };
 
@@ -1186,12 +1198,18 @@ static void cj_parse_string_to(cj_parse_ctx *ctx, char **out_str,
 
 static void cj_parse_array(cj_parse_ctx *ctx, tinygltf_json *out) {
     assert(*ctx->cur == '[');
+    if (ctx->depth >= CJ_MAX_DEPTH) {
+        cj_ctx_error(ctx, "nesting depth exceeded");
+        return;
+    }
     ++ctx->cur;
+    ++ctx->depth;
     out->make_array_();
 
     ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
     if (ctx->cur < ctx->end && *ctx->cur == ']') {
         ++ctx->cur;
+        --ctx->depth;
         return;
     }
 
@@ -1212,15 +1230,21 @@ static void cj_parse_array(cj_parse_ctx *ctx, tinygltf_json *out) {
         else if (*ctx->cur == ']') { ++ctx->cur; break; }
         else { cj_ctx_error(ctx, "expected ',' or ']'"); break; }
     }
+    --ctx->depth;
 }
 
 static void cj_parse_object(cj_parse_ctx *ctx, tinygltf_json *out) {
     assert(*ctx->cur == '{');
+    if (ctx->depth >= CJ_MAX_DEPTH) {
+        cj_ctx_error(ctx, "nesting depth exceeded");
+        return;
+    }
     ++ctx->cur;
+    ++ctx->depth;
     out->make_object_();
 
     ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
-    if (ctx->cur < ctx->end && *ctx->cur == '}') { ++ctx->cur; return; }
+    if (ctx->cur < ctx->end && *ctx->cur == '}') { ++ctx->cur; --ctx->depth; return; }
 
     for (;;) {
         if (ctx->err || ctx->cur >= ctx->end) break;
@@ -1262,6 +1286,7 @@ static void cj_parse_object(cj_parse_ctx *ctx, tinygltf_json *out) {
         else if (*ctx->cur == '}') { ++ctx->cur; break; }
         else { cj_ctx_error(ctx, "expected ',' or '}'"); break; }
     }
+    --ctx->depth;
 }
 
 static void cj_parse_value(cj_parse_ctx *ctx, tinygltf_json *out) {
@@ -1501,9 +1526,10 @@ inline tinygltf_json tinygltf_json::parse(const char *first, const char *last,
                                            std::nullptr_t,
                                            bool allow_exceptions) {
     cj_parse_ctx ctx;
-    ctx.cur      = first;
-    ctx.end      = last;
-    ctx.err      = 0;
+    ctx.cur       = first;
+    ctx.end       = last;
+    ctx.err       = 0;
+    ctx.depth     = 0;
     ctx.errmsg[0] = '\0';
 
     tinygltf_json result;
@@ -1631,7 +1657,7 @@ inline bool JsonIsNull(const json &o) { return o.is_null(); }
 inline void JsonSetObject(json &o) { o = json::object(); }
 
 inline void JsonReserveArray(json &o, size_t /*s*/) {
-    o.make_array_();
+    o.set_array();
 }
 
 /* Stub allocator for RapidJSON-compatibility (not used by custom backend) */
