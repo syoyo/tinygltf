@@ -106,7 +106,6 @@ static const char *cj_skip_ws_scalar(const char *p, const char *end) {
 }
 
 #if defined(TINYGLTF_JSON_SIMD_AVX2)
-#include <immintrin.h>
 
 static const char *cj_skip_ws(const char *p, const char *end) {
     while (p + 32 <= end) {
@@ -133,7 +132,6 @@ static const char *cj_skip_ws(const char *p, const char *end) {
 }
 
 #elif defined(TINYGLTF_JSON_SIMD_SSE2)
-#include <emmintrin.h>
 
 static const char *cj_skip_ws(const char *p, const char *end) {
     while (p + 16 <= end) {
@@ -161,7 +159,6 @@ static const char *cj_skip_ws(const char *p, const char *end) {
 }
 
 #elif defined(TINYGLTF_JSON_SIMD_NEON)
-#include <arm_neon.h>
 
 static const char *cj_skip_ws(const char *p, const char *end) {
     while (p + 16 <= end) {
@@ -299,10 +296,20 @@ static const char *cj_scan_str(const char *p, const char *end) {
  * ====================================================================== */
 
 static const char *cj_parse_uint64(const char *p, const char *end,
-                                   uint64_t *result) {
+                                   uint64_t *result, int *overflow) {
     uint64_t v = 0;
+    *overflow = 0;
     while (p < end && (unsigned)(*p - '0') <= 9u) {
-        v = v * 10u + (uint64_t)((unsigned char)*p - '0');
+        unsigned char d = (unsigned char)*p - '0';
+        /* Detect multiplication/addition overflow */
+        if (v > (UINT64_MAX - d) / 10u) {
+            *overflow = 1;
+            /* Consume remaining digits so caller sees the full token */
+            while (p < end && (unsigned)(*p - '0') <= 9u) ++p;
+            *result = UINT64_MAX;
+            return p;
+        }
+        v = v * 10u + (uint64_t)d;
         ++p;
     }
     *result = v;
@@ -313,6 +320,11 @@ static const char *cj_parse_uint64(const char *p, const char *end,
  * Parse a JSON number starting at [p, end).
  * Sets *is_int, *ival (integer result), *dval (floating-point result).
  * Returns pointer past the last character consumed, or NULL on error.
+ *
+ * NOTE: strtod is locale-dependent on some platforms (decimal separator).
+ * JSON mandates '.' as decimal separator.  Callers in environments where the
+ * C locale may be overridden should ensure the locale is reset to "C" before
+ * parsing floating-point JSON values.
  */
 static const char *cj_parse_number(const char *p, const char *end,
                                    int *is_int, int64_t *ival, double *dval) {
@@ -323,11 +335,12 @@ static const char *cj_parse_number(const char *p, const char *end,
 
     uint64_t int_part = 0;
     int has_frac = 0, has_exp = 0;
+    int int_overflow = 0;
 
     if (*p == '0') {
         ++p;
     } else if ((unsigned)(*p - '1') <= 8u) {
-        p = cj_parse_uint64(p, end, &int_part);
+        p = cj_parse_uint64(p, end, &int_part, &int_overflow);
     } else {
         return NULL;
     }
@@ -335,7 +348,7 @@ static const char *cj_parse_number(const char *p, const char *end,
     if (p < end && *p == '.') has_frac = 1;
     if (p < end && (*p == 'e' || *p == 'E')) has_exp = 1;
 
-    if (!has_frac && !has_exp) {
+    if (!has_frac && !has_exp && !int_overflow) {
         int64_t sv = neg ? -(int64_t)int_part : (int64_t)int_part;
         *is_int = 1;
         *ival   = sv;
@@ -343,7 +356,7 @@ static const char *cj_parse_number(const char *p, const char *end,
         return p;
     }
 
-    /* Floating-point: use strtod for correctness */
+    /* Floating-point or integer overflow: use strtod for correctness */
     char *eptr = NULL;
     double d = strtod(start, &eptr);
     if (eptr == start) return NULL;
@@ -1204,9 +1217,22 @@ static void cj_parse_string_to(cj_parse_ctx *ctx, char **out_str,
                 if (*scan == '\\') {
                     ++scan;
                     if (scan >= ctx->end) { cj_ctx_error(ctx, "truncated escape"); *out_str = NULL; *out_len = 0; return; }
-                    if (*scan == 'u') scan += 5;
-                    else              ++scan;
+                    if (*scan == 'u') {
+                        /* \uXXXX requires exactly 4 hex digits after 'u' */
+                        if (scan + 5 > ctx->end) {
+                            cj_ctx_error(ctx, "truncated \\u escape");
+                            *out_str = NULL; *out_len = 0; return;
+                        }
+                        scan += 5;
+                    } else {
+                        ++scan;
+                    }
                 }
+            }
+            /* After the loop, scan must point to the closing '"' */
+            if (scan >= ctx->end) {
+                cj_ctx_error(ctx, "unterminated string");
+                *out_str = NULL; *out_len = 0; return;
             }
             if (ctx->err) { *out_str = NULL; *out_len = 0; return; }
             *out_str = cj_unescape_string(ctx->cur, scan, out_len);
@@ -1471,6 +1497,8 @@ static void cj_strbuf_free_data(cj_strbuf *sb) {
 }
 
 static int cj_strbuf_grow(cj_strbuf *sb, size_t extra) {
+    /* Guard against size_t overflow in needed = sb->len + extra */
+    if (extra > (size_t)-1 - sb->len) return 0;
     size_t needed = sb->len + extra;
     if (needed <= sb->cap) return 1;
     size_t new_cap = sb->cap * 2;
