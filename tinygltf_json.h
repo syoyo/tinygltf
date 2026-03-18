@@ -485,7 +485,9 @@ static char *cj_unescape_string(const char *p, const char *str_end,
                     return NULL;
             }
         } else if (c < 0x20u) {
-            ++p; /* skip invalid control char */
+            /* Invalid unescaped control character in JSON string: treat as error */
+            free(out);
+            return NULL;
         } else {
             /* Should not be reached since scan_str stops here only for
                special chars - but guard just in case */
