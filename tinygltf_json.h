@@ -1364,7 +1364,14 @@ static void cj_parse_json(cj_parse_ctx *ctx, tinygltf_json *root) {
         if (after_val) {
             after_val = 0;
 
-            if (depth == 0) break; /* root value complete */
+            if (depth == 0) {
+                /* Root value complete: ensure only trailing whitespace remains */
+                ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
+                if (ctx->cur != ctx->end) {
+                    cj_ctx_error(ctx, "trailing non-whitespace after JSON root value");
+                }
+                break;
+            }
 
             cj_frame *f = &stack[depth - 1];
             ctx->cur = cj_skip_ws(ctx->cur, ctx->end);
