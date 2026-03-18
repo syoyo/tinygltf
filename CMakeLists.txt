@@ -47,6 +47,15 @@ if (TINYGLTF_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
   )
   add_test(NAME tester COMMAND tester WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  # Build and run tests with the custom JSON backend enabled to catch regressions
+  add_executable(tester_customjson tests/tester.cc)
+  target_include_directories(tester_customjson PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  target_compile_definitions(tester_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
+  add_test(NAME tester_customjson COMMAND tester_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif (TINYGLTF_BUILD_TESTS)
 
 #
