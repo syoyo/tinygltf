@@ -854,10 +854,12 @@ inline void tinygltf_json::copy_from_(const tinygltf_json &o) {
                 arr_data_ = (tinygltf_json *)malloc(
                     o.arr_size_ * sizeof(tinygltf_json));
                 if (arr_data_) {
-                    arr_size_ = o.arr_size_;
+                    arr_size_ = 0;
                     arr_cap_  = o.arr_size_;
-                    for (size_t i = 0; i < arr_size_; ++i)
+                    for (size_t i = 0; i < o.arr_size_; ++i) {
                         new (&arr_data_[i]) tinygltf_json(o.arr_data_[i]);
+                        ++arr_size_;
+                    }
                 }
             }
         }
@@ -1052,13 +1054,18 @@ inline void tinygltf_json::push_back(const tinygltf_json &v) {
 }
 
 inline tinygltf_json &tinygltf_json::operator[](const char *key) {
+    /* Degraded-mode fallback for API misuse (null key) or OOM.
+     * Returns a reference to a shared static null object.  This is the same
+     * best-effort pattern used for the OOM path below.
+     * CAUTION: the static is shared across calls; modifications through this
+     * reference persist (same caveat as the OOM fallback).  Callers should
+     * treat a null-key or OOM insert as a no-op. */
+    static tinygltf_json null_fallback;
+    if (!key) return null_fallback;
     if (type_ != CJ_OBJECT) make_object_();
     tinygltf_json_member *m = find_member_(key);
     if (m) return m->val;
-    if (!obj_reserve_()) {
-        static tinygltf_json null_fallback;
-        return null_fallback;
-    }
+    if (!obj_reserve_()) return null_fallback;
     tinygltf_json_member *nm = &obj_data_[obj_size_];
     new (nm) tinygltf_json_member();
     size_t klen = strlen(key);
@@ -1607,11 +1614,18 @@ static int cj_serialize(cj_strbuf *sb, const tinygltf_json *v,
         case CJ_REAL: {
             char buf[64];
             double d = v->d_;
-            /* Round-trip safe formatting */
+            /* Non-finite values (NaN, Inf) cannot be represented in JSON.
+             * Detect by formatting first: nan/NaN starts with 'n'/'N'/'-n'/'-N',
+             * inf/Inf starts with 'i'/'I'/'-i'/'-I'. Output null for these. */
             snprintf(buf, sizeof(buf), "%.17g", d);
-            /* Ensure there's a decimal point for floats */
-            if (!strchr(buf, '.') && !strchr(buf, 'e') && !strchr(buf, 'E')
-                && !strchr(buf, 'n') && !strchr(buf, 'N')) {
+            {
+                const char *b = buf;
+                if (*b == '-') ++b;
+                if (*b == 'n' || *b == 'N' || *b == 'i' || *b == 'I')
+                    return cj_sb_appends(sb, "null");
+            }
+            /* Ensure there's a decimal point so the value round-trips as float */
+            if (!strchr(buf, '.') && !strchr(buf, 'e') && !strchr(buf, 'E')) {
                 size_t bl = strlen(buf);
                 if (bl + 2 < sizeof(buf)) {
                     buf[bl]   = '.';
