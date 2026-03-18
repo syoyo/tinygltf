@@ -41,6 +41,8 @@
 
 /* C++ headers (minimal) */
 #include <string>
+#include <cstddef>  /* for std::nullptr_t */
+#include <new>      /* for placement-new */
 /* Exception opt-in: define TINYGLTF_JSON_USE_EXCEPTIONS to enable throws.
  * TINYGLTF_JSON_NO_EXCEPTIONS is the internal guard derived from the absence
  * of TINYGLTF_JSON_USE_EXCEPTIONS; users should not define it directly. */
