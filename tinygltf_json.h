@@ -480,8 +480,9 @@ static char *cj_unescape_string(const char *p, const char *str_end,
                     break;
                 }
                 default:
-                    *dst++ = (char)esc;
-                    break;
+                    /* Unknown escape sequence is invalid in JSON */
+                    free(out);
+                    return NULL;
             }
         } else if (c < 0x20u) {
             ++p; /* skip invalid control char */
