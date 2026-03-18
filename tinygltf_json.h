@@ -959,7 +959,16 @@ inline tinygltf_json::tinygltf_json(std::nullptr_t) { init_null_(); }
 inline tinygltf_json::tinygltf_json(bool b)     { init_null_(); type_ = CJ_BOOL; b_ = b ? 1 : 0; }
 inline tinygltf_json::tinygltf_json(int i)      { init_null_(); type_ = CJ_INT;  i_ = (int64_t)i; }
 inline tinygltf_json::tinygltf_json(int64_t i)  { init_null_(); type_ = CJ_INT;  i_ = i; }
-inline tinygltf_json::tinygltf_json(uint64_t u) { init_null_(); type_ = CJ_INT;  i_ = (int64_t)u; }
+inline tinygltf_json::tinygltf_json(uint64_t u) {
+    init_null_();
+    if (u <= (uint64_t)INT64_MAX) {
+        type_ = CJ_INT;
+        i_    = (int64_t)u;
+    } else {
+        type_ = CJ_REAL;
+        d_    = (double)u;
+    }
+}
 inline tinygltf_json::tinygltf_json(double d)   { init_null_(); type_ = CJ_REAL; d_ = d; }
 inline tinygltf_json::tinygltf_json(float f)    { init_null_(); type_ = CJ_REAL; d_ = (double)f; }
 
