@@ -1195,6 +1195,23 @@ template<> inline std::string tinygltf_json::get<std::string>() const {
     return std::string();
 }
 
+/* Primary template for any T not explicitly specialised (e.g. size_t on
+ * platforms where it is a distinct type from all of the above, such as
+ * macOS 64-bit where uint64_t=unsigned long long but size_t=unsigned long).
+ * Falls back to a static_cast from the stored integer or floating-point value.
+ * For unsigned T: negative integer values produce 0 rather than wrapping. */
+template<typename T>
+inline T tinygltf_json::get() const {
+    if (type_ == CJ_INT) {
+        /* Guard unsigned types against sign-extension of negative values */
+        if ((T)(-1) > (T)(0) && i_ < 0) return (T)(0);
+        return static_cast<T>(i_);
+    }
+    if (type_ == CJ_REAL) return static_cast<T>(d_);
+    if (type_ == CJ_BOOL) return static_cast<T>(b_);
+    return T();
+}
+
 /* ======================================================================
  * PARSER (C-style iterative, explicit frame stack)
  *
@@ -1292,7 +1309,6 @@ static void cj_parse_string_to(cj_parse_ctx *ctx, char **out_str,
             *out_str = cj_unescape_string(ctx->cur, scan, out_len);
             if (!*out_str) { cj_ctx_error(ctx, "string unescape failed"); }
             ctx->cur = scan + 1;
-            *out_len = len;
             return;
         }
         /* Control char (< 0x20) - treat as parse error (invalid JSON) */
