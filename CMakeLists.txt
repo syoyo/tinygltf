@@ -20,10 +20,6 @@ option(TINYGLTF_INSTALL "Install tinygltf files during install step. Usually set
 option(TINYGLTF_INSTALL_VENDOR "Install vendored nlohmann/json and nothings/stb headers" ON)
 option(TINYGLTF_USE_CUSTOM_JSON "Use the built-in fast JSON parser (tinygltf_json.h) instead of nlohmann/json" OFF)
 
-if (TINYGLTF_USE_CUSTOM_JSON)
-  add_definitions(-DTINYGLTF_USE_CUSTOM_JSON)
-endif (TINYGLTF_USE_CUSTOM_JSON)
-
 if (TINYGLTF_BUILD_LOADER_EXAMPLE)
   add_executable(loader_example
     loader_example.cc
@@ -75,6 +71,14 @@ else (TINYGLTF_HEADER_ONLY)
           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
           )
 endif (TINYGLTF_HEADER_ONLY)
+
+if (TINYGLTF_USE_CUSTOM_JSON)
+  if (TINYGLTF_HEADER_ONLY)
+    target_compile_definitions(tinygltf INTERFACE TINYGLTF_USE_CUSTOM_JSON)
+  else ()
+    target_compile_definitions(tinygltf PUBLIC TINYGLTF_USE_CUSTOM_JSON)
+  endif ()
+endif ()
 
 if (TINYGLTF_INSTALL)
   install(TARGETS tinygltf EXPORT tinygltfTargets)
