@@ -692,6 +692,7 @@ struct tinygltf_json_member {
         if (o.key) {
             key = (char *)malloc(o.key_len + 1);
             if (key) memcpy(key, o.key, o.key_len + 1);
+            else key_len = 0; /* malloc failure: keep key==NULL, len==0 */
         }
     }
 
@@ -711,6 +712,7 @@ struct tinygltf_json_member {
             if (o.key) {
                 key = (char *)malloc(o.key_len + 1);
                 if (key) memcpy(key, o.key, o.key_len + 1);
+                else key_len = 0; /* malloc failure: keep key==NULL, len==0 */
             }
         }
         return *this;
@@ -846,6 +848,7 @@ inline void tinygltf_json::copy_from_(const tinygltf_json &o) {
             str_len_ = o.str_len_;
             str_ = (char *)malloc(str_len_ + 1);
             if (str_) memcpy(str_, o.str_, str_len_ + 1);
+            else str_len_ = 0; /* malloc failure: keep str_==NULL, len==0 */
         }
     } else if (o.type_ == CJ_ARRAY) {
         if (o.arr_size_ > 0) {
@@ -962,6 +965,7 @@ inline tinygltf_json::tinygltf_json(const char *s) {
         str_len_ = strlen(s);
         str_     = (char *)malloc(str_len_ + 1);
         if (str_) memcpy(str_, s, str_len_ + 1);
+        else str_len_ = 0; /* malloc failure: keep str_==NULL, len==0 */
     }
 }
 
@@ -971,6 +975,7 @@ inline tinygltf_json::tinygltf_json(const std::string &s) {
     str_len_ = s.size();
     str_     = (char *)malloc(str_len_ + 1);
     if (str_) memcpy(str_, s.c_str(), str_len_ + 1);
+    else str_len_ = 0; /* malloc failure: keep str_==NULL, len==0 */
 }
 
 inline tinygltf_json::tinygltf_json(const tinygltf_json &o) {
@@ -1635,9 +1640,14 @@ static int cj_serialize(cj_strbuf *sb, const tinygltf_json *v,
             }
             return cj_sb_appends(sb, buf);
         }
-        case CJ_STRING:
-            return cj_append_str_escaped(sb,
-                       v->str_ ? v->str_ : "", v->str_len_);
+        case CJ_STRING: {
+            /* Defensive: if str_ is NULL (OOM during construction), use length 0.
+             * The invariant str_==NULL→str_len_==0 is enforced at all construction
+             * sites, but guard here in case of future callers. */
+            const char *s = v->str_ ? v->str_ : "";
+            size_t      n = v->str_ ? v->str_len_ : 0u;
+            return cj_append_str_escaped(sb, s, n);
+        }
         case CJ_ARRAY: {
             if (!cj_sb_appendc(sb, '[')) return 0;
             for (size_t i = 0; i < v->arr_size_; ++i) {
@@ -1654,8 +1664,10 @@ static int cj_serialize(cj_strbuf *sb, const tinygltf_json *v,
             for (size_t i = 0; i < v->obj_size_; ++i) {
                 if (indent > 0 && !cj_indent_line(sb, indent, depth + 1)) return 0;
                 const tinygltf_json_member *m = &v->obj_data_[i];
-                const char *key = m->key ? m->key : "";
-                if (!cj_append_str_escaped(sb, key, m->key_len)) return 0;
+                /* Defensive: if key is NULL (OOM during insert), use length 0 */
+                const char *key    = m->key ? m->key : "";
+                size_t      keylen = m->key ? m->key_len : 0u;
+                if (!cj_append_str_escaped(sb, key, keylen)) return 0;
                 if (!cj_sb_appendc(sb, ':')) return 0;
                 if (indent > 0 && !cj_sb_appendc(sb, ' ')) return 0;
                 if (!cj_serialize(sb, &m->val, indent, depth + 1)) return 0;
