@@ -349,14 +349,31 @@ static const char *cj_parse_number(const char *p, const char *end,
     if (p < end && (*p == 'e' || *p == 'E')) has_exp = 1;
 
     if (!has_frac && !has_exp && !int_overflow) {
-        int64_t sv = neg ? -(int64_t)int_part : (int64_t)int_part;
-        *is_int = 1;
-        *ival   = sv;
-        *dval   = (double)sv;
-        return p;
+        /* Guard signed overflow: -(int64_t)x is UB when x > INT64_MAX.
+         * Positive: x must fit in [0, INT64_MAX].
+         * Negative: magnitude must fit in [0, 2^63] i.e. <= INT64_MAX+1
+         *           (the upper bound covers INT64_MIN = -2^63). */
+        int fits;
+        if (!neg) {
+            fits = (int_part <= (uint64_t)INT64_MAX);
+        } else {
+            fits = (int_part <= (uint64_t)INT64_MAX + 1u);
+        }
+        if (fits) {
+            int64_t sv;
+            if (neg && int_part == (uint64_t)INT64_MAX + 1u)
+                sv = INT64_MIN; /* special case: magnitude 2^63 → INT64_MIN */
+            else
+                sv = neg ? -(int64_t)int_part : (int64_t)int_part;
+            *is_int = 1;
+            *ival   = sv;
+            *dval   = (double)sv;
+            return p;
+        }
+        /* Magnitude doesn't fit int64_t: fall through to strtod */
     }
 
-    /* Floating-point or integer overflow: use strtod for correctness */
+    /* Floating-point, integer overflow, or out-of-int64-range: use strtod */
     char *eptr = NULL;
     double d = strtod(start, &eptr);
     if (eptr == start) return NULL;
@@ -832,25 +849,31 @@ inline void tinygltf_json::copy_from_(const tinygltf_json &o) {
         }
     } else if (o.type_ == CJ_ARRAY) {
         if (o.arr_size_ > 0) {
-            arr_data_ = (tinygltf_json *)malloc(
-                o.arr_size_ * sizeof(tinygltf_json));
-            if (arr_data_) {
-                arr_size_ = o.arr_size_;
-                arr_cap_  = o.arr_size_;
-                for (size_t i = 0; i < arr_size_; ++i)
-                    new (&arr_data_[i]) tinygltf_json(o.arr_data_[i]);
+            /* Guard against multiplication overflow */
+            if (o.arr_size_ <= SIZE_MAX / sizeof(tinygltf_json)) {
+                arr_data_ = (tinygltf_json *)malloc(
+                    o.arr_size_ * sizeof(tinygltf_json));
+                if (arr_data_) {
+                    arr_size_ = o.arr_size_;
+                    arr_cap_  = o.arr_size_;
+                    for (size_t i = 0; i < arr_size_; ++i)
+                        new (&arr_data_[i]) tinygltf_json(o.arr_data_[i]);
+                }
             }
         }
     } else if (o.type_ == CJ_OBJECT) {
         if (o.obj_size_ > 0) {
-            obj_data_ = (tinygltf_json_member *)malloc(
-                o.obj_size_ * sizeof(tinygltf_json_member));
-            if (obj_data_) {
-                obj_size_ = 0;
-                obj_cap_  = o.obj_size_;
-                for (size_t i = 0; i < o.obj_size_; ++i) {
-                    new (&obj_data_[i]) tinygltf_json_member(o.obj_data_[i]);
-                    ++obj_size_;
+            /* Guard against multiplication overflow */
+            if (o.obj_size_ <= SIZE_MAX / sizeof(tinygltf_json_member)) {
+                obj_data_ = (tinygltf_json_member *)malloc(
+                    o.obj_size_ * sizeof(tinygltf_json_member));
+                if (obj_data_) {
+                    obj_size_ = 0;
+                    obj_cap_  = o.obj_size_;
+                    for (size_t i = 0; i < o.obj_size_; ++i) {
+                        new (&obj_data_[i]) tinygltf_json_member(o.obj_data_[i]);
+                        ++obj_size_;
+                    }
                 }
             }
         }
@@ -859,6 +882,7 @@ inline void tinygltf_json::copy_from_(const tinygltf_json &o) {
 
 inline tinygltf_json_member *tinygltf_json::find_member_(
     const char *key) const {
+    if (!key) return NULL;
     size_t klen = strlen(key);
     for (size_t i = 0; i < obj_size_; ++i) {
         /* Guard against NULL key (can occur if malloc failed during insert) */
@@ -1502,7 +1526,11 @@ static int cj_strbuf_grow(cj_strbuf *sb, size_t extra) {
     size_t needed = sb->len + extra;
     if (needed <= sb->cap) return 1;
     size_t new_cap = sb->cap * 2;
-    if (new_cap < needed) new_cap = needed + 256;
+    if (new_cap < needed) {
+        /* Guard against overflow in needed + 256 */
+        if (needed > SIZE_MAX - 256) return 0;
+        new_cap = needed + 256;
+    }
     char *nd = (char *)realloc(sb->data, new_cap);
     if (!nd) return 0;
     sb->data = nd;
@@ -1540,7 +1568,7 @@ static int cj_append_str_escaped(cj_strbuf *sb, const char *s, size_t len) {
             default:
                 if (c < 0x20u) {
                     char buf[8];
-                    snprintf(buf, sizeof(buf), "\\u%04X", c);
+                    snprintf(buf, sizeof(buf), "\\u%04x", (unsigned int)c);
                     if (!cj_sb_appends(sb, buf)) return 0;
                 } else {
                     if (!cj_sb_appendc(sb, (char)c)) return 0;
@@ -1561,6 +1589,11 @@ static int cj_indent_line(cj_strbuf *sb, int indent, int depth) {
 
 static int cj_serialize(cj_strbuf *sb, const tinygltf_json *v,
                         int indent, int depth) {
+    /* Prevent C stack overflow on deeply nested JSON.
+     * Parser caps nesting at CJ_MAX_ITER; serializer uses the same limit. */
+    if (depth >= CJ_MAX_ITER) {
+        return cj_sb_appends(sb, "null");
+    }
     switch (v->type_) {
         case CJ_NULL:
             return cj_sb_appends(sb, "null");
