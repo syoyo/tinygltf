@@ -1280,10 +1280,13 @@ static void cj_parse_string_to(cj_parse_ctx *ctx, char **out_str,
             *out_str = cj_unescape_string(ctx->cur, scan, out_len);
             if (!*out_str) { cj_ctx_error(ctx, "string unescape failed"); }
             ctx->cur = scan + 1;
+            *out_len = len;
             return;
         }
-        /* Control char (< 0x20) - skip */
-        ++p;
+        /* Control char (< 0x20) - treat as parse error (invalid JSON) */
+        cj_ctx_error(ctx, "invalid control character in string");
+        *out_str = NULL; *out_len = 0;
+        return;
     }
     cj_ctx_error(ctx, "unterminated string");
     *out_str = NULL; *out_len = 0;
