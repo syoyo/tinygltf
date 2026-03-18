@@ -1077,10 +1077,14 @@ inline tinygltf_json &tinygltf_json::operator[](const char *key) {
     new (nm) tinygltf_json_member();
     size_t klen = strlen(key);
     nm->key = (char *)malloc(klen + 1);
-    if (nm->key) {
-        memcpy(nm->key, key, klen + 1);
-        nm->key_len = klen;
+    if (!nm->key) {
+        /* Roll back insertion on key allocation failure: do not bump
+         * obj_size_, and return the shared null fallback, keeping the
+         * object in a consistent state. */
+        return null_fallback;
     }
+    memcpy(nm->key, key, klen + 1);
+    nm->key_len = klen;
     ++obj_size_;
     return nm->val;
 }
