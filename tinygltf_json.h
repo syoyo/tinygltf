@@ -440,7 +440,16 @@ static char *cj_unescape_string(const char *p, const char *str_end,
     char *dst = out;
 
     while (p < str_end) {
+        /* Track start of literal run so we can copy it before processing
+         * the special character that ends it. */
+        const char *run = p;
         p = cj_scan_str(p, str_end);
+        /* Copy non-special (literal) bytes from run to p */
+        if (p > run) {
+            size_t n = (size_t)(p - run);
+            memcpy(dst, run, n);
+            dst += n;
+        }
         if (p >= str_end) break;
 
         unsigned char c = (unsigned char)*p;
@@ -1090,9 +1099,10 @@ inline tinygltf_json &tinygltf_json::operator[](const char *key) {
     size_t klen = strlen(key);
     nm->key = (char *)malloc(klen + 1);
     if (!nm->key) {
-        /* Roll back insertion on key allocation failure: do not bump
-         * obj_size_, and return the shared null fallback, keeping the
+        /* Roll back insertion on key allocation failure: destroy the
+         * placement-new'd member and do not bump obj_size_, keeping the
          * object in a consistent state. */
+        nm->~tinygltf_json_member();
         return null_fallback;
     }
     memcpy(nm->key, key, klen + 1);
@@ -1298,6 +1308,10 @@ static void cj_parse_string_to(cj_parse_ctx *ctx, char **out_str,
                     } else {
                         ++scan;
                     }
+                } else {
+                    /* cj_scan_str stopped at a control char (<0x20): invalid JSON */
+                    cj_ctx_error(ctx, "invalid control character in string");
+                    *out_str = NULL; *out_len = 0; return;
                 }
             }
             /* After the loop, scan must point to the closing '"' */
