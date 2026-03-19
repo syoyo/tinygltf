@@ -61,7 +61,10 @@ static void fuzz_binary(const uint8_t *data, size_t size) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (size == 0) return 0;
 
-  /* Use the first byte to select the parse path, pass the rest as input. */
+  /* Use the lowest bit of the first byte to select the parse path.
+   * The remaining bits are left for the fuzzer engine to explore;
+   * additional paths (e.g. LoadASCIIFromFile, check_sections flags)
+   * can be added here in the future using more selector bits. */
   uint8_t selector = data[0];
   const uint8_t *payload = data + 1;
   size_t payload_size = size - 1;

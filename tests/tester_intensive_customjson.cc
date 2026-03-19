@@ -401,9 +401,16 @@ TEST_CASE("cj-malformed-incomplete-null", "[customjson][malformed]") {
 }
 
 TEST_CASE("cj-malformed-extra-data", "[customjson][malformed]") {
-  // Valid JSON followed by extra data
+  // Valid JSON followed by extra non-whitespace data
   auto doc = JsonConstruct("42 extra");
   REQUIRE(doc.is_null());
+}
+
+TEST_CASE("cj-trailing-whitespace-ok", "[customjson][parse]") {
+  // Valid JSON followed by whitespace only should be accepted
+  auto doc = JsonConstruct("42   \t\n ");
+  REQUIRE(doc.is_number());
+  REQUIRE(doc.get<int>() == 42);
 }
 
 TEST_CASE("cj-malformed-just-brace", "[customjson][malformed]") {
