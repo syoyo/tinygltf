@@ -18,6 +18,7 @@ option(TINYGLTF_BUILD_TESTS "Build unit tests" OFF)
 option(TINYGLTF_HEADER_ONLY "On: header-only mode. Off: create tinygltf library(No TINYGLTF_IMPLEMENTATION required in your project)" OFF)
 option(TINYGLTF_INSTALL "Install tinygltf files during install step. Usually set to OFF if you include tinygltf through add_subdirectory()" ON)
 option(TINYGLTF_INSTALL_VENDOR "Install vendored nlohmann/json and nothings/stb headers" ON)
+option(TINYGLTF_USE_CUSTOM_JSON "Use the built-in fast JSON parser (tinygltf_json.h) instead of nlohmann/json" OFF)
 
 if (TINYGLTF_BUILD_LOADER_EXAMPLE)
   add_executable(loader_example
@@ -46,6 +47,15 @@ if (TINYGLTF_BUILD_TESTS)
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
   )
   add_test(NAME tester COMMAND tester WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  # Build and run tests with the custom JSON backend enabled to catch regressions
+  add_executable(tester_customjson tests/tester.cc)
+  target_include_directories(tester_customjson PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  target_compile_definitions(tester_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
+  add_test(NAME tester_customjson COMMAND tester_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif (TINYGLTF_BUILD_TESTS)
 
 #
@@ -71,6 +81,14 @@ else (TINYGLTF_HEADER_ONLY)
           )
 endif (TINYGLTF_HEADER_ONLY)
 
+if (TINYGLTF_USE_CUSTOM_JSON)
+  if (TINYGLTF_HEADER_ONLY)
+    target_compile_definitions(tinygltf INTERFACE TINYGLTF_USE_CUSTOM_JSON)
+  else ()
+    target_compile_definitions(tinygltf PUBLIC TINYGLTF_USE_CUSTOM_JSON)
+  endif ()
+endif ()
+
 if (TINYGLTF_INSTALL)
   install(TARGETS tinygltf EXPORT tinygltfTargets)
   install(EXPORT tinygltfTargets NAMESPACE tinygltf:: FILE TinyGLTFTargets.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tinygltf)
@@ -80,6 +98,7 @@ if (TINYGLTF_INSTALL)
 
   INSTALL ( FILES
     tiny_gltf.h
+    tinygltf_json.h
     ${TINYGLTF_EXTRA_SOUECES}
     DESTINATION
     include
