@@ -1,4 +1,5 @@
 # CMake
+build/
 CMakeCache.txt
 CMakeFiles
 CMakeScripts
@@ -68,6 +69,7 @@ imgui.ini
 loader_example
 tests/tester
 tests/tester_noexcept
+tests/tester_intensive_customjson
 tests/issue-97.gltf
 tests/issue-261.gltf
 tests/issue-495-external.gltf

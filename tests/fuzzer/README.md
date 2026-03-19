@@ -7,6 +7,11 @@ Do fuzzing test for TinyGLTF API.
 * [x] LoadASCIIFromMemory
 * [ ] LoadBinaryFromMemory
 
+### Custom JSON backend (`tinygltf_json.h`)
+
+* [x] LoadASCIIFromMemory
+* [x] LoadBinaryFromMemory
+
 ## Requirements
 
 * meson
@@ -36,11 +41,17 @@ $ cd build
 $ ninja
 ```
 
+This builds two fuzzers:
+
+* `fuzz_gltf` – default nlohmann/json backend
+* `fuzz_gltf_customjson` – custom `tinygltf_json.h` backend (tests both ASCII and binary parsing paths)
+
 ## How to run
 
 Increase memory limit. e.g. `-rss_limit_mb=50000`
 
 ```
 $ ./fuzz_gltf -rss_limit_mb=20000 -jobs 4
+$ ./fuzz_gltf_customjson -rss_limit_mb=20000 -jobs 4
 ```
 
