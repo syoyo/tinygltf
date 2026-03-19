@@ -73,6 +73,19 @@ tests/tester
 tests/tester_noexcept
 tests/issue-97.gltf
 tests/issue-261.gltf
+tests/issue-495-external.gltf
+# Test-generated output files (written by tester.cc during test run)
+tests/Cube.gltf
+tests/Cube.bin
+tests/Cube.glb
+tests/Cube_BaseColor.png
+tests/Cube_MetallicRoughness.png
+tests/Cube_with_embedded_images.gltf
+tests/Cube_with_image_files.gltf
+tests/tmp.glb
+tests/ issue-236.gltf
+tests/ issue-236.bin
+tests/ 2x2 image  has multiple      spaces.png
 
 # unignore
 !Makefile
