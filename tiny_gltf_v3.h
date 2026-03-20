@@ -911,6 +911,10 @@ typedef struct tg3_parse_options {
     int32_t  images_as_is;              /* 1 = don't decode images */
     int32_t  preserve_image_channels;   /* 1 = keep original channels */
     int32_t  store_original_json;       /* 1 = store raw JSON strings */
+    int32_t  parse_float32;            /* 1 = parse JSON floats as float32 for speed
+                                        *     (breaks strict double-precision conformance
+                                        *      but sufficient for glTF data which is
+                                        *      typically single-precision anyway) */
     uint64_t max_external_file_size;    /* 0 = no limit */
 } tg3_parse_options;
 
@@ -3294,9 +3298,12 @@ TINYGLTF3_API tg3_error_code tg3_parse(
     model->arena_ = arena;
 
     /* Parse JSON */
-    tg3__json json_doc = tg3__json::parse(
-        (const char *)json_data, (const char *)json_data + json_size,
-        nullptr, false);
+    tg3__json json_doc = options->parse_float32
+        ? tg3__json::parse_float32(
+              (const char *)json_data, (const char *)json_data + json_size)
+        : tg3__json::parse(
+              (const char *)json_data, (const char *)json_data + json_size,
+              nullptr, false);
 
     if (json_doc.is_null()) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE,
@@ -3360,9 +3367,12 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(
     model->arena_ = arena;
 
     /* Parse JSON chunk */
-    tg3__json json_doc = tg3__json::parse(
-        (const char *)json_chunk, (const char *)json_chunk + json_chunk_size,
-        nullptr, false);
+    tg3__json json_doc = options->parse_float32
+        ? tg3__json::parse_float32(
+              (const char *)json_chunk, (const char *)json_chunk + json_chunk_size)
+        : tg3__json::parse(
+              (const char *)json_chunk, (const char *)json_chunk + json_chunk_size,
+              nullptr, false);
 
     if (json_doc.is_null() || !json_doc.is_object()) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE,
