@@ -1750,7 +1750,25 @@ static int tg3__parse_int(tg3__parse_ctx *ctx, const tg3__json &o,
                          "Field '%s' must be a number", key);
         return 0;
     }
-    *out = it->get<int>();
+    if (it->is_number_integer()) {
+        int64_t v = it->get<int64_t>();
+        if (v < (int64_t)INT32_MIN || v > (int64_t)INT32_MAX) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_JSON_TYPE_MISMATCH, parent,
+                             "Field '%s' value %" PRId64 " is out of range for int32", key, v);
+            return 0;
+        }
+        *out = (int32_t)v;
+    } else {
+        double d = it->get<double>();
+        if (d < (double)INT32_MIN || d > (double)INT32_MAX) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_JSON_TYPE_MISMATCH, parent,
+                             "Field '%s' value %f is out of range for int32", key, d);
+            return 0;
+        }
+        *out = (int32_t)d;
+    }
     return 1;
 }
 
