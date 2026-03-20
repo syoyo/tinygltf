@@ -297,8 +297,9 @@ static const char *cj_scan_str(const char *p, const char *end) {
  * FAST NUMBER PARSING (C-style)
  *
  * Uses Clinger's fast path for float conversion, avoiding strtod() for the
- * vast majority of JSON numbers.  This is locale-independent and typically
- * 4-10x faster than strtod.
+ * vast majority of JSON numbers.  The fast path itself is locale-independent
+ * and typically 4-10x faster than strtod; however, rare fallback paths may
+ * still invoke the C library's strtod(), which can be locale-dependent.
  *
  * Optional float32 mode (CJ_FLOAT32_MODE flag in cj_parse_number):
  *   Parses floating-point values to float (single) precision and stores
