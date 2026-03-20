@@ -2315,17 +2315,22 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3__json &o,
     /* Load buffer data */
     if (ctx->is_binary && buf_idx == 0 && buf->uri.len == 0) {
         /* GLB: first buffer uses binary chunk */
-        if (ctx->bin_data && ctx->bin_size >= byte_length) {
-            uint8_t *data = (uint8_t *)tg3__arena_alloc(ctx->arena, (size_t)byte_length);
-            if (!data) {
-                tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR,
-                                TG3_ERR_OUT_OF_MEMORY, "OOM for buffer data", NULL, -1);
-                return 0;
-            }
-            memcpy(data, ctx->bin_data, (size_t)byte_length);
-            buf->data.data = data;
-            buf->data.count = byte_length;
+        if (!ctx->bin_data || ctx->bin_size < byte_length) {
+            tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR,
+                            TG3_ERR_BUFFER_SIZE_MISMATCH,
+                            "GLB BIN chunk missing or smaller than buffer.byteLength",
+                            NULL, -1);
+            return 0;
         }
+        uint8_t *data = (uint8_t *)tg3__arena_alloc(ctx->arena, (size_t)byte_length);
+        if (!data) {
+            tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR,
+                            TG3_ERR_OUT_OF_MEMORY, "OOM for buffer data", NULL, -1);
+            return 0;
+        }
+        memcpy(data, ctx->bin_data, (size_t)byte_length);
+        buf->data.data = data;
+        buf->data.count = byte_length;
     } else if (buf->uri.len > 0) {
         if (tg3_is_data_uri(buf->uri.data, buf->uri.len)) {
             /* Data URI */
