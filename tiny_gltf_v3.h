@@ -47,7 +47,7 @@
  * Section 2: Configuration Macros
  * ====================================================================== */
 
-/* Build mode: define in ONE .c/.cpp translation unit */
+/* Build mode: define in ONE C++ translation unit (.cpp) */
 /* #define TINYGLTF3_IMPLEMENTATION */
 
 /* Opt-in features (OFF by default) */
@@ -1221,17 +1221,19 @@ ParseGenerator tg3_parse_coro(
 
 #ifdef TINYGLTF3_IMPLEMENTATION
 
+#if !defined(__cplusplus)
+#error "TINYGLTF3_IMPLEMENTATION requires a C++ translation unit (compile as .cpp)"
+#endif
+
 /* Include JSON parser */
 #include "tinygltf_json.h"
 
 #include <stdio.h>
 #include <math.h>
 
-#ifdef __cplusplus
 /* Implementation uses C++ features from tinygltf_json.h */
 #include <string>
 #include <algorithm>
-#endif
 
 /* Forward SIMD macros to tinygltf_json.h */
 #ifdef TINYGLTF3_JSON_SIMD_SSE2
