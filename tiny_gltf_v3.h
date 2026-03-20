@@ -1358,10 +1358,13 @@ static void *tg3__arena_alloc(tg3_arena *arena, size_t size) {
 }
 
 static char *tg3__arena_strdup(tg3_arena *arena, const char *s, size_t len) {
-    if (!s || len == 0) return NULL;
+    if (!s) return NULL;
+    /* Allocate len+1 bytes; when len==0 this produces a 1-byte "\0" buffer so
+     * that empty strings (data!=NULL, len==0) remain distinguishable from
+     * absent strings (data==NULL, len==0). */
     char *dst = (char *)tg3__arena_alloc(arena, len + 1);
     if (!dst) return NULL;
-    memcpy(dst, s, len);
+    if (len > 0) memcpy(dst, s, len);
     dst[len] = '\0';
     return dst;
 }
