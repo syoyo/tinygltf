@@ -1249,3 +1249,37 @@ TEST_CASE("empty-images-not-written", "[issue-495]") {
   // WriteImageData should be invoked for both images
   CHECK(counter == 2);
 }
+
+#ifdef TINYGLTF_USE_CUSTOM_JSON
+/* Regression test: in float32_mode, integer-only tokens with more than 9
+ * digits must still be parsed as integers (is_int == 1), not floats.
+ * Previously, max_sig=9 was applied to the integer part too, causing excess
+ * digits to bump exp10, which broke the exp10==0 guard in the integer
+ * fast-path and mis-classified the value as a float. */
+TEST_CASE("cj-float32-long-integer", "[customjson]") {
+    // Values chosen to cover exactly-at, just-over, and near int64 boundaries.
+    struct {
+        const char *text;
+        int64_t     expected;
+    } cases[] = {
+        { "1234567890",           1234567890LL        }, /* 10 digits */
+        { "12345678901",          12345678901LL       }, /* 11 digits */
+        { "1000000000000",        1000000000000LL     }, /* 13 digits */
+        { "9223372036854775807",  INT64_MAX           }, /* max int64 (19 digits) */
+        { "-1234567890",         -1234567890LL        }, /* negative 10 digits */
+        { "-9223372036854775808", INT64_MIN           }, /* min int64 */
+    };
+
+    for (auto &tc : cases) {
+        int      is_int = 0;
+        int64_t  ival   = 0;
+        double   dval   = 0.0;
+        const char *end = tc.text + strlen(tc.text);
+        const char *ret = cj_parse_number(tc.text, end, &is_int, &ival, &dval, /*float32_mode=*/1);
+        CAPTURE(tc.text);
+        REQUIRE(ret != nullptr);
+        CHECK(is_int == 1);
+        CHECK(ival == tc.expected);
+    }
+}
+#endif /* TINYGLTF_USE_CUSTOM_JSON */

@@ -422,9 +422,11 @@ static int cj_fast_flt_convert(uint64_t mantissa, int exp10, int neg, float *out
  * Returns pointer past the last character consumed, or NULL on error.
  *
  * float32_mode: when non-zero, floating-point values are parsed at float
- * (single) precision — fewer digits are significant, and the result is
- * stored as (double)(float)value.  This is faster but not JSON-conformant
- * for high-precision doubles.
+ * (single) precision — only 9 significant digits are tracked for the
+ * fraction part, and the result is stored as (double)(float)value.  This
+ * is faster but not JSON-conformant for high-precision doubles.  Integer-
+ * only tokens (no '.'/'e') are always parsed at full int64 precision
+ * regardless of this flag.
  *
  * Uses Clinger's fast path (no strtod) for ~99% of JSON float values.
  * Falls back to strtod only for extreme exponents or >19 significant digits. */
@@ -444,8 +446,12 @@ static const char *cj_parse_number(const char *p, const char *end,
     int mantissa_overflow = 0; /* set if >19 significant digits */
     int has_frac = 0, has_exp = 0;
 
-    /* Max significant digits we track: 19 for double, 9 for float32 */
-    int max_sig = float32_mode ? 9 : 19;
+    /* Max significant digits we track:
+     *   Integer part: always 19, so integer-only tokens (no '.'/'e') are always
+     *     accumulated fully and can be typed as int64 regardless of float32_mode.
+     *   Fraction part: 9 in float32_mode (single precision), 19 otherwise. */
+    int max_sig_int  = 19;
+    int max_sig_frac = float32_mode ? 9 : 19;
 
     /* Integer part */
     if (*p == '0') {
@@ -453,7 +459,7 @@ static const char *cj_parse_number(const char *p, const char *end,
     } else if ((unsigned)(*p - '1') <= 8u) {
         while (p < end && (unsigned)(*p - '0') <= 9u) {
             unsigned d = (unsigned)(*p - '0');
-            if (ndigits < max_sig) {
+            if (ndigits < max_sig_int) {
                 mantissa = mantissa * 10 + d;
             } else {
                 exp10++; /* excess digit: bump exponent instead */
@@ -474,7 +480,7 @@ static const char *cj_parse_number(const char *p, const char *end,
         if (p >= end || (unsigned)(*p - '0') > 9u) return NULL;
         while (p < end && (unsigned)(*p - '0') <= 9u) {
             unsigned d = (unsigned)(*p - '0');
-            if (ndigits < max_sig) {
+            if (ndigits < max_sig_frac) {
                 mantissa = mantissa * 10 + d;
                 exp10--;
             }
