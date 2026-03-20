@@ -2944,6 +2944,12 @@ static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3__json &o,
                 if (_items) { \
                     uint32_t _i = 0; \
                     for (auto _it = _arr_it->begin(); _it != _arr_it->end(); ++_it, ++_i) { \
+                        if (!_it->is_object()) { \
+                            tg3__error_pushf((ctx)->errors, (ctx)->arena, \
+                                TG3_SEVERITY_ERROR, TG3_ERR_JSON_TYPE_MISMATCH, \
+                                json_key, "Element %u must be an object", _i); \
+                            continue; \
+                        } \
                         parse_fn((ctx), *_it, &_items[_i], (int32_t)_i); \
                     } \
                     (model_field) = _items; \
@@ -2965,6 +2971,12 @@ static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3__json &o,
                 if (_items) { \
                     uint32_t _i = 0; \
                     for (auto _it = _arr_it->begin(); _it != _arr_it->end(); ++_it, ++_i) { \
+                        if (!_it->is_object()) { \
+                            tg3__error_pushf((ctx)->errors, (ctx)->arena, \
+                                TG3_SEVERITY_ERROR, TG3_ERR_JSON_TYPE_MISMATCH, \
+                                json_key, "Element %u must be an object", _i); \
+                            continue; \
+                        } \
                         parse_fn((ctx), *_it, &_items[_i]); \
                     } \
                     (model_field) = _items; \

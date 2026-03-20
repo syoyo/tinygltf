@@ -307,6 +307,14 @@ static const char *cj_scan_str(const char *p, const char *end) {
  *   Breaks strict JSON/IEEE-754-double conformance.
  * ====================================================================== */
 
+/* Safe double-to-int64 cast: clamp inf/NaN/out-of-range to 0. */
+static int64_t cj_dbl_to_i64(double d) {
+    if (d != d) return 0;                             /* NaN */
+    if (d >= (double)INT64_MAX)  return INT64_MAX;
+    if (d <= (double)INT64_MIN)  return INT64_MIN;
+    return (int64_t)d;
+}
+
 /* Exact powers of 10 that are representable as IEEE 754 double.
  * 10^0 through 10^22 are all exactly representable. */
 static const double cj_exact_pow10[23] = {
@@ -526,7 +534,7 @@ static const char *cj_parse_number(const char *p, const char *end,
             if (cj_fast_flt_convert(mantissa, exp10, neg, &f)) {
                 *is_int = 0;
                 *dval   = (double)f;
-                *ival   = (int64_t)f;
+                *ival   = cj_dbl_to_i64((double)f);
                 return p;
             }
         } else {
@@ -534,7 +542,7 @@ static const char *cj_parse_number(const char *p, const char *end,
             if (cj_fast_dbl_convert(mantissa, exp10, neg, &d)) {
                 *is_int = 0;
                 *dval   = d;
-                *ival   = (int64_t)d;
+                *ival   = cj_dbl_to_i64(d);
                 return p;
             }
         }
@@ -547,7 +555,7 @@ static const char *cj_parse_number(const char *p, const char *end,
     if (float32_mode) d = (double)(float)d;
     *is_int = 0;
     *dval   = d;
-    *ival   = (int64_t)d;
+    *ival   = cj_dbl_to_i64(d);
     return eptr;
 }
 
