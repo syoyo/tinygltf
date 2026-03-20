@@ -2932,6 +2932,22 @@ static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3__json &o,
 }
 
 /* ======================================================================
+ * Internal: Portable variadic-comma helper
+ *
+ * TG3__COMMA_VA_ARGS(__VA_ARGS__) expands to  , __VA_ARGS__  when the
+ * argument list is non-empty, and to nothing when it is empty.
+ *
+ * - C++20 and later: uses the standard __VA_OPT__(,) token.
+ * - C++17 and earlier: falls back to the widely-supported GNU/MSVC
+ *   ##__VA_ARGS__ extension.
+ * ====================================================================== */
+#if __cplusplus >= 202002L
+#  define TG3__COMMA_VA_ARGS(...) __VA_OPT__(,) __VA_ARGS__
+#else
+#  define TG3__COMMA_VA_ARGS(...) , ##__VA_ARGS__
+#endif
+
+/* ======================================================================
  * Internal: Array Parse Macro
  * ====================================================================== */
 
@@ -2946,7 +2962,7 @@ static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3__json &o,
                 if (_items) { \
                     uint32_t _i = 0; \
                     for (auto _it = _arr_it->begin(); _it != _arr_it->end(); ++_it, ++_i) { \
-                        parse_fn((ctx), *_it, &_items[_i], ##__VA_ARGS__); \
+                        parse_fn((ctx), *_it, &_items[_i] TG3__COMMA_VA_ARGS(__VA_ARGS__)); \
                     } \
                     (model_field) = _items; \
                     (count_field) = _count; \
@@ -4117,7 +4133,7 @@ static tg3__json tg3__serialize_model(const tg3_model *model, int wd,
         if ((arr) && (cnt) > 0) { \
             tg3__json jarr; jarr.set_array(); \
             for (uint32_t _i = 0; _i < (cnt); ++_i) { \
-                jarr.push_back(fn(&(arr)[_i], ##__VA_ARGS__)); \
+                jarr.push_back(fn(&(arr)[_i] TG3__COMMA_VA_ARGS(__VA_ARGS__))); \
             } \
             root[key] = static_cast<tg3__json&&>(jarr); \
         }
@@ -4358,7 +4374,7 @@ TINYGLTF3_API tg3_error_code tg3_writer_begin(tg3_writer *w, const tg3_asset *as
             w->root[json_key] = static_cast<tg3__json&&>(arr); \
         } \
         w->root[json_key].push_back( \
-            serialize_fn(item, w->options.serialize_defaults, ##__VA_ARGS__)); \
+            serialize_fn(item, w->options.serialize_defaults TG3__COMMA_VA_ARGS(__VA_ARGS__))); \
         return TG3_OK; \
     }
 
