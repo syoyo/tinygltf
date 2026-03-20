@@ -4350,7 +4350,7 @@ struct tg3_writer {
 TINYGLTF3_API tg3_writer *tg3_writer_create(
     tg3_write_chunk_fn chunk_fn, void *user_data,
     const tg3_write_options *options) {
-    tg3_writer *w = (tg3_writer *)calloc(1, sizeof(tg3_writer));
+    tg3_writer *w = new (std::nothrow) tg3_writer();
     if (!w) return NULL;
     w->chunk_fn = chunk_fn;
     w->user_data = user_data;
@@ -4426,10 +4426,7 @@ TINYGLTF3_API tg3_error_code tg3_writer_end(tg3_writer *w) {
 }
 
 TINYGLTF3_API void tg3_writer_destroy(tg3_writer *w) {
-    if (w) {
-        w->root.~tinygltf_json();
-        free(w);
-    }
+    delete w;
 }
 
 #endif /* TINYGLTF3_IMPLEMENTATION */
