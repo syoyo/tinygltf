@@ -56,6 +56,15 @@ if (TINYGLTF_BUILD_TESTS)
   )
   target_compile_definitions(tester_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
   add_test(NAME tester_customjson COMMAND tester_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  # Intensive parser tests for the custom JSON backend
+  add_executable(tester_intensive_customjson tests/tester_intensive_customjson.cc)
+  target_include_directories(tester_intensive_customjson PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  target_compile_definitions(tester_intensive_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
+  add_test(NAME tester_intensive_customjson COMMAND tester_intensive_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif (TINYGLTF_BUILD_TESTS)
 
 #
