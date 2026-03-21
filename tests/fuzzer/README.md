@@ -4,12 +4,12 @@ Do fuzzing test for TinyGLTF API.
 
 ## Supported API
 
-* [x] LoadASCIIFromMemory
+* [x] LoadASCIIFromString
 * [ ] LoadBinaryFromMemory
 
 ### Custom JSON backend (`tinygltf_json.h`)
 
-* [x] LoadASCIIFromMemory
+* [x] LoadASCIIFromString
 * [x] LoadBinaryFromMemory
 
 ## Requirements
