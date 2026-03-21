@@ -680,8 +680,11 @@ TEST_CASE("cj-roundtrip-material", "[customjson][roundtrip]") {
 /* ===== Section 6: Binary (GLB) loading ==================================== */
 
 TEST_CASE("cj-glb-invalid-magic", "[customjson][glb]") {
-  // GLB header: magic (4), version (4), length (4) = 12 bytes
-  // Wrong magic number
+  // GLB file header fields: magic (4), version (4), length (4) = 12 bytes.
+  // TinyGLTF::LoadBinaryFromMemory, however, requires at least 20 bytes
+  // (12-byte file header + 8-byte first chunk header) before checking magic/version.
+  // This buffer is only 12 bytes long (and uses a wrong magic), so the loader
+  // will reject it as an undersized/invalid GLB binary.
   unsigned char data[12] = {0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
                             0x00, 0x00, 0x0C, 0x00, 0x00, 0x00};
   tinygltf::Model model;
