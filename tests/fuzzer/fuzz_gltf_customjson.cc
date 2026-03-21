@@ -18,9 +18,6 @@
 
 #include <cstdint>
 #include <cstring>
-#include <memory>
-#include <vector>
-#include <iostream>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
