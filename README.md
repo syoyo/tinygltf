@@ -1,10 +1,6 @@
 # Header only C++ tiny glTF library(loader/saver).
 
-`TinyGLTF` is a header only C++11 glTF 2.0 https://github.com/KhronosGroup/glTF library.
-
-`TinyGLTF` uses Niels Lohmann's json library (https://github.com/nlohmann/json), so now it requires C++11 compiler.
-(Also, you can use RadpidJSON as an JSON backend)
-If you are looking for old, C++03 version, please use `devel-picojson` branch (but not maintained anymore).
+`TinyGLTF` is a header only C++ glTF 2.0 https://github.com/KhronosGroup/glTF library.
 
 ## TinyGLTF v3 (new major release)
 
@@ -21,7 +17,7 @@ v3 is a ground-up rewrite with a C-centric, low-overhead design:
 - **Streaming callbacks** — opt-in streaming parse/write via user-supplied callbacks.
 - **No RTTI, no exceptions required** — suitable for embedded and game-engine use.
 - **Opt-in filesystem and image I/O** — `TINYGLTF3_ENABLE_FS` / `TINYGLTF3_ENABLE_STB_IMAGE` are off by default; you control when and how assets are loaded.
-- **C++20 coroutine facade** (optional, auto-detected).
+- **C++20 coroutine facade** (optional, auto-detected). C17/C++17 default.
 
 ### Quick start (v3)
 
