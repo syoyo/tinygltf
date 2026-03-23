@@ -308,7 +308,8 @@ static const char *cj_scan_str(const char *p, const char *end) {
  *   Breaks strict JSON/IEEE-754-double conformance.
  * ====================================================================== */
 
-/* Safe double-to-int64 cast: clamp inf/NaN/out-of-range to 0. */
+/* Safe double-to-int64 cast: returns 0 for NaN; clamps +inf/out-of-range-high
+ * to INT64_MAX and -inf/out-of-range-low to INT64_MIN. */
 static int64_t cj_dbl_to_i64(double d) {
     if (d != d) return 0;                             /* NaN */
     if (d >= (double)INT64_MAX)  return INT64_MAX;
