@@ -6,9 +6,56 @@
 (Also, you can use RadpidJSON as an JSON backend)
 If you are looking for old, C++03 version, please use `devel-picojson` branch (but not maintained anymore).
 
+## TinyGLTF v3 (new major release)
+
+**`tiny_gltf_v3.h`** is the new major version of TinyGLTF and the recommended API for new projects.
+
+### What's new in v3
+
+v3 is a ground-up rewrite with a C-centric, low-overhead design:
+
+- **Pure C POD structs** — no STL containers in the public API; easy to bind to other languages.
+- **Arena-based memory management** — all parse-time allocations come from a single arena; a single `tg3_model_free()` frees everything.
+- **Structured error reporting** — `tg3_error_stack` provides machine-readable errors with severity levels and source locations.
+- **Custom JSON backend** — backed by `tinygltf_json.h`, a high-performance, locale-independent JSON parser with optional SIMD acceleration (SSE2 / AVX2 / NEON) and a float32 fast-path.
+- **Streaming callbacks** — opt-in streaming parse/write via user-supplied callbacks.
+- **No RTTI, no exceptions required** — suitable for embedded and game-engine use.
+- **Opt-in filesystem and image I/O** — `TINYGLTF3_ENABLE_FS` / `TINYGLTF3_ENABLE_STB_IMAGE` are off by default; you control when and how assets are loaded.
+- **C++20 coroutine facade** (optional, auto-detected).
+
+### Quick start (v3)
+
+Copy `tiny_gltf_v3.h` and `tinygltf_json.h` to your project. In **one** `.cpp` file:
+
+```cpp
+#define TINYGLTF3_IMPLEMENTATION
+#define TINYGLTF3_ENABLE_FS          // enable file I/O
+#define TINYGLTF3_ENABLE_STB_IMAGE   // enable image decoding
+#include "tiny_gltf_v3.h"
+```
+
+Loading a glTF file:
+
+```c
+tg3_load_options_t opts = tg3_load_options_default();
+tg3_error_stack_t errors = {0};
+tg3_model_t *model = tg3_load_from_file("scene.gltf", &opts, &errors);
+if (!model) {
+    for (int i = 0; i < errors.count; i++)
+        fprintf(stderr, "[%s] %s\n", tg3_severity_str(errors.items[i].severity),
+                errors.items[i].message);
+}
+// ... use model ...
+tg3_model_free(model);
+```
+
 ## Status
 
-Currently TinyGLTF is stable and maintenance mode. No drastic changes and feature additions planned.
+> ⚠️ **v2 deprecation notice:** `tiny_gltf.h` (v2) remains fully functional and is still supported,
+> but it is now in **maintenance mode only** — no new features will be added.
+> v2 will be **sunset after mid-2026**. New projects should use `tiny_gltf_v3.h`.
+
+Currently TinyGLTF v2 is stable and in maintenance mode. No drastic changes and feature additions planned.
  - v2.9.0 Various fixes and improvements. Filesystem callback API change.
  - v2.8.0 Add URICallbacks for custom URI handling in Buffer and Image. PR#397
  - v2.7.0 Change WriteImageDataFunction user callback function signature. PR#393

@@ -22,6 +22,9 @@ premake5.tar.gz
 *.vcxproj*
 .vs
 
+# default cmake build dir
+build/
+
 #binary directories
 bin/
 obj/
