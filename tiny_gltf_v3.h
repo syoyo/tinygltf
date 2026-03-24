@@ -2,8 +2,7 @@
  * tiny_gltf_v3.h - Header-only C glTF 2.0 loader and writer (v3)
  *
  * The MIT License (MIT)
- * Copyright (c) 2015 - Present Syoyo Fujita, Aurelien Chatelain and many
- * contributors.
+ * Copyright (c) 2026 - Present: Syoyo Fujita
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
