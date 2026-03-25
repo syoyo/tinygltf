@@ -231,6 +231,9 @@ typedef struct tg3_allocator {
     void  *user_data;
 } tg3_allocator;
 
+/* Forward declaration of arena type (defined in the implementation section) */
+struct tg3_arena;
+
 /* ======================================================================
  * Section 7: Error Reporting
  * ====================================================================== */
@@ -309,10 +312,11 @@ typedef struct tg3_error_entry {
 } tg3_error_entry;
 
 typedef struct tg3_error_stack {
-    tg3_error_entry *entries;
-    uint32_t         count;
-    uint32_t         capacity;
-    int32_t          has_error; /* 1 if any entry with severity == ERROR */
+    tg3_error_entry  *entries;
+    uint32_t          count;
+    uint32_t          capacity;
+    int32_t           has_error; /* 1 if any entry with severity == ERROR */
+    struct tg3_arena *msg_arena_; /* Internal: arena for dynamic validation message strings */
 } tg3_error_stack;
 
 /* Error stack query functions */
@@ -971,6 +975,19 @@ TINYGLTF3_API void tg3_error_stack_init(tg3_error_stack *es);
 TINYGLTF3_API void tg3_error_stack_free(tg3_error_stack *es);
 
 /* ======================================================================
+ * Section 13.5: Validation API
+ * ====================================================================== */
+
+/* Validate a parsed model against the glTF 2.0 specification.
+ * Errors and warnings are appended to 'errors'.
+ * Returns TG3_OK if no validation errors are found, or the first error
+ * code encountered otherwise.
+ * 'model' must not be NULL; 'errors' may be NULL (results discarded). */
+TINYGLTF3_API tg3_error_code tg3_validate(
+    const tg3_model    *model,
+    tg3_error_stack    *errors);
+
+/* ======================================================================
  * Section 14: Writer API
  * ====================================================================== */
 
@@ -1109,6 +1126,10 @@ inline tg3_error_code parse(Model &model, ErrorStack &errors,
     return tg3_parse_auto(model.get(), errors.get(), data, size,
                           base_dir, base_dir ? (uint32_t)strlen(base_dir) : 0,
                           options);
+}
+
+inline tg3_error_code validate(const Model &model, ErrorStack &errors) {
+    return tg3_validate(model.get(), errors.get());
 }
 
 } /* namespace tinygltf3 */
@@ -1469,6 +1490,9 @@ TINYGLTF3_API void tg3_error_stack_init(tg3_error_stack *es) {
 TINYGLTF3_API void tg3_error_stack_free(tg3_error_stack *es) {
     if (!es) return;
     free(es->entries);
+    if (es->msg_arena_) {
+        tg3__arena_destroy(es->msg_arena_);
+    }
     memset(es, 0, sizeof(tg3_error_stack));
 }
 
@@ -4429,6 +4453,691 @@ TINYGLTF3_API tg3_error_code tg3_writer_end(tg3_writer *w) {
 
 TINYGLTF3_API void tg3_writer_destroy(tg3_writer *w) {
     delete w;
+}
+
+/* ======================================================================
+ * Public: Validation API Implementation
+ * ====================================================================== */
+
+/* Internal helper: push a validation error/warning with arena-duped
+ * message and json_path strings so they outlive the validate function. */
+static void tg3__val_push(tg3_error_stack *es, tg3_arena *arena,
+                           tg3_severity sev, tg3_error_code code,
+                           const char *json_path_buf, const char *fmt, ...) {
+    if (!es) return;
+
+    char msg_buf[1024];
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(msg_buf, sizeof(msg_buf), fmt, ap);
+    va_end(ap);
+    if (n < 0) n = 0;
+    if ((size_t)n >= sizeof(msg_buf)) n = (int)(sizeof(msg_buf) - 1);
+
+    const char *msg  = msg_buf;
+    const char *path = json_path_buf;
+
+    if (arena) {
+        char *m = tg3__arena_strdup(arena, msg_buf, (size_t)n);
+        if (m) msg = m;
+        if (json_path_buf) {
+            char *p = tg3__arena_strdup(arena, json_path_buf, strlen(json_path_buf));
+            if (p) path = p;
+        }
+    }
+
+    tg3__error_push(es, sev, code, msg, path, -1);
+}
+
+/* Helper: validate a tg3_texture_info index. */
+static void tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
+                                      int32_t tex_idx, uint32_t textures_count,
+                                      uint32_t mat_idx, const char *field_name) {
+    if (tex_idx < 0) return; /* absent */
+    if ((uint32_t)tex_idx >= textures_count) {
+        char path[128];
+        snprintf(path, sizeof(path), "/materials/%u", mat_idx);
+        tg3__val_push(es, arena, TG3_SEVERITY_ERROR, TG3_ERR_INVALID_INDEX,
+                      path,
+                      "material[%u].%s texture index %d out of range [0, %u)",
+                      mat_idx, field_name, tex_idx, textures_count);
+    }
+}
+
+TINYGLTF3_API tg3_error_code tg3_validate(
+    const tg3_model *model,
+    tg3_error_stack *errors) {
+
+    if (!model) return TG3_ERR_INVALID_VALUE;
+
+    /* Set up arena for message and path strings */
+    tg3_arena *arena = NULL;
+    if (errors) {
+        if (!errors->msg_arena_) {
+            tg3_memory_config cfg;
+            memset(&cfg, 0, sizeof(cfg));
+            errors->msg_arena_ = tg3__arena_create(&cfg);
+        }
+        arena = errors->msg_arena_;
+    }
+
+    tg3_error_code first_err = TG3_OK;
+
+/* Push an error and record the first error code seen */
+#define TG3__VERR(code, path_buf, ...) \
+    do { \
+        tg3__val_push(errors, arena, TG3_SEVERITY_ERROR, (code), (path_buf), __VA_ARGS__); \
+        if (first_err == TG3_OK) first_err = (code); \
+    } while (0)
+
+/* Push a warning (does not set first_err) */
+#define TG3__VWARN(code, path_buf, ...) \
+    tg3__val_push(errors, arena, TG3_SEVERITY_WARNING, (code), (path_buf), __VA_ARGS__)
+
+    /* Temporary path buffer used in all per-entity loops.
+     * Content is always arena-duped inside tg3__val_push before returning. */
+    char path[256];
+    char ipath[512]; /* inner path for nested entities */
+
+    /* ------------------------------------------------------------------
+     * 1. Asset
+     * ------------------------------------------------------------------ */
+    if (!model->asset.version.data) {
+        TG3__VERR(TG3_ERR_MISSING_REQUIRED, "/asset",
+                  "asset.version is required");
+    } else if (!tg3_str_equals_cstr(model->asset.version, "2.0")) {
+        TG3__VWARN(TG3_ERR_INVALID_VALUE, "/asset/version",
+                   "asset.version is \"%.*s\", expected \"2.0\"",
+                   (int)model->asset.version.len, model->asset.version.data);
+    }
+
+    /* ------------------------------------------------------------------
+     * 2. Default scene index
+     * ------------------------------------------------------------------ */
+    if (model->default_scene >= 0 &&
+        (uint32_t)model->default_scene >= model->scenes_count) {
+        TG3__VERR(TG3_ERR_INVALID_INDEX, "/scene",
+                  "default scene index %d out of range [0, %u)",
+                  model->default_scene, model->scenes_count);
+    }
+
+    /* ------------------------------------------------------------------
+     * 3. Buffer views
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->buffer_views_count; i++) {
+        const tg3_buffer_view *bv = &model->buffer_views[i];
+        snprintf(path, sizeof(path), "/bufferViews/%u", i);
+
+        if (bv->buffer < 0 || (uint32_t)bv->buffer >= model->buffers_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "bufferView[%u].buffer index %d out of range [0, %u)",
+                      i, bv->buffer, model->buffers_count);
+        } else {
+            const tg3_buffer *buf = &model->buffers[(uint32_t)bv->buffer];
+            if (bv->byte_offset + bv->byte_length > buf->data.count) {
+                TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
+                          "bufferView[%u] byteOffset+byteLength (%llu) exceeds "
+                          "buffer[%d].byteLength (%llu)",
+                          i,
+                          (unsigned long long)(bv->byte_offset + bv->byte_length),
+                          bv->buffer,
+                          (unsigned long long)buf->data.count);
+            }
+        }
+
+        if (bv->byte_length == 0) {
+            TG3__VWARN(TG3_ERR_INVALID_BUFFER_VIEW, path,
+                       "bufferView[%u].byteLength is 0", i);
+        }
+
+        if (bv->byte_stride != 0) {
+            /* glTF 2.0 spec §3.6.2.4: byteStride must be in [4, 252] and
+             * a multiple of 4. */
+            if (bv->byte_stride < 4 || bv->byte_stride > 252) {
+                TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
+                          "bufferView[%u].byteStride %u must be in [4, 252]",
+                          i, bv->byte_stride);
+            } else if (bv->byte_stride % 4 != 0) {
+                TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
+                          "bufferView[%u].byteStride %u must be a multiple of 4",
+                          i, bv->byte_stride);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 4. Accessors
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->accessors_count; i++) {
+        const tg3_accessor *acc = &model->accessors[i];
+        snprintf(path, sizeof(path), "/accessors/%u", i);
+
+        /* Validate componentType */
+        int valid_ct = (acc->component_type == TG3_COMPONENT_TYPE_BYTE          ||
+                        acc->component_type == TG3_COMPONENT_TYPE_UNSIGNED_BYTE  ||
+                        acc->component_type == TG3_COMPONENT_TYPE_SHORT          ||
+                        acc->component_type == TG3_COMPONENT_TYPE_UNSIGNED_SHORT ||
+                        acc->component_type == TG3_COMPONENT_TYPE_UNSIGNED_INT   ||
+                        acc->component_type == TG3_COMPONENT_TYPE_FLOAT);
+        if (!valid_ct) {
+            TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                      "accessor[%u].componentType %d is not a valid glTF 2.0 componentType",
+                      i, acc->component_type);
+        }
+
+        /* Validate type */
+        int valid_type = (acc->type == TG3_TYPE_SCALAR ||
+                          acc->type == TG3_TYPE_VEC2   ||
+                          acc->type == TG3_TYPE_VEC3   ||
+                          acc->type == TG3_TYPE_VEC4   ||
+                          acc->type == TG3_TYPE_MAT2   ||
+                          acc->type == TG3_TYPE_MAT3   ||
+                          acc->type == TG3_TYPE_MAT4);
+        if (!valid_type) {
+            TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                      "accessor[%u].type %d is not a valid glTF 2.0 accessor type",
+                      i, acc->type);
+        }
+
+        /* count >= 1 */
+        if (acc->count == 0) {
+            TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                      "accessor[%u].count must be >= 1", i);
+        }
+
+        /* bufferView cross-reference and byte bounds */
+        if (acc->buffer_view >= 0) {
+            if ((uint32_t)acc->buffer_view >= model->buffer_views_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                          "accessor[%u].bufferView index %d out of range [0, %u)",
+                          i, acc->buffer_view, model->buffer_views_count);
+            } else if (valid_ct && valid_type && acc->count > 0) {
+                const tg3_buffer_view *bv =
+                    &model->buffer_views[(uint32_t)acc->buffer_view];
+                int32_t comp_sz  = tg3_component_size(acc->component_type);
+                int32_t num_comp = tg3_num_components(acc->type);
+                if (comp_sz > 0 && num_comp > 0) {
+                    int32_t elem_sz = comp_sz * num_comp;
+                    int32_t stride  = (bv->byte_stride > 0)
+                                       ? (int32_t)bv->byte_stride
+                                       : elem_sz;
+                    uint64_t max_byte =
+                        acc->byte_offset +
+                        (uint64_t)(acc->count - 1) * (uint64_t)stride +
+                        (uint64_t)elem_sz;
+                    if (max_byte > bv->byte_length) {
+                        TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                                  "accessor[%u] byte range exceeds "
+                                  "bufferView[%d].byteLength (%llu): "
+                                  "needs %llu bytes",
+                                  i, acc->buffer_view,
+                                  (unsigned long long)bv->byte_length,
+                                  (unsigned long long)max_byte);
+                    }
+                    /* byteOffset alignment */
+                    if (acc->byte_offset % (uint64_t)comp_sz != 0) {
+                        TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                                  "accessor[%u].byteOffset %llu is not aligned "
+                                  "to componentType size %d",
+                                  i, (unsigned long long)acc->byte_offset,
+                                  comp_sz);
+                    }
+                }
+            }
+        }
+
+        /* Sparse accessor sub-structure */
+        if (acc->sparse.is_sparse) {
+            if (acc->sparse.count <= 0) {
+                TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                          "accessor[%u].sparse.count must be > 0", i);
+            }
+            if (acc->sparse.indices.buffer_view < 0 ||
+                (uint32_t)acc->sparse.indices.buffer_view >=
+                    model->buffer_views_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                          "accessor[%u].sparse.indices.bufferView index %d "
+                          "out of range [0, %u)",
+                          i, acc->sparse.indices.buffer_view,
+                          model->buffer_views_count);
+            }
+            if (acc->sparse.values.buffer_view < 0 ||
+                (uint32_t)acc->sparse.values.buffer_view >=
+                    model->buffer_views_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                          "accessor[%u].sparse.values.bufferView index %d "
+                          "out of range [0, %u)",
+                          i, acc->sparse.values.buffer_view,
+                          model->buffer_views_count);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 5. Meshes
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->meshes_count; i++) {
+        const tg3_mesh *mesh = &model->meshes[i];
+        snprintf(path, sizeof(path), "/meshes/%u", i);
+
+        if (mesh->primitives_count == 0) {
+            TG3__VERR(TG3_ERR_INVALID_MESH, path,
+                      "mesh[%u] must have at least one primitive", i);
+        }
+
+        for (uint32_t pi = 0; pi < mesh->primitives_count; pi++) {
+            const tg3_primitive *prim = &mesh->primitives[pi];
+            snprintf(ipath, sizeof(ipath), "/meshes/%u/primitives/%u", i, pi);
+
+            if (prim->attributes_count == 0) {
+                TG3__VERR(TG3_ERR_INVALID_MESH, ipath,
+                          "mesh[%u].primitives[%u] must have at least one attribute",
+                          i, pi);
+            }
+
+            /* Validate attribute accessor indices */
+            for (uint32_t ai = 0; ai < prim->attributes_count; ai++) {
+                int32_t acc_idx = prim->attributes[ai].value;
+                if (acc_idx < 0 ||
+                    (uint32_t)acc_idx >= model->accessors_count) {
+                    TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                              "mesh[%u].primitives[%u] attribute \"%.*s\" "
+                              "accessor index %d out of range [0, %u)",
+                              i, pi,
+                              (int)prim->attributes[ai].key.len,
+                              prim->attributes[ai].key.data,
+                              acc_idx, model->accessors_count);
+                }
+            }
+
+            /* Validate indices accessor */
+            if (prim->indices >= 0) {
+                if ((uint32_t)prim->indices >= model->accessors_count) {
+                    TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                              "mesh[%u].primitives[%u].indices accessor index %d "
+                              "out of range [0, %u)",
+                              i, pi, prim->indices, model->accessors_count);
+                } else {
+                    const tg3_accessor *idx_acc =
+                        &model->accessors[(uint32_t)prim->indices];
+                    if (idx_acc->type != TG3_TYPE_SCALAR) {
+                        TG3__VERR(TG3_ERR_INVALID_ACCESSOR, ipath,
+                                  "mesh[%u].primitives[%u].indices accessor "
+                                  "must be SCALAR type",
+                                  i, pi);
+                    }
+                    if (idx_acc->component_type !=
+                            TG3_COMPONENT_TYPE_UNSIGNED_BYTE  &&
+                        idx_acc->component_type !=
+                            TG3_COMPONENT_TYPE_UNSIGNED_SHORT &&
+                        idx_acc->component_type !=
+                            TG3_COMPONENT_TYPE_UNSIGNED_INT) {
+                        TG3__VERR(TG3_ERR_INVALID_ACCESSOR, ipath,
+                                  "mesh[%u].primitives[%u].indices accessor "
+                                  "componentType must be UNSIGNED_BYTE, "
+                                  "UNSIGNED_SHORT, or UNSIGNED_INT",
+                                  i, pi);
+                    }
+                }
+            }
+
+            /* Validate material index */
+            if (prim->material >= 0 &&
+                (uint32_t)prim->material >= model->materials_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                          "mesh[%u].primitives[%u].material index %d "
+                          "out of range [0, %u)",
+                          i, pi, prim->material, model->materials_count);
+            }
+
+            /* Validate primitive mode */
+            if (prim->mode < TG3_MODE_POINTS || prim->mode > TG3_MODE_TRIANGLE_FAN) {
+                TG3__VERR(TG3_ERR_INVALID_MESH, ipath,
+                          "mesh[%u].primitives[%u].mode %d is not valid "
+                          "(must be TG3_MODE_POINTS..TG3_MODE_TRIANGLE_FAN)",
+                          i, pi, prim->mode);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 6. Nodes
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->nodes_count; i++) {
+        const tg3_node *node = &model->nodes[i];
+        snprintf(path, sizeof(path), "/nodes/%u", i);
+
+        if (node->camera >= 0 && (uint32_t)node->camera >= model->cameras_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "node[%u].camera index %d out of range [0, %u)",
+                      i, node->camera, model->cameras_count);
+        }
+        if (node->skin >= 0 && (uint32_t)node->skin >= model->skins_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "node[%u].skin index %d out of range [0, %u)",
+                      i, node->skin, model->skins_count);
+        }
+        if (node->mesh >= 0 && (uint32_t)node->mesh >= model->meshes_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "node[%u].mesh index %d out of range [0, %u)",
+                      i, node->mesh, model->meshes_count);
+        }
+        if (node->light >= 0 && (uint32_t)node->light >= model->lights_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "node[%u].light index %d out of range [0, %u)",
+                      i, node->light, model->lights_count);
+        }
+
+        for (uint32_t ci = 0; ci < node->children_count; ci++) {
+            int32_t child_idx = node->children[ci];
+            if (child_idx < 0 || (uint32_t)child_idx >= model->nodes_count) {
+                TG3__VERR(TG3_ERR_INVALID_NODE, path,
+                          "node[%u].children[%u] = %d is out of range [0, %u)",
+                          i, ci, child_idx, model->nodes_count);
+            } else if ((uint32_t)child_idx == i) {
+                TG3__VERR(TG3_ERR_INVALID_NODE, path,
+                          "node[%u].children[%u] = %d creates a self-reference",
+                          i, ci, child_idx);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 7. Skins
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->skins_count; i++) {
+        const tg3_skin *skin = &model->skins[i];
+        snprintf(path, sizeof(path), "/skins/%u", i);
+
+        if (skin->joints_count == 0) {
+            TG3__VERR(TG3_ERR_INVALID_SKIN, path,
+                      "skin[%u] must have at least one joint", i);
+        }
+
+        for (uint32_t ji = 0; ji < skin->joints_count; ji++) {
+            int32_t j = skin->joints[ji];
+            if (j < 0 || (uint32_t)j >= model->nodes_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                          "skin[%u].joints[%u] = %d out of range [0, %u)",
+                          i, ji, j, model->nodes_count);
+            }
+        }
+
+        if (skin->inverse_bind_matrices >= 0) {
+            if ((uint32_t)skin->inverse_bind_matrices >= model->accessors_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                          "skin[%u].inverseBindMatrices index %d "
+                          "out of range [0, %u)",
+                          i, skin->inverse_bind_matrices,
+                          model->accessors_count);
+            } else {
+                const tg3_accessor *ibm =
+                    &model->accessors[(uint32_t)skin->inverse_bind_matrices];
+                if (ibm->type != TG3_TYPE_MAT4) {
+                    TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                              "skin[%u].inverseBindMatrices accessor "
+                              "must be MAT4 type", i);
+                }
+                if (ibm->component_type != TG3_COMPONENT_TYPE_FLOAT) {
+                    TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                              "skin[%u].inverseBindMatrices accessor "
+                              "must have FLOAT componentType", i);
+                }
+                if (ibm->count < (uint64_t)skin->joints_count) {
+                    TG3__VERR(TG3_ERR_INVALID_SKIN, path,
+                              "skin[%u].inverseBindMatrices count %llu < "
+                              "joints count %u",
+                              i, (unsigned long long)ibm->count,
+                              skin->joints_count);
+                }
+            }
+        }
+
+        if (skin->skeleton >= 0 &&
+            (uint32_t)skin->skeleton >= model->nodes_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "skin[%u].skeleton index %d out of range [0, %u)",
+                      i, skin->skeleton, model->nodes_count);
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 8. Animations
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->animations_count; i++) {
+        const tg3_animation *anim = &model->animations[i];
+        snprintf(path, sizeof(path), "/animations/%u", i);
+
+        for (uint32_t si = 0; si < anim->samplers_count; si++) {
+            const tg3_animation_sampler *samp = &anim->samplers[si];
+            snprintf(ipath, sizeof(ipath),
+                     "/animations/%u/samplers/%u", i, si);
+
+            if (samp->input < 0 ||
+                (uint32_t)samp->input >= model->accessors_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                          "animation[%u].samplers[%u].input accessor index %d "
+                          "out of range [0, %u)",
+                          i, si, samp->input, model->accessors_count);
+            }
+            if (samp->output < 0 ||
+                (uint32_t)samp->output >= model->accessors_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                          "animation[%u].samplers[%u].output accessor index %d "
+                          "out of range [0, %u)",
+                          i, si, samp->output, model->accessors_count);
+            }
+
+            if (samp->interpolation.data) {
+                if (!tg3_str_equals_cstr(samp->interpolation, "LINEAR")     &&
+                    !tg3_str_equals_cstr(samp->interpolation, "STEP")       &&
+                    !tg3_str_equals_cstr(samp->interpolation, "CUBICSPLINE")) {
+                    TG3__VWARN(TG3_ERR_INVALID_VALUE, ipath,
+                               "animation[%u].samplers[%u].interpolation "
+                               "\"%.*s\" is not a recognised value",
+                               i, si,
+                               (int)samp->interpolation.len,
+                               samp->interpolation.data);
+                }
+            }
+        }
+
+        for (uint32_t ci = 0; ci < anim->channels_count; ci++) {
+            const tg3_animation_channel *chan = &anim->channels[ci];
+            snprintf(ipath, sizeof(ipath),
+                     "/animations/%u/channels/%u", i, ci);
+
+            if (chan->sampler < 0 ||
+                (uint32_t)chan->sampler >= anim->samplers_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                          "animation[%u].channels[%u].sampler index %d "
+                          "out of range [0, %u)",
+                          i, ci, chan->sampler, anim->samplers_count);
+            }
+
+            if (chan->target.node >= 0 &&
+                (uint32_t)chan->target.node >= model->nodes_count) {
+                TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
+                          "animation[%u].channels[%u].target.node index %d "
+                          "out of range [0, %u)",
+                          i, ci, chan->target.node, model->nodes_count);
+            }
+
+            if (!chan->target.path.data || chan->target.path.len == 0) {
+                TG3__VERR(TG3_ERR_MISSING_REQUIRED, ipath,
+                          "animation[%u].channels[%u].target.path is required",
+                          i, ci);
+            } else if (
+                !tg3_str_equals_cstr(chan->target.path, "translation") &&
+                !tg3_str_equals_cstr(chan->target.path, "rotation")    &&
+                !tg3_str_equals_cstr(chan->target.path, "scale")       &&
+                !tg3_str_equals_cstr(chan->target.path, "weights")) {
+                TG3__VERR(TG3_ERR_INVALID_VALUE, ipath,
+                          "animation[%u].channels[%u].target.path \"%.*s\" "
+                          "must be \"translation\", \"rotation\", "
+                          "\"scale\", or \"weights\"",
+                          i, ci,
+                          (int)chan->target.path.len,
+                          chan->target.path.data);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 9. Textures
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->textures_count; i++) {
+        const tg3_texture *tex = &model->textures[i];
+        snprintf(path, sizeof(path), "/textures/%u", i);
+
+        if (tex->sampler >= 0 &&
+            (uint32_t)tex->sampler >= model->samplers_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "texture[%u].sampler index %d out of range [0, %u)",
+                      i, tex->sampler, model->samplers_count);
+        }
+        if (tex->source >= 0 &&
+            (uint32_t)tex->source >= model->images_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "texture[%u].source index %d out of range [0, %u)",
+                      i, tex->source, model->images_count);
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 10. Materials
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->materials_count; i++) {
+        const tg3_material *mat = &model->materials[i];
+        snprintf(path, sizeof(path), "/materials/%u", i);
+
+        if (mat->alpha_mode.data) {
+            if (!tg3_str_equals_cstr(mat->alpha_mode, "OPAQUE") &&
+                !tg3_str_equals_cstr(mat->alpha_mode, "MASK")   &&
+                !tg3_str_equals_cstr(mat->alpha_mode, "BLEND")) {
+                TG3__VERR(TG3_ERR_INVALID_MATERIAL, path,
+                          "material[%u].alphaMode \"%.*s\" must be "
+                          "\"OPAQUE\", \"MASK\", or \"BLEND\"",
+                          i, (int)mat->alpha_mode.len, mat->alpha_mode.data);
+            }
+        }
+
+        tg3__val_check_tex_index(errors, arena,
+            mat->pbr_metallic_roughness.base_color_texture.index,
+            model->textures_count, i,
+            "pbrMetallicRoughness.baseColorTexture");
+        tg3__val_check_tex_index(errors, arena,
+            mat->pbr_metallic_roughness.metallic_roughness_texture.index,
+            model->textures_count, i,
+            "pbrMetallicRoughness.metallicRoughnessTexture");
+        tg3__val_check_tex_index(errors, arena,
+            mat->normal_texture.index,
+            model->textures_count, i, "normalTexture");
+        tg3__val_check_tex_index(errors, arena,
+            mat->occlusion_texture.index,
+            model->textures_count, i, "occlusionTexture");
+        tg3__val_check_tex_index(errors, arena,
+            mat->emissive_texture.index,
+            model->textures_count, i, "emissiveTexture");
+    }
+
+    /* ------------------------------------------------------------------
+     * 11. Cameras
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->cameras_count; i++) {
+        const tg3_camera *cam = &model->cameras[i];
+        snprintf(path, sizeof(path), "/cameras/%u", i);
+
+        if (!cam->type.data || cam->type.len == 0) {
+            TG3__VERR(TG3_ERR_MISSING_REQUIRED, path,
+                      "camera[%u].type is required", i);
+        } else if (tg3_str_equals_cstr(cam->type, "perspective")) {
+            if (cam->perspective.yfov <= 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].perspective.yfov must be > 0", i);
+            }
+            if (cam->perspective.znear <= 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].perspective.znear must be > 0", i);
+            }
+        } else if (tg3_str_equals_cstr(cam->type, "orthographic")) {
+            if (cam->orthographic.xmag == 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].orthographic.xmag must not be 0", i);
+            }
+            if (cam->orthographic.ymag == 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].orthographic.ymag must not be 0", i);
+            }
+            if (cam->orthographic.znear < 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].orthographic.znear must be >= 0", i);
+            }
+            if (cam->orthographic.zfar <= cam->orthographic.znear) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].orthographic.zfar must be > znear", i);
+            }
+        } else {
+            TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                      "camera[%u].type \"%.*s\" must be "
+                      "\"perspective\" or \"orthographic\"",
+                      i, (int)cam->type.len, cam->type.data);
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 12. Scenes
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->scenes_count; i++) {
+        const tg3_scene *scene = &model->scenes[i];
+        snprintf(path, sizeof(path), "/scenes/%u", i);
+
+        for (uint32_t ni = 0; ni < scene->nodes_count; ni++) {
+            int32_t n = scene->nodes[ni];
+            if (n < 0 || (uint32_t)n >= model->nodes_count) {
+                TG3__VERR(TG3_ERR_INVALID_SCENE, path,
+                          "scene[%u].nodes[%u] = %d out of range [0, %u)",
+                          i, ni, n, model->nodes_count);
+            }
+        }
+    }
+
+    /* ------------------------------------------------------------------
+     * 13. Images
+     * ------------------------------------------------------------------ */
+    for (uint32_t i = 0; i < model->images_count; i++) {
+        const tg3_image *img = &model->images[i];
+        snprintf(path, sizeof(path), "/images/%u", i);
+
+        if (img->buffer_view >= 0 &&
+            (uint32_t)img->buffer_view >= model->buffer_views_count) {
+            TG3__VERR(TG3_ERR_INVALID_INDEX, path,
+                      "image[%u].bufferView index %d out of range [0, %u)",
+                      i, img->buffer_view, model->buffer_views_count);
+        }
+
+        /* An image should have either a URI or a bufferView */
+        {
+            int has_uri = (img->uri.data != NULL && img->uri.len > 0);
+            int has_bv  = (img->buffer_view >= 0);
+            if (!has_uri && !has_bv && img->image.count == 0) {
+                TG3__VWARN(TG3_ERR_INVALID_IMAGE, path,
+                           "image[%u] has no URI, bufferView, or decoded data",
+                           i);
+            }
+            if (has_uri && has_bv) {
+                TG3__VWARN(TG3_ERR_INVALID_IMAGE, path,
+                           "image[%u] has both URI and bufferView; "
+                           "bufferView takes precedence",
+                           i);
+            }
+        }
+    }
+
+#undef TG3__VERR
+#undef TG3__VWARN
+
+    return first_err;
 }
 
 #endif /* TINYGLTF3_IMPLEMENTATION */

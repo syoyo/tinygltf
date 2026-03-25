@@ -65,6 +65,15 @@ if (TINYGLTF_BUILD_TESTS)
   )
   target_compile_definitions(tester_intensive_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
   add_test(NAME tester_intensive_customjson COMMAND tester_intensive_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  # v3 API tests (parser + validator)
+  add_executable(tester_v3 tests/v3/tester_v3.cc)
+  target_include_directories(tester_v3 PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  set_target_properties(tester_v3 PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
+  add_test(NAME tester_v3 COMMAND tester_v3 WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif (TINYGLTF_BUILD_TESTS)
 
 #
