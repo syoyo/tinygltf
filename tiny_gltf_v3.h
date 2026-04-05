@@ -3394,6 +3394,8 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(
     const char *base_dir, uint32_t base_dir_len,
     const tg3_parse_options *options) {
 
+    tg3__model_init(model);
+
     const uint8_t *json_chunk = NULL;
     uint64_t json_chunk_size = 0;
     const uint8_t *bin_chunk = NULL;
@@ -3410,8 +3412,6 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(
         tg3_parse_options_init(&default_opts);
         options = &default_opts;
     }
-
-    tg3__model_init(model);
 
     tg3_arena *arena = tg3__arena_create(&options->memory);
     if (!arena) {
