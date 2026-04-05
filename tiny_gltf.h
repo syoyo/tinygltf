@@ -4614,8 +4614,10 @@ static bool ParseBuffer(Buffer *buffer, std::string *err, const detail::json &o,
       }
 
       // Read buffer data
-      buffer->data.resize(static_cast<size_t>(byteLength));
-      memcpy(&(buffer->data.at(0)), bin_data, static_cast<size_t>(byteLength));
+      if (byteLength > 0) {
+        buffer->data.resize(static_cast<size_t>(byteLength));
+        memcpy(buffer->data.data(), bin_data, static_cast<size_t>(byteLength));
+      }
     }
 
   } else {
