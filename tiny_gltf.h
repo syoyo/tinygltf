@@ -3664,7 +3664,7 @@ std::string JsonToString(const detail::json &o, int spacing = -1) {
   }
   return buffer.GetString();
 #else
-  return o.dump(spacing);
+  return o.dump(spacing, ' ', false, detail::json::error_handler_t::replace);
 #endif
 }
 
