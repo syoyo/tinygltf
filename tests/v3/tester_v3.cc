@@ -591,6 +591,99 @@ TEST_CASE("v3-validate-error-messages-persist", "[v3][validate][errorstack]") {
 }
 
 /* ======================================================================
+ * Regression tests for bugs found in deep review
+ * ====================================================================== */
+
+/* Bug: tg3__val_check_tex_index bypassed TG3__VERR so first_err was never
+ * updated when a material's texture index was out of range.  tg3_validate()
+ * was returning TG3_OK despite errors having been pushed to the stack. */
+TEST_CASE("v3-validate-material-invalid-tex-index-returns-error", "[v3][validate][material][regression]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    /* Material references texture index 5 but there are no textures */
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"materials\":[{"
+        "  \"pbrMetallicRoughness\":{"
+        "    \"baseColorTexture\":{\"index\":5}"
+        "  }"
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    /* Must return a non-OK error code, not TG3_OK */
+    REQUIRE(rc == TG3_ERR_INVALID_INDEX);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    /* Verify the error is about the texture index */
+    bool found = false;
+    for (uint32_t i = 0; i < tg3_errors_count(&errors); i++) {
+        const tg3_error_entry *e = tg3_errors_get(&errors, i);
+        if (e->code == TG3_ERR_INVALID_INDEX &&
+            e->severity == TG3_SEVERITY_ERROR) {
+            found = true;
+            break;
+        }
+    }
+    REQUIRE(found);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+/* Bug: buffer-view byte-bounds check compared against buf->data.count which
+ * is 0 when the buffer's external file was never loaded (no FS callbacks).
+ * Every buffer view would incorrectly be flagged as out-of-range. */
+TEST_CASE("v3-validate-bufview-bounds-unloaded-buffer-no-false-positive", "[v3][validate][bufview][regression]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    /* Parse a model that references an external buffer (not a data URI).
+     * Without FS callbacks the buffer data is never loaded (data.count==0).
+     * The validator must NOT report a bounds error for the buffer view. */
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":48,\"uri\":\"external.bin\"}],"
+        "\"bufferViews\":[{"
+        "  \"buffer\":0,"
+        "  \"byteOffset\":0,"
+        "  \"byteLength\":48"
+        "}]"
+        "}";
+    /* Parse without FS support — buffer data stays unloaded */
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+
+    /* Buffer data not loaded: no bounds error should be emitted */
+    bool has_bounds_error = false;
+    for (uint32_t i = 0; i < tg3_errors_count(&errors); i++) {
+        const tg3_error_entry *e = tg3_errors_get(&errors, i);
+        if (e->code == TG3_ERR_INVALID_BUFFER_VIEW &&
+            e->severity == TG3_SEVERITY_ERROR) {
+            has_bounds_error = true;
+            break;
+        }
+    }
+    REQUIRE_FALSE(has_bounds_error);
+    /* Overall result should be OK (no errors, buffer index valid) */
+    REQUIRE(rc == TG3_OK);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+/* ======================================================================
  * Tests: C++ wrapper
  * ====================================================================== */
 

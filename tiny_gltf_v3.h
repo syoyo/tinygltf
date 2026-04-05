@@ -4460,7 +4460,9 @@ TINYGLTF3_API void tg3_writer_destroy(tg3_writer *w) {
  * ====================================================================== */
 
 /* Internal helper: push a validation error/warning with arena-duped
- * message and json_path strings so they outlive the validate function. */
+ * message and json_path strings so they outlive the validate function.
+ * If arena allocation fails (OOM) the error entry is silently dropped
+ * rather than storing dangling stack pointers. */
 static void tg3__val_push(tg3_error_stack *es, tg3_arena *arena,
                            tg3_severity sev, tg3_error_code code,
                            const char *json_path_buf, const char *fmt, ...) {
@@ -4474,26 +4476,30 @@ static void tg3__val_push(tg3_error_stack *es, tg3_arena *arena,
     if (n < 0) n = 0;
     if ((size_t)n >= sizeof(msg_buf)) n = (int)(sizeof(msg_buf) - 1);
 
-    const char *msg  = msg_buf;
-    const char *path = json_path_buf;
+    const char *msg  = NULL;
+    const char *path = NULL;
 
     if (arena) {
-        char *m = tg3__arena_strdup(arena, msg_buf, (size_t)n);
-        if (m) msg = m;
+        msg = tg3__arena_strdup(arena, msg_buf, (size_t)n);
         if (json_path_buf) {
-            char *p = tg3__arena_strdup(arena, json_path_buf, strlen(json_path_buf));
-            if (p) path = p;
+            path = tg3__arena_strdup(arena, json_path_buf,
+                                     strlen(json_path_buf));
         }
     }
+
+    /* If arena duplication failed (OOM), drop the entry to avoid storing
+     * dangling stack pointers. */
+    if (!msg) return;
 
     tg3__error_push(es, sev, code, msg, path, -1);
 }
 
-/* Helper: validate a tg3_texture_info index. */
-static void tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
-                                      int32_t tex_idx, uint32_t textures_count,
-                                      uint32_t mat_idx, const char *field_name) {
-    if (tex_idx < 0) return; /* absent */
+/* Helper: validate a tg3_texture_info index.
+ * Returns 1 if an error was pushed, 0 otherwise. */
+static int tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
+                                     int32_t tex_idx, uint32_t textures_count,
+                                     uint32_t mat_idx, const char *field_name) {
+    if (tex_idx < 0) return 0; /* absent */
     if ((uint32_t)tex_idx >= textures_count) {
         char path[128];
         snprintf(path, sizeof(path), "/materials/%u", mat_idx);
@@ -4501,7 +4507,9 @@ static void tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
                       path,
                       "material[%u].%s texture index %d out of range [0, %u)",
                       mat_idx, field_name, tex_idx, textures_count);
+        return 1;
     }
+    return 0;
 }
 
 TINYGLTF3_API tg3_error_code tg3_validate(
@@ -4574,7 +4582,12 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                       i, bv->buffer, model->buffers_count);
         } else {
             const tg3_buffer *buf = &model->buffers[(uint32_t)bv->buffer];
-            if (bv->byte_offset + bv->byte_length > buf->data.count) {
+            /* Only check byte bounds when the buffer data has been loaded.
+             * When parsing without FS support (external buffers) data.data
+             * will be NULL and data.count will be 0, which would produce
+             * false positives for every buffer view. */
+            if (buf->data.data != NULL &&
+                bv->byte_offset + bv->byte_length > buf->data.count) {
                 TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
                           "bufferView[%u] byteOffset+byteLength (%llu) exceeds "
                           "buffer[%d].byteLength (%llu)",
@@ -5022,23 +5035,27 @@ TINYGLTF3_API tg3_error_code tg3_validate(
             }
         }
 
-        tg3__val_check_tex_index(errors, arena,
-            mat->pbr_metallic_roughness.base_color_texture.index,
-            model->textures_count, i,
-            "pbrMetallicRoughness.baseColorTexture");
-        tg3__val_check_tex_index(errors, arena,
-            mat->pbr_metallic_roughness.metallic_roughness_texture.index,
-            model->textures_count, i,
-            "pbrMetallicRoughness.metallicRoughnessTexture");
-        tg3__val_check_tex_index(errors, arena,
-            mat->normal_texture.index,
-            model->textures_count, i, "normalTexture");
-        tg3__val_check_tex_index(errors, arena,
-            mat->occlusion_texture.index,
-            model->textures_count, i, "occlusionTexture");
-        tg3__val_check_tex_index(errors, arena,
-            mat->emissive_texture.index,
-            model->textures_count, i, "emissiveTexture");
+        /* Texture index checks: update first_err when any out-of-range
+         * index is detected (the helper bypasses TG3__VERR). */
+        if (tg3__val_check_tex_index(errors, arena,
+                mat->pbr_metallic_roughness.base_color_texture.index,
+                model->textures_count, i,
+                "pbrMetallicRoughness.baseColorTexture")           |
+            tg3__val_check_tex_index(errors, arena,
+                mat->pbr_metallic_roughness.metallic_roughness_texture.index,
+                model->textures_count, i,
+                "pbrMetallicRoughness.metallicRoughnessTexture")   |
+            tg3__val_check_tex_index(errors, arena,
+                mat->normal_texture.index,
+                model->textures_count, i, "normalTexture")         |
+            tg3__val_check_tex_index(errors, arena,
+                mat->occlusion_texture.index,
+                model->textures_count, i, "occlusionTexture")      |
+            tg3__val_check_tex_index(errors, arena,
+                mat->emissive_texture.index,
+                model->textures_count, i, "emissiveTexture")) {
+            if (first_err == TG3_OK) first_err = TG3_ERR_INVALID_INDEX;
+        }
     }
 
     /* ------------------------------------------------------------------
