@@ -250,6 +250,53 @@ TEST_CASE("v3-validate-accessor-invalid-bufferView-index", "[v3][validate][acces
     tg3_error_stack_free(&errors);
 }
 
+TEST_CASE("v3-validate-accessor-misaligned-effective-offset", "[v3][validate][accessor][regression]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{"
+        "  \"uri\":\"data:application/octet-stream;base64,AAAAAAAAAAA=\","
+        "  \"byteLength\":8"
+        "}],"
+        "\"bufferViews\":[{"
+        "  \"buffer\":0,"
+        "  \"byteOffset\":2,"
+        "  \"byteLength\":4"
+        "}],"
+        "\"accessors\":[{"
+        "  \"bufferView\":0,"
+        "  \"componentType\":5126,"
+        "  \"count\":1,"
+        "  \"type\":\"SCALAR\""
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_ACCESSOR);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    bool found = false;
+    for (uint32_t i = 0; i < tg3_errors_count(&errors); i++) {
+        const tg3_error_entry *e = tg3_errors_get(&errors, i);
+        if (e->code == TG3_ERR_INVALID_ACCESSOR &&
+            e->severity == TG3_SEVERITY_ERROR) {
+            found = true;
+            break;
+        }
+    }
+    REQUIRE(found);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
 /* ======================================================================
  * Tests: mesh validation
  * ====================================================================== */

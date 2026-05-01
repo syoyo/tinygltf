@@ -4695,6 +4695,24 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                                   i, (unsigned long long)acc->byte_offset,
                                   comp_sz);
                     }
+                    /* glTF also requires the effective offset into the
+                     * underlying buffer (bufferView.byteOffset +
+                     * accessor.byteOffset) to be component-size aligned. */
+                    if (((bv->byte_offset + acc->byte_offset) %
+                         (uint64_t)comp_sz) != 0) {
+                        TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                                  "accessor[%u] effective byte offset %llu "
+                                  "(bufferView[%d].byteOffset %llu + "
+                                  "accessor.byteOffset %llu) is not aligned "
+                                  "to componentType size %d",
+                                  i,
+                                  (unsigned long long)
+                                      (bv->byte_offset + acc->byte_offset),
+                                  acc->buffer_view,
+                                  (unsigned long long)bv->byte_offset,
+                                  (unsigned long long)acc->byte_offset,
+                                  comp_sz);
+                    }
                 }
             }
         }
