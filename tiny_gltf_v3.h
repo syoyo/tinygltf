@@ -5151,6 +5151,13 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                       i, img->buffer_view, model->buffer_views_count);
         }
 
+        if (img->buffer_view >= 0 &&
+            (img->mime_type.data == NULL || img->mime_type.len == 0)) {
+            TG3__VERR(TG3_ERR_INVALID_IMAGE, path,
+                      "image[%u] uses bufferView but is missing mimeType",
+                      i);
+        }
+
         /* An image should have either a URI or a bufferView */
         {
             int has_uri = (img->uri.data != NULL && img->uri.len > 0);
