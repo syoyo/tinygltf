@@ -1,3 +1,5 @@
 @PACKAGE_INIT@
 
+@FIND_DEPENDENCIES@
+
 include(${CMAKE_CURRENT_LIST_DIR}/TinyGLTFTargets.cmake)
