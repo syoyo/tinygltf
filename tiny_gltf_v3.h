@@ -4520,8 +4520,9 @@ static int tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
     return 0;
 }
 
-static uint64_t tg3__val_accessor_elem_size(int32_t component_type,
-                                            int32_t type) {
+static uint64_t tg3__val_accessor_elem_size_with_padding(
+    int32_t component_type,
+    int32_t type) {
     int32_t comp_sz = tg3_component_size(component_type);
     if (comp_sz <= 0) return 0;
 
@@ -4709,7 +4710,8 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                     &model->buffer_views[(uint32_t)acc->buffer_view];
                 int32_t comp_sz  = tg3_component_size(acc->component_type);
                 uint64_t elem_sz =
-                    tg3__val_accessor_elem_size(acc->component_type, acc->type);
+                    tg3__val_accessor_elem_size_with_padding(
+                        acc->component_type, acc->type);
                 if (comp_sz > 0 && elem_sz > 0) {
                     uint64_t stride = (bv->byte_stride > 0)
                                        ? (uint64_t)bv->byte_stride
@@ -4948,6 +4950,8 @@ TINYGLTF3_API tg3_error_code tg3_validate(
         }
     }
     if (node_parent_counts) {
+        /* Queue entries are written before they are read, so zero-init is not
+         * required here. */
         uint32_t *queue = (uint32_t *)malloc(sizeof(uint32_t) * model->nodes_count);
         if (!queue) {
             TG3__VERR(TG3_ERR_OUT_OF_MEMORY, "/nodes",
