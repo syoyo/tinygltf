@@ -392,6 +392,7 @@ typedef struct tg3_asset {
 typedef struct tg3_buffer {
     tg3_str       name;
     tg3_span_u8   data;
+    uint64_t      byte_length; /* Declared glTF buffer.byteLength */
     tg3_str       uri;
     tg3_extras_ext ext;
 } tg3_buffer;
@@ -627,6 +628,8 @@ typedef struct tg3_perspective_camera {
     double yfov;
     double zfar;  /* 0 = infinite */
     double znear;
+    int32_t has_aspect_ratio;
+    int32_t has_zfar;
     tg3_extras_ext ext;
 } tg3_perspective_camera;
 
@@ -2357,6 +2360,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3__json &o,
 
     uint64_t byte_length = 0;
     tg3__parse_uint64(ctx, o, "byteLength", &byte_length, 1, "/buffer");
+    buf->byte_length = byte_length;
 
     /* Load buffer data */
     if (ctx->is_binary && buf_idx == 0 && buf->uri.len == 0) {
@@ -2825,6 +2829,10 @@ static int tg3__parse_camera(tg3__parse_ctx *ctx, const tg3__json &o,
     if (cam->type.data && tg3_str_equals_cstr(cam->type, "perspective")) {
         auto p_it = o.find("perspective");
         if (p_it != o.end() && p_it->is_object()) {
+            cam->perspective.has_aspect_ratio =
+                ((*p_it).find("aspectRatio") != (*p_it).end()) ? 1 : 0;
+            cam->perspective.has_zfar =
+                ((*p_it).find("zfar") != (*p_it).end()) ? 1 : 0;
             tg3__parse_double(ctx, *p_it, "aspectRatio",
                               &cam->perspective.aspect_ratio, 0, "/camera/perspective");
             tg3__parse_double(ctx, *p_it, "yfov",
@@ -3741,7 +3749,7 @@ static tg3__json tg3__serialize_buffer(const tg3_buffer *b, int wd,
     (void)wd;
     tg3__json o = tg3__json::object();
     tg3__serialize_str(o, "name", b->name);
-    o["byteLength"] = (int64_t)b->data.count;
+    o["byteLength"] = (int64_t)(b->byte_length ? b->byte_length : b->data.count);
 
     if (b->uri.data && b->uri.len > 0) {
         tg3__serialize_str(o, "uri", b->uri);
@@ -4078,10 +4086,10 @@ static tg3__json tg3__serialize_camera(const tg3_camera *c, int wd) {
 
     if (c->type.data && tg3_str_equals_cstr(c->type, "perspective")) {
         tg3__json p = tg3__json::object();
-        if (c->perspective.aspect_ratio > 0)
+        if (c->perspective.has_aspect_ratio)
             p["aspectRatio"] = c->perspective.aspect_ratio;
         p["yfov"] = c->perspective.yfov;
-        if (c->perspective.zfar > 0) p["zfar"] = c->perspective.zfar;
+        if (c->perspective.has_zfar) p["zfar"] = c->perspective.zfar;
         p["znear"] = c->perspective.znear;
         tg3__serialize_extras_ext(p, &c->perspective.ext);
         o["perspective"] = static_cast<tg3__json&&>(p);
@@ -4497,8 +4505,8 @@ static void tg3__val_push(tg3_error_stack *es, tg3_arena *arena,
 /* Helper: validate a tg3_texture_info index.
  * Returns 1 if an error was pushed, 0 otherwise. */
 static int tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
-                                     int32_t tex_idx, uint32_t textures_count,
-                                     uint32_t mat_idx, const char *field_name) {
+                                      int32_t tex_idx, uint32_t textures_count,
+                                      uint32_t mat_idx, const char *field_name) {
     if (tex_idx < 0) return 0; /* absent */
     if ((uint32_t)tex_idx >= textures_count) {
         char path[128];
@@ -4510,6 +4518,32 @@ static int tg3__val_check_tex_index(tg3_error_stack *es, tg3_arena *arena,
         return 1;
     }
     return 0;
+}
+
+static uint64_t tg3__val_accessor_elem_size(int32_t component_type,
+                                            int32_t type) {
+    int32_t comp_sz = tg3_component_size(component_type);
+    if (comp_sz <= 0) return 0;
+
+    switch (type) {
+        case TG3_TYPE_MAT2: {
+            uint64_t column_stride = ((uint64_t)(2 * comp_sz) + 3ull) & ~3ull;
+            return 2ull * column_stride;
+        }
+        case TG3_TYPE_MAT3: {
+            uint64_t column_stride = ((uint64_t)(3 * comp_sz) + 3ull) & ~3ull;
+            return 3ull * column_stride;
+        }
+        case TG3_TYPE_MAT4: {
+            uint64_t column_stride = ((uint64_t)(4 * comp_sz) + 3ull) & ~3ull;
+            return 4ull * column_stride;
+        }
+        default: {
+            int32_t num_comp = tg3_num_components(type);
+            if (num_comp <= 0) return 0;
+            return (uint64_t)comp_sz * (uint64_t)num_comp;
+        }
+    }
 }
 
 TINYGLTF3_API tg3_error_code tg3_validate(
@@ -4582,25 +4616,31 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                       i, bv->buffer, model->buffers_count);
         } else {
             const tg3_buffer *buf = &model->buffers[(uint32_t)bv->buffer];
-            /* Only check byte bounds when the buffer data has been loaded.
-             * When parsing without FS support (external buffers) data.data
-             * will be NULL and data.count will be 0, which would produce
-             * false positives for every buffer view. */
-            if (buf->data.data != NULL &&
-                bv->byte_offset + bv->byte_length > buf->data.count) {
+            uint64_t declared_len =
+                (buf->byte_length > 0) ? buf->byte_length : buf->data.count;
+            uint64_t end = bv->byte_offset + bv->byte_length;
+            if (end > declared_len) {
                 TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
                           "bufferView[%u] byteOffset+byteLength (%llu) exceeds "
                           "buffer[%d].byteLength (%llu)",
                           i,
-                          (unsigned long long)(bv->byte_offset + bv->byte_length),
+                          (unsigned long long)end,
+                          bv->buffer,
+                          (unsigned long long)declared_len);
+            } else if (buf->data.data != NULL && end > buf->data.count) {
+                TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
+                          "bufferView[%u] byteOffset+byteLength (%llu) exceeds "
+                          "loaded buffer[%d] size (%llu)",
+                          i,
+                          (unsigned long long)end,
                           bv->buffer,
                           (unsigned long long)buf->data.count);
             }
         }
 
         if (bv->byte_length == 0) {
-            TG3__VWARN(TG3_ERR_INVALID_BUFFER_VIEW, path,
-                       "bufferView[%u].byteLength is 0", i);
+            TG3__VERR(TG3_ERR_INVALID_BUFFER_VIEW, path,
+                      "bufferView[%u].byteLength must be > 0", i);
         }
 
         if (bv->byte_stride != 0) {
@@ -4668,16 +4708,16 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                 const tg3_buffer_view *bv =
                     &model->buffer_views[(uint32_t)acc->buffer_view];
                 int32_t comp_sz  = tg3_component_size(acc->component_type);
-                int32_t num_comp = tg3_num_components(acc->type);
-                if (comp_sz > 0 && num_comp > 0) {
-                    int32_t elem_sz = comp_sz * num_comp;
-                    int32_t stride  = (bv->byte_stride > 0)
-                                       ? (int32_t)bv->byte_stride
+                uint64_t elem_sz =
+                    tg3__val_accessor_elem_size(acc->component_type, acc->type);
+                if (comp_sz > 0 && elem_sz > 0) {
+                    uint64_t stride = (bv->byte_stride > 0)
+                                       ? (uint64_t)bv->byte_stride
                                        : elem_sz;
                     uint64_t max_byte =
                         acc->byte_offset +
-                        (uint64_t)(acc->count - 1) * (uint64_t)stride +
-                        (uint64_t)elem_sz;
+                        (uint64_t)(acc->count - 1) * stride +
+                        elem_sz;
                     if (max_byte > bv->byte_length) {
                         TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
                                   "accessor[%u] byte range exceeds "
@@ -4722,6 +4762,23 @@ TINYGLTF3_API tg3_error_code tg3_validate(
             if (acc->sparse.count <= 0) {
                 TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
                           "accessor[%u].sparse.count must be > 0", i);
+            }
+            if ((uint64_t)acc->sparse.count > acc->count) {
+                TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                          "accessor[%u].sparse.count %d exceeds accessor.count %llu",
+                          i, acc->sparse.count,
+                          (unsigned long long)acc->count);
+            }
+            if (acc->sparse.indices.component_type !=
+                    TG3_COMPONENT_TYPE_UNSIGNED_BYTE &&
+                acc->sparse.indices.component_type !=
+                    TG3_COMPONENT_TYPE_UNSIGNED_SHORT &&
+                acc->sparse.indices.component_type !=
+                    TG3_COMPONENT_TYPE_UNSIGNED_INT) {
+                TG3__VERR(TG3_ERR_INVALID_ACCESSOR, path,
+                          "accessor[%u].sparse.indices.componentType %d must be "
+                          "UNSIGNED_BYTE, UNSIGNED_SHORT, or UNSIGNED_INT",
+                          i, acc->sparse.indices.component_type);
             }
             if (acc->sparse.indices.buffer_view < 0 ||
                 (uint32_t)acc->sparse.indices.buffer_view >=
@@ -4834,6 +4891,15 @@ TINYGLTF3_API tg3_error_code tg3_validate(
     /* ------------------------------------------------------------------
      * 6. Nodes
      * ------------------------------------------------------------------ */
+    uint32_t *node_parent_counts = NULL;
+    if (model->nodes_count > 0) {
+        node_parent_counts = (uint32_t *)calloc(model->nodes_count,
+                                                sizeof(uint32_t));
+        if (!node_parent_counts) {
+            TG3__VERR(TG3_ERR_OUT_OF_MEMORY, "/nodes",
+                      "OOM while validating node graph");
+        }
+    }
     for (uint32_t i = 0; i < model->nodes_count; i++) {
         const tg3_node *node = &model->nodes[i];
         snprintf(path, sizeof(path), "/nodes/%u", i);
@@ -4869,8 +4935,69 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                 TG3__VERR(TG3_ERR_INVALID_NODE, path,
                           "node[%u].children[%u] = %d creates a self-reference",
                           i, ci, child_idx);
+            } else if (node_parent_counts) {
+                uint32_t child_u = (uint32_t)child_idx;
+                node_parent_counts[child_u] += 1;
+                if (node_parent_counts[child_u] > 1) {
+                    char cpath[256];
+                    snprintf(cpath, sizeof(cpath), "/nodes/%u", child_u);
+                    TG3__VERR(TG3_ERR_INVALID_NODE, cpath,
+                              "node[%u] has multiple parents", child_u);
+                }
             }
         }
+    }
+    if (node_parent_counts) {
+        uint32_t *queue = (uint32_t *)malloc(sizeof(uint32_t) * model->nodes_count);
+        if (!queue) {
+            TG3__VERR(TG3_ERR_OUT_OF_MEMORY, "/nodes",
+                      "OOM while validating node graph");
+        } else {
+            uint32_t queue_head = 0;
+            uint32_t queue_tail = 0;
+            uint32_t visited = 0;
+
+            for (uint32_t i = 0; i < model->nodes_count; i++) {
+                if (node_parent_counts[i] == 0) {
+                    queue[queue_tail++] = i;
+                }
+            }
+
+            while (queue_head < queue_tail) {
+                uint32_t node_idx = queue[queue_head++];
+                const tg3_node *node = &model->nodes[node_idx];
+                visited++;
+
+                for (uint32_t ci = 0; ci < node->children_count; ci++) {
+                    int32_t child_idx = node->children[ci];
+                    if (child_idx < 0 ||
+                        (uint32_t)child_idx >= model->nodes_count ||
+                        (uint32_t)child_idx == node_idx) {
+                        continue;
+                    }
+
+                    if (node_parent_counts[(uint32_t)child_idx] > 0) {
+                        node_parent_counts[(uint32_t)child_idx]--;
+                        if (node_parent_counts[(uint32_t)child_idx] == 0) {
+                            queue[queue_tail++] = (uint32_t)child_idx;
+                        }
+                    }
+                }
+            }
+
+            if (visited != model->nodes_count) {
+                for (uint32_t i = 0; i < model->nodes_count; i++) {
+                    if (node_parent_counts[i] > 0) {
+                        snprintf(path, sizeof(path), "/nodes/%u", i);
+                        TG3__VERR(TG3_ERR_INVALID_NODE, path,
+                                  "node[%u] participates in a cycle", i);
+                    }
+                }
+            }
+
+            free(queue);
+        }
+        free(node_parent_counts);
     }
 
     /* ------------------------------------------------------------------
@@ -4986,8 +5113,11 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                           i, ci, chan->sampler, anim->samplers_count);
             }
 
-            if (chan->target.node >= 0 &&
-                (uint32_t)chan->target.node >= model->nodes_count) {
+            if (chan->target.node < 0) {
+                TG3__VERR(TG3_ERR_MISSING_REQUIRED, ipath,
+                          "animation[%u].channels[%u].target.node is required",
+                          i, ci);
+            } else if ((uint32_t)chan->target.node >= model->nodes_count) {
                 TG3__VERR(TG3_ERR_INVALID_INDEX, ipath,
                           "animation[%u].channels[%u].target.node index %d "
                           "out of range [0, %u)",
@@ -5095,6 +5225,16 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                 TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
                           "camera[%u].perspective.znear must be > 0", i);
             }
+            if (cam->perspective.has_aspect_ratio &&
+                cam->perspective.aspect_ratio <= 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].perspective.aspectRatio must be > 0", i);
+            }
+            if (cam->perspective.has_zfar &&
+                cam->perspective.zfar <= 0.0) {
+                TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
+                          "camera[%u].perspective.zfar must be > 0", i);
+            }
         } else if (tg3_str_equals_cstr(cam->type, "orthographic")) {
             if (cam->orthographic.xmag == 0.0) {
                 TG3__VERR(TG3_ERR_INVALID_CAMERA, path,
@@ -5168,10 +5308,9 @@ TINYGLTF3_API tg3_error_code tg3_validate(
                            i);
             }
             if (has_uri && has_bv) {
-                TG3__VWARN(TG3_ERR_INVALID_IMAGE, path,
-                           "image[%u] has both URI and bufferView; "
-                           "bufferView takes precedence",
-                           i);
+                TG3__VERR(TG3_ERR_INVALID_IMAGE, path,
+                          "image[%u] must not have both URI and bufferView",
+                          i);
             }
         }
     }

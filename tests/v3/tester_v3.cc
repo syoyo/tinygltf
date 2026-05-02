@@ -163,6 +163,56 @@ TEST_CASE("v3-validate-invalid-default-scene", "[v3][validate][scene]") {
 }
 
 /* ======================================================================
+ * Tests: bufferView validation
+ * ====================================================================== */
+
+TEST_CASE("v3-validate-bufview-zero-byte-length", "[v3][validate][bufview]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":4,\"uri\":\"data:application/octet-stream;base64,AAAAAA==\"}],"
+        "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":0}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_BUFFER_VIEW);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-bufview-respects-declared-buffer-byte-length", "[v3][validate][bufview][regression]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":4,\"uri\":\"data:application/octet-stream;base64,AAAAAAAAAAA=\"}],"
+        "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":4,\"byteLength\":1}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_BUFFER_VIEW);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+/* ======================================================================
  * Tests: accessor validation
  * ====================================================================== */
 
@@ -297,6 +347,107 @@ TEST_CASE("v3-validate-accessor-misaligned-effective-offset", "[v3][validate][ac
     tg3_error_stack_free(&errors);
 }
 
+TEST_CASE("v3-validate-accessor-mat3-byte-range-uses-gltf-padding", "[v3][validate][accessor][regression]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":10,\"uri\":\"data:application/octet-stream;base64,AAAAAAAAAAAAAA==\"}],"
+        "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":10}],"
+        "\"accessors\":[{"
+        "  \"bufferView\":0,"
+        "  \"componentType\":5121,"
+        "  \"count\":1,"
+        "  \"type\":\"MAT3\""
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_ACCESSOR);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-accessor-sparse-count-exceeds-accessor-count", "[v3][validate][accessor][sparse]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":8,\"uri\":\"data:application/octet-stream;base64,AAAAAAAAAAA=\"}],"
+        "\"bufferViews\":["
+        "  {\"buffer\":0,\"byteOffset\":0,\"byteLength\":2},"
+        "  {\"buffer\":0,\"byteOffset\":0,\"byteLength\":4}"
+        "],"
+        "\"accessors\":[{"
+        "  \"componentType\":5126,"
+        "  \"count\":1,"
+        "  \"type\":\"SCALAR\","
+        "  \"sparse\":{"
+        "    \"count\":2,"
+        "    \"indices\":{\"bufferView\":0,\"componentType\":5123},"
+        "    \"values\":{\"bufferView\":1}"
+        "  }"
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_ACCESSOR);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-accessor-sparse-invalid-index-component-type", "[v3][validate][accessor][sparse]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":8,\"uri\":\"data:application/octet-stream;base64,AAAAAAAAAAA=\"}],"
+        "\"bufferViews\":["
+        "  {\"buffer\":0,\"byteOffset\":0,\"byteLength\":2},"
+        "  {\"buffer\":0,\"byteOffset\":0,\"byteLength\":4}"
+        "],"
+        "\"accessors\":[{"
+        "  \"componentType\":5126,"
+        "  \"count\":2,"
+        "  \"type\":\"SCALAR\","
+        "  \"sparse\":{"
+        "    \"count\":1,"
+        "    \"indices\":{\"bufferView\":0,\"componentType\":5126},"
+        "    \"values\":{\"bufferView\":1}"
+        "  }"
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_ACCESSOR);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
 /* ======================================================================
  * Tests: mesh validation
  * ====================================================================== */
@@ -388,6 +539,50 @@ TEST_CASE("v3-validate-node-self-reference", "[v3][validate][node]") {
         "{"
         "\"asset\":{\"version\":\"2.0\"},"
         "\"nodes\":[{\"children\":[0]}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_NODE);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-node-indirect-cycle", "[v3][validate][node][graph]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"nodes\":[{\"children\":[1]},{\"children\":[0]}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_NODE);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-node-multiple-parents", "[v3][validate][node][graph]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"nodes\":[{\"children\":[2]},{\"children\":[2]},{}]"
         "}";
     parse_json(&model, &errors, json);
     tg3_error_stack_free(&errors);
@@ -505,6 +700,56 @@ TEST_CASE("v3-validate-camera-invalid-type", "[v3][validate][camera]") {
     tg3_error_stack_free(&errors);
 }
 
+TEST_CASE("v3-validate-camera-perspective-bad-aspect-ratio", "[v3][validate][camera]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"cameras\":[{"
+        "  \"type\":\"perspective\","
+        "  \"perspective\":{\"yfov\":1.0,\"znear\":0.01,\"aspectRatio\":0.0}"
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_CAMERA);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-camera-perspective-bad-zfar", "[v3][validate][camera]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"cameras\":[{"
+        "  \"type\":\"perspective\","
+        "  \"perspective\":{\"yfov\":1.0,\"znear\":0.01,\"zfar\":0.0}"
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_CAMERA);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
 /* ======================================================================
  * Tests: scene validation
  * ====================================================================== */
@@ -575,6 +820,7 @@ TEST_CASE("v3-validate-animation-invalid-target-path", "[v3][validate][animation
     const char *json =
         "{"
         "\"asset\":{\"version\":\"2.0\"},"
+        "\"nodes\":[{}],"
         "\"accessors\":["
         "  {\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\"},"
         "  {\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"}"
@@ -583,7 +829,7 @@ TEST_CASE("v3-validate-animation-invalid-target-path", "[v3][validate][animation
         "  \"samplers\":[{\"input\":0,\"output\":1,\"interpolation\":\"LINEAR\"}],"
         "  \"channels\":[{"
         "    \"sampler\":0,"
-        "    \"target\":{\"path\":\"bogus\"}"
+        "    \"target\":{\"node\":0,\"path\":\"bogus\"}"
         "  }]"
         "}]"
         "}";
@@ -593,6 +839,87 @@ TEST_CASE("v3-validate-animation-invalid-target-path", "[v3][validate][animation
 
     tg3_error_code rc = tg3_validate(&model, &errors);
     REQUIRE(rc == TG3_ERR_INVALID_VALUE);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-animation-missing-target-node", "[v3][validate][animation]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"accessors\":["
+        "  {\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\"},"
+        "  {\"componentType\":5126,\"count\":2,\"type\":\"VEC3\"}"
+        "],"
+        "\"animations\":[{"
+        "  \"samplers\":[{\"input\":0,\"output\":1}],"
+        "  \"channels\":[{\"sampler\":0,\"target\":{\"path\":\"translation\"}}]"
+        "}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_MISSING_REQUIRED);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+/* ======================================================================
+ * Tests: image validation
+ * ====================================================================== */
+
+TEST_CASE("v3-validate-image-bufferView-missing-mime-type", "[v3][validate][image]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":4,\"uri\":\"data:application/octet-stream;base64,AAAAAA==\"}],"
+        "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":4}],"
+        "\"images\":[{\"bufferView\":0}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_IMAGE);
+    REQUIRE(tg3_errors_has_error(&errors) == 1);
+
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+}
+
+TEST_CASE("v3-validate-image-uri-and-bufferView-mutually-exclusive", "[v3][validate][image]") {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_error_stack_init(&errors);
+
+    const char *json =
+        "{"
+        "\"asset\":{\"version\":\"2.0\"},"
+        "\"buffers\":[{\"byteLength\":4,\"uri\":\"data:application/octet-stream;base64,AAAAAA==\"}],"
+        "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":4}],"
+        "\"images\":[{\"bufferView\":0,\"mimeType\":\"image/png\",\"uri\":\"image.png\"}]"
+        "}";
+    parse_json(&model, &errors, json);
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+
+    tg3_error_code rc = tg3_validate(&model, &errors);
+    REQUIRE(rc == TG3_ERR_INVALID_IMAGE);
     REQUIRE(tg3_errors_has_error(&errors) == 1);
 
     tg3_model_free(&model);
