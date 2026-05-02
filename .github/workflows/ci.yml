@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_V3_VALIDATOR_TOOL=ON
 
       - name: Build
         run: cmake --build build
@@ -36,6 +36,17 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
+
+      - name: Run v3 validator on tracked glTF files
+        continue-on-error: true
+        run: |
+          rc=0
+          while IFS= read -r path; do
+            echo "::group::Validate ${path}"
+            ./build/tools/validator/tinygltf3-validator "${path}" || rc=1
+            echo "::endgroup::"
+          done < <(git ls-files '*.gltf')
+          exit $rc
 
   # Linux x64 - Clang 21
   linux-clang-x64:
