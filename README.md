@@ -133,23 +133,6 @@ Users who want to run TinyGLTF securely and safely(e.g. need to handle malcious 
 I recommend to build TinyGLTF for WASM target.
 WASI build example is located in [wasm](wasm) .
 
-## Projects using TinyGLTF
-
-* px_render Single header C++ Libraries for Thread Scheduling, Rendering, and so on... https://github.com/pplux/px
-* Physical based rendering with Vulkan using glTF 2.0 models https://github.com/SaschaWillems/Vulkan-glTF-PBR
-* GLTF loader plugin for OGRE 2.1. Support for PBR materials via HLMS/PBS https://github.com/Ybalrid/Ogre_glTF
-* [TinyGltfImporter](http://doc.magnum.graphics/magnum/classMagnum_1_1Trade_1_1TinyGltfImporter.html) plugin for [Magnum](https://github.com/mosra/magnum), a lightweight and modular C++11/C++14 graphics middleware for games and data visualization.
-* [Diligent Engine](https://github.com/DiligentGraphics/DiligentEngine) - A modern cross-platform low-level graphics library and rendering framework
-* Lighthouse 2: a rendering framework for real-time ray tracing / path tracing experiments. https://github.com/jbikker/lighthouse2
-* [QuickLook GLTF](https://github.com/toshiks/glTF-quicklook) - quicklook plugin for macos. Also SceneKit wrapper for tinygltf.
-* [GlslViewer](https://github.com/patriciogonzalezvivo/glslViewer) - live GLSL coding for MacOS and Linux
-* [Vulkan-Samples](https://github.com/KhronosGroup/Vulkan-Samples) - The Vulkan Samples is collection of resources to help you develop optimized Vulkan applications.
-* [TDME2](https://github.com/andreasdr/tdme2) - TDME2 - ThreeDeeMiniEngine2 is a lightweight 3D engine including tools suited for 3D game development using C++11
-* [SanityEngine](https://github.com/DethRaid/SanityEngine) - A C++/D3D12 renderer focused on the personal and professional development of its developer
-* [Open3D](http://www.open3d.org/) - A Modern Library for 3D Data Processing
-* [Supernova Engine](https://github.com/supernovaengine/supernova) - Game engine for 2D and 3D projects with Lua or C++ in data oriented design.
-* [Wicked Engine<img src="https://github.com/turanszkij/WickedEngine/blob/master/Content/logo_small.png" width="28px" align="center"/>](https://github.com/turanszkij/WickedEngine) - 3D engine with modern graphics
-* Your projects here! (Please send PR)
 
 ## TODOs
 
