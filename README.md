@@ -21,28 +21,36 @@ v3 is a ground-up rewrite with a C-centric, low-overhead design:
 
 ### Quick start (v3)
 
-Copy `tiny_gltf_v3.h` and `tinygltf_json.h` to your project. In **one** `.cpp` file:
+Copy `tiny_gltf_v3.h`, `tiny_gltf_v3.c`, and `tinygltf_json_c.h` to your project.
+Compile `tiny_gltf_v3.c` as C11 or newer. Define `TINYGLTF3_ENABLE_FS` when
+building `tiny_gltf_v3.c` if you want `tg3_parse_file()` to use stdio-backed
+filesystem helpers. The legacy `TINYGLTF3_IMPLEMENTATION` include path remains
+available for compatibility.
 
-```cpp
-#define TINYGLTF3_IMPLEMENTATION
-#define TINYGLTF3_ENABLE_FS          // enable file I/O
-#define TINYGLTF3_ENABLE_STB_IMAGE   // enable image decoding
+```c
 #include "tiny_gltf_v3.h"
 ```
 
 Loading a glTF file:
 
 ```c
-tg3_load_options_t opts = tg3_load_options_default();
-tg3_error_stack_t errors = {0};
-tg3_model_t *model = tg3_load_from_file("scene.gltf", &opts, &errors);
-if (!model) {
-    for (int i = 0; i < errors.count; i++)
-        fprintf(stderr, "[%s] %s\n", tg3_severity_str(errors.items[i].severity),
-                errors.items[i].message);
+tg3_parse_options opts;
+tg3_error_stack errors;
+tg3_model model;
+
+tg3_parse_options_init(&opts);
+tg3_error_stack_init(&errors);
+
+tg3_error_code err = tg3_parse_file(&model, &errors, "scene.gltf", 10, &opts);
+if (err != TG3_OK) {
+    for (uint32_t i = 0; i < errors.count; i++) {
+        fprintf(stderr, "[%d] %s\n", (int)errors.entries[i].severity,
+                errors.entries[i].message ? errors.entries[i].message : "(null)");
+    }
 }
 // ... use model ...
-tg3_model_free(model);
+tg3_model_free(&model);
+tg3_error_stack_free(&errors);
 ```
 
 ## Status

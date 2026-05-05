@@ -1,5 +1,5 @@
 /*
- * tiny_gltf_v3.h - Header-only C glTF 2.0 loader and writer (v3)
+ * tiny_gltf_v3.h - C-first glTF 2.0 loader and writer API (v3)
  *
  * The MIT License (MIT)
  * Copyright (c) 2026 - Present: Syoyo Fujita
@@ -27,7 +27,7 @@
  * Version: v3.0.0-alpha
  *
  * Ground-up C-centric API rewrite of tinygltf.
- * Uses tinygltf_json.h as the sole JSON backend.
+ * The default runtime implementation lives in tiny_gltf_v3.c.
  *
  * Key differences from v2:
  *   - Pure C POD structs (no STL containers in public API)
@@ -46,7 +46,7 @@
  * Section 2: Configuration Macros
  * ====================================================================== */
 
-/* Build mode: define in ONE C++ translation unit (.cpp) */
+/* Legacy single-translation-unit build mode: define in ONE C or C++ file */
 /* #define TINYGLTF3_IMPLEMENTATION */
 
 /* Opt-in features (OFF by default) */
@@ -1219,6 +1219,11 @@ ParseGenerator tg3_parse_coro(
  * ====================================================================== */
 
 #ifdef TINYGLTF3_IMPLEMENTATION
+#define TINYGLTF3_SOURCE_INCLUDED_FROM_HEADER 1
+#include "tiny_gltf_v3.c"
+#undef TINYGLTF3_SOURCE_INCLUDED_FROM_HEADER
+
+#if 0
 
 #if !defined(__cplusplus)
 #error "TINYGLTF3_IMPLEMENTATION requires a C++ translation unit (compile as .cpp)"
@@ -4431,6 +4436,7 @@ TINYGLTF3_API void tg3_writer_destroy(tg3_writer *w) {
     delete w;
 }
 
+#endif /* legacy header-only v3 implementation */
 #endif /* TINYGLTF3_IMPLEMENTATION */
 
 #endif /* TINY_GLTF_V3_H_ */

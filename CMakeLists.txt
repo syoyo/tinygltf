@@ -65,6 +65,21 @@ if (TINYGLTF_BUILD_TESTS)
   )
   target_compile_definitions(tester_intensive_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
   add_test(NAME tester_intensive_customjson COMMAND tester_intensive_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  add_executable(tester_v3_c
+    tests/tester_v3_c.c
+    tiny_gltf_v3.c
+  )
+  target_include_directories(tester_v3_c PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  set_target_properties(tester_v3_c PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+  )
+  add_test(NAME tester_v3_c COMMAND tester_v3_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif (TINYGLTF_BUILD_TESTS)
 
 #
@@ -107,7 +122,10 @@ if (TINYGLTF_INSTALL)
 
   INSTALL ( FILES
     tiny_gltf.h
+    tiny_gltf_v3.h
+    tiny_gltf_v3.c
     tinygltf_json.h
+    tinygltf_json_c.h
     ${TINYGLTF_EXTRA_SOUECES}
     DESTINATION
     include

@@ -26,7 +26,7 @@ MAX_TIME  ?= 0
 
 all: $(FUZZER)
 
-$(FUZZER): fuzz_gltf_v3.cc ../../../tiny_gltf_v3.h ../../../tinygltf_json.h
+$(FUZZER): fuzz_gltf_v3.cc ../../../tiny_gltf_v3.h ../../../tiny_gltf_v3.c ../../../tinygltf_json_c.h
 	$(CXX) $(CXXFLAGS) $(SANITIZE) $(INCLUDES) -o $@ $<
 
 run: $(FUZZER) | $(CORPUS) $(ARTIFACTS)

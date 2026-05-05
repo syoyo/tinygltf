@@ -28,7 +28,7 @@ all: $(GEN) $(BENCH_V3)
 $(GEN): gen_synthetic.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $<
 
-$(BENCH_V3): bench_v3.cpp ../tiny_gltf_v3.h ../tinygltf_json.h
+$(BENCH_V3): bench_v3.cpp ../tiny_gltf_v3.h ../tiny_gltf_v3.c ../tinygltf_json_c.h
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $<
 
 # Generate synthetic scenes of varying sizes
