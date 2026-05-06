@@ -4,7 +4,8 @@
 
 ## TinyGLTF v3 (new major release)
 
-**`tiny_gltf_v3.h`** is the new major version of TinyGLTF and the recommended API for new projects.
+**`tiny_gltf_v3.h`** is the new major version of TinyGLTF.
+The new C implementation (`tiny_gltf_v3.c` + `tinygltf_json_c.h`) is currently **experimental**.
 
 ### What's new in v3
 
@@ -13,7 +14,7 @@ v3 is a ground-up rewrite with a C-centric, low-overhead design:
 - **Pure C POD structs** — no STL containers in the public API; easy to bind to other languages.
 - **Arena-based memory management** — all parse-time allocations come from a single arena; a single `tg3_model_free()` frees everything.
 - **Structured error reporting** — `tg3_error_stack` provides machine-readable errors with severity levels and source locations.
-- **Custom JSON backend** — backed by `tinygltf_json.h`, a high-performance, locale-independent JSON parser with optional SIMD acceleration (SSE2 / AVX2 / NEON) and a float32 fast-path.
+- **Custom JSON backend** — backed by `tinygltf_json_c.h`, a locale-independent pure-C JSON parser/serializer used by the v3 runtime.
 - **Streaming callbacks** — opt-in streaming parse/write via user-supplied callbacks.
 - **No RTTI, no exceptions required** — suitable for embedded and game-engine use.
 - **Opt-in filesystem and image I/O** — `TINYGLTF3_ENABLE_FS` / `TINYGLTF3_ENABLE_STB_IMAGE` are off by default; you control when and how assets are loaded.
@@ -57,7 +58,10 @@ tg3_error_stack_free(&errors);
 
 > ⚠️ **v2 deprecation notice:** `tiny_gltf.h` (v2) remains fully functional and is still supported,
 > but it is now in **maintenance mode only** — no new features will be added.
-> v2 will be **sunset after mid-2026**. New projects should use `tiny_gltf_v3.h`.
+> v2 will be **sunset after mid-2026**. `tiny_gltf_v3.h` is the intended successor, but the new C v3 runtime is still **experimental**.
+
+TinyGLTF v3's C runtime (`tiny_gltf_v3.h` + `tiny_gltf_v3.c`) is available for evaluation and early adoption,
+but its API/behavior may still change while the implementation matures.
 
 Currently TinyGLTF v2 is stable and in maintenance mode. No drastic changes and feature additions planned.
  - v2.9.0 Various fixes and improvements. Filesystem callback API change.
