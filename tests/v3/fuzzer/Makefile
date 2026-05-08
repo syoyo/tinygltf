@@ -1,19 +1,23 @@
-# tests/v3/fuzzer/Makefile — Build libFuzzer harness for tinygltf v3
+# tests/v3/fuzzer/Makefile — Build libFuzzer harnesses for tinygltf v3
 #
-# Requires: clang++ with libFuzzer support
+# Requires: clang/clang++ with libFuzzer support
 #
 # Targets:
-#   make             — build fuzzer with ASan + UBSan
-#   make run         — run fuzzer with default settings
+#   make             — build both harnesses with ASan + UBSan
+#   make run         — run the dedicated pure-C v3 harness
+#   make run-cpp     — run the legacy header-implementation harness
 #   make seed        — generate seed corpus from test models
 #   make clean       — remove binaries and corpus
 
+CC        = clang
 CXX       = clang++
+CCFLAGS   = -g -O1 -std=c11
 CXXFLAGS  = -g -O1 -std=c++17 -fno-rtti -fno-exceptions
 SANITIZE  = -fsanitize=fuzzer,address,undefined
 INCLUDES  = -I../../..
 
 FUZZER    = fuzz_gltf_v3
+FUZZER_C  = fuzz_gltf_v3_c
 CORPUS    = corpus
 ARTIFACTS = artifacts
 
@@ -21,16 +25,28 @@ ARTIFACTS = artifacts
 MAX_LEN   ?= 65536
 JOBS      ?= $(shell nproc 2>/dev/null || echo 4)
 MAX_TIME  ?= 0
+FUZZ_ENV  ?= LSAN_OPTIONS=detect_leaks=0
 
-.PHONY: all run seed clean
+.PHONY: all run run-cpp seed clean
 
-all: $(FUZZER)
+all: $(FUZZER) $(FUZZER_C)
 
 $(FUZZER): fuzz_gltf_v3.cc ../../../tiny_gltf_v3.h ../../../tiny_gltf_v3.c ../../../tinygltf_json_c.h
 	$(CXX) $(CXXFLAGS) $(SANITIZE) $(INCLUDES) -o $@ $<
 
-run: $(FUZZER) | $(CORPUS) $(ARTIFACTS)
-	./$(FUZZER) $(CORPUS) \
+$(FUZZER_C): fuzz_gltf_v3_c.c ../../../tiny_gltf_v3.h ../../../tiny_gltf_v3.c ../../../tinygltf_json_c.h
+	$(CC) $(CCFLAGS) $(SANITIZE) $(INCLUDES) -o $@ $< ../../../tiny_gltf_v3.c
+
+run: $(FUZZER_C) | $(CORPUS) $(ARTIFACTS)
+	$(FUZZ_ENV) ./$(FUZZER_C) $(CORPUS) \
+		-artifact_prefix=$(ARTIFACTS)/ \
+		-max_len=$(MAX_LEN) \
+		-jobs=$(JOBS) \
+		-workers=$(JOBS) \
+		$(if $(filter-out 0,$(MAX_TIME)),-max_total_time=$(MAX_TIME))
+
+run-cpp: $(FUZZER) | $(CORPUS) $(ARTIFACTS)
+	$(FUZZ_ENV) ./$(FUZZER) $(CORPUS) \
 		-artifact_prefix=$(ARTIFACTS)/ \
 		-max_len=$(MAX_LEN) \
 		-jobs=$(JOBS) \
@@ -63,5 +79,5 @@ $(ARTIFACTS):
 	mkdir -p $(ARTIFACTS)
 
 clean:
-	rm -f $(FUZZER)
+	rm -f $(FUZZER) $(FUZZER_C)
 	rm -rf $(CORPUS) $(ARTIFACTS)

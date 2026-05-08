@@ -451,6 +451,46 @@ static int tg3__json_is_number(const tg3json_value *v) {
     return v && (v->type == TG3JSON_INT || v->type == TG3JSON_REAL);
 }
 
+static int tg3__json_number_to_int32(const tg3json_value *v, int32_t *out) {
+    double real;
+    int32_t converted;
+    if (!tg3__json_is_number(v) || !out) return 0;
+    if (v->type == TG3JSON_INT) {
+        if (v->u.integer < INT32_MIN || v->u.integer > INT32_MAX) return 0;
+        *out = (int32_t)v->u.integer;
+        return 1;
+    }
+    real = v->u.real;
+    if (!isfinite(real) || real < (double)INT32_MIN || real > (double)INT32_MAX) {
+        return 0;
+    }
+    converted = (int32_t)real;
+    if ((double)converted != real) return 0;
+    *out = converted;
+    return 1;
+}
+
+static int tg3__json_number_to_uint64(const tg3json_value *v, uint64_t *out) {
+    double real;
+    uint64_t converted;
+    /* Largest safely castable integer expressible as double below 2^64. */
+    const double max_safe_uint64_real = 18446744073709547520.0;
+    if (!tg3__json_is_number(v) || !out) return 0;
+    if (v->type == TG3JSON_INT) {
+        if (v->u.integer < 0) return 0;
+        *out = (uint64_t)v->u.integer;
+        return 1;
+    }
+    real = v->u.real;
+    if (!isfinite(real) || real < 0.0 || real > max_safe_uint64_real) {
+        return 0;
+    }
+    converted = (uint64_t)real;
+    if ((double)converted != real) return 0;
+    *out = converted;
+    return 1;
+}
+
 static int tg3__json_is_object(const tg3json_value *v) { return v && v->type == TG3JSON_OBJECT; }
 static int tg3__json_is_array(const tg3json_value *v) { return v && v->type == TG3JSON_ARRAY; }
 
@@ -487,7 +527,6 @@ static int tg3__parse_string(tg3__parse_ctx *ctx, const tg3json_value *o, const 
 static int tg3__parse_int(tg3__parse_ctx *ctx, const tg3json_value *o, const char *key,
                           int32_t *out, int required, const char *parent) {
     const tg3json_value *it = tg3__json_get(o, key);
-    int64_t v;
     if (!it) {
         if (required) {
             tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR, TG3_ERR_JSON_MISSING_FIELD,
@@ -501,13 +540,11 @@ static int tg3__parse_int(tg3__parse_ctx *ctx, const tg3json_value *o, const cha
                          parent, "Field '%s' must be a number", key);
         return 0;
     }
-    v = (it->type == TG3JSON_INT) ? it->u.integer : (int64_t)it->u.real;
-    if (v < INT32_MIN || v > INT32_MAX) {
+    if (!tg3__json_number_to_int32(it, out)) {
         tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR, TG3_ERR_JSON_TYPE_MISMATCH,
-                         parent, "Field '%s' value %" PRId64 " is out of range for int32", key, v);
+                         parent, "Field '%s' must be a finite int32-valued number", key);
         return 0;
     }
-    *out = (int32_t)v;
     return 1;
 }
 
@@ -527,8 +564,11 @@ static int tg3__parse_uint64(tg3__parse_ctx *ctx, const tg3json_value *o, const 
                          parent, "Field '%s' must be a number", key);
         return 0;
     }
-    if (it->type == TG3JSON_INT) *out = it->u.integer >= 0 ? (uint64_t)it->u.integer : 0u;
-    else *out = it->u.real >= 0.0 ? (uint64_t)it->u.real : 0u;
+    if (!tg3__json_number_to_uint64(it, out)) {
+        tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR, TG3_ERR_JSON_TYPE_MISMATCH,
+                         parent, "Field '%s' must be a finite uint64-valued number", key);
+        return 0;
+    }
     return 1;
 }
 
@@ -651,7 +691,13 @@ static int tg3__parse_int_array(tg3__parse_ctx *ctx, const tg3json_value *o, con
     }
     for (i = 0; i < count; ++i) {
         const tg3json_value *item = tg3json_array_get(it, i);
-        arr[i] = item ? (int32_t)((item->type == TG3JSON_REAL) ? item->u.real : item->u.integer) : 0;
+        if (!item || !tg3__json_number_to_int32(item, &arr[i])) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_JSON_TYPE_MISMATCH, parent,
+                             "Field '%s' element %u must be a finite int32-valued number",
+                             key, (unsigned)i);
+            return 0;
+        }
     }
     *out = arr;
     *out_count = (uint32_t)count;
@@ -1155,7 +1201,13 @@ static int tg3__parse_primitive(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
                 for (i = 0; i < count; ++i) {
                     const tg3json_object_entry *entry = tg3json_object_at(attr_it, i);
                     attrs[i].key = tg3__arena_str(ctx->arena, entry->key, (uint32_t)entry->key_len);
-                    attrs[i].value = (int32_t)((entry->value->type == TG3JSON_REAL) ? entry->value->u.real : entry->value->u.integer);
+                    if (!tg3__json_number_to_int32(entry->value, &attrs[i].value)) {
+                        tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                                         TG3_ERR_JSON_TYPE_MISMATCH, "/primitive/attributes",
+                                         "Attribute '%s' must be a finite int32-valued number",
+                                         entry->key ? entry->key : "");
+                        attrs[i].value = 0;
+                    }
                 }
                 prim->attributes = attrs;
                 prim->attributes_count = (uint32_t)count;
@@ -1186,7 +1238,13 @@ static int tg3__parse_primitive(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
                         for (ai = 0; ai < acount; ++ai) {
                             const tg3json_object_entry *entry = tg3json_object_at(target_obj, ai);
                             tattrs[ai].key = tg3__arena_str(ctx->arena, entry->key, (uint32_t)entry->key_len);
-                            tattrs[ai].value = (int32_t)((entry->value->type == TG3JSON_REAL) ? entry->value->u.real : entry->value->u.integer);
+                            if (!tg3__json_number_to_int32(entry->value, &tattrs[ai].value)) {
+                                tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                                                 TG3_ERR_JSON_TYPE_MISMATCH, "/primitive/targets",
+                                                 "Target attribute '%s' must be a finite int32-valued number",
+                                                 entry->key ? entry->key : "");
+                                tattrs[ai].value = 0;
+                            }
                         }
                     }
                     target_arrays[ti] = tattrs;
@@ -1611,6 +1669,7 @@ TINYGLTF3_API tg3_error_code tg3_parse(tg3_model *model, tg3_error_stack *errors
     tg3json_value json_doc;
     const char *error_pos = NULL;
     tg3_error_code ret;
+    int parsed_ok;
     if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
     tg3__model_init(model);
     arena = tg3__arena_create(&options->memory);
@@ -1619,9 +1678,12 @@ TINYGLTF3_API tg3_error_code tg3_parse(tg3_model *model, tg3_error_stack *errors
         return TG3_ERR_OUT_OF_MEMORY;
     }
     model->arena_ = arena;
-    if (!tg3json_parse_n((const char *)json_data, (size_t)json_size, TINYGLTF3_MAX_NESTING_DEPTH, &json_doc, &error_pos) || json_doc.type != TG3JSON_OBJECT) {
+    parsed_ok = tg3json_parse_n((const char *)json_data, (size_t)json_size,
+                                TINYGLTF3_MAX_NESTING_DEPTH, &json_doc, &error_pos);
+    if (!parsed_ok || json_doc.type != TG3JSON_OBJECT) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE, "Failed to parse JSON", NULL,
                         error_pos ? (int64_t)(error_pos - (const char *)json_data) : -1);
+        if (parsed_ok) tg3json_value_free(&json_doc);
         if (model->arena_) { tg3__arena_destroy(model->arena_); model->arena_ = NULL; }
         return TG3_ERR_JSON_PARSE;
     }
@@ -1657,6 +1719,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
     tg3json_value json_doc;
     const char *error_pos = NULL;
     tg3_error_code err;
+    int parsed_ok;
     err = tg3__parse_glb_header(glb_data, glb_size, &json_chunk, &json_chunk_size, &bin_chunk, &bin_chunk_size, errors);
     if (err != TG3_OK) return err;
     if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
@@ -1667,9 +1730,12 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
         return TG3_ERR_OUT_OF_MEMORY;
     }
     model->arena_ = arena;
-    if (!tg3json_parse_n((const char *)json_chunk, (size_t)json_chunk_size, TINYGLTF3_MAX_NESTING_DEPTH, &json_doc, &error_pos) || json_doc.type != TG3JSON_OBJECT) {
+    parsed_ok = tg3json_parse_n((const char *)json_chunk, (size_t)json_chunk_size,
+                                TINYGLTF3_MAX_NESTING_DEPTH, &json_doc, &error_pos);
+    if (!parsed_ok || json_doc.type != TG3JSON_OBJECT) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE, "Failed to parse GLB JSON chunk", NULL,
                         error_pos ? (int64_t)(error_pos - (const char *)json_chunk) : -1);
+        if (parsed_ok) tg3json_value_free(&json_doc);
         tg3__arena_destroy(model->arena_);
         model->arena_ = NULL;
         return TG3_ERR_JSON_PARSE;
@@ -1717,6 +1783,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_file(tg3_model *model, tg3_error_stack *e
     uint32_t i;
     if (options) opts = *options;
     else tg3_parse_options_init(&opts);
+    tg3__model_init(model);
 #ifdef TINYGLTF3_ENABLE_FS
     tg3__set_default_fs(&opts.fs);
 #endif

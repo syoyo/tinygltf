@@ -129,11 +129,103 @@ static int check_minimal_write_roundtrip(void) {
   return 1;
 }
 
+static int check_parse_file_failure_initializes_model(void) {
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  memset(&model, 0xA5, sizeof(model));
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+
+  err = tg3_parse_file(&model, &errors, "scene.gltf", 10, &opts);
+  if (err != TG3_ERR_FS_NOT_AVAILABLE) {
+    fprintf(stderr, "tg3_parse_file unexpected error: %d\n", (int)err);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+
+  if (model.default_scene != -1) {
+    fprintf(stderr, "tg3_parse_file did not initialize model on failure\n");
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_non_object_root_rejected(void) {
+  static const uint8_t json[] = "\"not an object\"";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_JSON_PARSE) {
+    fprintf(stderr, "non-object root returned unexpected error: %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+
+  if (model.default_scene != -1) {
+    fprintf(stderr, "non-object root left model in unexpected state\n");
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_huge_integer_field_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"scene\":6.66667e+70}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_JSON_PARSE) {
+    fprintf(stderr, "huge integer-like field returned unexpected error: %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
 int main(void) {
   if (!check_minimal_parse()) {
     return 1;
   }
   if (!check_minimal_write_roundtrip()) {
+    return 1;
+  }
+  if (!check_parse_file_failure_initializes_model()) {
+    return 1;
+  }
+  if (!check_non_object_root_rejected()) {
+    return 1;
+  }
+  if (!check_huge_integer_field_rejected()) {
     return 1;
   }
   return 0;

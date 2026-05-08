@@ -5,3 +5,7 @@ all: ../tiny_gltf.h
 	clang++  -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester tester.cc
 	clang++ -DTINYGLTF_NOEXCEPTION -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester_noexcept tester.cc
 	clang++ -DTINYGLTF_USE_CUSTOM_JSON -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester_intensive_customjson tester_intensive_customjson.cc
+	clang -I../ -std=c11 -g -O0 -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+
+tester_v3_c: tester_v3_c.c ../tiny_gltf_v3.h ../tiny_gltf_v3.c ../tinygltf_json_c.h
+	clang -I../ -std=c11 -g -O0 -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
