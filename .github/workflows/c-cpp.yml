@@ -100,6 +100,17 @@ jobs:
         ./tester_noexcept
         cd ..
 
+    - name: v3_c_tests
+      run: |
+        cd tests
+        cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
+           -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+        ./tester_v3_c
+        cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
+           -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
+        ./tester_v3_c_v1port
+        cd ..
+
 
   build-rapidjson-linux:
 

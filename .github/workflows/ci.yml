@@ -328,3 +328,71 @@ jobs:
           cd tests
           clang++ -fsanitize=undefined -I../ -std=c++11 -g -O1 -o tester tester.cc
           ./tester
+
+  # v3 C runtime: internal security regression tests + ported v1 unit tests.
+  v3-c-tests:
+    runs-on: ubuntu-latest
+    name: v3 C tests (Linux x64)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build tester_v3_c
+        run: |
+          cd tests
+          cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
+             -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+
+      - name: Build tester_v3_c_v1port
+        run: |
+          cd tests
+          cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
+             -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
+
+      - name: Run tester_v3_c (security regressions)
+        run: |
+          cd tests
+          ./tester_v3_c
+
+      - name: Run tester_v3_c_v1port (18 ported unit tests)
+        run: |
+          cd tests
+          ./tester_v3_c_v1port
+
+  # v3 C runtime under ASan + UBSan for memory-safety + UB checks.
+  v3-c-tests-sanitizers:
+    runs-on: ubuntu-latest
+    name: v3 C tests (Clang ASan + UBSan)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build tester_v3_c with ASan + UBSan
+        run: |
+          cd tests
+          clang -I../ -std=c11 -g -O1 -DTINYGLTF3_ENABLE_FS \
+                -fsanitize=address,undefined -fno-omit-frame-pointer \
+                -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+
+      - name: Build tester_v3_c_v1port with ASan + UBSan
+        run: |
+          cd tests
+          clang -I../ -std=c11 -g -O1 -DTINYGLTF3_ENABLE_FS \
+                -fsanitize=address,undefined -fno-omit-frame-pointer \
+                -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
+
+      - name: Run tester_v3_c
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          cd tests
+          ./tester_v3_c
+
+      - name: Run tester_v3_c_v1port
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          cd tests
+          ./tester_v3_c_v1port
