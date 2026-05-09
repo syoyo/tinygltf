@@ -135,8 +135,10 @@ static int errstack_contains(const tg3_error_stack *e, const char *needle) {
   fprintf(stdout, "  [PASS] %s\n", label); \
   return 1; \
 } while (0)
-#define FAIL(fmt, ...) do { \
-  fprintf(stderr, "  [FAIL] " fmt "\n", ##__VA_ARGS__); \
+#define FAIL(...) do { \
+  fprintf(stderr, "  [FAIL] "); \
+  fprintf(stderr, __VA_ARGS__); \
+  fprintf(stderr, "\n"); \
   goto fail; \
 } while (0)
 

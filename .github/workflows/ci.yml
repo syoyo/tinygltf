@@ -340,13 +340,13 @@ jobs:
       - name: Build tester_v3_c
         run: |
           cd tests
-          cc -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+          cc -I../ -std=c11 -g -O0 -Wall -Wextra -Wpedantic -Werror -DTINYGLTF3_ENABLE_FS \
              -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
 
       - name: Build tester_v3_c_v1port
         run: |
           cd tests
-          cc -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+          cc -I../ -std=c11 -g -O0 -Wall -Wextra -Wpedantic -Werror -DTINYGLTF3_ENABLE_FS \
              -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
 
       - name: Run tester_v3_c (security regressions)
@@ -375,13 +375,21 @@ jobs:
       - name: Build tester_v3_c
         run: |
           cd tests
-          clang -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+          clang -I../ -std=c11 -g -O0 -Werror -Weverything \
+                -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
+                -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
+                -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                -DTINYGLTF3_ENABLE_FS \
                 -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
 
       - name: Build tester_v3_c_v1port
         run: |
           cd tests
-          clang -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+          clang -I../ -std=c11 -g -O0 -Werror -Weverything \
+                -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
+                -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
+                -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                -DTINYGLTF3_ENABLE_FS \
                 -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
 
       - name: Run tester_v3_c
@@ -411,13 +419,21 @@ jobs:
       - name: Build tester_v3_c
         run: |
           cd tests
-          clang-21 -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+          clang-21 -I../ -std=c11 -g -O0 -Werror -Weverything \
+                   -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
+                   -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
+                   -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                   -DTINYGLTF3_ENABLE_FS \
                    -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
 
       - name: Build tester_v3_c_v1port
         run: |
           cd tests
-          clang-21 -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+          clang-21 -I../ -std=c11 -g -O0 -Werror -Weverything \
+                   -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
+                   -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
+                   -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                   -DTINYGLTF3_ENABLE_FS \
                    -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
 
       - name: Run tester_v3_c
@@ -429,6 +445,30 @@ jobs:
         run: |
           cd tests
           ./tester_v3_c_v1port
+
+  # v3 C runtime built with MSVC at warning-level 4 (/W4 /WX).
+  v3-c-tests-msvc:
+    runs-on: windows-latest
+    name: v3 C tests (Windows x64, MSVC /W4)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and run tester_v3_c
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd tests
+          cl /nologo /W4 /WX /std:c11 /Zi /Od /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c.c ..\tiny_gltf_v3.c /Fe:tester_v3_c.exe
+          tester_v3_c.exe
+
+      - name: Build and run tester_v3_c_v1port
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd tests
+          cl /nologo /W4 /WX /std:c11 /Zi /Od /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c_v1port.c ..\tiny_gltf_v3.c /Fe:tester_v3_c_v1port.exe
+          tester_v3_c_v1port.exe
 
   # v3 C runtime under ASan + UBSan for memory-safety + UB checks.
   v3-c-tests-sanitizers:

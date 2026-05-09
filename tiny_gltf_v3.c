@@ -98,17 +98,17 @@ static tg3_arena *tg3__arena_create(const tg3_memory_config *config) {
 
 static tg3__arena_block *tg3__arena_new_block(tg3_arena *arena, size_t min_size) {
     size_t cap = arena->block_size;
-    uint8_t *raw;
+    void *raw;
     tg3__arena_block *block;
     if (cap < min_size) cap = min_size;
     if (arena->max_single_alloc && cap > arena->max_single_alloc) return NULL;
     if (arena->total_allocated + sizeof(tg3__arena_block) + cap > arena->memory_budget) return NULL;
 
-    raw = (uint8_t *)arena->alloc.alloc(sizeof(tg3__arena_block) + cap, arena->alloc.user_data);
+    raw = arena->alloc.alloc(sizeof(tg3__arena_block) + cap, arena->alloc.user_data);
     if (!raw) return NULL;
     block = (tg3__arena_block *)raw;
     block->next = NULL;
-    block->base = raw + sizeof(tg3__arena_block);
+    block->base = (uint8_t *)raw + sizeof(tg3__arena_block);
     block->used = 0;
     block->capacity = cap;
     arena->total_allocated += sizeof(tg3__arena_block) + cap;
@@ -2171,10 +2171,6 @@ static int tg3__json_set_string(tg3json_value *obj, const char *key, const char 
     return tg3__json_set_string_n(obj, key, str, str ? strlen(str) : 0);
 }
 
-static int tg3__json_set_value_copy(tg3json_value *obj, const char *key, const tg3json_value *value) {
-    return tg3json_object_set_copy(obj, key, value);
-}
-
 static int tg3__json_array_append_int(tg3json_value *arr, int64_t value) {
     tg3json_value tmp;
     tg3json_value_init_int(&tmp, value);
@@ -2370,9 +2366,11 @@ static int tg3__value_to_json(const tg3_value *v, tg3json_value *out) {
                 }
             }
             return 1;
-        default:
-            return 0;
+        case TG3_VALUE_BINARY:
+            /* Binary blobs cannot be represented as JSON; emit null. */
+            return 1;
     }
+    return 0; /* unreachable: all enum cases handled above. */
 }
 
 static int tg3__serialize_extras_ext(tg3json_value *o, const tg3_extras_ext *ee) {

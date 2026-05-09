@@ -641,7 +641,11 @@ void tg3json_value_free(tg3json_value *value) {
             }
             free(value->u.object.items);
             break;
-        default:
+        case TG3JSON_NULL:
+        case TG3JSON_BOOL:
+        case TG3JSON_INT:
+        case TG3JSON_REAL:
+            /* Scalar variants own no heap memory. */
             break;
     }
     tg3json__init_value(value);
@@ -733,9 +737,8 @@ int tg3json_value_copy(tg3json_value *dst, const tg3json_value *src) {
                 }
             }
             return 1;
-        default:
-            return 0;
     }
+    return 0; /* unreachable: all enum cases handled above. */
 }
 
 const tg3json_value *tg3json_object_get_n(const tg3json_value *object,
@@ -973,9 +976,8 @@ static int tg3json__stringify_value_ex(tg3json__buffer *buf, const tg3json_value
             }
             if (indent > 0 && value->u.object.count > 0 && !tg3json__indent(buf, indent, depth)) return 0;
             return tg3json__buf_putc(buf, '}');
-        default:
-            return 0;
     }
+    return 0; /* unreachable: all enum cases handled above. */
 }
 
 char *tg3json_stringify(const tg3json_value *value, size_t *out_len) {
