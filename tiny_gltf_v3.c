@@ -473,7 +473,9 @@ static int tg3__json_number_to_int32(const tg3json_value *v, int32_t *out) {
 static int tg3__json_number_to_uint64(const tg3json_value *v, uint64_t *out) {
     double real;
     uint64_t converted;
-    /* Largest safely castable integer expressible as double below 2^64. */
+    /* Doubles have a 53-bit mantissa, so 2^64 itself rounds up and would be UB
+       on cast to uint64_t. Cap at the largest representable value strictly
+       below 2^64 (== 2^64 - 2^11). */
     const double max_safe_uint64_real = 18446744073709547520.0;
     if (!tg3__json_is_number(v) || !out) return 0;
     if (v->type == TG3JSON_INT) {
@@ -489,6 +491,13 @@ static int tg3__json_number_to_uint64(const tg3json_value *v, uint64_t *out) {
     if ((double)converted != real) return 0;
     *out = converted;
     return 1;
+}
+
+static double tg3__json_number_to_double(const tg3json_value *v) {
+    if (!v) return 0.0;
+    if (v->type == TG3JSON_INT) return (double)v->u.integer;
+    if (v->type == TG3JSON_REAL) return v->u.real;
+    return 0.0;
 }
 
 static int tg3__json_is_object(const tg3json_value *v) { return v && v->type == TG3JSON_OBJECT; }
@@ -588,7 +597,7 @@ static int tg3__parse_double(tg3__parse_ctx *ctx, const tg3json_value *o, const 
                          parent, "Field '%s' must be a number", key);
         return 0;
     }
-    *out = (it->type == TG3JSON_INT) ? (double)it->u.integer : it->u.real;
+    *out = tg3__json_number_to_double(it);
     return 1;
 }
 
@@ -647,8 +656,7 @@ static int tg3__parse_number_array(tg3__parse_ctx *ctx, const tg3json_value *o, 
         return 0;
     }
     for (i = 0; i < count; ++i) {
-        const tg3json_value *item = tg3json_array_get(it, i);
-        arr[i] = (item && item->type == TG3JSON_REAL) ? item->u.real : (item ? (double)item->u.integer : 0.0);
+        arr[i] = tg3__json_number_to_double(tg3json_array_get(it, i));
     }
     *out = arr;
     *out_count = (uint32_t)count;
@@ -715,7 +723,7 @@ static void tg3__parse_number_to_fixed(const tg3json_value *o, const char *key,
     for (i = 0; i < count; ++i) {
         const tg3json_value *item = tg3json_array_get(it, i);
         if (!item) continue;
-        out[i] = (item->type == TG3JSON_REAL) ? item->u.real : (double)item->u.integer;
+        out[i] = tg3__json_number_to_double(item);
     }
 }
 

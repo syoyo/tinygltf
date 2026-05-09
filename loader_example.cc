@@ -6,7 +6,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "tiny_gltf.h"
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 
@@ -852,6 +855,206 @@ static void Dump(const tinygltf::Model &model) {
   }
 }
 
+/* ===== Digest helpers (used to compare v1 vs v3 parses) ===================== */
+
+static uint64_t fnv64(const unsigned char *data, size_t n) {
+  uint64_t h = 0xcbf29ce484222325ULL;
+  for (size_t i = 0; i < n; ++i) { h ^= data[i]; h *= 0x100000001b3ULL; }
+  return h;
+}
+
+static void d_str(const std::string &s) {
+  putchar('"');
+  for (unsigned char c : s) {
+    if (c == '"' || c == '\\') { putchar('\\'); putchar((char)c); }
+    else if (c < 0x20 || c >= 0x7f) putchar('?');
+    else putchar((char)c);
+  }
+  putchar('"');
+}
+
+static void d_dbl(double v) { printf("%.7g", v); }
+
+static void d_dbl_arr(const double *v, size_t n) {
+  putchar('[');
+  for (size_t i = 0; i < n; ++i) { if (i) putchar(','); d_dbl(v[i]); }
+  putchar(']');
+}
+
+static void d_dbl_vec(const std::vector<double> &v) {
+  d_dbl_arr(v.data(), v.size());
+}
+
+static void PrintDigest(const tinygltf::Model &m) {
+  printf("DIGEST_BEGIN\n");
+
+  printf("asset version=");
+  d_str(m.asset.version);
+  printf(" generator=");
+  d_str(m.asset.generator);
+  printf("\n");
+
+  for (size_t i = 0; i < m.buffers.size(); ++i) {
+    const auto &b = m.buffers[i];
+    uint64_t h = b.data.empty() ? 0 : fnv64(b.data.data(), b.data.size());
+    printf("buffer %zu byte_length=%llu fnv64=0x%016llx\n",
+           i, (unsigned long long)b.data.size(), (unsigned long long)h);
+  }
+  for (size_t i = 0; i < m.bufferViews.size(); ++i) {
+    const auto &bv = m.bufferViews[i];
+    printf("buffer_view %zu buffer=%d byte_offset=%llu byte_length=%llu byte_stride=%u\n",
+           i, bv.buffer, (unsigned long long)bv.byteOffset,
+           (unsigned long long)bv.byteLength, (unsigned)bv.byteStride);
+  }
+  for (size_t i = 0; i < m.accessors.size(); ++i) {
+    const auto &a = m.accessors[i];
+    printf("accessor %zu buffer_view=%d byte_offset=%llu component_type=%d count=%llu type=%d normalized=%d min=",
+           i, a.bufferView, (unsigned long long)a.byteOffset, a.componentType,
+           (unsigned long long)a.count, a.type, a.normalized ? 1 : 0);
+    d_dbl_vec(a.minValues);
+    printf(" max=");
+    d_dbl_vec(a.maxValues);
+    printf(" sparse=%d\n", a.sparse.isSparse ? 1 : 0);
+  }
+  for (size_t i = 0; i < m.meshes.size(); ++i) {
+    const auto &me = m.meshes[i];
+    printf("mesh %zu primitives_count=%zu weights_count=%zu\n",
+           i, me.primitives.size(), me.weights.size());
+    for (size_t j = 0; j < me.primitives.size(); ++j) {
+      const auto &p = me.primitives[j];
+      printf("prim %zu %zu indices=%d material=%d mode=%d attrs=[",
+             i, j, p.indices, p.material, p.mode);
+      // attributes is std::map → already sorted by key
+      bool first = true;
+      for (const auto &kv : p.attributes) {
+        if (!first) putchar(',');
+        printf("%s:%d", kv.first.c_str(), kv.second);
+        first = false;
+      }
+      printf("] targets_count=%zu\n", p.targets.size());
+    }
+  }
+  for (size_t i = 0; i < m.nodes.size(); ++i) {
+    const auto &n = m.nodes[i];
+    double t[3] = {0, 0, 0};
+    double r[4] = {0, 0, 0, 1};
+    double s[3] = {1, 1, 1};
+    double mat[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+    int has_matrix = (n.matrix.size() == 16) ? 1 : 0;
+    if (n.translation.size() == 3) std::copy(n.translation.begin(), n.translation.end(), t);
+    if (n.rotation.size() == 4)    std::copy(n.rotation.begin(),    n.rotation.end(),    r);
+    if (n.scale.size() == 3)       std::copy(n.scale.begin(),       n.scale.end(),       s);
+    if (has_matrix) std::copy(n.matrix.begin(), n.matrix.end(), mat);
+    printf("node %zu mesh=%d skin=%d camera=%d light=%d children_count=%zu has_matrix=%d t=",
+           i, n.mesh, n.skin, n.camera, n.light, n.children.size(), has_matrix);
+    d_dbl_arr(t, 3);
+    printf(" r=");
+    d_dbl_arr(r, 4);
+    printf(" s=");
+    d_dbl_arr(s, 3);
+    printf(" matrix=");
+    d_dbl_arr(mat, 16);
+    printf(" weights_count=%zu\n", n.weights.size());
+  }
+  for (size_t i = 0; i < m.materials.size(); ++i) {
+    const auto &mat = m.materials[i];
+    double ef[3] = {0, 0, 0};
+    double bcf[4] = {1, 1, 1, 1};
+    if (mat.emissiveFactor.size() == 3)
+      std::copy(mat.emissiveFactor.begin(), mat.emissiveFactor.end(), ef);
+    if (mat.pbrMetallicRoughness.baseColorFactor.size() == 4)
+      std::copy(mat.pbrMetallicRoughness.baseColorFactor.begin(),
+                mat.pbrMetallicRoughness.baseColorFactor.end(), bcf);
+    printf("material %zu alpha_mode=", i);
+    d_str(mat.alphaMode);
+    printf(" alpha_cutoff=");
+    d_dbl(mat.alphaCutoff);
+    printf(" double_sided=%d emissive=", mat.doubleSided ? 1 : 0);
+    d_dbl_arr(ef, 3);
+    printf(" base_color_factor=");
+    d_dbl_arr(bcf, 4);
+    printf(" metallic=");
+    d_dbl(mat.pbrMetallicRoughness.metallicFactor);
+    printf(" roughness=");
+    d_dbl(mat.pbrMetallicRoughness.roughnessFactor);
+    printf(" base_color_tex=%d normal_tex=%d occlusion_tex=%d emissive_tex=%d\n",
+           mat.pbrMetallicRoughness.baseColorTexture.index,
+           mat.normalTexture.index,
+           mat.occlusionTexture.index,
+           mat.emissiveTexture.index);
+  }
+  for (size_t i = 0; i < m.textures.size(); ++i) {
+    const auto &t = m.textures[i];
+    printf("texture %zu source=%d sampler=%d\n", i, t.source, t.sampler);
+  }
+  for (size_t i = 0; i < m.samplers.size(); ++i) {
+    const auto &s = m.samplers[i];
+    printf("sampler %zu min_filter=%d mag_filter=%d wrap_s=%d wrap_t=%d\n",
+           i, s.minFilter, s.magFilter, s.wrapS, s.wrapT);
+  }
+  for (size_t i = 0; i < m.images.size(); ++i) {
+    const auto &im = m.images[i];
+    /* mime_type and uri normalization differ between v1/v3 (data URIs,
+       extension inference); buffer_view reference is the parse-fidelity bit. */
+    printf("image %zu buffer_view=%d\n", i, im.bufferView);
+  }
+  for (size_t i = 0; i < m.skins.size(); ++i) {
+    const auto &s = m.skins[i];
+    printf("skin %zu inverse_bind_matrices=%d skeleton=%d joints_count=%zu\n",
+           i, s.inverseBindMatrices, s.skeleton, s.joints.size());
+  }
+  for (size_t i = 0; i < m.animations.size(); ++i) {
+    const auto &a = m.animations[i];
+    printf("animation %zu channels_count=%zu samplers_count=%zu\n",
+           i, a.channels.size(), a.samplers.size());
+    for (size_t j = 0; j < a.channels.size(); ++j) {
+      const auto &c = a.channels[j];
+      printf("chan %zu %zu sampler=%d target_node=%d target_path=", i, j,
+             c.sampler, c.target_node);
+      d_str(c.target_path);
+      printf("\n");
+    }
+    for (size_t j = 0; j < a.samplers.size(); ++j) {
+      const auto &as = a.samplers[j];
+      printf("samp %zu %zu input=%d output=%d interpolation=", i, j,
+             as.input, as.output);
+      d_str(as.interpolation);
+      printf("\n");
+    }
+  }
+  for (size_t i = 0; i < m.cameras.size(); ++i) {
+    const auto &c = m.cameras[i];
+    bool is_persp = (c.type == "perspective");
+    printf("camera %zu type=", i);
+    d_str(c.type);
+    if (is_persp) {
+      printf(" yfov=");
+      d_dbl(c.perspective.yfov);
+      printf(" znear=");
+      d_dbl(c.perspective.znear);
+      printf(" zfar=");
+      d_dbl(c.perspective.zfar);
+      printf(" aspect=");
+      d_dbl(c.perspective.aspectRatio);
+    } else {
+      printf(" xmag=");
+      d_dbl(c.orthographic.xmag);
+      printf(" ymag=");
+      d_dbl(c.orthographic.ymag);
+      printf(" znear=");
+      d_dbl(c.orthographic.znear);
+      printf(" zfar=");
+      d_dbl(c.orthographic.zfar);
+    }
+    printf("\n");
+  }
+  for (size_t i = 0; i < m.scenes.size(); ++i) {
+    const auto &s = m.scenes[i];
+    printf("scene %zu nodes_count=%zu\n", i, s.nodes.size());
+  }
+  printf("DIGEST_END\n");
+}
+
 int main(int argc, char **argv) {
   if (argc < 2) {
     printf("Needs input.gltf\n");
@@ -899,6 +1102,20 @@ int main(int argc, char **argv) {
     printf("Failed to parse glTF\n");
     return -1;
   }
+
+  printf("COUNTS"
+         " accessors=%zu animations=%zu buffers=%zu bufferViews=%zu"
+         " cameras=%zu images=%zu materials=%zu meshes=%zu nodes=%zu"
+         " samplers=%zu scenes=%zu skins=%zu textures=%zu lights=%zu\n",
+         model.accessors.size(), model.animations.size(),
+         model.buffers.size(), model.bufferViews.size(),
+         model.cameras.size(), model.images.size(),
+         model.materials.size(), model.meshes.size(),
+         model.nodes.size(), model.samplers.size(),
+         model.scenes.size(), model.skins.size(),
+         model.textures.size(), model.lights.size());
+
+  PrintDigest(model);
 
   Dump(model);
 
