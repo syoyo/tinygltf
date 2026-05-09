@@ -1072,6 +1072,20 @@ static int tg3__load_external_file(tg3__parse_ctx *ctx, uint8_t **out_data, uint
                          NULL, "Failed to read file: %s", path_buf);
         return 0;
     }
+    if (ctx->opts.max_external_file_size > 0 &&
+        *out_size > ctx->opts.max_external_file_size) {
+        if (ctx->opts.fs.free_file) {
+            ctx->opts.fs.free_file(*out_data, *out_size, ctx->opts.fs.user_data);
+        }
+        tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                         TG3_ERR_FILE_TOO_LARGE, NULL,
+                         "External file %s exceeds max_external_file_size (%llu > %llu)",
+                         path_buf, (unsigned long long)*out_size,
+                         (unsigned long long)ctx->opts.max_external_file_size);
+        *out_data = NULL;
+        *out_size = 0;
+        return 0;
+    }
     return 1;
 }
 
