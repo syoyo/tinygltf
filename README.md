@@ -19,6 +19,7 @@ v3 is a ground-up rewrite with a C-centric, low-overhead design:
 - **No RTTI, no exceptions required** — suitable for embedded and game-engine use.
 - **Opt-in filesystem and image I/O** — `TINYGLTF3_ENABLE_FS` / `TINYGLTF3_ENABLE_STB_IMAGE` are off by default; you control when and how assets are loaded.
 - **C++20 coroutine facade** (optional, auto-detected). C17/C++17 default.
+- **Hardened against untrusted input** — URI sanitization, post-parse index-bounds validation (default-on, opt-out via `tg3_parse_options.validate_indices = 0`), strict numeric range checks; exercised by a libFuzzer harness and by a cross-version verifier that compares parsed output against the v1 C++ reference loader. See *Security model* below and the `Security Considerations` block at the top of `tiny_gltf_v3.h`.
 
 ### Quick start (v3)
 
@@ -53,6 +54,27 @@ if (err != TG3_OK) {
 tg3_model_free(&model);
 tg3_error_stack_free(&errors);
 ```
+
+### Security model (v3 C runtime)
+
+The v3 C runtime is built for processing **untrusted glTF/GLB input** (server-side asset pipelines, user uploads, etc.) and ships hardened by default:
+
+- **URI sanitization** — external buffer/image URIs are rejected before any filesystem call if they are empty, contain NUL bytes, begin with `/` or `\`, look like a Windows drive prefix (`X:`), or contain a `..` segment. Production callers SHOULD still provide a custom `tg3_fs_callbacks.read_file` that confines reads to a known directory (e.g. via `openat` plus a `realpath` prefix check) when the input is attacker-controlled.
+- **Index bounds validation** — every `int32_t` index field populated from JSON (accessor.bufferView, primitive.indices/material/attributes, scene.nodes[], skin.joints[], animation channel/sampler refs, KHR_audio + MSFT_lod refs, …) is checked after the structural parse. Out-of-range indices produce `TG3_ERR_INVALID_INDEX`. Default `tg3_parse_options.validate_indices = 1`; set to `0` only when you need raw round-trip and have your own validator.
+- **Strict numeric range checks** — JSON numbers feeding integer fields go through finite/round-trip-validated coercion (`tg3__json_number_to_int32` / `_uint64`). `byteStride` is restricted to 0 or [4, 252].
+- **Memory budget** — the arena is capped at `TINYGLTF3_MAX_MEMORY_BYTES` (1 GB by default; configurable via `tg3_memory_config`).
+- **Image decoding off by default** — the parser does not decode image bytes; use `tg3_parse_options.images_as_is = 1` to skip any decoder entirely when handling untrusted input.
+- **Error message lifetime** — error strings on `tg3_error_stack` are arena-allocated and remain valid until `tg3_model_free()`. Read or copy them BEFORE freeing the model.
+
+See the `Security Considerations` block at the top of `tiny_gltf_v3.h` for the authoritative threat-model summary.
+
+### Testing & verification
+
+The v3 C runtime ships with three layers of automated coverage:
+
+- **`tests/tester_v3_c.c`** — internal unit checks plus security regression tests (path traversal, negative `byteStride`, OOB indices, error-message lifetime, …). Build via `make` in `tests/`; run `./tester_v3_c` for the internal suite or `./tester_v3_c <file.gltf|file.glb>` to parse a single asset.
+- **`test_runner.py`** — a cross-version verifier that runs the v1 C++ reference loader (`loader_example`) and the v3 C tester against every model in `glTF-Sample-Models/2.0`, then diffs a structured DIGEST block (buffer FNV64 hashes, accessor/bufferView fields, primitive attribute maps, node TRS, material PBR factors, skin/animation/scene topology, …). v1 is the ground truth.
+- **`tests/v3/fuzzer/`** — libFuzzer harness with ASan + UBSan (`make run` builds and runs `fuzz_gltf_v3_c`). Crafted regression inputs live in `tests/v3/security/` and are seeded into `tests/v3/fuzzer/corpus/`.
 
 ## Status
 
