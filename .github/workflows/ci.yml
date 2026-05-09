@@ -332,7 +332,7 @@ jobs:
   # v3 C runtime: internal security regression tests + ported v1 unit tests.
   v3-c-tests:
     runs-on: ubuntu-latest
-    name: v3 C tests (Linux x64)
+    name: v3 C tests (Linux x64, GCC)
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -340,13 +340,13 @@ jobs:
       - name: Build tester_v3_c
         run: |
           cd tests
-          cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
+          cc -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
              -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
 
       - name: Build tester_v3_c_v1port
         run: |
           cd tests
-          cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
+          cc -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
              -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
 
       - name: Run tester_v3_c (security regressions)
@@ -355,6 +355,77 @@ jobs:
           ./tester_v3_c
 
       - name: Run tester_v3_c_v1port (18 ported unit tests)
+        run: |
+          cd tests
+          ./tester_v3_c_v1port
+
+  # v3 C runtime under stock Ubuntu clang.
+  v3-c-tests-clang:
+    runs-on: ubuntu-latest
+    name: v3 C tests (Linux x64, Clang)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
+      - name: Build tester_v3_c
+        run: |
+          cd tests
+          clang -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+                -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+
+      - name: Build tester_v3_c_v1port
+        run: |
+          cd tests
+          clang -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+                -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
+
+      - name: Run tester_v3_c
+        run: |
+          cd tests
+          ./tester_v3_c
+
+      - name: Run tester_v3_c_v1port
+        run: |
+          cd tests
+          ./tester_v3_c_v1port
+
+  # v3 C runtime under bleeding-edge clang 21 (matches local dev environment).
+  v3-c-tests-clang21:
+    runs-on: ubuntu-24.04
+    name: v3 C tests (Linux x64, Clang 21)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang 21
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 21
+
+      - name: Build tester_v3_c
+        run: |
+          cd tests
+          clang-21 -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+                   -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+
+      - name: Build tester_v3_c_v1port
+        run: |
+          cd tests
+          clang-21 -I../ -std=c11 -g -O0 -Wall -Wextra -DTINYGLTF3_ENABLE_FS \
+                   -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
+
+      - name: Run tester_v3_c
+        run: |
+          cd tests
+          ./tester_v3_c
+
+      - name: Run tester_v3_c_v1port
         run: |
           cd tests
           ./tester_v3_c_v1port

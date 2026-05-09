@@ -1617,22 +1617,24 @@ static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3json_value *o,
 static int tg3__validate_indices(tg3__parse_ctx *ctx, const tg3_model *m) {
     uint32_t i, j;
     int errs = 0;
-    /* Helper macros — push with format and bump error counter. */
+    /* Helper macros — push with format and bump error counter. Every call
+     * site passes at least one variadic arg, so plain __VA_ARGS__ (C11) is
+     * sufficient and avoids the GNU `, ##__VA_ARGS__` extension. */
     #define TG3__IDX_BAD(path_str, fmt, ...) do { \
         if (errs < TG3__IDX_ERR_CAP) { \
             tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR, \
-                             TG3_ERR_INVALID_INDEX, (path_str), fmt, ##__VA_ARGS__); \
+                             TG3_ERR_INVALID_INDEX, (path_str), fmt, __VA_ARGS__); \
         } \
         ++errs; \
     } while (0)
     #define TG3__CHECK_REQ(idx, max, path_str, fmt, ...) do { \
         if ((idx) < 0 || (uint32_t)(idx) >= (max)) { \
-            TG3__IDX_BAD(path_str, fmt, ##__VA_ARGS__); \
+            TG3__IDX_BAD(path_str, fmt, __VA_ARGS__); \
         } \
     } while (0)
     #define TG3__CHECK_OPT(idx, max, path_str, fmt, ...) do { \
         if ((idx) != -1 && ((idx) < 0 || (uint32_t)(idx) >= (max))) { \
-            TG3__IDX_BAD(path_str, fmt, ##__VA_ARGS__); \
+            TG3__IDX_BAD(path_str, fmt, __VA_ARGS__); \
         } \
     } while (0)
 
