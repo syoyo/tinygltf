@@ -1,0 +1,14 @@
+{
+  "asset": {"version": "2.0"},
+  "buffers": [
+    {"uri": "../../../../../../../../tmp/tg3-poc-secret.txt", "byteLength": 32}
+  ],
+  "bufferViews": [
+    {"buffer": 0, "byteOffset": 0, "byteLength": 32}
+  ],
+  "accessors": [
+    {"bufferView": 0, "byteOffset": 0, "componentType": 5121, "count": 32, "type": "SCALAR"}
+  ],
+  "scenes": [{"nodes": []}],
+  "scene": 0
+}

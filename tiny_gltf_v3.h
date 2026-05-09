@@ -37,6 +37,37 @@
  *   - Streaming parse/write via callbacks
  *   - No RTTI, no exceptions required
  *   - C++20 coroutine facade (optional)
+ *
+ * Security considerations (read before processing untrusted glTF):
+ *
+ *   1. External URI loading. When TINYGLTF3_ENABLE_FS is defined and no custom
+ *      tg3_fs_callbacks are supplied, the parser opens external buffer/image
+ *      URIs through the libc default fopen(). The parser rejects URIs that
+ *      contain '..' segments, leading '/' or '\\', Windows drive prefixes
+ *      (e.g. "C:"), or NUL bytes — but it does NOT chroot or canonicalize the
+ *      result. Production callers SHOULD provide a tg3_fs_callbacks with a
+ *      read_file callback that confines reads to a known directory (e.g. via
+ *      openat(AT_FDCWD, path, O_NOFOLLOW) plus a realpath() prefix check) when
+ *      the input glTF is attacker-controlled.
+ *
+ *   2. Index validation. Many glTF fields are integer indices into model
+ *      arrays (accessor.bufferView, primitive.material, scene.nodes[], etc.).
+ *      With opts.validate_indices = 1 (the default) the parser rejects every
+ *      out-of-range index after the structural parse and returns
+ *      TG3_ERR_INVALID_INDEX. Set opts.validate_indices = 0 only when you
+ *      need to round-trip raw or extension data and have your own validator.
+ *
+ *   3. Image decoding. The parser does not decode image bytes by default.
+ *      Set opts.images_as_is = 1 (already the safe default for untrusted
+ *      input) to skip any decoder and store raw bytes only.
+ *
+ *   4. Memory budget. The arena is capped at TINYGLTF3_MAX_MEMORY_BYTES
+ *      (1 GB by default; configurable per-parse via tg3_memory_config).
+ *      The parser returns TG3_ERR_OUT_OF_MEMORY rather than overcommitting.
+ *
+ *   5. Error message lifetime. Error strings on tg3_error_stack are
+ *      arena-allocated and remain valid until tg3_model_free() is called.
+ *      Read or copy them BEFORE freeing the model.
  */
 
 #ifndef TINY_GLTF_V3_H_
@@ -914,6 +945,10 @@ typedef struct tg3_parse_options {
                                         *     (breaks strict double-precision conformance
                                         *      but sufficient for glTF data which is
                                         *      typically single-precision anyway) */
+    int32_t  validate_indices;          /* 1 = reject out-of-range index fields
+                                        *     after parse so naive consumers cannot
+                                        *     dereference attacker-controlled indices.
+                                        *     Default: 1. Set to 0 to skip (raw mode). */
     uint64_t max_external_file_size;    /* 0 = no limit */
 } tg3_parse_options;
 

@@ -423,6 +423,232 @@ static int check_huge_integer_field_rejected(void) {
   return 1;
 }
 
+/* ===== Security regression tests ============================================ */
+
+/* fs read_file callback that records calls into *(int *)user_data and never
+ * succeeds — used to verify path-traversal URIs never reach the filesystem. */
+static int32_t recording_read_file(uint8_t **out_data, uint64_t *out_size,
+                                   const char *path, uint32_t path_len,
+                                   void *user_data) {
+  (void)out_data; (void)out_size; (void)path; (void)path_len;
+  if (user_data) *(int *)user_data += 1;
+  return 0;
+}
+
+static int check_path_traversal_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"uri\":\"../../etc/passwd\",\"byteLength\":4}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  int fs_calls = 0;
+  uint32_t i;
+  int saw = 0;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.fs.read_file = recording_read_file;
+  opts.fs.user_data = &fs_calls;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1),
+                  "/some/base", 10, &opts);
+  if (err == TG3_OK) {
+    fprintf(stderr, "path traversal NOT rejected\n");
+    goto fail;
+  }
+  if (fs_calls != 0) {
+    fprintf(stderr, "fs.read_file called %d times for traversal URI\n", fs_calls);
+    goto fail;
+  }
+  for (i = 0; i < errors.count; ++i) {
+    if (errors.entries[i].code == TG3_ERR_INVALID_VALUE) saw = 1;
+  }
+  if (!saw) {
+    fprintf(stderr, "expected TG3_ERR_INVALID_VALUE on traversal\n");
+    goto fail;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+fail:
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 0;
+}
+
+static int check_absolute_uri_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"uri\":\"/etc/passwd\",\"byteLength\":4}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  int fs_calls = 0;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.fs.read_file = recording_read_file;
+  opts.fs.user_data = &fs_calls;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1),
+                  "/base", 5, &opts);
+  if (err == TG3_OK || fs_calls != 0) {
+    fprintf(stderr, "absolute URI not rejected (rc=%d, fs_calls=%d)\n",
+            (int)err, fs_calls);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_negative_byte_stride_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"byteLength\":4}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteLength\":4,\"byteStride\":-1}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err == TG3_OK) {
+    fprintf(stderr, "negative byteStride NOT rejected\n");
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_oob_index_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"byteLength\":4}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteLength\":4}],"
+      "\"accessors\":[{\"bufferView\":1000000,\"componentType\":5121,"
+      "\"count\":1,\"type\":\"SCALAR\"}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_INVALID_INDEX) {
+    fprintf(stderr, "OOB index expected TG3_ERR_INVALID_INDEX, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_oob_index_opt_in(void) {
+  /* When validate_indices=0, parse should accept the same out-of-range index. */
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"byteLength\":4}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteLength\":4}],"
+      "\"accessors\":[{\"bufferView\":1000000,\"componentType\":5121,"
+      "\"count\":1,\"type\":\"SCALAR\"}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.validate_indices = 0;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "validate_indices=0 should accept OOB index, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  if (model.accessors_count != 1 || model.accessors[0].buffer_view != 1000000) {
+    fprintf(stderr, "OOB index not preserved when validation off\n");
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_extension_index_oob_rejected(void) {
+  /* MSFT_lod and KHR_audio index fields must be validated when
+   * validate_indices=1, otherwise downstream consumers can read OOB. */
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"nodes\":[{\"extensions\":{\"MSFT_lod\":{\"ids\":[99999]}}}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_INVALID_INDEX) {
+    fprintf(stderr, "MSFT_lod OOB index expected TG3_ERR_INVALID_INDEX, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_error_messages_survive_parse_failure(void) {
+  /* Regression: parse failure must not invalidate arena-allocated error
+   * message strings on the user's tg3_error_stack before model_free. */
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"byteLength\":4}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteLength\":4,\"byteStride\":-1}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  uint32_t i;
+  int seen_stride_msg = 0;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err == TG3_OK) goto fail;
+  for (i = 0; i < errors.count; ++i) {
+    const char *m = errors.entries[i].message;
+    if (m && strstr(m, "byteStride")) seen_stride_msg = 1;
+  }
+  if (!seen_stride_msg) {
+    fprintf(stderr, "byteStride error message missing or unreadable after parse\n");
+    goto fail;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+fail:
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 0;
+}
+
 static int parse_file_arg(const char *path) {
   FILE *fp = fopen(path, "rb");
   uint8_t *buf;
@@ -519,6 +745,27 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (!check_huge_integer_field_rejected()) {
+    return 1;
+  }
+  if (!check_path_traversal_rejected()) {
+    return 1;
+  }
+  if (!check_absolute_uri_rejected()) {
+    return 1;
+  }
+  if (!check_negative_byte_stride_rejected()) {
+    return 1;
+  }
+  if (!check_oob_index_rejected()) {
+    return 1;
+  }
+  if (!check_oob_index_opt_in()) {
+    return 1;
+  }
+  if (!check_extension_index_oob_rejected()) {
+    return 1;
+  }
+  if (!check_error_messages_survive_parse_failure()) {
     return 1;
   }
   return 0;

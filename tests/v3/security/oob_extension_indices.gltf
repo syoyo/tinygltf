@@ -1,0 +1,19 @@
+{
+  "asset": {"version": "2.0"},
+  "nodes": [
+    {"extensions": {"KHR_audio": {"emitter": 2147483647},
+                    "MSFT_lod": {"ids": [-1, 9999]}}}
+  ],
+  "materials": [
+    {"extensions": {"MSFT_lod": {"ids": [-5]}}}
+  ],
+  "scenes": [
+    {"extensions": {"KHR_audio": {"emitters": [12345]}}}
+  ],
+  "extensions": {
+    "KHR_audio": {
+      "sources":  [{"bufferView": -1}],
+      "emitters": [{"source": 99999}]
+    }
+  }
+}

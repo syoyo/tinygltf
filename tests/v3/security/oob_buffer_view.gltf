@@ -1,0 +1,9 @@
+{
+  "asset": {"version": "2.0"},
+  "buffers": [{"byteLength": 4}],
+  "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": 4}],
+  "accessors": [
+    {"bufferView": 1000000, "byteOffset": 0, "componentType": 5121, "count": 1, "type": "SCALAR"}
+  ],
+  "scenes": [{"nodes": []}]
+}

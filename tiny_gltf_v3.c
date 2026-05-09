@@ -230,6 +230,7 @@ TINYGLTF3_API void tg3_parse_options_init(tg3_parse_options *options) {
     options->memory.memory_budget = TINYGLTF3_MAX_MEMORY_BYTES;
     options->memory.arena_block_size = TG3__ARENA_DEFAULT_BLOCK_SIZE;
     options->max_external_file_size = 0;
+    options->validate_indices = 1;
 }
 
 TINYGLTF3_API void tg3_write_options_init(tg3_write_options *options) {
@@ -1008,6 +1009,32 @@ static int tg3__parse_accessor(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_
     return 1;
 }
 
+/* Reject URIs that could escape base_dir or smuggle a different path through
+ * path-resolution layers. Returns 1 if the URI is safe to concatenate with
+ * base_dir, 0 if it must be rejected. */
+static int tg3__uri_is_safe(const char *uri, uint32_t uri_len) {
+    uint32_t i;
+    if (!uri || uri_len == 0) return 0;
+    /* No NUL bytes — fopen would truncate; protects against smuggling. */
+    if (memchr(uri, '\0', uri_len) != NULL) return 0;
+    /* Reject absolute paths (POSIX and Windows). */
+    if (uri[0] == '/' || uri[0] == '\\') return 0;
+    /* Reject Windows drive prefixes like "C:". */
+    if (uri_len >= 2 && uri[1] == ':' &&
+        ((uri[0] >= 'A' && uri[0] <= 'Z') || (uri[0] >= 'a' && uri[0] <= 'z'))) {
+        return 0;
+    }
+    /* Reject any ".." segment, separator-aware on both / and \. */
+    for (i = 0; i + 1 < uri_len; ++i) {
+        if (uri[i] == '.' && uri[i + 1] == '.') {
+            int at_start = (i == 0) || uri[i - 1] == '/' || uri[i - 1] == '\\';
+            int at_end = (i + 2 == uri_len) || uri[i + 2] == '/' || uri[i + 2] == '\\';
+            if (at_start && at_end) return 0;
+        }
+    }
+    return 1;
+}
+
 static int tg3__load_external_file(tg3__parse_ctx *ctx, uint8_t **out_data, uint64_t *out_size,
                                    const char *uri, uint32_t uri_len) {
     char path_buf[4096];
@@ -1018,8 +1045,17 @@ static int tg3__load_external_file(tg3__parse_ctx *ctx, uint8_t **out_data, uint
                         "No filesystem callbacks available", NULL, -1);
         return 0;
     }
+    if (!tg3__uri_is_safe(uri, uri_len)) {
+        tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_INVALID_VALUE,
+                        "External URI rejected (absolute path, '..' segment, or NUL byte)",
+                        NULL, -1);
+        return 0;
+    }
+    /* Saturating bounds check: path_buf is fixed-size; subtract instead of add
+     * so 32-bit size_t cannot wrap. */
+    if (uri_len >= sizeof(path_buf)) return 0;
     if (ctx->base_dir_len > 0) {
-        if (ctx->base_dir_len + 1u + uri_len >= sizeof(path_buf)) return 0;
+        if (ctx->base_dir_len >= sizeof(path_buf) - uri_len - 1u) return 0;
         memcpy(path_buf, ctx->base_dir, ctx->base_dir_len);
         path_len = ctx->base_dir_len;
         if (path_len > 0 && path_buf[path_len - 1u] != '/' && path_buf[path_len - 1u] != '\\') {
@@ -1107,6 +1143,17 @@ static int tg3__parse_buffer_view(tg3__parse_ctx *ctx, const tg3json_value *o, t
     tg3__parse_uint64(ctx, o, "byteLength", &val, 1, "/bufferView");
     bv->byte_length = val;
     tg3__parse_int(ctx, o, "byteStride", &stride, 0, "/bufferView");
+    /* glTF spec: byteStride is 0 (tightly packed) or in [4, 252]. Reject
+     * negatives so the (uint32_t) cast cannot wrap to 2^32-1 and propagate
+     * into downstream size math; reject 1..3 so consumers that pre-allocate
+     * `count * stride` cannot underallocate against a spec-non-conforming
+     * stride. */
+    if (stride != 0 && (stride < 4 || stride > 252)) {
+        tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                         TG3_ERR_INVALID_VALUE, "/bufferView",
+                         "byteStride %d must be 0 or in [4, 252]", stride);
+        return 0;
+    }
     bv->byte_stride = (uint32_t)stride;
     tg3__parse_int(ctx, o, "target", &bv->target, 0, "/bufferView");
     tg3__parse_extras_and_extensions(ctx, o, &bv->ext);
@@ -1256,7 +1303,9 @@ static int tg3__parse_primitive(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
                         }
                     }
                     target_arrays[ti] = tattrs;
-                    target_counts[ti] = (uint32_t)acount;
+                    /* On arena OOM tattrs may be NULL; keep count consistent so
+                     * the index validator and downstream consumers don't deref. */
+                    target_counts[ti] = tattrs ? (uint32_t)acount : 0u;
                 }
                 prim->targets = target_arrays;
                 prim->target_attribute_counts = target_counts;
@@ -1546,6 +1595,203 @@ static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3json_value *o,
         } \
     } while (0)
 
+/* Post-parse index validation. Walks every int32_t index field populated from
+ * JSON and rejects out-of-range values so naive consumers cannot dereference
+ * attacker-controlled indices into model arrays. Caps reported errors so a
+ * pathological input does not flood the error stack. Returns 1 on success. */
+#define TG3__IDX_ERR_CAP 64
+static int tg3__validate_indices(tg3__parse_ctx *ctx, const tg3_model *m) {
+    uint32_t i, j;
+    int errs = 0;
+    /* Helper macros — push with format and bump error counter. */
+    #define TG3__IDX_BAD(path_str, fmt, ...) do { \
+        if (errs < TG3__IDX_ERR_CAP) { \
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR, \
+                             TG3_ERR_INVALID_INDEX, (path_str), fmt, ##__VA_ARGS__); \
+        } \
+        ++errs; \
+    } while (0)
+    #define TG3__CHECK_REQ(idx, max, path_str, fmt, ...) do { \
+        if ((idx) < 0 || (uint32_t)(idx) >= (max)) { \
+            TG3__IDX_BAD(path_str, fmt, ##__VA_ARGS__); \
+        } \
+    } while (0)
+    #define TG3__CHECK_OPT(idx, max, path_str, fmt, ...) do { \
+        if ((idx) != -1 && ((idx) < 0 || (uint32_t)(idx) >= (max))) { \
+            TG3__IDX_BAD(path_str, fmt, ##__VA_ARGS__); \
+        } \
+    } while (0)
+
+    if (m->default_scene != -1) {
+        TG3__CHECK_OPT(m->default_scene, m->scenes_count, "/scene",
+                       "default scene %d out of range [0,%u)",
+                       m->default_scene, m->scenes_count);
+    }
+    for (i = 0; i < m->buffer_views_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        TG3__CHECK_REQ(m->buffer_views[i].buffer, m->buffers_count,
+                       "/bufferViews", "bufferViews[%u].buffer %d out of range [0,%u)",
+                       i, m->buffer_views[i].buffer, m->buffers_count);
+    }
+    for (i = 0; i < m->accessors_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_accessor *a = &m->accessors[i];
+        TG3__CHECK_OPT(a->buffer_view, m->buffer_views_count, "/accessors",
+                       "accessors[%u].bufferView %d out of range [0,%u)",
+                       i, a->buffer_view, m->buffer_views_count);
+        if (a->sparse.is_sparse) {
+            TG3__CHECK_REQ(a->sparse.indices.buffer_view, m->buffer_views_count,
+                           "/accessors", "accessors[%u].sparse.indices.bufferView %d out of range [0,%u)",
+                           i, a->sparse.indices.buffer_view, m->buffer_views_count);
+            TG3__CHECK_REQ(a->sparse.values.buffer_view, m->buffer_views_count,
+                           "/accessors", "accessors[%u].sparse.values.bufferView %d out of range [0,%u)",
+                           i, a->sparse.values.buffer_view, m->buffer_views_count);
+        }
+    }
+    for (i = 0; i < m->meshes_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_mesh *me = &m->meshes[i];
+        for (j = 0; j < me->primitives_count && errs < TG3__IDX_ERR_CAP; ++j) {
+            const tg3_primitive *p = &me->primitives[j];
+            uint32_t ai;
+            TG3__CHECK_OPT(p->indices, m->accessors_count, "/meshes",
+                           "meshes[%u].primitives[%u].indices %d out of range [0,%u)",
+                           i, j, p->indices, m->accessors_count);
+            TG3__CHECK_OPT(p->material, m->materials_count, "/meshes",
+                           "meshes[%u].primitives[%u].material %d out of range [0,%u)",
+                           i, j, p->material, m->materials_count);
+            for (ai = 0; ai < p->attributes_count && errs < TG3__IDX_ERR_CAP; ++ai) {
+                TG3__CHECK_REQ(p->attributes[ai].value, m->accessors_count, "/meshes",
+                               "meshes[%u].primitives[%u].attributes[%u] %d out of range [0,%u)",
+                               i, j, ai, p->attributes[ai].value, m->accessors_count);
+            }
+            {
+                uint32_t ti;
+                for (ti = 0; ti < p->targets_count && errs < TG3__IDX_ERR_CAP; ++ti) {
+                    uint32_t tk;
+                    uint32_t tcount = p->target_attribute_counts ? p->target_attribute_counts[ti] : 0;
+                    const tg3_str_int_pair *tarr = p->targets ? p->targets[ti] : NULL;
+                    if (!tarr) continue;
+                    for (tk = 0; tk < tcount && errs < TG3__IDX_ERR_CAP; ++tk) {
+                        TG3__CHECK_REQ(tarr[tk].value, m->accessors_count, "/meshes",
+                                       "meshes[%u].primitives[%u].targets[%u][%u] %d out of range [0,%u)",
+                                       i, j, ti, tk, tarr[tk].value, m->accessors_count);
+                    }
+                }
+            }
+        }
+    }
+    for (i = 0; i < m->nodes_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_node *n = &m->nodes[i];
+        uint32_t k;
+        TG3__CHECK_OPT(n->mesh,   m->meshes_count,   "/nodes", "nodes[%u].mesh %d out of range [0,%u)",   i, n->mesh,   m->meshes_count);
+        TG3__CHECK_OPT(n->skin,   m->skins_count,    "/nodes", "nodes[%u].skin %d out of range [0,%u)",   i, n->skin,   m->skins_count);
+        TG3__CHECK_OPT(n->camera, m->cameras_count,  "/nodes", "nodes[%u].camera %d out of range [0,%u)", i, n->camera, m->cameras_count);
+        TG3__CHECK_OPT(n->light,  m->lights_count,   "/nodes", "nodes[%u].light %d out of range [0,%u)",  i, n->light,  m->lights_count);
+        for (k = 0; k < n->children_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(n->children[k], m->nodes_count, "/nodes",
+                           "nodes[%u].children[%u] %d out of range [0,%u)",
+                           i, k, n->children[k], m->nodes_count);
+        }
+    }
+    for (i = 0; i < m->textures_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        TG3__CHECK_OPT(m->textures[i].source,  m->images_count,   "/textures",
+                       "textures[%u].source %d out of range [0,%u)",  i, m->textures[i].source,  m->images_count);
+        TG3__CHECK_OPT(m->textures[i].sampler, m->samplers_count, "/textures",
+                       "textures[%u].sampler %d out of range [0,%u)", i, m->textures[i].sampler, m->samplers_count);
+    }
+    for (i = 0; i < m->images_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        TG3__CHECK_OPT(m->images[i].buffer_view, m->buffer_views_count, "/images",
+                       "images[%u].bufferView %d out of range [0,%u)",
+                       i, m->images[i].buffer_view, m->buffer_views_count);
+    }
+    for (i = 0; i < m->skins_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_skin *s = &m->skins[i];
+        uint32_t k;
+        TG3__CHECK_OPT(s->inverse_bind_matrices, m->accessors_count, "/skins",
+                       "skins[%u].inverseBindMatrices %d out of range [0,%u)",
+                       i, s->inverse_bind_matrices, m->accessors_count);
+        TG3__CHECK_OPT(s->skeleton, m->nodes_count, "/skins",
+                       "skins[%u].skeleton %d out of range [0,%u)",
+                       i, s->skeleton, m->nodes_count);
+        for (k = 0; k < s->joints_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(s->joints[k], m->nodes_count, "/skins",
+                           "skins[%u].joints[%u] %d out of range [0,%u)",
+                           i, k, s->joints[k], m->nodes_count);
+        }
+    }
+    for (i = 0; i < m->animations_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_animation *an = &m->animations[i];
+        uint32_t k;
+        for (k = 0; k < an->channels_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(an->channels[k].sampler, an->samplers_count, "/animations",
+                           "animations[%u].channels[%u].sampler %d out of range [0,%u)",
+                           i, k, an->channels[k].sampler, an->samplers_count);
+            TG3__CHECK_OPT(an->channels[k].target.node, m->nodes_count, "/animations",
+                           "animations[%u].channels[%u].target.node %d out of range [0,%u)",
+                           i, k, an->channels[k].target.node, m->nodes_count);
+        }
+        for (k = 0; k < an->samplers_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(an->samplers[k].input,  m->accessors_count, "/animations",
+                           "animations[%u].samplers[%u].input %d out of range [0,%u)",
+                           i, k, an->samplers[k].input,  m->accessors_count);
+            TG3__CHECK_REQ(an->samplers[k].output, m->accessors_count, "/animations",
+                           "animations[%u].samplers[%u].output %d out of range [0,%u)",
+                           i, k, an->samplers[k].output, m->accessors_count);
+        }
+    }
+    for (i = 0; i < m->scenes_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        uint32_t k;
+        const tg3_scene *s = &m->scenes[i];
+        for (k = 0; k < s->nodes_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(s->nodes[k], m->nodes_count, "/scenes",
+                           "scenes[%u].nodes[%u] %d out of range [0,%u)",
+                           i, k, s->nodes[k], m->nodes_count);
+        }
+        for (k = 0; k < s->audio_emitters_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(s->audio_emitters[k], m->audio_emitters_count, "/scenes",
+                           "scenes[%u].audio_emitters[%u] %d out of range [0,%u)",
+                           i, k, s->audio_emitters[k], m->audio_emitters_count);
+        }
+    }
+    /* Extension index fields (KHR_audio, MSFT_lod). */
+    for (i = 0; i < m->nodes_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_node *n = &m->nodes[i];
+        uint32_t k;
+        TG3__CHECK_OPT(n->emitter, m->audio_emitters_count, "/nodes",
+                       "nodes[%u].emitter %d out of range [0,%u)",
+                       i, n->emitter, m->audio_emitters_count);
+        for (k = 0; k < n->lods_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(n->lods[k], m->nodes_count, "/nodes",
+                           "nodes[%u].lods[%u] %d out of range [0,%u)",
+                           i, k, n->lods[k], m->nodes_count);
+        }
+    }
+    for (i = 0; i < m->materials_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        const tg3_material *mat = &m->materials[i];
+        uint32_t k;
+        for (k = 0; k < mat->lods_count && errs < TG3__IDX_ERR_CAP; ++k) {
+            TG3__CHECK_REQ(mat->lods[k], m->materials_count, "/materials",
+                           "materials[%u].lods[%u] %d out of range [0,%u)",
+                           i, k, mat->lods[k], m->materials_count);
+        }
+    }
+    for (i = 0; i < m->audio_sources_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        TG3__CHECK_OPT(m->audio_sources[i].buffer_view, m->buffer_views_count,
+                       "/extensions/KHR_audio/sources",
+                       "audio_sources[%u].bufferView %d out of range [0,%u)",
+                       i, m->audio_sources[i].buffer_view, m->buffer_views_count);
+    }
+    for (i = 0; i < m->audio_emitters_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        TG3__CHECK_OPT(m->audio_emitters[i].source, m->audio_sources_count,
+                       "/extensions/KHR_audio/emitters",
+                       "audio_emitters[%u].source %d out of range [0,%u)",
+                       i, m->audio_emitters[i].source, m->audio_sources_count);
+    }
+
+    #undef TG3__CHECK_OPT
+    #undef TG3__CHECK_REQ
+    #undef TG3__IDX_BAD
+    return errs == 0;
+}
+
 static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_value *json_doc, tg3_model *model) {
     const tg3json_value *asset_it = tg3json_object_get(json_doc, "asset");
     const tg3json_value *ext_it;
@@ -1606,6 +1852,11 @@ static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_va
         }
     }
     tg3__parse_extras_and_extensions(ctx, json_doc, &model->ext);
+    if (ctx->opts.validate_indices) {
+        if (!tg3__validate_indices(ctx, model)) {
+            return TG3_ERR_INVALID_INDEX;
+        }
+    }
     return (ctx->errors && ctx->errors->has_error) ? TG3_ERR_JSON_PARSE : TG3_OK;
 }
 
@@ -1692,7 +1943,8 @@ TINYGLTF3_API tg3_error_code tg3_parse(tg3_model *model, tg3_error_stack *errors
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE, "Failed to parse JSON", NULL,
                         error_pos ? (int64_t)(error_pos - (const char *)json_data) : -1);
         if (parsed_ok) tg3json_value_free(&json_doc);
-        if (model->arena_) { tg3__arena_destroy(model->arena_); model->arena_ = NULL; }
+        /* Keep arena alive so error messages (arena-allocated) stay valid for
+         * the caller; tg3_model_free is the sole arena owner on the error path. */
         return TG3_ERR_JSON_PARSE;
     }
     memset(&ctx, 0, sizeof(ctx));
@@ -1706,10 +1958,9 @@ TINYGLTF3_API tg3_error_code tg3_parse(tg3_model *model, tg3_error_stack *errors
 #endif
     ret = tg3__parse_from_json(&ctx, &json_doc, model);
     tg3json_value_free(&json_doc);
-    if (ret != TG3_OK && model->arena_) {
-        tg3__arena_destroy(model->arena_);
-        model->arena_ = NULL;
-    }
+    /* Arena stays attached to model->arena_ on both success and failure;
+     * tg3_model_free reclaims it. Destroying here would dangle arena-allocated
+     * error messages on the user-facing tg3_error_stack. */
     return ret;
 }
 
@@ -1728,10 +1979,13 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
     const char *error_pos = NULL;
     tg3_error_code err;
     int parsed_ok;
+    /* Initialize model before any failure-return so callers can safely call
+     * tg3_model_free() on the error path; the GLB header parse must not run
+     * against a model whose arena_ field is uninitialized garbage. */
+    tg3__model_init(model);
     err = tg3__parse_glb_header(glb_data, glb_size, &json_chunk, &json_chunk_size, &bin_chunk, &bin_chunk_size, errors);
     if (err != TG3_OK) return err;
     if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
-    tg3__model_init(model);
     arena = tg3__arena_create(&options->memory);
     if (!arena) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY, "Failed to create arena", NULL, -1);
@@ -1744,8 +1998,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE, "Failed to parse GLB JSON chunk", NULL,
                         error_pos ? (int64_t)(error_pos - (const char *)json_chunk) : -1);
         if (parsed_ok) tg3json_value_free(&json_doc);
-        tg3__arena_destroy(model->arena_);
-        model->arena_ = NULL;
+        /* Keep arena alive so error messages stay valid; model_free owns it. */
         return TG3_ERR_JSON_PARSE;
     }
     memset(&ctx, 0, sizeof(ctx));
@@ -1762,10 +2015,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
 #endif
     err = tg3__parse_from_json(&ctx, &json_doc, model);
     tg3json_value_free(&json_doc);
-    if (err != TG3_OK && model->arena_) {
-        tg3__arena_destroy(model->arena_);
-        model->arena_ = NULL;
-    }
+    /* Arena stays attached to model->arena_ on both paths; model_free owns it. */
     return err;
 }
 
