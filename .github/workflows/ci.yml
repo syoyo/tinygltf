@@ -378,7 +378,8 @@ jobs:
           clang -I../ -std=c11 -g -O0 -Werror -Weverything \
                 -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
                 -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
-                -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                -Wno-declaration-after-statement -Wno-unknown-warning-option \
+                -Wno-pre-c11-compat \
                 -DTINYGLTF3_ENABLE_FS \
                 -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
 
@@ -388,7 +389,8 @@ jobs:
           clang -I../ -std=c11 -g -O0 -Werror -Weverything \
                 -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
                 -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
-                -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                -Wno-declaration-after-statement -Wno-unknown-warning-option \
+                -Wno-pre-c11-compat \
                 -DTINYGLTF3_ENABLE_FS \
                 -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
 
@@ -422,7 +424,8 @@ jobs:
           clang-21 -I../ -std=c11 -g -O0 -Werror -Weverything \
                    -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
                    -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
-                   -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                   -Wno-declaration-after-statement -Wno-unknown-warning-option \
+                -Wno-pre-c11-compat \
                    -DTINYGLTF3_ENABLE_FS \
                    -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
 
@@ -432,7 +435,8 @@ jobs:
           clang-21 -I../ -std=c11 -g -O0 -Werror -Weverything \
                    -Wno-padded -Wno-unsafe-buffer-usage -Wno-switch-default \
                    -Wno-format-nonliteral -Wno-float-equal -Wno-cast-align \
-                   -Wno-declaration-after-statement -Wno-pre-c11-compat \
+                   -Wno-declaration-after-statement -Wno-unknown-warning-option \
+                -Wno-pre-c11-compat \
                    -DTINYGLTF3_ENABLE_FS \
                    -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
 
@@ -459,7 +463,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests
-          cl /nologo /W4 /WX /std:c11 /Zi /Od /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c.c ..\tiny_gltf_v3.c /Fe:tester_v3_c.exe
+          cl /nologo /W4 /WX /std:c11 /Zi /Od /D_CRT_SECURE_NO_WARNINGS /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c.c ..\tiny_gltf_v3.c /Fe:tester_v3_c.exe
           tester_v3_c.exe
 
       - name: Build and run tester_v3_c_v1port
@@ -467,7 +471,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests
-          cl /nologo /W4 /WX /std:c11 /Zi /Od /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c_v1port.c ..\tiny_gltf_v3.c /Fe:tester_v3_c_v1port.exe
+          cl /nologo /W4 /WX /std:c11 /Zi /Od /D_CRT_SECURE_NO_WARNINGS /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c_v1port.c ..\tiny_gltf_v3.c /Fe:tester_v3_c_v1port.exe
           tester_v3_c_v1port.exe
 
   # v3 C runtime under ASan + UBSan for memory-safety + UB checks.
