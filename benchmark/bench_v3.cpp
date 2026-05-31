@@ -139,7 +139,9 @@ struct BenchResult {
 /* ------------------------------------------------------------------ */
 
 static BenchResult bench_file(const char *filename, int iterations, int warmup,
-                               bool quiet, int float32_mode = 0) {
+                               bool quiet, int float32_mode = 0,
+                               int skip_extras_values = 0,
+                               int borrow_input_buffers = 0) {
     BenchResult r = {};
     r.filename = filename;
     r.iterations = iterations;
@@ -199,6 +201,8 @@ static BenchResult bench_file(const char *filename, int iterations, int warmup,
         opts.memory.allocator.free = tracked_free;
         opts.memory.allocator.user_data = &tracker;
         opts.parse_float32 = float32_mode;
+        opts.skip_extras_values = skip_extras_values;
+        opts.borrow_input_buffers = borrow_input_buffers;
 
         tg3_model model;
         tg3_error_stack errors;
@@ -340,7 +344,11 @@ static void usage() {
         "  --csv            Output in CSV format\n"
         "  --quiet          Suppress per-iteration error messages\n"
         "  --batch          Benchmark multiple files\n"
-        "  --float32        Parse JSON floats as float32 (faster, less precise)\n");
+        "  --float32        Parse JSON floats as float32 (faster, less precise)\n"
+        "  --skip-extras-values\n"
+        "                   Skip materializing extras/unknown extension values\n"
+        "  --borrow-input-buffers\n"
+        "                   Let GLB buffers reference caller-owned input bytes\n");
 }
 
 int main(int argc, char **argv) {
@@ -351,6 +359,8 @@ int main(int argc, char **argv) {
     bool csv = false;
     bool quiet = false;
     int float32_mode = 0;
+    int skip_extras_values = 0;
+    int borrow_input_buffers = 0;
     std::vector<std::string> files;
 
     for (int i = 1; i < argc; ++i) {
@@ -364,6 +374,10 @@ int main(int argc, char **argv) {
             quiet = true;
         } else if (strcmp(argv[i], "--float32") == 0) {
             float32_mode = 1;
+        } else if (strcmp(argv[i], "--skip-extras-values") == 0) {
+            skip_extras_values = 1;
+        } else if (strcmp(argv[i], "--borrow-input-buffers") == 0) {
+            borrow_input_buffers = 1;
         } else if (strcmp(argv[i], "--batch") == 0) {
             /* batch mode: just collect files */
         } else if (argv[i][0] != '-') {
@@ -379,10 +393,14 @@ int main(int argc, char **argv) {
         if (!csv && !quiet) {
             printf("Benchmarking: %s (%d iterations, %d warmup%s)\n",
                    file.c_str(), iterations, warmup,
-                   float32_mode ? ", float32" : "");
+                   float32_mode ? ", float32" :
+                   skip_extras_values ? ", skip extras" :
+                   borrow_input_buffers ? ", borrow buffers" : "");
         }
 
-        BenchResult r = bench_file(file.c_str(), iterations, warmup, quiet, float32_mode);
+        BenchResult r = bench_file(file.c_str(), iterations, warmup, quiet,
+                                   float32_mode, skip_extras_values,
+                                   borrow_input_buffers);
 
         if (csv) {
             print_csv_row(r);

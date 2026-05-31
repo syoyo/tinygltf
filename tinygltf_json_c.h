@@ -58,6 +58,17 @@ int tg3json_parse_n(const char *data, size_t len, size_t depth_limit,
                     tg3json_value *out_value, const char **out_error_pos);
 int tg3json_parse(const char *begin, const char *end, size_t depth_limit,
                   tg3json_value *out_value, const char **out_error_pos);
+typedef struct tg3json_parse_options {
+    size_t depth_limit;       /* 0 = default */
+    size_t memory_budget;     /* 0 = unlimited */
+    size_t max_single_alloc;  /* 0 = unlimited */
+    size_t max_string_length; /* 0 = unlimited */
+    int parse_float32;        /* 1 = round JSON reals to float */
+} tg3json_parse_options;
+int tg3json_parse_n_opts(const char *data, size_t len,
+                         const tg3json_parse_options *options,
+                         tg3json_value *out_value,
+                         const char **out_error_pos);
 void tg3json_value_free(tg3json_value *value);
 void tg3json_value_init_null(tg3json_value *value);
 void tg3json_value_init_bool(tg3json_value *value, int boolean_value);
@@ -109,9 +120,15 @@ typedef struct tg3json__parser {
     const char *end;
     const char *error;
     size_t depth_limit;
+    size_t memory_budget;
+    size_t max_single_alloc;
+    size_t max_string_length;
+    size_t allocated;
+    int parse_float32;
 } tg3json__parser;
 
 typedef struct tg3json__buffer {
+    tg3json__parser *parser;
     char *data;
     size_t len;
     size_t cap;
@@ -129,6 +146,20 @@ static char *tg3json__strndup_local(const char *src, size_t len) {
     if (len > 0) memcpy(dst, src, len);
     dst[len] = '\0';
     return dst;
+}
+
+static void *tg3json__parser_alloc(tg3json__parser *parser, size_t size) {
+    void *ptr;
+    if (!parser) return malloc(size);
+    if (parser->max_single_alloc && size > parser->max_single_alloc) return NULL;
+    if (parser->memory_budget &&
+        (size > parser->memory_budget || parser->allocated > parser->memory_budget - size)) {
+        return NULL;
+    }
+    ptr = malloc(size);
+    if (!ptr) return NULL;
+    parser->allocated += size;
+    return ptr;
 }
 
 static int tg3json__reserve_bytes(void **ptr, size_t elem_size,
@@ -154,6 +185,44 @@ static int tg3json__reserve_bytes(void **ptr, size_t elem_size,
     return 1;
 }
 
+static int tg3json__reserve_bytes_parser(tg3json__parser *parser, void **ptr,
+                                         size_t elem_size, size_t needed,
+                                         size_t *capacity) {
+    void *new_ptr;
+    size_t new_cap;
+    size_t old_bytes;
+    size_t new_bytes;
+
+    if (needed <= *capacity) return 1;
+    new_cap = (*capacity > 0) ? *capacity : 8;
+    while (new_cap < needed) {
+        if (new_cap > ((size_t)-1) / 2) {
+            new_cap = needed;
+            break;
+        }
+        new_cap *= 2;
+    }
+
+    if (elem_size != 0 && new_cap > ((size_t)-1) / elem_size) return 0;
+    old_bytes = elem_size * (*capacity);
+    new_bytes = elem_size * new_cap;
+    if (parser) {
+        size_t delta = (new_bytes > old_bytes) ? (new_bytes - old_bytes) : 0;
+        if (parser->max_single_alloc && new_bytes > parser->max_single_alloc) return 0;
+        if (parser->memory_budget && delta > 0 &&
+            (delta > parser->memory_budget ||
+             parser->allocated > parser->memory_budget - delta)) {
+            return 0;
+        }
+    }
+    new_ptr = realloc(*ptr, new_bytes);
+    if (!new_ptr) return 0;
+    if (parser && new_bytes > old_bytes) parser->allocated += new_bytes - old_bytes;
+    *ptr = new_ptr;
+    *capacity = new_cap;
+    return 1;
+}
+
 static const char *tg3json__skip_ws(const char *p, const char *end) {
     while (p < end) {
         unsigned char c = (unsigned char)*p;
@@ -169,7 +238,8 @@ static void tg3json__set_error(tg3json__parser *parser, const char *pos) {
 
 static int tg3json__buf_append(tg3json__buffer *buf, const char *src, size_t len) {
     if (len == 0) return 1;
-    if (!tg3json__reserve_bytes((void **)&buf->data, 1, buf->len + len + 1, &buf->cap)) {
+    if (!tg3json__reserve_bytes_parser(buf->parser, (void **)&buf->data, 1,
+                                       buf->len + len + 1, &buf->cap)) {
         return 0;
     }
     memcpy(buf->data + buf->len, src, len);
@@ -179,7 +249,8 @@ static int tg3json__buf_append(tg3json__buffer *buf, const char *src, size_t len
 }
 
 static int tg3json__buf_putc(tg3json__buffer *buf, char c) {
-    if (!tg3json__reserve_bytes((void **)&buf->data, 1, buf->len + 2, &buf->cap)) {
+    if (!tg3json__reserve_bytes_parser(buf->parser, (void **)&buf->data, 1,
+                                       buf->len + 2, &buf->cap)) {
         return 0;
     }
     buf->data[buf->len++] = c;
@@ -230,6 +301,7 @@ static int tg3json__parse_string_raw(tg3json__parser *parser,
     tg3json__buffer buf;
     const char *start;
     memset(&buf, 0, sizeof(buf));
+    buf.parser = parser;
 
     if (parser->cur >= parser->end || *parser->cur != '"') {
         tg3json__set_error(parser, parser->cur);
@@ -241,6 +313,8 @@ static int tg3json__parse_string_raw(tg3json__parser *parser,
     while (parser->cur < parser->end) {
         unsigned char c = (unsigned char)*parser->cur;
         if (c == '"') {
+            size_t final_len = buf.len + (size_t)(parser->cur - start);
+            if (parser->max_string_length && final_len > parser->max_string_length) goto oom;
             if (!tg3json__buf_append(&buf, start, (size_t)(parser->cur - start))) goto oom;
             ++parser->cur;
             *out_str = buf.data;
@@ -249,6 +323,8 @@ static int tg3json__parse_string_raw(tg3json__parser *parser,
         }
         if (c == '\\') {
             uint32_t codepoint;
+            size_t pending_len = (size_t)(parser->cur - start);
+            if (parser->max_string_length && buf.len + pending_len > parser->max_string_length) goto oom;
             if (!tg3json__buf_append(&buf, start, (size_t)(parser->cur - start))) goto oom;
             ++parser->cur;
             if (parser->cur >= parser->end) break;
@@ -304,6 +380,37 @@ oom:
 static int tg3json__parse_value(tg3json__parser *parser, size_t depth,
                                 tg3json_value *out_value);
 
+static int tg3json__parse_int64_span(const char *start, const char *end,
+                                     int64_t *out) {
+    const char *p = start;
+    uint64_t value = 0;
+    uint64_t limit = (uint64_t)INT64_MAX;
+    int neg = 0;
+    if (p < end && *p == '-') {
+        neg = 1;
+        limit += 1u;
+        ++p;
+    }
+    if (p >= end) return 0;
+    while (p < end) {
+        unsigned digit = (unsigned)(*p - '0');
+        if (digit > 9u) return 0;
+        if (value > (limit - digit) / 10u) return 0;
+        value = value * 10u + (uint64_t)digit;
+        ++p;
+    }
+    if (neg) {
+        if (value == ((uint64_t)INT64_MAX + 1u)) {
+            *out = INT64_MIN;
+        } else {
+            *out = -(int64_t)value;
+        }
+    } else {
+        *out = (int64_t)value;
+    }
+    return 1;
+}
+
 static int tg3json__parse_array(tg3json__parser *parser, size_t depth,
                                 tg3json_value *out_value) {
     tg3json_value *items = NULL;
@@ -323,7 +430,8 @@ static int tg3json__parse_array(tg3json__parser *parser, size_t depth,
     while (parser->cur < parser->end) {
         tg3json_value value;
         tg3json__init_value(&value);
-        if (!tg3json__reserve_bytes((void **)&items, sizeof(*items), count + 1, &cap)) goto oom;
+        if (!tg3json__reserve_bytes_parser(parser, (void **)&items,
+                                           sizeof(*items), count + 1, &cap)) goto oom;
         if (!tg3json__parse_value(parser, depth + 1, &value)) goto fail;
         items[count++] = value;
         parser->cur = tg3json__skip_ws(parser->cur, parser->end);
@@ -395,14 +503,15 @@ static int tg3json__parse_object(tg3json__parser *parser, size_t depth,
             free(key);
             goto fail;
         }
-        if (!tg3json__reserve_bytes((void **)&items, sizeof(*items), count + 1, &cap)) {
+        if (!tg3json__reserve_bytes_parser(parser, (void **)&items,
+                                           sizeof(*items), count + 1, &cap)) {
             free(key);
             tg3json_value_free(&value);
             goto oom;
         }
         items[count].key = key;
         items[count].key_len = key_len;
-        items[count].value = (tg3json_value *)malloc(sizeof(tg3json_value));
+        items[count].value = (tg3json_value *)tg3json__parser_alloc(parser, sizeof(tg3json_value));
         if (!items[count].value) {
             free(key);
             tg3json_value_free(&value);
@@ -485,28 +594,24 @@ static int tg3json__parse_number(tg3json__parser *parser, tg3json_value *out_val
         do { ++p; } while (p < parser->end && *p >= '0' && *p <= '9');
     }
 
-    len = (size_t)(p - start);
-    if (len + 1 > sizeof(stack_buf)) {
-        num_buf = (char *)malloc(len + 1);
-        if (!num_buf) goto oom;
-    }
-    memcpy(num_buf, start, len);
-    num_buf[len] = '\0';
-
     if (!is_real) {
-        char *endptr = NULL;
-        long long v;
-        errno = 0;
-        v = strtoll(num_buf, &endptr, 10);
-        if (errno == 0 && endptr == num_buf + len) {
+        int64_t v;
+        if (tg3json__parse_int64_span(start, p, &v)) {
             out_value->type = TG3JSON_INT;
-            out_value->u.integer = (int64_t)v;
+            out_value->u.integer = v;
             parser->cur = p;
-            if (num_buf != stack_buf) free(num_buf);
             return 1;
         }
         is_real = 1;
     }
+
+    len = (size_t)(p - start);
+    if (len + 1 > sizeof(stack_buf)) {
+        num_buf = (char *)tg3json__parser_alloc(parser, len + 1);
+        if (!num_buf) goto oom;
+    }
+    memcpy(num_buf, start, len);
+    num_buf[len] = '\0';
 
     {
         char *endptr = NULL;
@@ -516,6 +621,7 @@ static int tg3json__parse_number(tg3json__parser *parser, tg3json_value *out_val
             if (num_buf != stack_buf) free(num_buf);
             goto fail;
         }
+        if (parser->parse_float32) out_value->u.real = (double)(float)out_value->u.real;
         out_value->type = TG3JSON_REAL;
         parser->cur = p;
         if (num_buf != stack_buf) free(num_buf);
@@ -584,14 +690,25 @@ static int tg3json__parse_value(tg3json__parser *parser, size_t depth,
     return 0;
 }
 
-int tg3json_parse_n(const char *data, size_t len, size_t depth_limit,
-                    tg3json_value *out_value, const char **out_error_pos) {
+int tg3json_parse_n_opts(const char *data, size_t len,
+                         const tg3json_parse_options *options,
+                         tg3json_value *out_value,
+                         const char **out_error_pos) {
     tg3json__parser parser;
+    if (!data || !out_value) {
+        if (out_error_pos) *out_error_pos = data;
+        return 0;
+    }
     tg3json__init_value(out_value);
     parser.cur = data;
     parser.end = data + len;
     parser.error = NULL;
-    parser.depth_limit = depth_limit ? depth_limit : 512;
+    parser.depth_limit = (options && options->depth_limit) ? options->depth_limit : 512;
+    parser.memory_budget = options ? options->memory_budget : 0;
+    parser.max_single_alloc = options ? options->max_single_alloc : 0;
+    parser.max_string_length = options ? options->max_string_length : 0;
+    parser.allocated = 0;
+    parser.parse_float32 = options ? options->parse_float32 : 0;
 
     if (!tg3json__parse_value(&parser, 0, out_value)) {
         if (out_error_pos) *out_error_pos = parser.error;
@@ -606,6 +723,14 @@ int tg3json_parse_n(const char *data, size_t len, size_t depth_limit,
     }
     if (out_error_pos) *out_error_pos = NULL;
     return 1;
+}
+
+int tg3json_parse_n(const char *data, size_t len, size_t depth_limit,
+                    tg3json_value *out_value, const char **out_error_pos) {
+    tg3json_parse_options options;
+    memset(&options, 0, sizeof(options));
+    options.depth_limit = depth_limit;
+    return tg3json_parse_n_opts(data, len, &options, out_value, out_error_pos);
 }
 
 int tg3json_parse(const char *begin, const char *end, size_t depth_limit,

@@ -418,6 +418,7 @@ typedef struct tg3_asset {
 /* --- Buffer --- */
 typedef struct tg3_buffer {
     tg3_str       name;
+    uint64_t      byte_length;  /* Declared buffer.byteLength */
     tg3_span_u8   data;
     tg3_str       uri;
     tg3_extras_ext ext;
@@ -941,6 +942,10 @@ typedef struct tg3_parse_options {
     int32_t  images_as_is;              /* 1 = don't decode images */
     int32_t  preserve_image_channels;   /* 1 = keep original channels */
     int32_t  store_original_json;       /* 1 = store raw JSON strings */
+    int32_t  skip_extras_values;        /* 1 = skip materializing extras and
+                                        *     unknown extension value trees */
+    int32_t  borrow_input_buffers;      /* 1 = GLB BIN buffer spans may point
+                                        *     into caller-owned input data */
     int32_t  parse_float32;            /* 1 = parse JSON floats as float32 for speed
                                         *     (breaks strict double-precision conformance
                                         *      but sufficient for glTF data which is

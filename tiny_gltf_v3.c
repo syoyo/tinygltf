@@ -504,6 +504,18 @@ static double tg3__json_number_to_double(const tg3json_value *v) {
 static int tg3__json_is_object(const tg3json_value *v) { return v && v->type == TG3JSON_OBJECT; }
 static int tg3__json_is_array(const tg3json_value *v) { return v && v->type == TG3JSON_ARRAY; }
 
+static int tg3__u64_add_overflow(uint64_t a, uint64_t b, uint64_t *out) {
+    if (a > UINT64_MAX - b) return 1;
+    *out = a + b;
+    return 0;
+}
+
+static int tg3__u64_mul_overflow(uint64_t a, uint64_t b, uint64_t *out) {
+    if (a != 0 && b > UINT64_MAX / a) return 1;
+    *out = a * b;
+    return 0;
+}
+
 static int tg3__json_has(const tg3json_value *o, const char *key) {
     return tg3json_object_get(o, key) ? 1 : 0;
 }
@@ -830,10 +842,12 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
     memset(ee, 0, sizeof(*ee));
     extras_it = tg3__json_get(o, "extras");
     if (extras_it) {
-        tg3_value *ev = (tg3_value *)tg3__arena_alloc(ctx->arena, sizeof(tg3_value));
-        if (ev) {
-            *ev = tg3__json_to_value(ctx, extras_it);
-            ee->extras = ev;
+        if (!ctx->opts.skip_extras_values) {
+            tg3_value *ev = (tg3_value *)tg3__arena_alloc(ctx->arena, sizeof(tg3_value));
+            if (ev) {
+                *ev = tg3__json_to_value(ctx, extras_it);
+                ee->extras = ev;
+            }
         }
         if (ctx->opts.store_original_json) {
             size_t raw_len = 0;
@@ -853,8 +867,13 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
             if (exts) {
                 for (i = 0; i < count; ++i) {
                     const tg3json_object_entry *entry = tg3json_object_at(ext_it, i);
+                    memset(&exts[i], 0, sizeof(exts[i]));
                     exts[i].name = tg3__arena_str(ctx->arena, entry->key, (uint32_t)entry->key_len);
-                    exts[i].value = tg3__json_to_value(ctx, entry->value);
+                    if (!ctx->opts.skip_extras_values) {
+                        exts[i].value = tg3__json_to_value(ctx, entry->value);
+                    } else {
+                        exts[i].value.type = TG3_VALUE_NULL;
+                    }
                 }
                 ee->extensions = exts;
                 ee->extensions_count = (uint32_t)count;
@@ -1096,6 +1115,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
     tg3__parse_string(ctx, o, "name", &buf->name, 0, "/buffer");
     tg3__parse_string(ctx, o, "uri", &buf->uri, 0, "/buffer");
     tg3__parse_uint64(ctx, o, "byteLength", &byte_length, 1, "/buffer");
+    buf->byte_length = byte_length;
     if (ctx->is_binary && buf_idx == 0 && buf->uri.len == 0) {
         uint8_t *data;
         if (!ctx->bin_data || ctx->bin_size < byte_length) {
@@ -1103,13 +1123,24 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
                             "GLB BIN chunk missing or smaller than buffer.byteLength", NULL, -1);
             return 0;
         }
+        if (ctx->opts.borrow_input_buffers) {
+            buf->data.data = ctx->bin_data;
+            buf->data.count = byte_length;
+            tg3__parse_extras_and_extensions(ctx, o, &buf->ext);
+            return 1;
+        }
+        if (byte_length > (uint64_t)((size_t)-1)) {
+            tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
+                            "buffer.byteLength exceeds addressable size", NULL, -1);
+            return 0;
+        }
         data = (uint8_t *)tg3__arena_alloc(ctx->arena, (size_t)byte_length);
-        if (!data) {
+        if (!data && byte_length > 0) {
             tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
                             "OOM for buffer data", NULL, -1);
             return 0;
         }
-        memcpy(data, ctx->bin_data, (size_t)byte_length);
+        if (byte_length > 0) memcpy(data, ctx->bin_data, (size_t)byte_length);
         buf->data.data = data;
         buf->data.count = byte_length;
     } else if (buf->uri.len > 0) {
@@ -1130,11 +1161,22 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
             uint8_t *file_data = NULL;
             uint64_t file_size = 0;
             if (tg3__load_external_file(ctx, &file_data, &file_size, buf->uri.data, buf->uri.len)) {
-                uint8_t *data = (uint8_t *)tg3__arena_alloc(ctx->arena, (size_t)file_size);
+                uint8_t *data = NULL;
+                if (file_size > (uint64_t)((size_t)-1)) {
+                    tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
+                                    "external buffer exceeds addressable size", NULL, -1);
+                    if (ctx->opts.fs.free_file) ctx->opts.fs.free_file(file_data, file_size, ctx->opts.fs.user_data);
+                    tg3__parse_extras_and_extensions(ctx, o, &buf->ext);
+                    return 0;
+                }
+                data = (uint8_t *)tg3__arena_alloc(ctx->arena, (size_t)file_size);
                 if (data) {
                     memcpy(data, file_data, (size_t)file_size);
                     buf->data.data = data;
                     buf->data.count = file_size;
+                } else if (file_size > 0) {
+                    tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
+                                    "OOM for external buffer data", NULL, -1);
                 }
                 if (ctx->opts.fs.free_file) ctx->opts.fs.free_file(file_data, file_size, ctx->opts.fs.user_data);
             }
@@ -1808,6 +1850,176 @@ static int tg3__validate_indices(tg3__parse_ctx *ctx, const tg3_model *m) {
     return errs == 0;
 }
 
+static int tg3__valid_accessor_component_type(int32_t component_type) {
+    switch (component_type) {
+        case TG3_COMPONENT_TYPE_BYTE:
+        case TG3_COMPONENT_TYPE_UNSIGNED_BYTE:
+        case TG3_COMPONENT_TYPE_SHORT:
+        case TG3_COMPONENT_TYPE_UNSIGNED_SHORT:
+        case TG3_COMPONENT_TYPE_UNSIGNED_INT:
+        case TG3_COMPONENT_TYPE_FLOAT:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static int tg3__valid_sparse_index_component_type(int32_t component_type) {
+    return component_type == TG3_COMPONENT_TYPE_UNSIGNED_BYTE ||
+           component_type == TG3_COMPONENT_TYPE_UNSIGNED_SHORT ||
+           component_type == TG3_COMPONENT_TYPE_UNSIGNED_INT;
+}
+
+static int tg3__validate_range_in_buffer_view(tg3__parse_ctx *ctx,
+                                              const tg3_buffer_view *bv,
+                                              uint64_t byte_offset,
+                                              uint64_t byte_length,
+                                              const char *what) {
+    uint64_t end;
+    int overflow = tg3__u64_add_overflow(byte_offset, byte_length, &end);
+    if (overflow || end > bv->byte_length) {
+        tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                         TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                         "%s byte range [%llu,%llu) exceeds bufferView length %llu",
+                         what,
+                         (unsigned long long)byte_offset,
+                         (unsigned long long)(overflow ? UINT64_MAX : end),
+                         (unsigned long long)bv->byte_length);
+        return 0;
+    }
+    return 1;
+}
+
+static int tg3__validate_resources(tg3__parse_ctx *ctx, const tg3_model *m) {
+    uint32_t i;
+    int ok = 1;
+
+    for (i = 0; i < m->buffers_count; ++i) {
+        const tg3_buffer *b = &m->buffers[i];
+        if (b->data.count > 0 && b->byte_length > b->data.count) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_BUFFER_SIZE_MISMATCH, "/buffers",
+                             "buffers[%u].byteLength %llu exceeds loaded data size %llu",
+                             i, (unsigned long long)b->byte_length,
+                             (unsigned long long)b->data.count);
+            ok = 0;
+        }
+    }
+
+    for (i = 0; i < m->buffer_views_count; ++i) {
+        const tg3_buffer_view *bv = &m->buffer_views[i];
+        const tg3_buffer *b;
+        uint64_t buffer_size;
+        uint64_t end;
+        if (bv->buffer < 0 || (uint32_t)bv->buffer >= m->buffers_count) {
+            continue;
+        }
+        b = &m->buffers[bv->buffer];
+        buffer_size = b->byte_length ? b->byte_length : b->data.count;
+        if (tg3__u64_add_overflow(bv->byte_offset, bv->byte_length, &end) ||
+            end > buffer_size) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_INVALID_BUFFER_VIEW, "/bufferViews",
+                             "bufferViews[%u] byte range exceeds buffers[%d].byteLength",
+                             i, bv->buffer);
+            ok = 0;
+        }
+    }
+
+    for (i = 0; i < m->accessors_count; ++i) {
+        const tg3_accessor *a = &m->accessors[i];
+        int32_t comp_size;
+        int32_t num_comp;
+        uint64_t elem_size;
+        if (!tg3__valid_accessor_component_type(a->component_type)) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                             "accessors[%u].componentType %d is invalid",
+                             i, a->component_type);
+            ok = 0;
+            continue;
+        }
+        comp_size = tg3_component_size(a->component_type);
+        num_comp = tg3_num_components(a->type);
+        if (comp_size <= 0 || num_comp <= 0) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                             "accessors[%u].type %d is invalid", i, a->type);
+            ok = 0;
+            continue;
+        }
+        if (tg3__u64_mul_overflow((uint64_t)comp_size, (uint64_t)num_comp, &elem_size)) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                             TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                             "accessors[%u] element size overflows", i);
+            ok = 0;
+            continue;
+        }
+        if (a->buffer_view >= 0 && (uint32_t)a->buffer_view < m->buffer_views_count) {
+            const tg3_buffer_view *bv = &m->buffer_views[a->buffer_view];
+            uint64_t stride = bv->byte_stride ? (uint64_t)bv->byte_stride : elem_size;
+            uint64_t last_offset = 0;
+            uint64_t span = 0;
+            if (stride < elem_size ||
+                (a->count > 0 &&
+                 (tg3__u64_mul_overflow(a->count - 1u, stride, &last_offset) ||
+                  tg3__u64_add_overflow(last_offset, elem_size, &span)))) {
+                tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                                 TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                                 "accessors[%u] byte stride/count overflows", i);
+                ok = 0;
+            } else if (!tg3__validate_range_in_buffer_view(ctx, bv, a->byte_offset,
+                                                           a->count > 0 ? span : 0,
+                                                           "accessor")) {
+                ok = 0;
+            }
+        }
+        if (a->sparse.is_sparse) {
+            uint64_t sparse_count;
+            if (a->sparse.count < 0 || (uint64_t)a->sparse.count > a->count) {
+                tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                                 TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                                 "accessors[%u].sparse.count %d is invalid",
+                                 i, a->sparse.count);
+                ok = 0;
+                continue;
+            }
+            sparse_count = (uint64_t)a->sparse.count;
+            if (!tg3__valid_sparse_index_component_type(a->sparse.indices.component_type)) {
+                tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                                 TG3_ERR_INVALID_ACCESSOR, "/accessors",
+                                 "accessors[%u].sparse.indices.componentType %d is invalid",
+                                 i, a->sparse.indices.component_type);
+                ok = 0;
+            }
+            if (a->sparse.indices.buffer_view >= 0 &&
+                (uint32_t)a->sparse.indices.buffer_view < m->buffer_views_count) {
+                const tg3_buffer_view *bv = &m->buffer_views[a->sparse.indices.buffer_view];
+                uint64_t bytes = 0;
+                int32_t idx_size_i = tg3_component_size(a->sparse.indices.component_type);
+                if (idx_size_i <= 0 ||
+                    tg3__u64_mul_overflow(sparse_count, (uint64_t)idx_size_i, &bytes) ||
+                    !tg3__validate_range_in_buffer_view(ctx, bv, a->sparse.indices.byte_offset,
+                                                        bytes, "sparse indices")) {
+                    ok = 0;
+                }
+            }
+            if (a->sparse.values.buffer_view >= 0 &&
+                (uint32_t)a->sparse.values.buffer_view < m->buffer_views_count) {
+                const tg3_buffer_view *bv = &m->buffer_views[a->sparse.values.buffer_view];
+                uint64_t bytes = 0;
+                if (tg3__u64_mul_overflow(sparse_count, elem_size, &bytes) ||
+                    !tg3__validate_range_in_buffer_view(ctx, bv, a->sparse.values.byte_offset,
+                                                        bytes, "sparse values")) {
+                    ok = 0;
+                }
+            }
+        }
+    }
+
+    return ok;
+}
+
 static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_value *json_doc, tg3_model *model) {
     const tg3json_value *asset_it = tg3json_object_get(json_doc, "asset");
     const tg3json_value *ext_it;
@@ -1873,7 +2085,20 @@ static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_va
             return TG3_ERR_INVALID_INDEX;
         }
     }
+    if (!tg3__validate_resources(ctx, model)) {
+        return TG3_ERR_INVALID_ACCESSOR;
+    }
     return (ctx->errors && ctx->errors->has_error) ? TG3_ERR_JSON_PARSE : TG3_OK;
+}
+
+static void tg3__json_parse_options_from_tg3(const tg3_parse_options *options,
+                                             tg3json_parse_options *json_options) {
+    memset(json_options, 0, sizeof(*json_options));
+    json_options->depth_limit = TINYGLTF3_MAX_NESTING_DEPTH;
+    json_options->memory_budget = options ? (size_t)options->memory.memory_budget : 0;
+    json_options->max_single_alloc = options ? (size_t)options->memory.max_single_alloc : 0;
+    json_options->max_string_length = TINYGLTF3_MAX_STRING_LENGTH;
+    json_options->parse_float32 = options ? options->parse_float32 : 0;
 }
 
 static tg3_error_code tg3__parse_glb_header(const uint8_t *data, uint64_t size,
@@ -1901,17 +2126,17 @@ static tg3_error_code tg3__parse_glb_header(const uint8_t *data, uint64_t size,
         return TG3_ERR_GLB_INVALID_VERSION;
     }
     memcpy(&total_length, data + 8, 4);
-    if ((uint64_t)total_length > size) {
+    if ((uint64_t)total_length != size) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_SIZE_MISMATCH,
-                        "GLB total length exceeds data size", NULL, -1);
+                        "GLB total length does not match data size", NULL, -1);
         return TG3_ERR_GLB_SIZE_MISMATCH;
     }
-    while (offset + 8 <= size) {
+    while (offset + 8 <= (uint64_t)total_length) {
         uint32_t chunk_length;
         uint32_t chunk_type;
         memcpy(&chunk_length, data + offset, 4); offset += 4;
         memcpy(&chunk_type, data + offset, 4); offset += 4;
-        if (offset + chunk_length > size) {
+        if (offset + chunk_length > (uint64_t)total_length) {
             tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_CHUNK_ERROR,
                             "GLB chunk exceeds data size", NULL, -1);
             return TG3_ERR_GLB_CHUNK_ERROR;
@@ -1942,19 +2167,23 @@ TINYGLTF3_API tg3_error_code tg3_parse(tg3_model *model, tg3_error_stack *errors
     tg3_arena *arena;
     tg3__parse_ctx ctx;
     tg3json_value json_doc;
+    tg3json_parse_options json_options;
     const char *error_pos = NULL;
     tg3_error_code ret;
     int parsed_ok;
-    if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
+    if (!model) return TG3_ERR_JSON_PARSE;
     tg3__model_init(model);
+    if (!json_data) return TG3_ERR_JSON_PARSE;
+    if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
     arena = tg3__arena_create(&options->memory);
     if (!arena) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY, "Failed to create arena", NULL, -1);
         return TG3_ERR_OUT_OF_MEMORY;
     }
     model->arena_ = arena;
-    parsed_ok = tg3json_parse_n((const char *)json_data, (size_t)json_size,
-                                TINYGLTF3_MAX_NESTING_DEPTH, &json_doc, &error_pos);
+    tg3__json_parse_options_from_tg3(options, &json_options);
+    parsed_ok = tg3json_parse_n_opts((const char *)json_data, (size_t)json_size,
+                                     &json_options, &json_doc, &error_pos);
     if (!parsed_ok || json_doc.type != TG3JSON_OBJECT) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE, "Failed to parse JSON", NULL,
                         error_pos ? (int64_t)(error_pos - (const char *)json_data) : -1);
@@ -1992,13 +2221,16 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
     tg3_arena *arena;
     tg3__parse_ctx ctx;
     tg3json_value json_doc;
+    tg3json_parse_options json_options;
     const char *error_pos = NULL;
     tg3_error_code err;
     int parsed_ok;
     /* Initialize model before any failure-return so callers can safely call
      * tg3_model_free() on the error path; the GLB header parse must not run
      * against a model whose arena_ field is uninitialized garbage. */
+    if (!model) return TG3_ERR_GLB_INVALID_HEADER;
     tg3__model_init(model);
+    if (!glb_data) return TG3_ERR_GLB_INVALID_HEADER;
     err = tg3__parse_glb_header(glb_data, glb_size, &json_chunk, &json_chunk_size, &bin_chunk, &bin_chunk_size, errors);
     if (err != TG3_OK) return err;
     if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
@@ -2008,8 +2240,9 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
         return TG3_ERR_OUT_OF_MEMORY;
     }
     model->arena_ = arena;
-    parsed_ok = tg3json_parse_n((const char *)json_chunk, (size_t)json_chunk_size,
-                                TINYGLTF3_MAX_NESTING_DEPTH, &json_doc, &error_pos);
+    tg3__json_parse_options_from_tg3(options, &json_options);
+    parsed_ok = tg3json_parse_n_opts((const char *)json_chunk, (size_t)json_chunk_size,
+                                     &json_options, &json_doc, &error_pos);
     if (!parsed_ok || json_doc.type != TG3JSON_OBJECT) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_JSON_PARSE, "Failed to parse GLB JSON chunk", NULL,
                         error_pos ? (int64_t)(error_pos - (const char *)json_chunk) : -1);
@@ -2039,6 +2272,11 @@ TINYGLTF3_API tg3_error_code tg3_parse_auto(tg3_model *model, tg3_error_stack *e
                                             const uint8_t *data, uint64_t size,
                                             const char *base_dir, uint32_t base_dir_len,
                                             const tg3_parse_options *options) {
+    if (!model) return TG3_ERR_JSON_PARSE;
+    if (!data && size > 0) {
+        tg3__model_init(model);
+        return TG3_ERR_JSON_PARSE;
+    }
     if (size >= 4 && data[0] == 'g' && data[1] == 'l' && data[2] == 'T' && data[3] == 'F') {
         return tg3_parse_glb(model, errors, data, size, base_dir, base_dir_len, options);
     }
@@ -2055,9 +2293,11 @@ TINYGLTF3_API tg3_error_code tg3_parse_file(tg3_model *model, tg3_error_stack *e
     uint32_t base_dir_len = 0;
     tg3_error_code result;
     uint32_t i;
+    if (!model) return TG3_ERR_FILE_NOT_FOUND;
+    tg3__model_init(model);
+    if (!filename) return TG3_ERR_FILE_NOT_FOUND;
     if (options) opts = *options;
     else tg3_parse_options_init(&opts);
-    tg3__model_init(model);
 #ifdef TINYGLTF3_ENABLE_FS
     tg3__set_default_fs(&opts.fs);
 #endif
@@ -2464,7 +2704,8 @@ static int tg3__serialize_buffer(const tg3_buffer *b, int wd, int embed, tg3json
     (void)wd;
     tg3json_value_init_object(out);
     if (!tg3__serialize_str(out, "name", b->name) ||
-        !tg3__json_set_int(out, "byteLength", (int64_t)b->data.count)) {
+        !tg3__json_set_int(out, "byteLength",
+                           (int64_t)(b->byte_length ? b->byte_length : b->data.count))) {
         tg3json_value_free(out);
         return 0;
     }

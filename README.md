@@ -61,8 +61,10 @@ The v3 C runtime is built for processing **untrusted glTF/GLB input** (server-si
 
 - **URI sanitization** — external buffer/image URIs are rejected before any filesystem call if they are empty, contain NUL bytes, begin with `/` or `\`, look like a Windows drive prefix (`X:`), or contain a `..` segment. Production callers SHOULD still provide a custom `tg3_fs_callbacks.read_file` that confines reads to a known directory (e.g. via `openat` plus a `realpath` prefix check) when the input is attacker-controlled.
 - **Index bounds validation** — every `int32_t` index field populated from JSON (accessor.bufferView, primitive.indices/material/attributes, scene.nodes[], skin.joints[], animation channel/sampler refs, KHR_audio + MSFT_lod refs, …) is checked after the structural parse. Out-of-range indices produce `TG3_ERR_INVALID_INDEX`. Default `tg3_parse_options.validate_indices = 1`; set to `0` only when you need raw round-trip and have your own validator.
+- **Buffer/accessor range validation** — declared buffer lengths, bufferView ranges, accessor element spans, sparse accessor spans, component types, and overflow-prone size math are checked before returning a model.
 - **Strict numeric range checks** — JSON numbers feeding integer fields go through finite/round-trip-validated coercion (`tg3__json_number_to_int32` / `_uint64`). `byteStride` is restricted to 0 or [4, 252].
-- **Memory budget** — the arena is capped at `TINYGLTF3_MAX_MEMORY_BYTES` (1 GB by default; configurable via `tg3_memory_config`).
+- **Memory budget** — the arena and C JSON parser enforce `TINYGLTF3_MAX_MEMORY_BYTES` by default; `max_single_alloc` and `TINYGLTF3_MAX_STRING_LENGTH` bound individual allocation and string size.
+- **Opt-in fast paths** — `skip_extras_values` avoids materializing `extras` and unknown extension value trees, and `borrow_input_buffers` lets GLB buffer spans reference caller-owned input bytes instead of copying the BIN chunk.
 - **Image decoding off by default** — the parser does not decode image bytes; use `tg3_parse_options.images_as_is = 1` to skip any decoder entirely when handling untrusted input.
 - **Error message lifetime** — error strings on `tg3_error_stack` are arena-allocated and remain valid until `tg3_model_free()`. Read or copy them BEFORE freeing the model.
 

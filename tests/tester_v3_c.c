@@ -649,6 +649,196 @@ fail:
   return 0;
 }
 
+static int check_buffer_view_range_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"uri\":\"data:application/octet-stream;base64,AAAA\",\"byteLength\":4}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":2,\"byteLength\":4}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_INVALID_ACCESSOR) {
+    fprintf(stderr, "bufferView OOB expected TG3_ERR_INVALID_ACCESSOR, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_accessor_range_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"uri\":\"data:application/octet-stream;base64,AAAA\",\"byteLength\":4}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteLength\":4}],"
+      "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\"}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_INVALID_ACCESSOR) {
+    fprintf(stderr, "accessor OOB expected TG3_ERR_INVALID_ACCESSOR, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_sparse_accessor_range_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"uri\":\"data:application/octet-stream;base64,AAAAAAAA\",\"byteLength\":6}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteOffset\":0,\"byteLength\":2},"
+      "{\"buffer\":0,\"byteOffset\":2,\"byteLength\":4}],"
+      "\"accessors\":[{\"componentType\":5126,\"count\":2,\"type\":\"SCALAR\","
+      "\"sparse\":{\"count\":2,\"indices\":{\"bufferView\":0,\"componentType\":5123},"
+      "\"values\":{\"bufferView\":1}}}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_INVALID_ACCESSOR) {
+    fprintf(stderr, "sparse accessor OOB expected TG3_ERR_INVALID_ACCESSOR, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_skip_extras_values_opt_in(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"extras\":{\"large\":[1,2,3]},"
+      "\"nodes\":[{\"extensions\":{\"VENDOR_test\":{\"x\":1}}}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_OK || !model.ext.extras || model.ext.extras->type != TG3_VALUE_OBJECT) {
+    fprintf(stderr, "default extras materialization failed\n");
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.skip_extras_values = 1;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_OK || model.ext.extras != NULL ||
+      model.nodes_count != 1 || model.nodes[0].ext.extensions_count != 1 ||
+      model.nodes[0].ext.extensions[0].value.type != TG3_VALUE_NULL) {
+    fprintf(stderr, "skip_extras_values did not skip value trees as expected\n");
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_json_limits_rejected(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"nodes\":[{\"name\":\"abcdef\"}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.memory.max_single_alloc = 4;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_JSON_PARSE) {
+    fprintf(stderr, "small max_single_alloc expected JSON parse failure, got %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_borrow_input_buffers(void) {
+  static const char json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"byteLength\":4}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  uint32_t json_len = (uint32_t)(sizeof(json) - 1);
+  uint32_t json_padded = (json_len + 3u) & ~3u;
+  uint32_t bin_len = 4;
+  uint32_t total = 12u + 8u + json_padded + 8u + bin_len;
+  uint32_t version = 2;
+  uint32_t json_type = 0x4E4F534Au;
+  uint32_t bin_type = 0x004E4942u;
+  uint8_t *glb = (uint8_t *)malloc(total);
+  uint32_t bin_off = 12u + 8u + json_padded + 8u;
+  int ok = 0;
+
+  if (!glb) return 0;
+  memset(glb, ' ', total);
+  memcpy(glb, "glTF", 4);
+  memcpy(glb + 4, &version, 4);
+  memcpy(glb + 8, &total, 4);
+  memcpy(glb + 12, &json_padded, 4);
+  memcpy(glb + 16, &json_type, 4);
+  memcpy(glb + 20, json, json_len);
+  memcpy(glb + 20 + json_padded, &bin_len, 4);
+  memcpy(glb + 24 + json_padded, &bin_type, 4);
+  glb[bin_off + 0] = 1;
+  glb[bin_off + 1] = 2;
+  glb[bin_off + 2] = 3;
+  glb[bin_off + 3] = 4;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.borrow_input_buffers = 1;
+  err = tg3_parse_glb(&model, &errors, glb, (uint64_t)total, "", 0, &opts);
+  if (err == TG3_OK && model.buffers_count == 1 &&
+      model.buffers[0].data.data == glb + bin_off &&
+      model.buffers[0].data.count == 4) {
+    ok = 1;
+  } else {
+    fprintf(stderr, "borrow_input_buffers failed: err=%d buffers=%u\n",
+            (int)err, model.buffers_count);
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  free(glb);
+  return ok;
+}
+
 static int parse_file_arg(const char *path) {
   FILE *fp = fopen(path, "rb");
   uint8_t *buf;
@@ -766,6 +956,24 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (!check_error_messages_survive_parse_failure()) {
+    return 1;
+  }
+  if (!check_buffer_view_range_rejected()) {
+    return 1;
+  }
+  if (!check_accessor_range_rejected()) {
+    return 1;
+  }
+  if (!check_sparse_accessor_range_rejected()) {
+    return 1;
+  }
+  if (!check_skip_extras_values_opt_in()) {
+    return 1;
+  }
+  if (!check_json_limits_rejected()) {
+    return 1;
+  }
+  if (!check_borrow_input_buffers()) {
     return 1;
   }
   return 0;
