@@ -116,8 +116,12 @@
 
 /* Assert override */
 #ifndef TINYGLTF3_ASSERT
+#ifndef TINYGLTF3_NO_STDLIB
 #include <assert.h>
 #define TINYGLTF3_ASSERT(x) assert(x)
+#else
+#define TINYGLTF3_ASSERT(x) ((void)(x))
+#endif
 #endif
 
 /* ======================================================================
@@ -127,8 +131,34 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdarg.h>
+#ifndef TINYGLTF3_NO_STDLIB
 #include <string.h>
 #include <stdlib.h>
+#endif
+
+#ifndef TINYGLTF3_MALLOC
+#ifndef TINYGLTF3_NO_STDLIB
+#define TINYGLTF3_MALLOC(sz) malloc(sz)
+#else
+#define TINYGLTF3_MALLOC(sz) NULL
+#endif
+#endif
+
+#ifndef TINYGLTF3_REALLOC
+#ifndef TINYGLTF3_NO_STDLIB
+#define TINYGLTF3_REALLOC(ptr, sz) realloc((ptr), (sz))
+#else
+#define TINYGLTF3_REALLOC(ptr, sz) NULL
+#endif
+#endif
+
+#ifndef TINYGLTF3_FREE
+#ifndef TINYGLTF3_NO_STDLIB
+#define TINYGLTF3_FREE(ptr) free(ptr)
+#else
+#define TINYGLTF3_FREE(ptr) ((void)(ptr))
+#endif
+#endif
 
 /* ======================================================================
  * Section 4: Constants and Enums

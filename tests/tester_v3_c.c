@@ -228,6 +228,16 @@ static int mem_contains(const uint8_t *data, uint64_t size, const char *needle) 
   return 0;
 }
 
+static void write_u32le(uint8_t *dst, uint32_t v) {
+  memcpy(dst, &v, sizeof(v));
+}
+
+static uint32_t read_u32le(const uint8_t *src) {
+  uint32_t v;
+  memcpy(&v, src, sizeof(v));
+  return v;
+}
+
 static int check_minimal_parse(void) {
   static const uint8_t json[] =
       "{\"asset\":{\"version\":\"2.0\"},"
@@ -337,6 +347,529 @@ static int check_minimal_write_roundtrip(void) {
   tg3_model_free(&model);
   tg3_error_stack_free(&errors);
   return 1;
+}
+
+static int check_binary_write_roundtrip(void) {
+  static const char json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"byteLength\":4}]}";
+  uint32_t json_len = (uint32_t)(sizeof(json) - 1);
+  uint32_t json_padded = (json_len + 3u) & ~3u;
+  uint32_t bin_len = 4;
+  uint32_t total = 12u + 8u + json_padded + 8u + bin_len;
+  uint8_t *glb = (uint8_t *)malloc(total);
+  uint32_t bin_off = 12u + 8u + json_padded + 8u;
+  tg3_model model;
+  tg3_model roundtrip;
+  tg3_error_stack errors;
+  tg3_parse_options parse_opts;
+  tg3_write_options write_opts;
+  tg3_error_code err;
+  uint8_t *out = NULL;
+  uint64_t out_size = 0;
+  int ok = 0;
+
+  if (!glb) return 0;
+  memset(glb, ' ', total);
+  memcpy(glb, "glTF", 4);
+  write_u32le(glb + 4, 2u);
+  write_u32le(glb + 8, total);
+  write_u32le(glb + 12, json_padded);
+  write_u32le(glb + 16, 0x4E4F534Au);
+  memcpy(glb + 20, json, json_len);
+  write_u32le(glb + 20 + json_padded, bin_len);
+  write_u32le(glb + 24 + json_padded, 0x004E4942u);
+  glb[bin_off + 0] = 1;
+  glb[bin_off + 1] = 2;
+  glb[bin_off + 2] = 3;
+  glb[bin_off + 3] = 4;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&parse_opts);
+  parse_opts.borrow_input_buffers = 1;
+  err = tg3_parse_glb(&model, &errors, glb, (uint64_t)total, "", 0, &parse_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "source GLB parse failed: %d\n", (int)err);
+    goto done;
+  }
+
+  tg3_write_options_init(&write_opts);
+  write_opts.write_binary = 1;
+  err = tg3_write_to_memory(&model, &errors, &out, &out_size, &write_opts);
+  if (err != TG3_OK || !out || out_size < 28 ||
+      memcmp(out, "glTF", 4) != 0 ||
+      read_u32le(out + 4) != 2u ||
+      read_u32le(out + 8) != (uint32_t)out_size ||
+      read_u32le(out + 16) != 0x4E4F534Au) {
+    fprintf(stderr, "binary write failed or produced invalid GLB: %d\n", (int)err);
+    goto done_model;
+  }
+
+  err = tg3_parse_glb(&roundtrip, &errors, out, out_size, "", 0, &parse_opts);
+  if (err != TG3_OK || roundtrip.buffers_count != 1 ||
+      roundtrip.buffers[0].data.count != 4 ||
+      roundtrip.buffers[0].data.data[0] != 1 ||
+      roundtrip.buffers[0].data.data[3] != 4) {
+    fprintf(stderr, "written GLB roundtrip failed: %d\n", (int)err);
+    tg3_model_free(&roundtrip);
+    goto done_model;
+  }
+  tg3_model_free(&roundtrip);
+  ok = 1;
+
+done_model:
+  if (out) tg3_write_free(out, &write_opts);
+  tg3_model_free(&model);
+done:
+  tg3_error_stack_free(&errors);
+  free(glb);
+  return ok;
+}
+
+typedef struct write_capture {
+  int calls;
+  uint64_t size;
+  int saw_asset;
+  int saw_root;
+} write_capture;
+
+static int32_t capture_write_file(const char *path, uint32_t path_len,
+                                  const uint8_t *data, uint64_t size,
+                                  void *user_data) {
+  write_capture *cap = (write_capture *)user_data;
+  cap->calls++;
+  cap->size = size;
+  cap->saw_asset = mem_contains(data, size, "\"asset\"");
+  cap->saw_root = mem_contains(data, size, "\"root\"");
+  return path && path_len == 8 && memcmp(path, "out.gltf", 8) == 0;
+}
+
+static int check_write_to_file_callback(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"nodes\":[{\"name\":\"root\"}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options parse_opts;
+  tg3_write_options write_opts;
+  tg3_error_code err;
+  write_capture cap;
+  memset(&cap, 0, sizeof(cap));
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&parse_opts);
+  tg3_write_options_init(&write_opts);
+
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0,
+                  &parse_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "parse before write callback failed: %d\n", (int)err);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  write_opts.fs.write_file = capture_write_file;
+  write_opts.fs.user_data = &cap;
+  err = tg3_write_to_file(&model, &errors, "out.gltf", 8, &write_opts);
+  if (err != TG3_OK || cap.calls != 1 || cap.size == 0 ||
+      !cap.saw_asset || !cap.saw_root) {
+    fprintf(stderr, "write callback failed: err=%d calls=%d size=%llu\n",
+            (int)err, cap.calls, (unsigned long long)cap.size);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+typedef struct read_capture {
+  int calls;
+  int frees;
+} read_capture;
+
+static int32_t memory_read_file(uint8_t **out_data, uint64_t *out_size,
+                                const char *path, uint32_t path_len,
+                                void *user_data) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"nodes\":[{\"name\":\"from-callback\"}]}";
+  read_capture *cap = (read_capture *)user_data;
+  uint8_t *copy;
+  if (!path || path_len != 15 || memcmp(path, "mem/model.gltf", 15) != 0) return 0;
+  cap->calls++;
+  copy = (uint8_t *)malloc(sizeof(json) - 1);
+  if (!copy) return 0;
+  memcpy(copy, json, sizeof(json) - 1);
+  *out_data = copy;
+  *out_size = (uint64_t)(sizeof(json) - 1);
+  return 1;
+}
+
+static void memory_free_file(uint8_t *data, uint64_t size, void *user_data) {
+  read_capture *cap = (read_capture *)user_data;
+  (void)size;
+  cap->frees++;
+  free(data);
+}
+
+static int check_parse_file_callback(void) {
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  read_capture cap;
+  memset(&cap, 0, sizeof(cap));
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.fs.read_file = memory_read_file;
+  opts.fs.free_file = memory_free_file;
+  opts.fs.user_data = &cap;
+  err = tg3_parse_file(&model, &errors, "mem/model.gltf", 15, &opts);
+  if (err != TG3_OK || cap.calls != 1 || cap.frees != 1 ||
+      model.nodes_count != 1 ||
+      !tg3_str_equals_cstr(model.nodes[0].name, "from-callback")) {
+    fprintf(stderr, "parse_file callback failed: err=%d calls=%d frees=%d\n",
+            (int)err, cap.calls, cap.frees);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+typedef struct chunk_capture {
+  int calls;
+  uint64_t size;
+  int saw_asset;
+  int saw_node;
+} chunk_capture;
+
+static int32_t capture_chunk(const uint8_t *data, uint64_t size, void *user_data) {
+  chunk_capture *cap = (chunk_capture *)user_data;
+  cap->calls++;
+  cap->size += size;
+  cap->saw_asset = cap->saw_asset || mem_contains(data, size, "\"asset\"");
+  cap->saw_node = cap->saw_node || mem_contains(data, size, "\"stream-node\"");
+  return 1;
+}
+
+static int check_streaming_writer(void) {
+  tg3_write_options opts;
+  tg3_writer *w;
+  tg3_asset asset;
+  tg3_node node;
+  chunk_capture cap;
+  tg3_error_code err;
+  memset(&asset, 0, sizeof(asset));
+  memset(&node, 0, sizeof(node));
+  memset(&cap, 0, sizeof(cap));
+  tg3_write_options_init(&opts);
+  asset.version.data = "2.0";
+  asset.version.len = 3;
+  node.name.data = "stream-node";
+  node.name.len = 11;
+  node.camera = -1;
+  node.skin = -1;
+  node.mesh = -1;
+  node.light = -1;
+  node.emitter = -1;
+  node.rotation[3] = 1.0;
+  node.scale[0] = 1.0;
+  node.scale[1] = 1.0;
+  node.scale[2] = 1.0;
+  w = tg3_writer_create(capture_chunk, &cap, &opts);
+  if (!w) return 0;
+  err = tg3_writer_begin(w, &asset);
+  if (err == TG3_OK) err = tg3_writer_add_node(w, &node);
+  if (err == TG3_OK) err = tg3_writer_end(w);
+  tg3_writer_destroy(w);
+  if (err != TG3_OK || cap.calls != 1 || cap.size == 0 ||
+      !cap.saw_asset || !cap.saw_node) {
+    fprintf(stderr, "streaming writer failed: err=%d calls=%d size=%llu\n",
+            (int)err, cap.calls, (unsigned long long)cap.size);
+    return 0;
+  }
+  return 1;
+}
+
+static int check_embed_buffer_from_glb(void) {
+  static const char json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"byteLength\":4}]}";
+  uint32_t json_len = (uint32_t)(sizeof(json) - 1);
+  uint32_t json_padded = (json_len + 3u) & ~3u;
+  uint32_t bin_len = 4;
+  uint32_t total = 12u + 8u + json_padded + 8u + bin_len;
+  uint8_t *glb = (uint8_t *)malloc(total);
+  uint32_t bin_off = 12u + 8u + json_padded + 8u;
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options parse_opts;
+  tg3_write_options write_opts;
+  tg3_error_code err;
+  uint8_t *out = NULL;
+  uint64_t out_size = 0;
+  int ok = 0;
+
+  if (!glb) return 0;
+  memset(glb, ' ', total);
+  memcpy(glb, "glTF", 4);
+  write_u32le(glb + 4, 2u);
+  write_u32le(glb + 8, total);
+  write_u32le(glb + 12, json_padded);
+  write_u32le(glb + 16, 0x4E4F534Au);
+  memcpy(glb + 20, json, json_len);
+  write_u32le(glb + 20 + json_padded, bin_len);
+  write_u32le(glb + 24 + json_padded, 0x004E4942u);
+  glb[bin_off + 0] = 1;
+  glb[bin_off + 1] = 2;
+  glb[bin_off + 2] = 3;
+  glb[bin_off + 3] = 4;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&parse_opts);
+  parse_opts.borrow_input_buffers = 1;
+  err = tg3_parse_glb(&model, &errors, glb, (uint64_t)total, "", 0, &parse_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "embed source GLB parse failed: %d\n", (int)err);
+    goto done;
+  }
+
+  tg3_write_options_init(&write_opts);
+  write_opts.pretty_print = 0;
+  write_opts.embed_buffers = 1;
+  err = tg3_write_to_memory(&model, &errors, &out, &out_size, &write_opts);
+  if (err != TG3_OK || !out ||
+      !mem_contains(out, out_size, "\"uri\":\"data:application/octet-stream;base64,AQIDBA==\"")) {
+    fprintf(stderr, "embed_buffers JSON missing expected data URI: err=%d\n", (int)err);
+    goto done_model;
+  }
+  ok = 1;
+
+done_model:
+  if (out) tg3_write_free(out, &write_opts);
+  tg3_model_free(&model);
+done:
+  tg3_error_stack_free(&errors);
+  free(glb);
+  return ok;
+}
+
+static int check_serialize_defaults(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"nodes\":[{\"name\":\"n\"}],"
+      "\"materials\":[{}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options parse_opts;
+  tg3_write_options write_opts;
+  tg3_error_code err;
+  uint8_t *out = NULL;
+  uint64_t out_size = 0;
+  int ok;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&parse_opts);
+  tg3_write_options_init(&write_opts);
+  write_opts.pretty_print = 0;
+  write_opts.serialize_defaults = 1;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0,
+                  &parse_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "serialize-defaults parse failed: %d\n", (int)err);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  err = tg3_write_to_memory(&model, &errors, &out, &out_size, &write_opts);
+  ok = (err == TG3_OK && out &&
+        mem_contains(out, out_size, "\"translation\"") &&
+        mem_contains(out, out_size, "\"rotation\"") &&
+        mem_contains(out, out_size, "\"scale\"") &&
+        mem_contains(out, out_size, "\"alphaCutoff\"") &&
+        mem_contains(out, out_size, "\"doubleSided\""));
+  if (!ok) fprintf(stderr, "serialize_defaults missing expected default fields\n");
+  if (out) tg3_write_free(out, &write_opts);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+static int check_parse_float32_model(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"accessors\":[{\"componentType\":5126,\"count\":1,\"type\":\"SCALAR\","
+      "\"min\":[0.10000000149011612],\"max\":[0.10000000149011612]}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  double expected = (double)(float)0.10000000149011612;
+  int ok;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.parse_float32 = 1;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  ok = (err == TG3_OK && model.accessors_count == 1 &&
+        model.accessors[0].min_values_count == 1 &&
+        model.accessors[0].max_values_count == 1 &&
+        model.accessors[0].min_values[0] == expected &&
+        model.accessors[0].max_values[0] == expected);
+  if (!ok) fprintf(stderr, "model parse_float32 failed: err=%d\n", (int)err);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+typedef struct parse_stream_capture {
+  int assets;
+  int nodes;
+  int scenes;
+  int saw_stream_node;
+} parse_stream_capture;
+
+static tg3_stream_action stream_asset_cb(const tg3_asset *a, void *ud) {
+  parse_stream_capture *cap = (parse_stream_capture *)ud;
+  cap->assets++;
+  (void)a;
+  return TG3_STREAM_CONTINUE;
+}
+
+static tg3_stream_action stream_node_cb(const tg3_node *n, int32_t idx, void *ud) {
+  parse_stream_capture *cap = (parse_stream_capture *)ud;
+  (void)idx;
+  cap->nodes++;
+  if (tg3_str_equals_cstr(n->name, "streamed")) cap->saw_stream_node = 1;
+  return TG3_STREAM_CONTINUE;
+}
+
+static tg3_stream_action stream_scene_cb(const tg3_scene *s, int32_t idx, void *ud) {
+  parse_stream_capture *cap = (parse_stream_capture *)ud;
+  (void)s;
+  (void)idx;
+  cap->scenes++;
+  return TG3_STREAM_CONTINUE;
+}
+
+static tg3_stream_action aborting_node_cb(const tg3_node *n, int32_t idx, void *ud) {
+  (void)n;
+  (void)idx;
+  (void)ud;
+  return TG3_STREAM_ABORT;
+}
+
+static int check_parse_stream_callbacks(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"scene\":0,"
+      "\"scenes\":[{\"nodes\":[0]}],\"nodes\":[{\"name\":\"streamed\"}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_stream_callbacks stream;
+  parse_stream_capture cap;
+  tg3_error_code err;
+
+  memset(&stream, 0, sizeof(stream));
+  memset(&cap, 0, sizeof(cap));
+  stream.on_asset = stream_asset_cb;
+  stream.on_node = stream_node_cb;
+  stream.on_scene = stream_scene_cb;
+  stream.user_data = &cap;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.stream = &stream;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_OK || cap.assets != 1 || cap.nodes != 1 || cap.scenes != 1 ||
+      !cap.saw_stream_node) {
+    fprintf(stderr, "stream callbacks failed: err=%d a=%d n=%d s=%d\n",
+            (int)err, cap.assets, cap.nodes, cap.scenes);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+
+  memset(&stream, 0, sizeof(stream));
+  stream.on_node = aborting_node_cb;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.stream = &stream;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  if (err != TG3_ERR_STREAM_ABORTED) {
+    fprintf(stderr, "stream abort returned %d\n", (int)err);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_store_original_json(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.0\"},\"extras\":{\"answer\":42},"
+      "\"extensions\":{\"VENDOR_test\":{\"enabled\":true}}}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  int ok;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.store_original_json = 1;
+  err = tg3_parse(&model, &errors, json, (uint64_t)(sizeof(json) - 1), "", 0, &opts);
+  ok = (err == TG3_OK &&
+        model.ext.extras && model.ext.extras->type == TG3_VALUE_OBJECT &&
+        model.ext.extras_json.data && model.ext.extras_json.len > 0 &&
+        model.ext.extensions_count == 1 &&
+        model.ext.extensions_json.data && model.ext.extensions_json.len > 0);
+  if (!ok) fprintf(stderr, "store_original_json failed: err=%d\n", (int)err);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+static int check_glb_header_errors(void) {
+  uint8_t glb[28];
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  int ok = 1;
+
+  tg3_parse_options_init(&opts);
+  tg3_error_stack_init(&errors);
+  memset(glb, 0, sizeof(glb));
+  memcpy(glb, "BAD!", 4);
+  write_u32le(glb + 4, 2u);
+  write_u32le(glb + 8, 28u);
+  err = tg3_parse_glb(&model, &errors, glb, sizeof(glb), "", 0, &opts);
+  ok = ok && (err == TG3_ERR_GLB_INVALID_MAGIC);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+
+  tg3_error_stack_init(&errors);
+  memset(glb, 0, sizeof(glb));
+  memcpy(glb, "glTF", 4);
+  write_u32le(glb + 4, 1u);
+  write_u32le(glb + 8, 28u);
+  err = tg3_parse_glb(&model, &errors, glb, sizeof(glb), "", 0, &opts);
+  ok = ok && (err == TG3_ERR_GLB_INVALID_VERSION);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+
+  tg3_error_stack_init(&errors);
+  memset(glb, 0, sizeof(glb));
+  memcpy(glb, "glTF", 4);
+  write_u32le(glb + 4, 2u);
+  write_u32le(glb + 8, 4096u);
+  err = tg3_parse_glb(&model, &errors, glb, sizeof(glb), "", 0, &opts);
+  ok = ok && (err == TG3_ERR_GLB_SIZE_MISMATCH);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+
+  if (!ok) fprintf(stderr, "GLB header error coverage failed\n");
+  return ok;
 }
 
 static int check_parse_file_failure_initializes_model(void) {
@@ -926,6 +1459,36 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (!check_minimal_write_roundtrip()) {
+    return 1;
+  }
+  if (!check_binary_write_roundtrip()) {
+    return 1;
+  }
+  if (!check_embed_buffer_from_glb()) {
+    return 1;
+  }
+  if (!check_serialize_defaults()) {
+    return 1;
+  }
+  if (!check_parse_float32_model()) {
+    return 1;
+  }
+  if (!check_write_to_file_callback()) {
+    return 1;
+  }
+  if (!check_parse_file_callback()) {
+    return 1;
+  }
+  if (!check_streaming_writer()) {
+    return 1;
+  }
+  if (!check_parse_stream_callbacks()) {
+    return 1;
+  }
+  if (!check_store_original_json()) {
+    return 1;
+  }
+  if (!check_glb_header_errors()) {
     return 1;
   }
   if (!check_parse_file_failure_initializes_model()) {

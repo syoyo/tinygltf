@@ -79,7 +79,49 @@ if (TINYGLTF_BUILD_TESTS)
     C_STANDARD_REQUIRED ON
     C_EXTENSIONS OFF
   )
+  target_compile_definitions(tester_v3_c PRIVATE TINYGLTF3_ENABLE_FS)
   add_test(NAME tester_v3_c COMMAND tester_v3_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  add_executable(tester_v3_c_v1port
+    tests/tester_v3_c_v1port.c
+    tiny_gltf_v3.c
+  )
+  target_include_directories(tester_v3_c_v1port PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+  set_target_properties(tester_v3_c_v1port PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+  )
+  target_compile_definitions(tester_v3_c_v1port PRIVATE TINYGLTF3_ENABLE_FS)
+  add_test(NAME tester_v3_c_v1port COMMAND tester_v3_c_v1port WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  add_executable(tester_v3_json_c tests/tester_v3_json_c.c)
+  target_include_directories(tester_v3_json_c PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  set_target_properties(tester_v3_json_c PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+  )
+  add_test(NAME tester_v3_json_c COMMAND tester_v3_json_c WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+
+  add_executable(tester_v3_freestanding tests/tester_v3_freestanding.c)
+  target_include_directories(tester_v3_freestanding PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+  )
+  set_target_properties(tester_v3_freestanding PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF
+  )
+  if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(tester_v3_freestanding PRIVATE -ffreestanding)
+  endif()
+  add_test(NAME tester_v3_freestanding COMMAND tester_v3_freestanding WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif (TINYGLTF_BUILD_TESTS)
 
 #

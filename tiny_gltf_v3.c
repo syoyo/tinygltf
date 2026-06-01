@@ -1,14 +1,136 @@
 #ifndef TINYGLTF3_SOURCE_INCLUDED_FROM_HEADER
 #include "tiny_gltf_v3.h"
 #endif
+#ifdef TINYGLTF3_NO_STDLIB
+#ifndef TINYGLTF_JSON_NO_STDLIB
+#define TINYGLTF_JSON_NO_STDLIB
+#endif
+#endif
+#ifndef TINYGLTF_JSON_MALLOC
+#define TINYGLTF_JSON_MALLOC(sz) TINYGLTF3_MALLOC(sz)
+#endif
+#ifndef TINYGLTF_JSON_REALLOC
+#define TINYGLTF_JSON_REALLOC(ptr, sz) TINYGLTF3_REALLOC((ptr), (sz))
+#endif
+#ifndef TINYGLTF_JSON_FREE
+#define TINYGLTF_JSON_FREE(ptr) TINYGLTF3_FREE(ptr)
+#endif
 #define TINYGLTF_JSON_C_IMPLEMENTATION
 #include "tinygltf_json_c.h"
 
 #include <inttypes.h>
+#ifndef TINYGLTF3_NO_STDLIB
 #include <math.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
+#include <stdio.h>
+#endif
+
+static void *tg3__memcpy(void *dst, const void *src, size_t size) {
+#ifndef TINYGLTF3_NO_STDLIB
+    return memcpy(dst, src, size);
+#else
+    unsigned char *d = (unsigned char *)dst;
+    const unsigned char *s = (const unsigned char *)src;
+    while (size--) *d++ = *s++;
+    return dst;
+#endif
+}
+
+static void *tg3__memset(void *dst, int value, size_t size) {
+#ifndef TINYGLTF3_NO_STDLIB
+    return memset(dst, value, size);
+#else
+    unsigned char *d = (unsigned char *)dst;
+    while (size--) *d++ = (unsigned char)value;
+    return dst;
+#endif
+}
+
+static int tg3__memcmp(const void *a, const void *b, size_t size) {
+#ifndef TINYGLTF3_NO_STDLIB
+    return memcmp(a, b, size);
+#else
+    const unsigned char *pa = (const unsigned char *)a;
+    const unsigned char *pb = (const unsigned char *)b;
+    while (size--) {
+        if (*pa != *pb) return (int)*pa - (int)*pb;
+        ++pa;
+        ++pb;
+    }
+    return 0;
+#endif
+}
+
+static size_t tg3__strlen(const char *s) {
+#ifndef TINYGLTF3_NO_STDLIB
+    return strlen(s);
+#else
+    const char *p = s;
+    while (*p) ++p;
+    return (size_t)(p - s);
+#endif
+}
+
+static void *tg3__memchr(const void *s, int c, size_t size) {
+#ifndef TINYGLTF3_NO_STDLIB
+    return (void *)memchr(s, c, size);
+#else
+    const unsigned char *p = (const unsigned char *)s;
+    unsigned char ch = (unsigned char)c;
+    while (size--) {
+        if (*p == ch) return (void *)p;
+        ++p;
+    }
+    return NULL;
+#endif
+}
+
+static int tg3__isfinite(double v) {
+    uint64_t bits = 0;
+    tg3__memcpy(&bits, &v, sizeof(bits));
+    return (bits & 0x7ff0000000000000ULL) != 0x7ff0000000000000ULL;
+}
+
+static double tg3__fabs(double v) {
+    uint64_t bits = 0;
+    tg3__memcpy(&bits, &v, sizeof(bits));
+    bits &= 0x7fffffffffffffffULL;
+    tg3__memcpy(&v, &bits, sizeof(v));
+    return v;
+}
+
+static int tg3__vsnprintf(char *buf, size_t size, const char *fmt, va_list ap) {
+#ifndef TINYGLTF3_NO_STDLIB
+    return vsnprintf(buf, size, fmt, ap);
+#else
+    size_t i = 0;
+    (void)ap;
+    if (size == 0) return 0;
+    while (fmt[i] && i + 1u < size) {
+        buf[i] = fmt[i];
+        ++i;
+    }
+    buf[i] = '\0';
+    return (int)i;
+#endif
+}
+
+#ifndef TINYGLTF3_MEMCPY
+#define TINYGLTF3_MEMCPY(dst, src, size) tg3__memcpy((dst), (src), (size))
+#endif
+#ifndef TINYGLTF3_MEMSET
+#define TINYGLTF3_MEMSET(dst, value, size) tg3__memset((dst), (value), (size))
+#endif
+#ifndef TINYGLTF3_MEMCMP
+#define TINYGLTF3_MEMCMP(a, b, size) tg3__memcmp((a), (b), (size))
+#endif
+#ifndef TINYGLTF3_STRLEN
+#define TINYGLTF3_STRLEN(s) tg3__strlen((s))
+#endif
+#ifndef TINYGLTF3_MEMCHR
+#define TINYGLTF3_MEMCHR(s, c, size) tg3__memchr((s), (c), (size))
+#endif
 
 #define TG3__ARENA_DEFAULT_BLOCK_SIZE (256u * 1024u)
 #define TG3__ARENA_ALIGNMENT 8u
@@ -52,20 +174,23 @@ struct tg3_writer {
 };
 
 static void *tg3__default_alloc(size_t size, void *ud) {
+    (void)size;
     (void)ud;
-    return malloc(size);
+    return TINYGLTF3_MALLOC(size);
 }
 
 static void *tg3__default_realloc(void *ptr, size_t old_size, size_t new_size, void *ud) {
+    (void)ptr;
     (void)old_size;
+    (void)new_size;
     (void)ud;
-    return realloc(ptr, new_size);
+    return TINYGLTF3_REALLOC(ptr, new_size);
 }
 
 static void tg3__default_free(void *ptr, size_t size, void *ud) {
     (void)size;
     (void)ud;
-    free(ptr);
+    TINYGLTF3_FREE(ptr);
 }
 
 static tg3_arena *tg3__arena_create(const tg3_memory_config *config) {
@@ -82,7 +207,7 @@ static tg3_arena *tg3__arena_create(const tg3_memory_config *config) {
 
     arena = (tg3_arena *)alloc.alloc(sizeof(tg3_arena), alloc.user_data);
     if (!arena) return NULL;
-    memset(arena, 0, sizeof(*arena));
+    TINYGLTF3_MEMSET(arena, 0, sizeof(*arena));
     arena->alloc = alloc;
     arena->block_size = (config && config->arena_block_size > 0)
                             ? (size_t)config->arena_block_size
@@ -140,7 +265,7 @@ static char *tg3__arena_strdup(tg3_arena *arena, const char *s, size_t len) {
     if (!s) return NULL;
     dst = (char *)tg3__arena_alloc(arena, len + 1);
     if (!dst) return NULL;
-    if (len > 0) memcpy(dst, s, len);
+    if (len > 0) TINYGLTF3_MEMCPY(dst, s, len);
     dst[len] = '\0';
     return dst;
 }
@@ -175,7 +300,7 @@ static void tg3__error_push(tg3_error_stack *es, tg3_severity sev,
     if (!es) return;
     if (es->count >= es->capacity) {
         new_cap = es->capacity ? es->capacity * 2u : 16u;
-        new_entries = (tg3_error_entry *)realloc(es->entries, new_cap * sizeof(tg3_error_entry));
+        new_entries = (tg3_error_entry *)TINYGLTF3_REALLOC(es->entries, new_cap * sizeof(tg3_error_entry));
         if (!new_entries) return;
         es->entries = new_entries;
         es->capacity = new_cap;
@@ -198,7 +323,7 @@ static void tg3__error_pushf(tg3_error_stack *es, tg3_arena *arena,
     const char *msg = buf;
     if (!es) return;
     va_start(ap, fmt);
-    n = vsnprintf(buf, sizeof(buf), fmt, ap);
+    n = tg3__vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     if (n < 0) n = 0;
     if ((size_t)n >= sizeof(buf)) n = (int)(sizeof(buf) - 1u);
@@ -215,16 +340,16 @@ TINYGLTF3_API const tg3_error_entry *tg3_errors_get(const tg3_error_stack *es, u
     if (!es || index >= es->count) return NULL;
     return &es->entries[index];
 }
-TINYGLTF3_API void tg3_error_stack_init(tg3_error_stack *es) { if (es) memset(es, 0, sizeof(*es)); }
+TINYGLTF3_API void tg3_error_stack_init(tg3_error_stack *es) { if (es) TINYGLTF3_MEMSET(es, 0, sizeof(*es)); }
 TINYGLTF3_API void tg3_error_stack_free(tg3_error_stack *es) {
     if (!es) return;
-    free(es->entries);
-    memset(es, 0, sizeof(*es));
+    TINYGLTF3_FREE(es->entries);
+    TINYGLTF3_MEMSET(es, 0, sizeof(*es));
 }
 
 TINYGLTF3_API void tg3_parse_options_init(tg3_parse_options *options) {
     if (!options) return;
-    memset(options, 0, sizeof(*options));
+    TINYGLTF3_MEMSET(options, 0, sizeof(*options));
     options->required_sections = TG3_REQUIRE_VERSION;
     options->strictness = TG3_PERMISSIVE;
     options->memory.memory_budget = TINYGLTF3_MAX_MEMORY_BYTES;
@@ -235,7 +360,7 @@ TINYGLTF3_API void tg3_parse_options_init(tg3_parse_options *options) {
 
 TINYGLTF3_API void tg3_write_options_init(tg3_write_options *options) {
     if (!options) return;
-    memset(options, 0, sizeof(*options));
+    TINYGLTF3_MEMSET(options, 0, sizeof(*options));
     options->pretty_print = 1;
     options->memory.memory_budget = TINYGLTF3_MAX_MEMORY_BYTES;
     options->memory.arena_block_size = TG3__ARENA_DEFAULT_BLOCK_SIZE;
@@ -281,16 +406,16 @@ TINYGLTF3_API int32_t tg3_accessor_byte_stride(const tg3_accessor *accessor, con
 TINYGLTF3_API int32_t tg3_str_equals(tg3_str a, tg3_str b) {
     if (a.len != b.len) return 0;
     if (a.len == 0) return 1;
-    return memcmp(a.data, b.data, a.len) == 0 ? 1 : 0;
+    return TINYGLTF3_MEMCMP(a.data, b.data, a.len) == 0 ? 1 : 0;
 }
 
 TINYGLTF3_API int32_t tg3_str_equals_cstr(tg3_str a, const char *b) {
     uint32_t blen;
     if (!b) return a.len == 0 ? 1 : 0;
-    blen = (uint32_t)strlen(b);
+    blen = (uint32_t)TINYGLTF3_STRLEN(b);
     if (a.len != blen) return 0;
     if (a.len == 0) return 1;
-    return memcmp(a.data, b, a.len) == 0 ? 1 : 0;
+    return TINYGLTF3_MEMCMP(a.data, b, a.len) == 0 ? 1 : 0;
 }
 
 static int tg3__b64_decode_char(unsigned char c) {
@@ -335,7 +460,7 @@ static uint8_t *tg3__b64_decode(const char *input, size_t input_len, size_t *out
 }
 
 TINYGLTF3_API int32_t tg3_is_data_uri(const char *uri, uint32_t len) {
-    return (uri && len >= 5u && memcmp(uri, "data:", 5) == 0) ? 1 : 0;
+    return (uri && len >= 5u && TINYGLTF3_MEMCMP(uri, "data:", 5) == 0) ? 1 : 0;
 }
 
 typedef struct tg3__data_uri_result {
@@ -349,7 +474,7 @@ static int tg3__parse_data_uri(const char *uri, uint32_t uri_len, tg3__data_uri_
     const char *end;
     const char *semi;
     size_t mime_len;
-    if (!uri || uri_len < 5u || memcmp(uri, "data:", 5) != 0) return 0;
+    if (!uri || uri_len < 5u || TINYGLTF3_MEMCMP(uri, "data:", 5) != 0) return 0;
     p = uri + 5;
     end = uri + uri_len;
     semi = p;
@@ -357,10 +482,10 @@ static int tg3__parse_data_uri(const char *uri, uint32_t uri_len, tg3__data_uri_
     if (semi >= end) return 0;
     mime_len = (size_t)(semi - p);
     if (mime_len >= sizeof(result->mime_type)) mime_len = sizeof(result->mime_type) - 1u;
-    memcpy(result->mime_type, p, mime_len);
+    TINYGLTF3_MEMCPY(result->mime_type, p, mime_len);
     result->mime_type[mime_len] = '\0';
     p = semi + 1;
-    if ((size_t)(end - p) < 7u || memcmp(p, "base64,", 7) != 0) return 0;
+    if ((size_t)(end - p) < 7u || TINYGLTF3_MEMCMP(p, "base64,", 7) != 0) return 0;
     p += 7;
     result->data_start = p;
     result->data_len = (size_t)(end - p);
@@ -376,15 +501,15 @@ static uint8_t *tg3__decode_data_uri(tg3_arena *arena, const char *uri, uint32_t
         return NULL;
     }
     if (out_mime && out_mime_cap > 0) {
-        mlen = strlen(dr.mime_type);
+        mlen = TINYGLTF3_STRLEN(dr.mime_type);
         if (mlen >= out_mime_cap) mlen = out_mime_cap - 1u;
-        memcpy(out_mime, dr.mime_type, mlen);
+        TINYGLTF3_MEMCPY(out_mime, dr.mime_type, mlen);
         out_mime[mlen] = '\0';
     }
     return tg3__b64_decode(dr.data_start, dr.data_len, out_len, arena);
 }
 
-#ifdef TINYGLTF3_ENABLE_FS
+#if defined(TINYGLTF3_ENABLE_FS) && !defined(TINYGLTF3_NO_STDLIB)
 static int32_t tg3__fs_file_exists(const char *path, uint32_t path_len, void *ud) {
     FILE *fp;
     (void)path_len; (void)ud;
@@ -409,18 +534,18 @@ static int32_t tg3__fs_read_file(uint8_t **out_data, uint64_t *out_size,
     size = ftell(fp);
     if (size < 0) { fclose(fp); return 0; }
     if (fseek(fp, 0, SEEK_SET) != 0) { fclose(fp); return 0; }
-    data = (uint8_t *)malloc((size_t)size);
+    data = (uint8_t *)TINYGLTF3_MALLOC((size_t)size);
     if (!data) { fclose(fp); return 0; }
     nread = fread(data, 1, (size_t)size, fp);
     fclose(fp);
-    if (nread != (size_t)size) { free(data); return 0; }
+    if (nread != (size_t)size) { TINYGLTF3_FREE(data); return 0; }
     *out_data = data;
     *out_size = (uint64_t)size;
     return 1;
 }
 
 static void tg3__fs_free_file(uint8_t *data, uint64_t size, void *ud) {
-    (void)size; (void)ud; free(data);
+    (void)size; (void)ud; TINYGLTF3_FREE(data);
 }
 
 static int32_t tg3__fs_write_file(const char *path, uint32_t path_len,
@@ -444,7 +569,7 @@ static void tg3__set_default_fs(tg3_fs_callbacks *fs) {
 #endif
 
 static void tg3__model_init(tg3_model *model) {
-    memset(model, 0, sizeof(*model));
+    TINYGLTF3_MEMSET(model, 0, sizeof(*model));
     model->default_scene = -1;
 }
 
@@ -462,7 +587,7 @@ static int tg3__json_number_to_int32(const tg3json_value *v, int32_t *out) {
         return 1;
     }
     real = v->u.real;
-    if (!isfinite(real) || real < (double)INT32_MIN || real > (double)INT32_MAX) {
+    if (!tg3__isfinite(real) || real < (double)INT32_MIN || real > (double)INT32_MAX) {
         return 0;
     }
     converted = (int32_t)real;
@@ -485,7 +610,7 @@ static int tg3__json_number_to_uint64(const tg3json_value *v, uint64_t *out) {
         return 1;
     }
     real = v->u.real;
-    if (!isfinite(real) || real < 0.0 || real > max_safe_uint64_real) {
+    if (!tg3__isfinite(real) || real < 0.0 || real > max_safe_uint64_real) {
         return 0;
     }
     converted = (uint64_t)real;
@@ -783,7 +908,7 @@ static int tg3__parse_string_array(tg3__parse_ctx *ctx, const tg3json_value *o, 
 static tg3_value tg3__json_to_value(tg3__parse_ctx *ctx, const tg3json_value *j) {
     tg3_value v;
     size_t i;
-    memset(&v, 0, sizeof(v));
+    TINYGLTF3_MEMSET(&v, 0, sizeof(v));
     if (!j) return v;
     switch (j->type) {
         case TG3JSON_NULL:
@@ -839,7 +964,7 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
                                              tg3_extras_ext *ee) {
     const tg3json_value *extras_it;
     const tg3json_value *ext_it;
-    memset(ee, 0, sizeof(*ee));
+    TINYGLTF3_MEMSET(ee, 0, sizeof(*ee));
     extras_it = tg3__json_get(o, "extras");
     if (extras_it) {
         if (!ctx->opts.skip_extras_values) {
@@ -854,7 +979,7 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
             char *raw = tg3json_stringify(extras_it, &raw_len);
             if (raw) {
                 ee->extras_json = tg3__arena_str(ctx->arena, raw, (uint32_t)raw_len);
-                free(raw);
+                TINYGLTF3_FREE(raw);
             }
         }
     }
@@ -867,7 +992,7 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
             if (exts) {
                 for (i = 0; i < count; ++i) {
                     const tg3json_object_entry *entry = tg3json_object_at(ext_it, i);
-                    memset(&exts[i], 0, sizeof(exts[i]));
+                    TINYGLTF3_MEMSET(&exts[i], 0, sizeof(exts[i]));
                     exts[i].name = tg3__arena_str(ctx->arena, entry->key, (uint32_t)entry->key_len);
                     if (!ctx->opts.skip_extras_values) {
                         exts[i].value = tg3__json_to_value(ctx, entry->value);
@@ -884,17 +1009,17 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
             char *raw = tg3json_stringify(ext_it, &raw_len);
             if (raw) {
                 ee->extensions_json = tg3__arena_str(ctx->arena, raw, (uint32_t)raw_len);
-                free(raw);
+                TINYGLTF3_FREE(raw);
             }
         }
     }
 }
 
-static void tg3__init_texture_info(tg3_texture_info *ti) { memset(ti, 0, sizeof(*ti)); ti->index = -1; }
-static void tg3__init_normal_texture_info(tg3_normal_texture_info *ti) { memset(ti, 0, sizeof(*ti)); ti->index = -1; ti->scale = 1.0; }
-static void tg3__init_occlusion_texture_info(tg3_occlusion_texture_info *ti) { memset(ti, 0, sizeof(*ti)); ti->index = -1; ti->strength = 1.0; }
+static void tg3__init_texture_info(tg3_texture_info *ti) { TINYGLTF3_MEMSET(ti, 0, sizeof(*ti)); ti->index = -1; }
+static void tg3__init_normal_texture_info(tg3_normal_texture_info *ti) { TINYGLTF3_MEMSET(ti, 0, sizeof(*ti)); ti->index = -1; ti->scale = 1.0; }
+static void tg3__init_occlusion_texture_info(tg3_occlusion_texture_info *ti) { TINYGLTF3_MEMSET(ti, 0, sizeof(*ti)); ti->index = -1; ti->strength = 1.0; }
 static void tg3__init_pbr(tg3_pbr_metallic_roughness *pbr) {
-    memset(pbr, 0, sizeof(*pbr));
+    TINYGLTF3_MEMSET(pbr, 0, sizeof(*pbr));
     pbr->base_color_factor[0] = 1.0; pbr->base_color_factor[1] = 1.0;
     pbr->base_color_factor[2] = 1.0; pbr->base_color_factor[3] = 1.0;
     pbr->metallic_factor = 1.0; pbr->roughness_factor = 1.0;
@@ -902,14 +1027,14 @@ static void tg3__init_pbr(tg3_pbr_metallic_roughness *pbr) {
     tg3__init_texture_info(&pbr->metallic_roughness_texture);
 }
 static void tg3__init_node(tg3_node *n) {
-    memset(n, 0, sizeof(*n));
+    TINYGLTF3_MEMSET(n, 0, sizeof(*n));
     n->camera = -1; n->skin = -1; n->mesh = -1; n->light = -1; n->emitter = -1;
     n->rotation[3] = 1.0; n->scale[0] = 1.0; n->scale[1] = 1.0; n->scale[2] = 1.0;
     n->matrix[0] = 1.0; n->matrix[5] = 1.0; n->matrix[10] = 1.0; n->matrix[15] = 1.0;
 }
 
 static int tg3__parse_asset(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_asset *asset) {
-    memset(asset, 0, sizeof(*asset));
+    TINYGLTF3_MEMSET(asset, 0, sizeof(*asset));
     tg3__parse_string(ctx, o, "version", &asset->version, 0, "/asset");
     tg3__parse_string(ctx, o, "generator", &asset->generator, 0, "/asset");
     tg3__parse_string(ctx, o, "minVersion", &asset->min_version, 0, "/asset");
@@ -957,20 +1082,20 @@ static int tg3__parse_occlusion_texture_info(tg3__parse_ctx *ctx, const tg3json_
 }
 
 static int tg3__accessor_type_from_string(const char *s, size_t len) {
-    if (len == 6 && memcmp(s, "SCALAR", 6) == 0) return TG3_TYPE_SCALAR;
-    if (len == 4 && memcmp(s, "VEC2", 4) == 0) return TG3_TYPE_VEC2;
-    if (len == 4 && memcmp(s, "VEC3", 4) == 0) return TG3_TYPE_VEC3;
-    if (len == 4 && memcmp(s, "VEC4", 4) == 0) return TG3_TYPE_VEC4;
-    if (len == 4 && memcmp(s, "MAT2", 4) == 0) return TG3_TYPE_MAT2;
-    if (len == 4 && memcmp(s, "MAT3", 4) == 0) return TG3_TYPE_MAT3;
-    if (len == 4 && memcmp(s, "MAT4", 4) == 0) return TG3_TYPE_MAT4;
+    if (len == 6 && TINYGLTF3_MEMCMP(s, "SCALAR", 6) == 0) return TG3_TYPE_SCALAR;
+    if (len == 4 && TINYGLTF3_MEMCMP(s, "VEC2", 4) == 0) return TG3_TYPE_VEC2;
+    if (len == 4 && TINYGLTF3_MEMCMP(s, "VEC3", 4) == 0) return TG3_TYPE_VEC3;
+    if (len == 4 && TINYGLTF3_MEMCMP(s, "VEC4", 4) == 0) return TG3_TYPE_VEC4;
+    if (len == 4 && TINYGLTF3_MEMCMP(s, "MAT2", 4) == 0) return TG3_TYPE_MAT2;
+    if (len == 4 && TINYGLTF3_MEMCMP(s, "MAT3", 4) == 0) return TG3_TYPE_MAT3;
+    if (len == 4 && TINYGLTF3_MEMCMP(s, "MAT4", 4) == 0) return TG3_TYPE_MAT4;
     return -1;
 }
 
 static int tg3__parse_accessor_sparse(tg3__parse_ctx *ctx, const tg3json_value *o,
                                       tg3_accessor_sparse *sparse) {
     const tg3json_value *it = tg3__json_get(o, "sparse");
-    memset(sparse, 0, sizeof(*sparse));
+    TINYGLTF3_MEMSET(sparse, 0, sizeof(*sparse));
     sparse->indices.buffer_view = -1;
     sparse->values.buffer_view = -1;
     if (!it) return 1;
@@ -1006,7 +1131,7 @@ static int tg3__parse_accessor(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_
     tg3_str type_str;
     uint64_t bo = 0;
     uint64_t cnt = 0;
-    memset(acc, 0, sizeof(*acc));
+    TINYGLTF3_MEMSET(acc, 0, sizeof(*acc));
     acc->buffer_view = -1;
     acc->component_type = -1;
     acc->type = -1;
@@ -1035,7 +1160,7 @@ static int tg3__uri_is_safe(const char *uri, uint32_t uri_len) {
     uint32_t i;
     if (!uri || uri_len == 0) return 0;
     /* No NUL bytes — fopen would truncate; protects against smuggling. */
-    if (memchr(uri, '\0', uri_len) != NULL) return 0;
+    if (TINYGLTF3_MEMCHR(uri, '\0', uri_len) != NULL) return 0;
     /* Reject absolute paths (POSIX and Windows). */
     if (uri[0] == '/' || uri[0] == '\\') return 0;
     /* Reject Windows drive prefixes like "C:". */
@@ -1075,14 +1200,14 @@ static int tg3__load_external_file(tg3__parse_ctx *ctx, uint8_t **out_data, uint
     if (uri_len >= sizeof(path_buf)) return 0;
     if (ctx->base_dir_len > 0) {
         if (ctx->base_dir_len >= sizeof(path_buf) - uri_len - 1u) return 0;
-        memcpy(path_buf, ctx->base_dir, ctx->base_dir_len);
+        TINYGLTF3_MEMCPY(path_buf, ctx->base_dir, ctx->base_dir_len);
         path_len = ctx->base_dir_len;
         if (path_len > 0 && path_buf[path_len - 1u] != '/' && path_buf[path_len - 1u] != '\\') {
             path_buf[path_len++] = '/';
         }
     }
     if (path_len + uri_len >= sizeof(path_buf)) return 0;
-    memcpy(path_buf + path_len, uri, uri_len);
+    TINYGLTF3_MEMCPY(path_buf + path_len, uri, uri_len);
     path_len += uri_len;
     path_buf[path_len] = '\0';
     ok = ctx->opts.fs.read_file(out_data, out_size, path_buf, path_len, ctx->opts.fs.user_data);
@@ -1111,7 +1236,7 @@ static int tg3__load_external_file(tg3__parse_ctx *ctx, uint8_t **out_data, uint
 static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
                              tg3_buffer *buf, int32_t buf_idx) {
     uint64_t byte_length = 0;
-    memset(buf, 0, sizeof(*buf));
+    TINYGLTF3_MEMSET(buf, 0, sizeof(*buf));
     tg3__parse_string(ctx, o, "name", &buf->name, 0, "/buffer");
     tg3__parse_string(ctx, o, "uri", &buf->uri, 0, "/buffer");
     tg3__parse_uint64(ctx, o, "byteLength", &byte_length, 1, "/buffer");
@@ -1140,7 +1265,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
                             "OOM for buffer data", NULL, -1);
             return 0;
         }
-        if (byte_length > 0) memcpy(data, ctx->bin_data, (size_t)byte_length);
+        if (byte_length > 0) TINYGLTF3_MEMCPY(data, ctx->bin_data, (size_t)byte_length);
         buf->data.data = data;
         buf->data.count = byte_length;
     } else if (buf->uri.len > 0) {
@@ -1148,7 +1273,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
             size_t decoded_len = 0;
             char mime[64];
             uint8_t *decoded;
-            memset(mime, 0, sizeof(mime));
+            TINYGLTF3_MEMSET(mime, 0, sizeof(mime));
             decoded = tg3__decode_data_uri(ctx->arena, buf->uri.data, buf->uri.len, &decoded_len, mime, sizeof(mime));
             if (!decoded && byte_length > 0) {
                 tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_DATA_URI_DECODE,
@@ -1171,7 +1296,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
                 }
                 data = (uint8_t *)tg3__arena_alloc(ctx->arena, (size_t)file_size);
                 if (data) {
-                    memcpy(data, file_data, (size_t)file_size);
+                    TINYGLTF3_MEMCPY(data, file_data, (size_t)file_size);
                     buf->data.data = data;
                     buf->data.count = file_size;
                 } else if (file_size > 0) {
@@ -1189,7 +1314,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
 static int tg3__parse_buffer_view(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_buffer_view *bv) {
     uint64_t val = 0;
     int32_t stride = 0;
-    memset(bv, 0, sizeof(*bv));
+    TINYGLTF3_MEMSET(bv, 0, sizeof(*bv));
     bv->buffer = -1;
     tg3__parse_string(ctx, o, "name", &bv->name, 0, "/bufferView");
     tg3__parse_int(ctx, o, "buffer", &bv->buffer, 1, "/bufferView");
@@ -1218,7 +1343,7 @@ static int tg3__parse_buffer_view(tg3__parse_ctx *ctx, const tg3json_value *o, t
 
 static int tg3__parse_image(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_image *img, int32_t img_idx) {
     (void)img_idx;
-    memset(img, 0, sizeof(*img));
+    TINYGLTF3_MEMSET(img, 0, sizeof(*img));
     img->width = -1; img->height = -1; img->component = -1; img->bits = -1; img->pixel_type = -1; img->buffer_view = -1;
     tg3__parse_string(ctx, o, "name", &img->name, 0, "/image");
     tg3__parse_string(ctx, o, "uri", &img->uri, 0, "/image");
@@ -1230,7 +1355,7 @@ static int tg3__parse_image(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_ima
 }
 
 static int tg3__parse_sampler(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_sampler *samp) {
-    memset(samp, 0, sizeof(*samp));
+    TINYGLTF3_MEMSET(samp, 0, sizeof(*samp));
     samp->min_filter = -1; samp->mag_filter = -1;
     samp->wrap_s = TG3_TEXTURE_WRAP_REPEAT; samp->wrap_t = TG3_TEXTURE_WRAP_REPEAT;
     tg3__parse_string(ctx, o, "name", &samp->name, 0, "/sampler");
@@ -1243,7 +1368,7 @@ static int tg3__parse_sampler(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_s
 }
 
 static int tg3__parse_texture(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_texture *tex) {
-    memset(tex, 0, sizeof(*tex));
+    TINYGLTF3_MEMSET(tex, 0, sizeof(*tex));
     tex->sampler = -1; tex->source = -1;
     tg3__parse_string(ctx, o, "name", &tex->name, 0, "/texture");
     tg3__parse_int(ctx, o, "sampler", &tex->sampler, 0, "/texture");
@@ -1255,7 +1380,7 @@ static int tg3__parse_texture(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_t
 static int tg3__parse_material(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_material *mat) {
     const tg3json_value *pbr_it;
     const tg3json_value *ext_it;
-    memset(mat, 0, sizeof(*mat));
+    TINYGLTF3_MEMSET(mat, 0, sizeof(*mat));
     tg3__init_pbr(&mat->pbr_metallic_roughness);
     tg3__init_normal_texture_info(&mat->normal_texture);
     tg3__init_occlusion_texture_info(&mat->occlusion_texture);
@@ -1297,7 +1422,7 @@ static int tg3__parse_material(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_
 static int tg3__parse_primitive(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_primitive *prim) {
     const tg3json_value *attr_it;
     const tg3json_value *targets_it;
-    memset(prim, 0, sizeof(*prim));
+    TINYGLTF3_MEMSET(prim, 0, sizeof(*prim));
     prim->material = -1; prim->indices = -1; prim->mode = TG3_MODE_TRIANGLES;
     tg3__parse_int(ctx, o, "material", &prim->material, 0, "/primitive");
     tg3__parse_int(ctx, o, "indices", &prim->indices, 0, "/primitive");
@@ -1375,7 +1500,7 @@ static int tg3__parse_primitive(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
 
 static int tg3__parse_mesh(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_mesh *mesh) {
     const tg3json_value *prim_it = tg3__json_get(o, "primitives");
-    memset(mesh, 0, sizeof(*mesh));
+    TINYGLTF3_MEMSET(mesh, 0, sizeof(*mesh));
     tg3__parse_string(ctx, o, "name", &mesh->name, 0, "/mesh");
     if (tg3__json_is_array(prim_it)) {
         size_t count = tg3json_array_size(prim_it);
@@ -1421,7 +1546,7 @@ static int tg3__parse_node(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_node
 }
 
 static int tg3__parse_skin(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_skin *skin) {
-    memset(skin, 0, sizeof(*skin));
+    TINYGLTF3_MEMSET(skin, 0, sizeof(*skin));
     skin->inverse_bind_matrices = -1; skin->skeleton = -1;
     tg3__parse_string(ctx, o, "name", &skin->name, 0, "/skin");
     tg3__parse_int(ctx, o, "inverseBindMatrices", &skin->inverse_bind_matrices, 0, "/skin");
@@ -1434,7 +1559,7 @@ static int tg3__parse_skin(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_skin
 static int tg3__parse_animation(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_animation *anim) {
     const tg3json_value *ch_it = tg3__json_get(o, "channels");
     const tg3json_value *samp_it = tg3__json_get(o, "samplers");
-    memset(anim, 0, sizeof(*anim));
+    TINYGLTF3_MEMSET(anim, 0, sizeof(*anim));
     tg3__parse_string(ctx, o, "name", &anim->name, 0, "/animation");
     if (tg3__json_is_array(ch_it)) {
         size_t count = tg3json_array_size(ch_it);
@@ -1445,7 +1570,7 @@ static int tg3__parse_animation(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
                 for (i = 0; i < count; ++i) {
                     const tg3json_value *item = tg3json_array_get(ch_it, i);
                     const tg3json_value *tgt_it;
-                    memset(&channels[i], 0, sizeof(channels[i]));
+                    TINYGLTF3_MEMSET(&channels[i], 0, sizeof(channels[i]));
                     channels[i].sampler = -1;
                     channels[i].target.node = -1;
                     tg3__parse_int(ctx, item, "sampler", &channels[i].sampler, 1, "/animation/channel");
@@ -1471,7 +1596,7 @@ static int tg3__parse_animation(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
                 for (i = 0; i < count; ++i) {
                     const tg3json_value *item = tg3json_array_get(samp_it, i);
                     tg3_str interp;
-                    memset(&samplers[i], 0, sizeof(samplers[i]));
+                    TINYGLTF3_MEMSET(&samplers[i], 0, sizeof(samplers[i]));
                     samplers[i].input = -1; samplers[i].output = -1;
                     tg3__parse_int(ctx, item, "input", &samplers[i].input, 1, "/animation/sampler");
                     tg3__parse_int(ctx, item, "output", &samplers[i].output, 1, "/animation/sampler");
@@ -1491,7 +1616,7 @@ static int tg3__parse_animation(tg3__parse_ctx *ctx, const tg3json_value *o, tg3
 
 static int tg3__parse_camera(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_camera *cam) {
     const tg3json_value *it;
-    memset(cam, 0, sizeof(*cam));
+    TINYGLTF3_MEMSET(cam, 0, sizeof(*cam));
     tg3__parse_string(ctx, o, "name", &cam->name, 0, "/camera");
     tg3__parse_string(ctx, o, "type", &cam->type, 1, "/camera");
     if (cam->type.data && tg3_str_equals_cstr(cam->type, "perspective")) {
@@ -1519,7 +1644,7 @@ static int tg3__parse_camera(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_ca
 
 static int tg3__parse_scene(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_scene *scene) {
     const tg3json_value *ext_it;
-    memset(scene, 0, sizeof(*scene));
+    TINYGLTF3_MEMSET(scene, 0, sizeof(*scene));
     tg3__parse_string(ctx, o, "name", &scene->name, 0, "/scene");
     tg3__parse_int_array(ctx, o, "nodes", &scene->nodes, &scene->nodes_count, 0, "/scene");
     ext_it = tg3__json_get(o, "extensions");
@@ -1535,7 +1660,7 @@ static int tg3__parse_scene(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_sce
 
 static int tg3__parse_light(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_light *light) {
     const tg3json_value *spot_it;
-    memset(light, 0, sizeof(*light));
+    TINYGLTF3_MEMSET(light, 0, sizeof(*light));
     light->color[0] = 1.0; light->color[1] = 1.0; light->color[2] = 1.0;
     light->intensity = 1.0; light->spot.outer_cone_angle = 0.7853981634;
     tg3__parse_string(ctx, o, "name", &light->name, 0, "/light");
@@ -1554,7 +1679,7 @@ static int tg3__parse_light(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_lig
 }
 
 static int tg3__parse_audio_source(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_audio_source *src) {
-    memset(src, 0, sizeof(*src));
+    TINYGLTF3_MEMSET(src, 0, sizeof(*src));
     src->buffer_view = -1;
     tg3__parse_string(ctx, o, "name", &src->name, 0, "/audioSource");
     tg3__parse_string(ctx, o, "uri", &src->uri, 0, "/audioSource");
@@ -1566,7 +1691,7 @@ static int tg3__parse_audio_source(tg3__parse_ctx *ctx, const tg3json_value *o, 
 
 static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_audio_emitter *emitter) {
     const tg3json_value *pos_it;
-    memset(emitter, 0, sizeof(*emitter));
+    TINYGLTF3_MEMSET(emitter, 0, sizeof(*emitter));
     emitter->gain = 1.0; emitter->source = -1;
     emitter->positional.cone_inner_angle = 6.283185307179586;
     emitter->positional.cone_outer_angle = 6.283185307179586;
@@ -2093,7 +2218,7 @@ static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_va
 
 static void tg3__json_parse_options_from_tg3(const tg3_parse_options *options,
                                              tg3json_parse_options *json_options) {
-    memset(json_options, 0, sizeof(*json_options));
+    TINYGLTF3_MEMSET(json_options, 0, sizeof(*json_options));
     json_options->depth_limit = TINYGLTF3_MAX_NESTING_DEPTH;
     json_options->memory_budget = options ? (size_t)options->memory.memory_budget : 0;
     json_options->max_single_alloc = options ? (size_t)options->memory.max_single_alloc : 0;
@@ -2119,13 +2244,13 @@ static tg3_error_code tg3__parse_glb_header(const uint8_t *data, uint64_t size,
                         "Invalid GLB magic bytes", NULL, -1);
         return TG3_ERR_GLB_INVALID_MAGIC;
     }
-    memcpy(&version, data + 4, 4);
+    TINYGLTF3_MEMCPY(&version, data + 4, 4);
     if (version != 2) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_INVALID_VERSION,
                         "Unsupported GLB version (expected 2)", NULL, -1);
         return TG3_ERR_GLB_INVALID_VERSION;
     }
-    memcpy(&total_length, data + 8, 4);
+    TINYGLTF3_MEMCPY(&total_length, data + 8, 4);
     if ((uint64_t)total_length != size) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_SIZE_MISMATCH,
                         "GLB total length does not match data size", NULL, -1);
@@ -2134,8 +2259,8 @@ static tg3_error_code tg3__parse_glb_header(const uint8_t *data, uint64_t size,
     while (offset + 8 <= (uint64_t)total_length) {
         uint32_t chunk_length;
         uint32_t chunk_type;
-        memcpy(&chunk_length, data + offset, 4); offset += 4;
-        memcpy(&chunk_type, data + offset, 4); offset += 4;
+        TINYGLTF3_MEMCPY(&chunk_length, data + offset, 4); offset += 4;
+        TINYGLTF3_MEMCPY(&chunk_type, data + offset, 4); offset += 4;
         if (offset + chunk_length > (uint64_t)total_length) {
             tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_CHUNK_ERROR,
                             "GLB chunk exceeds data size", NULL, -1);
@@ -2192,13 +2317,13 @@ TINYGLTF3_API tg3_error_code tg3_parse(tg3_model *model, tg3_error_stack *errors
          * the caller; tg3_model_free is the sole arena owner on the error path. */
         return TG3_ERR_JSON_PARSE;
     }
-    memset(&ctx, 0, sizeof(ctx));
+    TINYGLTF3_MEMSET(&ctx, 0, sizeof(ctx));
     ctx.arena = arena;
     ctx.errors = errors;
     ctx.opts = *options;
     ctx.base_dir = base_dir;
     ctx.base_dir_len = base_dir_len;
-#ifdef TINYGLTF3_ENABLE_FS
+#if defined(TINYGLTF3_ENABLE_FS) && !defined(TINYGLTF3_NO_STDLIB)
     tg3__set_default_fs(&ctx.opts.fs);
 #endif
     ret = tg3__parse_from_json(&ctx, &json_doc, model);
@@ -2250,7 +2375,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
         /* Keep arena alive so error messages stay valid; model_free owns it. */
         return TG3_ERR_JSON_PARSE;
     }
-    memset(&ctx, 0, sizeof(ctx));
+    TINYGLTF3_MEMSET(&ctx, 0, sizeof(ctx));
     ctx.arena = arena;
     ctx.errors = errors;
     ctx.opts = *options;
@@ -2259,7 +2384,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
     ctx.is_binary = 1;
     ctx.bin_data = bin_chunk;
     ctx.bin_size = bin_chunk_size;
-#ifdef TINYGLTF3_ENABLE_FS
+#if defined(TINYGLTF3_ENABLE_FS) && !defined(TINYGLTF3_NO_STDLIB)
     tg3__set_default_fs(&ctx.opts.fs);
 #endif
     err = tg3__parse_from_json(&ctx, &json_doc, model);
@@ -2298,7 +2423,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_file(tg3_model *model, tg3_error_stack *e
     if (!filename) return TG3_ERR_FILE_NOT_FOUND;
     if (options) opts = *options;
     else tg3_parse_options_init(&opts);
-#ifdef TINYGLTF3_ENABLE_FS
+#if defined(TINYGLTF3_ENABLE_FS) && !defined(TINYGLTF3_NO_STDLIB)
     tg3__set_default_fs(&opts.fs);
 #endif
     if (!opts.fs.read_file) {
@@ -2311,12 +2436,12 @@ TINYGLTF3_API tg3_error_code tg3_parse_file(tg3_model *model, tg3_error_stack *e
                         "Failed to read file", NULL, -1);
         return TG3_ERR_FILE_NOT_FOUND;
     }
-    memset(base_dir_buf, 0, sizeof(base_dir_buf));
+    TINYGLTF3_MEMSET(base_dir_buf, 0, sizeof(base_dir_buf));
     for (i = 0; i < filename_len; ++i) {
         if (filename[i] == '/' || filename[i] == '\\') base_dir_len = i;
     }
     if (base_dir_len > 0) {
-        memcpy(base_dir_buf, filename, base_dir_len);
+        TINYGLTF3_MEMCPY(base_dir_buf, filename, base_dir_len);
         base_dir_buf[base_dir_len] = '\0';
     }
     result = tg3_parse_auto(model, errors, file_data, file_size, base_dir_buf, base_dir_len, &opts);
@@ -2327,7 +2452,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_file(tg3_model *model, tg3_error_stack *e
 TINYGLTF3_API void tg3_model_free(tg3_model *model) {
     if (!model) return;
     if (model->arena_) tg3__arena_destroy(model->arena_);
-    memset(model, 0, sizeof(*model));
+    TINYGLTF3_MEMSET(model, 0, sizeof(*model));
     model->default_scene = -1;
 }
 
@@ -2335,7 +2460,7 @@ static char *tg3__b64_encode(const uint8_t *input, size_t input_len, size_t *out
     static const char chars[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     size_t enc_len = ((input_len + 2u) / 3u) * 4u;
-    char *out = (char *)malloc(enc_len + 1u);
+    char *out = (char *)TINYGLTF3_MALLOC(enc_len + 1u);
     size_t i;
     size_t j = 0;
     if (!out) return NULL;
@@ -2408,7 +2533,7 @@ static int tg3__json_set_string_n(tg3json_value *obj, const char *key, const cha
 }
 
 static int tg3__json_set_string(tg3json_value *obj, const char *key, const char *str) {
-    return tg3__json_set_string_n(obj, key, str, str ? strlen(str) : 0);
+    return tg3__json_set_string_n(obj, key, str, str ? TINYGLTF3_STRLEN(str) : 0);
 }
 
 static int tg3__json_array_append_int(tg3json_value *arr, int64_t value) {
@@ -2478,7 +2603,7 @@ static int tg3__serialize_uint64(tg3json_value *o, const char *key, uint64_t val
 
 static int tg3__serialize_double(tg3json_value *o, const char *key, double val,
                                  double default_val, int write_defaults) {
-    if (fabs(val - default_val) <= 1e-12 && !write_defaults) return 1;
+    if (tg3__fabs(val - default_val) <= 1e-12 && !write_defaults) return 1;
     return tg3__json_set_real(o, key, val);
 }
 
@@ -2724,22 +2849,22 @@ static int tg3__serialize_buffer(const tg3_buffer *b, int wd, int embed, tg3json
             tg3json_value_free(out);
             return 0;
         }
-        uri = (char *)malloc(prefix_len + enc_len + 1u);
+        uri = (char *)TINYGLTF3_MALLOC(prefix_len + enc_len + 1u);
         if (!uri) {
-            free(encoded);
+            TINYGLTF3_FREE(encoded);
             tg3json_value_free(out);
             return 0;
         }
-        memcpy(uri, prefix, prefix_len);
-        memcpy(uri + prefix_len, encoded, enc_len);
+        TINYGLTF3_MEMCPY(uri, prefix, prefix_len);
+        TINYGLTF3_MEMCPY(uri + prefix_len, encoded, enc_len);
         uri[prefix_len + enc_len] = '\0';
-        free(encoded);
+        TINYGLTF3_FREE(encoded);
         if (!tg3__json_set_string_n(out, "uri", uri, prefix_len + enc_len)) {
-            free(uri);
+            TINYGLTF3_FREE(uri);
             tg3json_value_free(out);
             return 0;
         }
-        free(uri);
+        TINYGLTF3_FREE(uri);
     }
     if (!tg3__serialize_extras_ext(out, &b->ext)) {
         tg3json_value_free(out);
@@ -2887,9 +3012,9 @@ static int tg3__serialize_material(const tg3_material *m, int wd, tg3json_value 
         has_pbr = 1;
     }
     if (!tg3__serialize_double(&pbr, "metallicFactor", p->metallic_factor, 1.0, wd)) goto fail;
-    if (fabs(p->metallic_factor - 1.0) > 1e-12 || wd) has_pbr = 1;
+    if (tg3__fabs(p->metallic_factor - 1.0) > 1e-12 || wd) has_pbr = 1;
     if (!tg3__serialize_double(&pbr, "roughnessFactor", p->roughness_factor, 1.0, wd)) goto fail;
-    if (fabs(p->roughness_factor - 1.0) > 1e-12 || wd) has_pbr = 1;
+    if (tg3__fabs(p->roughness_factor - 1.0) > 1e-12 || wd) has_pbr = 1;
     if (p->base_color_texture.index >= 0) {
         if (!tg3__serialize_texture_info(&pbr, "baseColorTexture", &p->base_color_texture, wd)) goto fail;
         has_pbr = 1;
@@ -3343,22 +3468,22 @@ TINYGLTF3_API tg3_error_code tg3_write_to_memory(const tg3_model *model, tg3_err
         }
         bin_padded = ((uint32_t)bin_len + 3u) & ~3u;
         total = 12u + 8u + json_padded + ((bin_data && bin_len > 0) ? (8u + bin_padded) : 0u);
-        glb = (uint8_t *)malloc(total);
+        glb = (uint8_t *)TINYGLTF3_MALLOC(total);
         if (!glb) {
-            free(json_str);
+            TINYGLTF3_FREE(json_str);
             tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
                             "OOM allocating GLB output", NULL, -1);
             return TG3_ERR_OUT_OF_MEMORY;
         }
-        memcpy(glb, "glTF", 4);
+        TINYGLTF3_MEMCPY(glb, "glTF", 4);
         {
             uint32_t version = 2u;
             uint32_t json_type = 0x4E4F534Au;
-            memcpy(glb + 4, &version, 4);
-            memcpy(glb + 8, &total, 4);
-            memcpy(glb + 12, &json_padded, 4);
-            memcpy(glb + 16, &json_type, 4);
-            memcpy(glb + 20, json_str, json_len);
+            TINYGLTF3_MEMCPY(glb + 4, &version, 4);
+            TINYGLTF3_MEMCPY(glb + 8, &total, 4);
+            TINYGLTF3_MEMCPY(glb + 12, &json_padded, 4);
+            TINYGLTF3_MEMCPY(glb + 16, &json_type, 4);
+            TINYGLTF3_MEMCPY(glb + 20, json_str, json_len);
         }
         while ((uint32_t)json_len < json_padded) {
             glb[20u + json_len] = ' ';
@@ -3368,25 +3493,25 @@ TINYGLTF3_API tg3_error_code tg3_write_to_memory(const tg3_model *model, tg3_err
             uint32_t bin_off = 20u + json_padded;
             uint32_t bin_type = 0x004E4942u;
             uint32_t i;
-            memcpy(glb + bin_off, &bin_padded, 4);
-            memcpy(glb + bin_off + 4u, &bin_type, 4);
-            memcpy(glb + bin_off + 8u, bin_data, (size_t)bin_len);
+            TINYGLTF3_MEMCPY(glb + bin_off, &bin_padded, 4);
+            TINYGLTF3_MEMCPY(glb + bin_off + 4u, &bin_type, 4);
+            TINYGLTF3_MEMCPY(glb + bin_off + 8u, bin_data, (size_t)bin_len);
             for (i = (uint32_t)bin_len; i < bin_padded; ++i) glb[bin_off + 8u + i] = 0;
         }
-        free(json_str);
+        TINYGLTF3_FREE(json_str);
         *out_data = glb;
         *out_size = total;
         return TG3_OK;
     } else {
-        uint8_t *data = (uint8_t *)malloc(json_len);
+        uint8_t *data = (uint8_t *)TINYGLTF3_MALLOC(json_len);
         if (!data) {
-            free(json_str);
+            TINYGLTF3_FREE(json_str);
             tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
                             "OOM allocating JSON output", NULL, -1);
             return TG3_ERR_OUT_OF_MEMORY;
         }
-        memcpy(data, json_str, json_len);
-        free(json_str);
+        TINYGLTF3_MEMCPY(data, json_str, json_len);
+        TINYGLTF3_FREE(json_str);
         *out_data = data;
         *out_size = (uint64_t)json_len;
         return TG3_OK;
@@ -3403,7 +3528,7 @@ TINYGLTF3_API tg3_error_code tg3_write_to_file(const tg3_model *model, tg3_error
     int32_t ok;
     if (options) opts = *options;
     else tg3_write_options_init(&opts);
-#ifdef TINYGLTF3_ENABLE_FS
+#if defined(TINYGLTF3_ENABLE_FS) && !defined(TINYGLTF3_NO_STDLIB)
     tg3__set_default_fs(&opts.fs);
 #endif
     if (!opts.fs.write_file) {
@@ -3414,7 +3539,7 @@ TINYGLTF3_API tg3_error_code tg3_write_to_file(const tg3_model *model, tg3_error
     err = tg3_write_to_memory(model, errors, &data, &size, &opts);
     if (err != TG3_OK) return err;
     ok = opts.fs.write_file(filename, filename_len, data, size, opts.fs.user_data);
-    free(data);
+    TINYGLTF3_FREE(data);
     if (!ok) {
         tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_FILE_WRITE,
                         "Failed to write file", NULL, -1);
@@ -3425,14 +3550,14 @@ TINYGLTF3_API tg3_error_code tg3_write_to_file(const tg3_model *model, tg3_error
 
 TINYGLTF3_API void tg3_write_free(uint8_t *data, const tg3_write_options *options) {
     (void)options;
-    free(data);
+    TINYGLTF3_FREE(data);
 }
 
 TINYGLTF3_API tg3_writer *tg3_writer_create(tg3_write_chunk_fn chunk_fn, void *user_data,
                                             const tg3_write_options *options) {
-    tg3_writer *w = (tg3_writer *)malloc(sizeof(tg3_writer));
+    tg3_writer *w = (tg3_writer *)TINYGLTF3_MALLOC(sizeof(tg3_writer));
     if (!w) return NULL;
-    memset(w, 0, sizeof(*w));
+    TINYGLTF3_MEMSET(w, 0, sizeof(*w));
     w->chunk_fn = chunk_fn;
     w->user_data = user_data;
     if (options) w->options = *options;
@@ -3508,12 +3633,12 @@ TINYGLTF3_API tg3_error_code tg3_writer_end(tg3_writer *w) {
         : tg3json_stringify(&w->root, &json_len);
     if (!json_str) return TG3_ERR_OUT_OF_MEMORY;
     ok = w->chunk_fn((const uint8_t *)json_str, (uint64_t)json_len, w->user_data);
-    free(json_str);
+    TINYGLTF3_FREE(json_str);
     return ok ? TG3_OK : TG3_ERR_WRITE_FAILED;
 }
 
 TINYGLTF3_API void tg3_writer_destroy(tg3_writer *w) {
     if (!w) return;
     tg3json_value_free(&w->root);
-    free(w);
+    TINYGLTF3_FREE(w);
 }
