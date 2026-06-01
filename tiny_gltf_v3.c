@@ -641,6 +641,15 @@ static int tg3__u64_mul_overflow(uint64_t a, uint64_t b, uint64_t *out) {
     return 0;
 }
 
+static int tg3__u64_fits_size(uint64_t v) {
+#if SIZE_MAX < UINT64_MAX
+    return v <= (uint64_t)SIZE_MAX;
+#else
+    (void)v;
+    return 1;
+#endif
+}
+
 static int tg3__json_has(const tg3json_value *o, const char *key) {
     return tg3json_object_get(o, key) ? 1 : 0;
 }
@@ -1254,7 +1263,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
             tg3__parse_extras_and_extensions(ctx, o, &buf->ext);
             return 1;
         }
-        if (byte_length > (uint64_t)((size_t)-1)) {
+        if (!tg3__u64_fits_size(byte_length)) {
             tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
                             "buffer.byteLength exceeds addressable size", NULL, -1);
             return 0;
@@ -1287,7 +1296,7 @@ static int tg3__parse_buffer(tg3__parse_ctx *ctx, const tg3json_value *o,
             uint64_t file_size = 0;
             if (tg3__load_external_file(ctx, &file_data, &file_size, buf->uri.data, buf->uri.len)) {
                 uint8_t *data = NULL;
-                if (file_size > (uint64_t)((size_t)-1)) {
+                if (!tg3__u64_fits_size(file_size)) {
                     tg3__error_push(ctx->errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
                                     "external buffer exceeds addressable size", NULL, -1);
                     if (ctx->opts.fs.free_file) ctx->opts.fs.free_file(file_data, file_size, ctx->opts.fs.user_data);

@@ -7,7 +7,11 @@ on:
       - devel
     paths:
     - 'tiny_gltf.*'
+    - 'tinygltf_json_c.h'
     - 'CMakeLists.txt'
+    - 'meson.build'
+    - 'meson_options.txt'
+    - 'tests/tester_v3*.c'
     - '.github/workflows/mingw-w64-msys2.yml'
   pull_request:
   workflow_dispatch:
@@ -37,9 +41,13 @@ jobs:
           cmake \
             -G"Ninja" \
             -S . \
-            -B build
+            -B build \
+            -DTINYGLTF_BUILD_TESTS=ON
 
       - name: Build
         run: |
           cmake --build build
 
+      - name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure

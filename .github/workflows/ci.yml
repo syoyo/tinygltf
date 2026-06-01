@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Configure
-        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build
@@ -53,7 +53,7 @@ jobs:
 
       - name: Configure
         run: |
-          cmake -B build -DCMAKE_C_COMPILER=clang-21 -DCMAKE_CXX_COMPILER=clang++-21 -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+          cmake -B build -DCMAKE_C_COMPILER=clang-21 -DCMAKE_CXX_COMPILER=clang++-21 -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build
@@ -74,7 +74,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Configure
-        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build
@@ -94,7 +94,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Configure
-        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+        run: cmake -B build -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_TESTS=ON
 
       - name: Build
         run: cmake --build build
@@ -117,7 +117,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off ..
+          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off -DTINYGLTF_BUILD_TESTS=ON ..
 
       - name: Build
         run: cmake --build build --config Release
@@ -141,7 +141,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G "Visual Studio 17 2022" -A Win32 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off ..
+          cmake -G "Visual Studio 17 2022" -A Win32 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=Off -DTINYGLTF_BUILD_TESTS=ON ..
 
       - name: Build
         run: cmake --build build --config Release
@@ -189,7 +189,7 @@ jobs:
 
       - name: Build with CMake
         run: |
-          cmake -G"Ninja" -S . -B build
+          cmake -G"Ninja" -S . -B build -DTINYGLTF_BUILD_TESTS=ON
           cmake --build build
 
       - name: Run loader_example
@@ -249,7 +249,7 @@ jobs:
       - name: Build with CMake Header-Only
         run: |
           mkdir build
-          cmake -B build -DTINYGLTF_HEADER_ONLY=ON -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON
+          cmake -B build -DTINYGLTF_HEADER_ONLY=ON -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_TESTS=ON
           cmake --build build
 
       - name: Run loader_example
@@ -258,6 +258,30 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
+
+  # v3 C tests through Meson on the primary desktop platforms.
+  v3-c-meson:
+    runs-on: ${{ matrix.os }}
+    name: v3 C Meson (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Meson
+        run: python -m pip install meson ninja
+
+      - name: Configure
+        run: meson setup build-meson -Dtests=true
+
+      - name: Build
+        run: meson compile -C build-meson
+
+      - name: Run v3 C tests
+        run: meson test -C build-meson --print-errorlogs
 
   # Special Configuration: RapidJSON Backend
   linux-rapidjson:
@@ -273,7 +297,7 @@ jobs:
 
       - name: Configure
         run: |
-          cmake -B build -DTINYGLTF_USE_RAPIDJSON=ON -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DCMAKE_PREFIX_PATH=$PWD/rapidjson
+          cmake -B build -DTINYGLTF_USE_RAPIDJSON=ON -DTINYGLTF_BUILD_LOADER_EXAMPLE=ON -DTINYGLTF_BUILD_TESTS=ON -DCMAKE_PREFIX_PATH=$PWD/rapidjson
 
       - name: Build
         run: cmake --build build

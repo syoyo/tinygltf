@@ -66,10 +66,12 @@ jobs:
           mkdir build
           cd build
           cmake --help
-          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On ..
+          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On -DTINYGLTF_BUILD_TESTS=ON ..
           cd ..
       - name: Build
         run: cmake --build build --config Release
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
 
 
   build-linux:
@@ -109,6 +111,12 @@ jobs:
         cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
            -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
         ./tester_v3_c_v1port
+        cc -I../ -std=c11 -g -O0 \
+           -o tester_v3_json_c tester_v3_json_c.c
+        ./tester_v3_json_c
+        cc -I../ -std=c11 -ffreestanding -g -O0 \
+           -o tester_v3_freestanding tester_v3_freestanding.c
+        ./tester_v3_freestanding
         cd ..
 
 
@@ -177,4 +185,3 @@ jobs:
 
             git clone https://github.com/Tencent/rapidjson
             clang++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
-

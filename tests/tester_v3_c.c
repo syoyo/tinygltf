@@ -1372,6 +1372,255 @@ static int check_borrow_input_buffers(void) {
   return ok;
 }
 
+static int parse_path_for_test(tg3_model *model, tg3_error_stack *errors,
+                               const char *path, const tg3_parse_options *opts) {
+  FILE *fp;
+  uint8_t *buf;
+  long sz;
+  size_t got;
+  const char *slash;
+  uint32_t base_len;
+  tg3_error_code err;
+
+  memset(model, 0, sizeof(*model));
+  fp = fopen(path, "rb");
+  if (!fp) {
+    fprintf(stderr, "open failed: %s\n", path);
+    return 0;
+  }
+  if (fseek(fp, 0, SEEK_END) != 0 || (sz = ftell(fp)) < 0 ||
+      fseek(fp, 0, SEEK_SET) != 0) {
+    fprintf(stderr, "seek failed: %s\n", path);
+    fclose(fp);
+    return 0;
+  }
+  buf = (uint8_t *)malloc((size_t)sz);
+  if (!buf) {
+    fprintf(stderr, "alloc failed: %s\n", path);
+    fclose(fp);
+    return 0;
+  }
+  got = fread(buf, 1, (size_t)sz, fp);
+  fclose(fp);
+  if (got != (size_t)sz) {
+    fprintf(stderr, "short read: %s\n", path);
+    free(buf);
+    return 0;
+  }
+
+  slash = strrchr(path, '/');
+  base_len = slash ? (uint32_t)(slash - path) : 0;
+  err = tg3_parse_auto(model, errors, buf, (uint64_t)sz, path, base_len, opts);
+  free(buf);
+  if (err != TG3_OK) {
+    fprintf(stderr, "parse failed: %s err=%d\n", path, (int)err);
+    return 0;
+  }
+  return 1;
+}
+
+static int has_str(const tg3_str *items, uint32_t count, const char *needle) {
+  uint32_t i;
+  for (i = 0; i < count; ++i) {
+    if (tg3_str_equals_cstr(items[i], needle)) return 1;
+  }
+  return 0;
+}
+
+static int ext_has(const tg3_extras_ext *ext, const char *name) {
+  uint32_t i;
+  if (!ext || !ext->extensions) return 0;
+  for (i = 0; i < ext->extensions_count; ++i) {
+    if (tg3_str_equals_cstr(ext->extensions[i].name, name)) return 1;
+  }
+  return 0;
+}
+
+static int check_stdio_parse_regression_files(void) {
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  int ok = 1;
+
+  tg3_parse_options_init(&opts);
+
+  tg3_error_stack_init(&errors);
+  if (!parse_path_for_test(&model, &errors, "../models/Extensions-issue97/test.gltf", &opts) ||
+      model.extensions_used_count != 1 ||
+      !has_str(model.extensions_used, model.extensions_used_count,
+               "VENDOR_material_some_ext") ||
+      model.materials_count != 1 ||
+      !ext_has(&model.materials[0].ext, "VENDOR_material_some_ext")) {
+    fprintf(stderr, "issue-97 extension parse regression failed\n");
+    ok = 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  if (!ok) return 0;
+
+  tg3_error_stack_init(&errors);
+  if (!parse_path_for_test(&model, &errors,
+                           "../models/Extensions-overwrite-issue261/issue-261.gltf",
+                           &opts) ||
+      !has_str(model.extensions_used, model.extensions_used_count,
+               "KHR_lights_punctual") ||
+      !ext_has(&model.ext, "NV_MDL") ||
+      !ext_has(&model.ext, "KHR_lights_punctual")) {
+    fprintf(stderr, "issue-261 extension overwrite regression failed\n");
+    ok = 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  if (!ok) return 0;
+
+  tg3_error_stack_init(&errors);
+  if (!parse_path_for_test(&model, &errors,
+                           "../models/regression/unassigned-skeleton.gltf",
+                           &opts) ||
+      model.skins_count != 1 || model.skins[0].skeleton != -1) {
+    fprintf(stderr, "issue-321 unassigned skeleton regression failed\n");
+    ok = 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  if (!ok) return 0;
+
+  tg3_error_stack_init(&errors);
+  if (!parse_path_for_test(&model, &errors,
+                           "../models/regression/zero-sized-bin-chunk-issue-440.glb",
+                           &opts)) {
+    fprintf(stderr, "issue-440 zero-sized BIN chunk regression failed\n");
+    ok = 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  if (!ok) return 0;
+
+  tg3_error_stack_init(&errors);
+  if (!parse_path_for_test(&model, &errors, "issue-492.glb", &opts)) {
+    fprintf(stderr, "issue-492 inverse bind matrices regression failed\n");
+    ok = 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+static int check_stdio_parse_file_cube(void) {
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  int ok;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.images_as_is = 1;
+  err = tg3_parse_file(&model, &errors, "../models/Cube/Cube.gltf", 24, &opts);
+  ok = (err == TG3_OK && model.buffers_count == 1 &&
+        model.buffers[0].data.data && model.buffers[0].data.count > 0 &&
+        model.images_count == 2 && model.images[0].uri.data);
+  if (!ok) {
+    fprintf(stderr, "stdio parse_file Cube regression failed: err=%d\n", (int)err);
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+static int write_read_stdio_roundtrip(const uint8_t *json, uint64_t json_size,
+                                      const char *path,
+                                      int (*check_model)(const tg3_model *model)) {
+  tg3_model model;
+  tg3_model roundtrip;
+  tg3_error_stack errors;
+  tg3_parse_options parse_opts;
+  tg3_write_options write_opts;
+  tg3_error_code err;
+  int ok = 0;
+
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&parse_opts);
+  tg3_write_options_init(&write_opts);
+
+  err = tg3_parse(&model, &errors, json, json_size, "", 0, &parse_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "stdio write source parse failed: err=%d\n", (int)err);
+    goto done;
+  }
+  err = tg3_write_to_file(&model, &errors, path, (uint32_t)strlen(path), &write_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "stdio write_to_file failed: %s err=%d\n", path, (int)err);
+    goto done_model;
+  }
+  err = tg3_parse_file(&roundtrip, &errors, path, (uint32_t)strlen(path), &parse_opts);
+  if (err != TG3_OK) {
+    fprintf(stderr, "stdio parse_file roundtrip failed: %s err=%d\n", path, (int)err);
+    goto done_model;
+  }
+  ok = check_model(&roundtrip);
+  tg3_model_free(&roundtrip);
+
+done_model:
+  tg3_model_free(&model);
+done:
+  remove(path);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+static int check_empty_node_scene_material_model(const tg3_model *model) {
+  return model->nodes_count == 1 &&
+         model->scenes_count == 1 &&
+         model->materials_count == 1 &&
+         model->scenes[0].nodes_count == 1 &&
+         model->scenes[0].nodes[0] == 0;
+}
+
+static int check_light_lod_model(const tg3_model *model) {
+  return model->lights_count == 1 &&
+         model->nodes_count == 3 &&
+         model->nodes[0].light == 0 &&
+         model->nodes[0].lods_count == 2 &&
+         model->nodes[0].lods[0] == 1 &&
+         model->nodes[0].lods[1] == 2 &&
+         model->scenes_count == 1 &&
+         model->scenes[0].nodes_count == 1 &&
+         model->scenes[0].nodes[0] == 0;
+}
+
+static int check_stdio_write_regression_cases(void) {
+  static const uint8_t empty_node_scene_material[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"nodes\":[{}],"
+      "\"scenes\":[{\"nodes\":[0]}],"
+      "\"materials\":[{}]}";
+  static const uint8_t light_lod[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"extensionsUsed\":[\"KHR_lights_punctual\",\"MSFT_lod\"],"
+      "\"extensions\":{\"KHR_lights_punctual\":{\"lights\":[{"
+      "\"type\":\"point\",\"intensity\":0.75,\"color\":[1.0,0.8,0.95]}]}},"
+      "\"nodes\":[{\"extensions\":{\"KHR_lights_punctual\":{\"light\":0},"
+      "\"MSFT_lod\":{\"ids\":[1,2]}}},{},{}],"
+      "\"scenes\":[{\"nodes\":[0]}]}";
+
+  if (!write_read_stdio_roundtrip(
+          empty_node_scene_material,
+          (uint64_t)(sizeof(empty_node_scene_material) - 1),
+          "tg3_v3_empty_node_scene_material.gltf",
+          check_empty_node_scene_material_model)) {
+    fprintf(stderr, "empty node/scene/material stdio roundtrip failed\n");
+    return 0;
+  }
+  if (!write_read_stdio_roundtrip(light_lod, (uint64_t)(sizeof(light_lod) - 1),
+                                  "tg3_v3_light_lod.gltf",
+                                  check_light_lod_model)) {
+    fprintf(stderr, "light/lod stdio roundtrip failed\n");
+    return 0;
+  }
+  return 1;
+}
+
 static int parse_file_arg(const char *path) {
   FILE *fp = fopen(path, "rb");
   uint8_t *buf;
@@ -1537,6 +1786,15 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (!check_borrow_input_buffers()) {
+    return 1;
+  }
+  if (!check_stdio_parse_regression_files()) {
+    return 1;
+  }
+  if (!check_stdio_parse_file_cube()) {
+    return 1;
+  }
+  if (!check_stdio_write_regression_cases()) {
     return 1;
   }
   return 0;
