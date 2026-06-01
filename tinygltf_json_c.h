@@ -129,6 +129,14 @@ char *tg3json_stringify_pretty(const tg3json_value *value, int indent, size_t *o
 #ifndef TINYGLTF_JSON_NO_STDLIB
   #include <stdlib.h>
   #include <string.h>
+  #include <stdio.h>
+  #include <float.h>
+#if defined(_MSC_VER) || (defined(LDBL_MANT_DIG) && LDBL_MANT_DIG <= 53)
+#define TG3JSON_USE_STDLIB_FPCONV 1
+#endif
+#endif
+#ifndef TG3JSON_USE_STDLIB_FPCONV
+#define TG3JSON_USE_STDLIB_FPCONV 0
 #endif
 
 #ifdef TINYGLTF_JSON_NO_STDLIB
@@ -266,12 +274,6 @@ static uint64_t tg3json__double_bits(double v) {
     return bits;
 }
 
-static double tg3json__double_from_bits(uint64_t bits) {
-    double v = 0.0;
-    TINYGLTF_JSON_MEMCPY(&v, &bits, sizeof(v));
-    return v;
-}
-
 static int tg3json__is_nan_bits(uint64_t bits) {
     return ((bits & 0x7ff0000000000000ULL) == 0x7ff0000000000000ULL) &&
            ((bits & 0x000fffffffffffffULL) != 0);
@@ -279,6 +281,13 @@ static int tg3json__is_nan_bits(uint64_t bits) {
 
 static int tg3json__is_inf_bits(uint64_t bits) {
     return (bits & 0x7fffffffffffffffULL) == 0x7ff0000000000000ULL;
+}
+
+#if !TG3JSON_USE_STDLIB_FPCONV
+static double tg3json__double_from_bits(uint64_t bits) {
+    double v = 0.0;
+    TINYGLTF_JSON_MEMCPY(&v, &bits, sizeof(v));
+    return v;
 }
 
 static long double tg3json__pow10_ld(int exp10) {
@@ -299,8 +308,30 @@ static long double tg3json__pow10_ld(int exp10) {
     }
     return v;
 }
+#endif
 
 static int tg3json__parse_f64_c(const char *start, const char *end, double *out) {
+#if TG3JSON_USE_STDLIB_FPCONV
+    size_t len = (size_t)(end - start);
+    char stack_buf[128];
+    char *buf = stack_buf;
+    char *parse_end = NULL;
+    double v;
+    if (len + 1 > sizeof(stack_buf)) {
+        buf = (char *)TINYGLTF_JSON_MALLOC(len + 1);
+        if (!buf) return 0;
+    }
+    if (len > 0) TINYGLTF_JSON_MEMCPY(buf, start, len);
+    buf[len] = '\0';
+    v = strtod(buf, &parse_end);
+    if (parse_end != buf + len || tg3json__is_inf_bits(tg3json__double_bits(v))) {
+        if (buf != stack_buf) TINYGLTF_JSON_FREE(buf);
+        return 0;
+    }
+    if (buf != stack_buf) TINYGLTF_JSON_FREE(buf);
+    *out = v;
+    return 1;
+#else
     const char *p = start;
     int neg = 0;
     int saw_digit = 0;
@@ -399,6 +430,7 @@ static int tg3json__parse_f64_c(const char *start, const char *end, double *out)
     *out = (double)v;
     if (tg3json__is_inf_bits(tg3json__double_bits(*out))) return 0;
     return 1;
+#endif
 }
 
 static char *tg3json__write_exp(char *p, int exp10) {
@@ -452,6 +484,97 @@ static int tg3json__same_f64(double a, double b) {
     return tg3json__double_bits(a) == tg3json__double_bits(b);
 }
 
+#if TG3JSON_USE_STDLIB_FPCONV
+static void tg3json__normalize_exponent(char *s) {
+    char *e = s;
+    char *dst;
+    int neg = 0;
+    while (*e && *e != 'e' && *e != 'E') ++e;
+    if (!*e) return;
+    *e++ = 'e';
+    dst = e;
+    if (*e == '+' || *e == '-') {
+        neg = (*e == '-');
+        ++e;
+    }
+    while (*e == '0') ++e;
+    if (neg) *dst++ = '-';
+    if (!*e) {
+        *dst++ = '0';
+    } else {
+        while (*e) *dst++ = *e++;
+    }
+    *dst = '\0';
+}
+
+static void tg3json__expand_short_plain_decimal(char *s) {
+    char *p = s;
+    char *e;
+    char digits[32];
+    char out[96];
+    int negative = 0;
+    int ndigits = 0;
+    int int_digits = 0;
+    int exp10 = 0;
+    int new_point;
+    int i;
+    char *q = out;
+
+    if (*p == '-') {
+        negative = 1;
+        ++p;
+    }
+    e = p;
+    while (*e && *e != 'e') ++e;
+    if (!*e) return;
+    for (; p < e; ++p) {
+        if (*p == '.') {
+            int_digits = ndigits;
+        } else {
+            if (ndigits < (int)(sizeof(digits) - 1)) digits[ndigits++] = *p;
+        }
+    }
+    if (int_digits == 0) int_digits = ndigits;
+    ++e;
+    if (*e == '-') {
+        int sign = -1;
+        ++e;
+        while (*e >= '0' && *e <= '9') exp10 = exp10 * 10 + (*e++ - '0');
+        exp10 *= sign;
+    } else {
+        while (*e >= '0' && *e <= '9') exp10 = exp10 * 10 + (*e++ - '0');
+    }
+    if (exp10 < -4 || exp10 >= 16) return;
+
+    new_point = int_digits + exp10;
+    if (negative) *q++ = '-';
+    if (new_point <= 0) {
+        *q++ = '0';
+        *q++ = '.';
+        for (i = 0; i < -new_point; ++i) *q++ = '0';
+        for (i = 0; i < ndigits; ++i) *q++ = digits[i];
+    } else if (new_point >= ndigits) {
+        for (i = 0; i < ndigits; ++i) *q++ = digits[i];
+        for (i = ndigits; i < new_point; ++i) *q++ = '0';
+    } else {
+        for (i = 0; i < new_point; ++i) *q++ = digits[i];
+        *q++ = '.';
+        for (; i < ndigits; ++i) *q++ = digits[i];
+    }
+    *q = '\0';
+    if (q > out) {
+        char *dot = out;
+        while (*dot && *dot != '.') ++dot;
+        if (*dot == '.') {
+            char *end = q - 1;
+            while (end > dot && *end == '0') *end-- = '\0';
+            if (end == dot) *end = '\0';
+        }
+    }
+    TINYGLTF_JSON_MEMCPY(s, out, (size_t)(TINYGLTF_JSON_STRLEN(out) + 1));
+}
+#endif
+
 static char *tg3json__dtoa_c(double value, char *buf) {
     uint64_t bits = tg3json__double_bits(value);
     int negative = (int)(bits >> 63);
@@ -489,6 +612,39 @@ static char *tg3json__dtoa_c(double value, char *buf) {
         *buf++ = '1';
         return buf;
     }
+
+#if TG3JSON_USE_STDLIB_FPCONV
+    {
+        int precision;
+        char candidate[96];
+        char shortest[96];
+        shortest[0] = '\0';
+        for (precision = 1; precision <= 17; ++precision) {
+            char fmt[8];
+            double parsed = 0.0;
+            int n;
+            n = snprintf(fmt, sizeof(fmt), "%%.%dg", precision);
+            if (n <= 0 || n >= (int)sizeof(fmt)) continue;
+            n = snprintf(candidate, sizeof(candidate), fmt, value);
+            if (n <= 0 || n >= (int)sizeof(candidate)) continue;
+            tg3json__normalize_exponent(candidate);
+            tg3json__expand_short_plain_decimal(candidate);
+            if (tg3json__parse_f64_c(candidate, candidate + TINYGLTF_JSON_STRLEN(candidate), &parsed) &&
+                tg3json__same_f64(parsed, value)) {
+                TINYGLTF_JSON_MEMCPY(shortest, candidate, TINYGLTF_JSON_STRLEN(candidate) + 1);
+                break;
+            }
+        }
+        if (!shortest[0]) {
+            int n = snprintf(shortest, sizeof(shortest), "%.17g", value);
+            if (n <= 0 || n >= (int)sizeof(shortest)) return buf;
+            tg3json__normalize_exponent(shortest);
+            tg3json__expand_short_plain_decimal(shortest);
+        }
+        TINYGLTF_JSON_MEMCPY(buf, shortest, TINYGLTF_JSON_STRLEN(shortest));
+        return buf + TINYGLTF_JSON_STRLEN(shortest);
+    }
+#endif
 
     x = negative ? -(long double)value : (long double)value;
     while (x >= 1.0e16L) {
