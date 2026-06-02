@@ -7059,7 +7059,11 @@ static void SerializeNumberProperty(const std::string &key, T number,
   detail::JsonAddMember(obj, key.c_str(), detail::json(number));
 }
 
-#ifdef TINYGLTF_USE_RAPIDJSON
+#if defined(TINYGLTF_USE_RAPIDJSON) || defined(TINYGLTF_USE_CUSTOM_JSON)
+// size_t needs an explicit cast to uint64_t: on platforms where size_t is
+// neither int64_t nor uint64_t (e.g. macOS ARM64 where it is unsigned long,
+// or 32-bit targets where it is unsigned int) constructing detail::json
+// directly from a size_t is an ambiguous overload.
 template <>
 void SerializeNumberProperty(const std::string &key, size_t number,
                              detail::json &obj) {
