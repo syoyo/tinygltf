@@ -19,7 +19,7 @@ v3 is a ground-up rewrite with a C-centric, low-overhead design:
 - **No RTTI, no exceptions required** — suitable for embedded and game-engine use.
 - **Opt-in filesystem and image I/O** — `TINYGLTF3_ENABLE_FS` / `TINYGLTF3_ENABLE_STB_IMAGE` are off by default; you control when and how assets are loaded.
 - **C++20 coroutine facade** (optional, auto-detected). C17/C++17 default.
-- **Hardened against untrusted input** — URI sanitization, post-parse index-bounds validation (default-on, opt-out via `tg3_parse_options.validate_indices = 0`), strict numeric range checks; exercised by a libFuzzer harness and by a cross-version verifier that compares parsed output against the v1 C++ reference loader. See *Security model* below and the `Security Considerations` block at the top of `tiny_gltf_v3.h`.
+- **Hardened against untrusted input** — URI sanitization, post-parse index-bounds validation (default-on, opt-out via `tg3_parse_options.validate_indices = 0`), strict numeric range checks; exercised by a libFuzzer harness and by a cross-version verifier that compares parsed output against the v1 C++ reference loader.
 
 ### Quick start (v3)
 
@@ -54,21 +54,6 @@ if (err != TG3_OK) {
 tg3_model_free(&model);
 tg3_error_stack_free(&errors);
 ```
-
-### Security model (v3 C runtime)
-
-The v3 C runtime is built for processing **untrusted glTF/GLB input** (server-side asset pipelines, user uploads, etc.) and ships hardened by default:
-
-- **URI sanitization** — external buffer/image URIs are rejected before any filesystem call if they are empty, contain NUL bytes, begin with `/` or `\`, look like a Windows drive prefix (`X:`), or contain a `..` segment. Production callers SHOULD still provide a custom `tg3_fs_callbacks.read_file` that confines reads to a known directory (e.g. via `openat` plus a `realpath` prefix check) when the input is attacker-controlled.
-- **Index bounds validation** — every `int32_t` index field populated from JSON (accessor.bufferView, primitive.indices/material/attributes, scene.nodes[], skin.joints[], animation channel/sampler refs, KHR_audio + MSFT_lod refs, …) is checked after the structural parse. Out-of-range indices produce `TG3_ERR_INVALID_INDEX`. Default `tg3_parse_options.validate_indices = 1`; set to `0` only when you need raw round-trip and have your own validator.
-- **Buffer/accessor range validation** — declared buffer lengths, bufferView ranges, accessor element spans, sparse accessor spans, component types, and overflow-prone size math are checked before returning a model.
-- **Strict numeric range checks** — JSON numbers feeding integer fields go through finite/round-trip-validated coercion (`tg3__json_number_to_int32` / `_uint64`). `byteStride` is restricted to 0 or [4, 252].
-- **Memory budget** — the arena and C JSON parser enforce `TINYGLTF3_MAX_MEMORY_BYTES` by default; `max_single_alloc` and `TINYGLTF3_MAX_STRING_LENGTH` bound individual allocation and string size.
-- **Opt-in fast paths** — `skip_extras_values` avoids materializing `extras` and unknown extension value trees, and `borrow_input_buffers` lets GLB buffer spans reference caller-owned input bytes instead of copying the BIN chunk.
-- **Image decoding off by default** — the parser does not decode image bytes; use `tg3_parse_options.images_as_is = 1` to skip any decoder entirely when handling untrusted input.
-- **Error message lifetime** — error strings on `tg3_error_stack` are arena-allocated and remain valid until `tg3_model_free()`. Read or copy them BEFORE freeing the model.
-
-See the `Security Considerations` block at the top of `tiny_gltf_v3.h` for the authoritative threat-model summary.
 
 ### Testing & verification
 
