@@ -250,6 +250,7 @@ static size_t tg3json__itoa(int64_t value, char *buf) {
     return (size_t)(p - buf);
 }
 
+#if !TG3JSON_USE_STDLIB_FPCONV
 static size_t tg3json__utoa(uint64_t value, char *buf) {
     char tmp[32];
     size_t n = 0;
@@ -267,6 +268,7 @@ static size_t tg3json__utoa(uint64_t value, char *buf) {
     buf[i] = '\0';
     return i;
 }
+#endif  /* !TG3JSON_USE_STDLIB_FPCONV */
 
 static uint64_t tg3json__double_bits(double v) {
     uint64_t bits = 0;
@@ -433,6 +435,7 @@ static int tg3json__parse_f64_c(const char *start, const char *end, double *out)
 #endif
 }
 
+#if !TG3JSON_USE_STDLIB_FPCONV
 static char *tg3json__write_exp(char *p, int exp10) {
     char tmp[16];
     size_t n;
@@ -479,6 +482,7 @@ static char *tg3json__format_decimal_digits(char *out, const char *digits,
     for (i = 0; i < ndigits; ++i) *p++ = digits[i];
     return p;
 }
+#endif  /* !TG3JSON_USE_STDLIB_FPCONV */
 
 static int tg3json__same_f64(double a, double b) {
     return tg3json__double_bits(a) == tg3json__double_bits(b);
@@ -579,6 +583,7 @@ static char *tg3json__dtoa_c(double value, char *buf) {
     uint64_t bits = tg3json__double_bits(value);
     int negative = (int)(bits >> 63);
     uint64_t abits = bits & 0x7fffffffffffffffULL;
+#if !TG3JSON_USE_STDLIB_FPCONV
     long double x;
     int dec_e = 0;
     char digits[24];
@@ -586,6 +591,7 @@ static char *tg3json__dtoa_c(double value, char *buf) {
     int i;
     char best[80];
     size_t best_len;
+#endif
 
     if (tg3json__is_nan_bits(bits)) {
         TINYGLTF_JSON_MEMCPY(buf, "nan", 3);
@@ -644,7 +650,7 @@ static char *tg3json__dtoa_c(double value, char *buf) {
         TINYGLTF_JSON_MEMCPY(buf, shortest, TINYGLTF_JSON_STRLEN(shortest));
         return buf + TINYGLTF_JSON_STRLEN(shortest);
     }
-#endif
+#else
 
     x = negative ? -(long double)value : (long double)value;
     while (x >= 1.0e16L) {
@@ -708,6 +714,7 @@ static char *tg3json__dtoa_c(double value, char *buf) {
     }
     TINYGLTF_JSON_MEMCPY(buf, best, best_len);
     return buf + best_len;
+#endif
 }
 
 typedef struct tg3json__parser {
