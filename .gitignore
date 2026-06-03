@@ -70,9 +70,20 @@ imgui.ini
 *.app
 
 loader_example
+# Compiled test binaries (built by tests/Makefile, CMakeLists.txt, meson.build)
 tests/tester
 tests/tester_noexcept
+tests/tester_customjson
 tests/tester_intensive_customjson
+tests/tester_v3
+tests/tester_v3_c
+tests/tester_v3_c_cpp
+tests/tester_v3_c_v1port
+tests/tester_v3_c_v1port_cpp
+tests/tester_v3_freestanding
+tests/tester_v3_json_c
+tests/fuzzer/fuzz_gltf
+tests/fuzzer/fuzz_gltf_customjson
 tests/issue-97.gltf
 tests/issue-261.gltf
 tests/issue-495-external.gltf
