@@ -104,7 +104,8 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --output-on-failure
 
-  # Windows x64 - MSVC
+  # Windows x64 - MSVC (VS version agnostic; msvc-dev-cmd locates the
+  # Visual Studio shipped with the runner image, e.g. VS2022 or VS2026)
   windows-msvc-x64:
     runs-on: windows-latest
     name: Windows x64 (MSVC)
@@ -112,21 +113,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Configure
-        run: |
-          mkdir build
-          cd build
-          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF3_BUILD_TESTS=ON ..
+        run: cmake -B build -G Ninja -DTINYGLTF3_BUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build
 
       - name: Run tester_v3_c on a sample model
         run: |
-          .\build\Release\tester_v3_c.exe models\Cube\Cube.gltf
+          .\build\tester_v3_c.exe models\Cube\Cube.gltf
 
       - name: Run tests
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build --output-on-failure
 
   # Windows MinGW - MSYS2
   windows-mingw-msys2:
@@ -332,10 +333,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Build and run tester_v3_c
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests
           cl /nologo /W4 /WX /std:c11 /Zi /Od /D_CRT_SECURE_NO_WARNINGS /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c.c ..\tiny_gltf_v3.c /Fe:tester_v3_c.exe
           tester_v3_c.exe
@@ -343,7 +346,6 @@ jobs:
       - name: Build and run tester_v3_c_v1port
         shell: cmd
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests
           cl /nologo /W4 /WX /std:c11 /Zi /Od /D_CRT_SECURE_NO_WARNINGS /DTINYGLTF3_ENABLE_FS /I.. tester_v3_c_v1port.c ..\tiny_gltf_v3.c /Fe:tester_v3_c_v1port.exe
           tester_v3_c_v1port.exe

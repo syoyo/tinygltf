@@ -22,27 +22,24 @@ jobs:
             cd tests
             x86_64-w64-mingw32-gcc -I../ -std=c11 -DTINYGLTF3_ENABLE_FS -o tester_v3_c.exe tester_v3_c.c ../tiny_gltf_v3.c
 
-  # Windows(x64) + Visual Studio 2022 build
+  # Windows(x64) + MSVC build (VS version agnostic: msvc-dev-cmd locates
+  # whatever Visual Studio the runner image ships, e.g. VS2022 or VS2026)
   build-windows-msvc:
 
     runs-on: windows-latest
     name: Build v3 C tests on Windows(x64, MSVC)
 
-    # Use system installed cmake
-    # https://help.github.com/en/actions/reference/software-installed-on-github-hosted-runners
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+      - name: Set up MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Configure
-        run: |
-          mkdir build
-          cd build
-          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF3_BUILD_TESTS=ON ..
-          cd ..
+        run: cmake -B build -G Ninja -DTINYGLTF3_BUILD_TESTS=ON
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build
       - name: Run tests
-        run: ctest --test-dir build -C Release --output-on-failure
+        run: ctest --test-dir build --output-on-failure
 
 
   build-linux:
