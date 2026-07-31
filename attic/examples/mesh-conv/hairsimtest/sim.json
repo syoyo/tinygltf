@@ -1,0 +1,11 @@
+{
+	"sim": {
+		"version": 1,
+		"id": "sim",
+		"name": "1",
+		"kind": "Puppeteer",
+		"mood": null,
+		"postPlaybackMood": null,
+		"duration": 3.75
+	}
+}

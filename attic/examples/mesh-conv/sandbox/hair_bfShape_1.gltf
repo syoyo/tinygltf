@@ -1,0 +1,288 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 79434,
+      "max": [
+        28135.0
+      ],
+      "min": [
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/indices",
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 28136,
+      "max": [
+        11.10669994354248,
+        170.1320037841797,
+        7.035999774932861
+      ],
+      "min": [
+        -11.581600189208984,
+        142.8719940185547,
+        -15.023500442504883
+      ],
+      "name": "hair_bfShape_1.obj#0/POSITION",
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 28136,
+      "max": [
+        0.9999430179595947,
+        0.9999679923057556,
+        0.9999390244483948
+      ],
+      "min": [
+        -0.9997580051422119,
+        -0.8950620293617249,
+        -0.9999200105667114
+      ],
+      "name": "hair_bfShape_1.obj#0/NORMAL",
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 28136,
+      "max": [
+        0.889851987361908,
+        0.998104989528656
+      ],
+      "min": [
+        0.0014202300226315856,
+        -0.0010660899570211768
+      ],
+      "name": "hair_bfShape_1.obj#0/TEXCOORD_0",
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5123,
+      "count": 28136,
+      "max": [
+        97.0,
+        97.0,
+        94.0,
+        93.0
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/JOINTS_0",
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5123,
+      "count": 28136,
+      "max": [
+        93.0,
+        93.0,
+        92.0,
+        92.0
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/JOINTS_1",
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5123,
+      "count": 28136,
+      "max": [
+        91.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/JOINTS_2",
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 28136,
+      "max": [
+        1.0,
+        0.5,
+        0.3330000042915344,
+        0.24390600621700287
+      ],
+      "min": [
+        0.2014250010251999,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/WEIGHTS_0",
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5126,
+      "count": 28136,
+      "max": [
+        0.18594099581241608,
+        0.11678200215101242,
+        0.10268200188875198,
+        0.03563150018453598
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/WEIGHTS_1",
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 9,
+      "componentType": 5126,
+      "count": 28136,
+      "max": [
+        0.001464050030335784,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "min": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "name": "hair_bfShape_1.obj#0/WEIGHTS_2",
+      "type": "VEC4"
+    }
+  ],
+  "asset": {
+    "generator": "mesh-modify",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 317736,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 337632,
+      "byteOffset": 317736,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 337632,
+      "byteOffset": 655368,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 225088,
+      "byteOffset": 993000,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 225088,
+      "byteOffset": 1218088,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 225088,
+      "byteOffset": 1443176,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 225088,
+      "byteOffset": 1668264,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 450176,
+      "byteOffset": 1893352,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 450176,
+      "byteOffset": 2343528,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 450176,
+      "byteOffset": 2793704,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 3243880,
+      "name": "bufffer0",
+      "uri": "hair_bfShape_1.bin"
+    }
+  ],
+  "meshes": [
+    {
+      "name": "hair_bfShape_1.obj",
+      "primitives": [
+        {
+          "attributes": {
+            "JOINTS_0": 4,
+            "JOINTS_1": 5,
+            "JOINTS_2": 6,
+            "NORMAL": 2,
+            "POSITION": 1,
+            "TEXCOORD_0": 3,
+            "WEIGHTS_0": 7,
+            "WEIGHTS_1": 8,
+            "WEIGHTS_2": 9
+          },
+          "indices": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "mesh"
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}

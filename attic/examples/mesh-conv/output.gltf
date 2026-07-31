@@ -1,0 +1,128 @@
+{
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 11532,
+      "max": [
+        11531.0
+      ],
+      "min": [
+        0.0
+      ],
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 11532,
+      "max": [
+        14679.0,
+        1.0,
+        9728.0
+      ],
+      "min": [
+        14678.0,
+        0.0,
+        9216.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 11532,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 11532,
+      "max": [
+        0.96875,
+        0.96875
+      ],
+      "min": [
+        0.03125,
+        0.03125
+      ],
+      "type": "VEC2"
+    }
+  ],
+  "asset": {
+    "generator": "mesh-modify",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 46128,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 138384,
+      "byteOffset": 46128,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 138384,
+      "byteOffset": 184512,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 92256,
+      "byteOffset": 322896,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 415152,
+      "name": "bufffer0",
+      "uri": "output.bin"
+    }
+  ],
+  "meshes": [
+    {
+      "name": "r.28.18.obj",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 2,
+            "POSITION": 1,
+            "TEXCOORD_0": 3
+          },
+          "indices": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "mesh"
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}

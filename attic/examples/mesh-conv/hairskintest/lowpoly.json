@@ -1,0 +1,11 @@
+{
+	"lowpoly": {
+		"version": 1,
+		"id": "lowpoly",
+		"name": "1",
+		"kind": "Puppeteer",
+		"mood": null,
+		"postPlaybackMood": null,
+		"duration": 62.5
+	}
+}

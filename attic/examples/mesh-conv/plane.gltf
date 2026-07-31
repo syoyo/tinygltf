@@ -1,0 +1,185 @@
+{
+    "asset": {
+        "copyright": "(C)2020 syoyo",
+        "generator": "maya2glTF master d293e09",
+        "version": "2.0"
+    },
+    "scenes": [
+        {
+            "nodes": [
+                0
+            ]
+        }
+    ],
+    "scene": 0,
+    "nodes": [
+        {
+            "name": "pPlane1",
+            "mesh": 0
+        }
+    ],
+    "meshes": [
+        {
+            "name": "pPlaneShape1",
+            "extras": {
+                "targetNames": []
+            },
+            "primitives": [
+                {
+                    "attributes": {
+                        "NORMAL": 1,
+                        "POSITION": 2,
+                        "TANGENT": 3,
+                        "TEXCOORD_0": 4
+                    },
+                    "indices": 0,
+                    "mode": 4,
+                    "material": 0
+                }
+            ]
+        }
+    ],
+    "materials": [
+        {
+            "name": "lambert1",
+            "pbrMetallicRoughness": {
+                "baseColorFactor": [
+                    0.4000000059604645,
+                    0.4000000059604645,
+                    0.4000000059604645,
+                    1.0
+                ],
+                "metallicFactor": 0.0,
+                "roughnessFactor": 1.0
+            }
+        }
+    ],
+    "accessors": [
+        {
+            "name": "pPlaneShape1#0/indices",
+            "bufferView": 0,
+            "byteOffset": 0,
+            "componentType": 5123,
+            "count": 24,
+            "max": [
+                8
+            ],
+            "min": [
+                0
+            ],
+            "type": "SCALAR"
+        },
+        {
+            "name": "pPlaneShape1#0/vertices/NORMAL",
+            "bufferView": 1,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 9,
+            "max": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "min": [
+                0.0,
+                1.0,
+                0.0
+            ],
+            "type": "VEC3"
+        },
+        {
+            "name": "pPlaneShape1#0/vertices/POSITION",
+            "bufferView": 1,
+            "byteOffset": 108,
+            "componentType": 5126,
+            "count": 9,
+            "max": [
+                0.5,
+                0.0,
+                0.5
+            ],
+            "min": [
+                -0.5,
+                0.0,
+                -0.5
+            ],
+            "type": "VEC3"
+        },
+        {
+            "name": "pPlaneShape1#0/vertices/TANGENT",
+            "bufferView": 2,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 9,
+            "max": [
+                1.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "min": [
+                1.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "pPlaneShape1#0/vertices/TEXCOORD_0",
+            "bufferView": 3,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 9,
+            "max": [
+                1.0,
+                1.0
+            ],
+            "min": [
+                0.0,
+                0.0
+            ],
+            "type": "VEC2"
+        }
+    ],
+    "bufferViews": [
+        {
+            "name": "plane/data/indices-2",
+            "buffer": 0,
+            "byteOffset": 432,
+            "byteLength": 48,
+            "target": 34963
+        },
+        {
+            "name": "plane/data/vertices-12",
+            "buffer": 0,
+            "byteOffset": 144,
+            "byteLength": 216,
+            "byteStride": 12,
+            "target": 34962
+        },
+        {
+            "name": "plane/data/vertices-16",
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 144,
+            "byteStride": 16,
+            "target": 34962
+        },
+        {
+            "name": "plane/data/vertices-8",
+            "buffer": 0,
+            "byteOffset": 360,
+            "byteLength": 72,
+            "byteStride": 8,
+            "target": 34962
+        }
+    ],
+    "buffers": [
+        {
+            "name": "plane/data",
+            "byteLength": 480,
+            "uri": "plane0.bin"
+        }
+    ]
+}

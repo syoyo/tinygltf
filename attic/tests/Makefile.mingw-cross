@@ -1,0 +1,5 @@
+CXX=/mnt/data/local/llvm-mingw-20200325-ubuntu-18.04/bin/x86_64-w64-mingw32-clang++
+#CXX=x86_64-w64-mingw32-g++
+
+all: ../tiny_gltf.h
+	$(CXX) -fuse-ld=lld -I../ $(EXTRA_CXXFLAGS) -std=c++11 -g -O0 -o tester.exe tester.cc

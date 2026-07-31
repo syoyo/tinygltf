@@ -1,0 +1,1049 @@
+{
+    "asset": {
+        "copyright": "(C)2020 syoyo",
+        "generator": "maya2glTF master d293e09",
+        "version": "2.0"
+    },
+    "scenes": [
+        {
+            "nodes": [
+                0
+            ]
+        }
+    ],
+    "scene": 0,
+    "nodes": [
+        {
+            "name": "JpGirl_rig_GRP",
+            "children": [
+                35,
+                1
+            ]
+        },
+        {
+            "name": "jpGirl_SkeletonGroup",
+            "children": [
+                2
+            ]
+        },
+        {
+            "name": "World_root",
+            "children": [
+                3
+            ]
+        },
+        {
+            "name": "root:SSC",
+            "children": [
+                4
+            ]
+        },
+        {
+            "name": "root",
+            "children": [
+                5
+            ]
+        },
+        {
+            "name": "hip:SSC",
+            "children": [
+                6
+            ],
+            "translation": [
+                0.0,
+                95.3000030517578,
+                -2.5
+            ]
+        },
+        {
+            "name": "hip",
+            "children": [
+                11,
+                9,
+                7
+            ],
+            "rotation": [
+                0.7019110321998596,
+                0.7019110321998596,
+                0.08556213974952698,
+                -0.08556213974952698
+            ]
+        },
+        {
+            "name": "RightUpLeg:SSC",
+            "children": [
+                8
+            ],
+            "translation": [
+                0.3400452136993408,
+                -8.4399995803833,
+                -0.3999845683574677
+            ]
+        },
+        {
+            "name": "RightUpLeg",
+            "rotation": [
+                -0.9930307865142822,
+                0.025250911712646489,
+                -0.11506549268960952,
+                0.0034906959626823665
+            ]
+        },
+        {
+            "name": "LeftUpLeg:SSC",
+            "children": [
+                10
+            ],
+            "translation": [
+                0.3400000035762787,
+                8.4399995803833,
+                -0.4000000059604645
+            ]
+        },
+        {
+            "name": "LeftUpLeg",
+            "rotation": [
+                0.11506549268960952,
+                -0.0034906959626823665,
+                -0.9930307865142822,
+                0.025250911712646489
+            ]
+        },
+        {
+            "name": "spine:SSC",
+            "children": [
+                12
+            ],
+            "translation": [
+                12.149999618530274,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "spine",
+            "children": [
+                13
+            ],
+            "rotation": [
+                0.0,
+                -0.11146893352270128,
+                0.0,
+                0.9937679171562196
+            ]
+        },
+        {
+            "name": "spine1:SSC",
+            "children": [
+                14
+            ],
+            "translation": [
+                7.429999828338623,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "spine1",
+            "children": [
+                15
+            ],
+            "rotation": [
+                0.0,
+                -0.06932120025157929,
+                0.0,
+                0.99759441614151
+            ]
+        },
+        {
+            "name": "spine2:SSC",
+            "children": [
+                16
+            ],
+            "translation": [
+                6.699999809265137,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "spine2",
+            "children": [
+                17
+            ],
+            "rotation": [
+                0.0,
+                -0.05102870985865593,
+                0.0,
+                0.9986971616744996
+            ]
+        },
+        {
+            "name": "spine3:SSC",
+            "children": [
+                18
+            ],
+            "translation": [
+                9.270000457763672,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "spine3",
+            "children": [
+                31,
+                25,
+                19
+            ],
+            "rotation": [
+                0.0,
+                0.07497872412204743,
+                0.0,
+                0.9971851110458374
+            ]
+        },
+        {
+            "name": "RightShoulder:SSC",
+            "children": [
+                20
+            ],
+            "translation": [
+                9.529823303222657,
+                -2.150000095367432,
+                0.6804447770118713
+            ]
+        },
+        {
+            "name": "RightShoulder",
+            "children": [
+                21
+            ],
+            "rotation": [
+                -0.7832595705986023,
+                -0.6147632598876953,
+                0.0888834223151207,
+                -0.025889459997415544
+            ]
+        },
+        {
+            "name": "RightArm:SSC",
+            "children": [
+                22
+            ],
+            "translation": [
+                -13.065248489379885,
+                0.0003884710022248328,
+                -0.000008015000275918283
+            ]
+        },
+        {
+            "name": "RightArm",
+            "children": [
+                23
+            ],
+            "rotation": [
+                -0.19383077323436738,
+                -0.06883493810892105,
+                0.5376238822937012,
+                0.8177114129066467
+            ]
+        },
+        {
+            "name": "RightForeArm:SSC",
+            "children": [
+                24
+            ],
+            "translation": [
+                -25.749731063842778,
+                -0.00001512200014985865,
+                -0.000008099000297079329
+            ]
+        },
+        {
+            "name": "RightForeArm",
+            "rotation": [
+                0.0,
+                0.14780941605567933,
+                0.0,
+                0.9890158772468568
+            ]
+        },
+        {
+            "name": "LeftShoulder:SSC",
+            "children": [
+                26
+            ],
+            "translation": [
+                9.529999732971192,
+                2.150000095367432,
+                0.6804323792457581
+            ]
+        },
+        {
+            "name": "LeftShoulder",
+            "children": [
+                27
+            ],
+            "rotation": [
+                0.0888834223151207,
+                -0.025889459997415544,
+                0.7832595705986023,
+                0.6147632598876953
+            ]
+        },
+        {
+            "name": "LeftArm:SSC",
+            "children": [
+                28
+            ],
+            "translation": [
+                13.06532382965088,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "LeftArm",
+            "children": [
+                29
+            ],
+            "rotation": [
+                -0.19383077323436738,
+                -0.06883493810892105,
+                0.5376238822937012,
+                0.8177114129066467
+            ]
+        },
+        {
+            "name": "LeftForeArm:SSC",
+            "children": [
+                30
+            ],
+            "translation": [
+                25.75,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "LeftForeArm",
+            "rotation": [
+                0.0,
+                0.14780941605567933,
+                0.0,
+                0.9890158772468568
+            ]
+        },
+        {
+            "name": "neck:SSC",
+            "children": [
+                32
+            ],
+            "translation": [
+                11.600000381469729,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "neck",
+            "children": [
+                33
+            ],
+            "rotation": [
+                0.0,
+                0.1322563886642456,
+                0.0,
+                0.9912155270576476
+            ]
+        },
+        {
+            "name": "neck1:SSC",
+            "children": [
+                34
+            ],
+            "translation": [
+                4.71999979019165,
+                0.0,
+                0.0
+            ]
+        },
+        {
+            "name": "neck1"
+        },
+        {
+            "name": "girl_geo_grp",
+            "children": [
+                36
+            ]
+        },
+        {
+            "name": "body_GP",
+            "children": [
+                37
+            ]
+        },
+        {
+            "name": "shirts_GP",
+            "children": [
+                39,
+                38
+            ]
+        },
+        {
+            "name": "eri",
+            "mesh": 0,
+            "skin": 0
+        },
+        {
+            "name": "cloth_shirts",
+            "mesh": 1,
+            "skin": 1
+        }
+    ],
+    "meshes": [
+        {
+            "name": "eriShape",
+            "extras": {
+                "targetNames": []
+            },
+            "primitives": [
+                {
+                    "attributes": {
+                        "JOINTS_0": 1,
+                        "JOINTS_1": 2,
+                        "NORMAL": 3,
+                        "POSITION": 4,
+                        "TANGENT": 5,
+                        "TEXCOORD_0": 6,
+                        "WEIGHTS_0": 7,
+                        "WEIGHTS_1": 8
+                    },
+                    "indices": 0,
+                    "mode": 4,
+                    "material": 0
+                }
+            ]
+        },
+        {
+            "name": "cloth_shirtsShape",
+            "extras": {
+                "targetNames": []
+            },
+            "primitives": [
+                {
+                    "attributes": {
+                        "JOINTS_0": 10,
+                        "JOINTS_1": 11,
+                        "NORMAL": 12,
+                        "POSITION": 13,
+                        "TANGENT": 14,
+                        "TEXCOORD_0": 15,
+                        "WEIGHTS_0": 16,
+                        "WEIGHTS_1": 17
+                    },
+                    "indices": 9,
+                    "mode": 4,
+                    "material": 1
+                }
+            ]
+        }
+    ],
+    "skins": [
+        {
+            "name": "eriShape",
+            "inverseBindMatrices": 18,
+            "joints": [
+                14,
+                16,
+                18,
+                32,
+                34,
+                26,
+                28,
+                20,
+                22
+            ]
+        },
+        {
+            "name": "cloth_shirtsShape",
+            "inverseBindMatrices": 19,
+            "joints": [
+                6,
+                12,
+                14,
+                16,
+                18,
+                32,
+                34,
+                26,
+                28,
+                30,
+                20,
+                22,
+                24,
+                10,
+                8
+            ]
+        }
+    ],
+    "materials": [
+        {
+            "name": "aiStandardSurface8",
+            "pbrMetallicRoughness": {
+                "baseColorTexture": {
+                    "index": 0
+                },
+                "metallicFactor": 0.0,
+                "roughnessFactor": 0.10000000149011612
+            },
+            "alphaMode": "BLEND"
+        },
+        {
+            "name": "aiStandardSurface7",
+            "pbrMetallicRoughness": {
+                "baseColorTexture": {
+                    "index": 1
+                },
+                "metallicFactor": 0.0,
+                "roughnessFactor": 1.0,
+                "metallicRoughnessTexture": {
+                    "index": 2
+                }
+            },
+            "normalTexture": {
+                "index": 3
+            },
+            "alphaMode": "OPAQUE"
+        }
+    ],
+    "textures": [
+        {
+            "sampler": 0,
+            "source": 0
+        },
+        {
+            "sampler": 0,
+            "source": 1
+        },
+        {
+            "sampler": 0,
+            "source": 2
+        },
+        {
+            "sampler": 0,
+            "source": 3
+        }
+    ],
+    "images": [
+        {
+            "uri": "eriShape.png"
+        },
+        {
+            "uri": "cloth_shirtsShape.png"
+        },
+        {
+            "uri": "cloth_shirtsShape.png"
+        },
+        {
+            "uri": "cloth_shirtsShape.png"
+        }
+    ],
+    "samplers": [
+        {
+            "magFilter": 9729,
+            "minFilter": 9987,
+            "wrapS": 10497,
+            "wrapT": 10497
+        }
+    ],
+    "accessors": [
+        {
+            "name": "eriShape#0/indices",
+            "bufferView": 4,
+            "byteOffset": 0,
+            "componentType": 5123,
+            "count": 1224,
+            "max": [
+                251
+            ],
+            "min": [
+                0
+            ],
+            "type": "SCALAR"
+        },
+        {
+            "name": "eriShape#0/vertices/JOINTS_0",
+            "bufferView": 5,
+            "byteOffset": 0,
+            "componentType": 5123,
+            "count": 252,
+            "max": [
+                7,
+                7,
+                8,
+                8
+            ],
+            "min": [
+                1,
+                1,
+                0,
+                0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "eriShape#0/vertices/JOINTS_1",
+            "bufferView": 5,
+            "byteOffset": 2016,
+            "componentType": 5123,
+            "count": 252,
+            "max": [
+                8,
+                8,
+                0,
+                0
+            ],
+            "min": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "eriShape#0/vertices/NORMAL",
+            "bufferView": 6,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 252,
+            "max": [
+                0.9989870190620422,
+                0.8777745366096497,
+                0.9759003520011902
+            ],
+            "min": [
+                -0.998987078666687,
+                -0.8380224108695984,
+                -0.999508798122406
+            ],
+            "type": "VEC3"
+        },
+        {
+            "name": "eriShape#0/vertices/POSITION",
+            "bufferView": 6,
+            "byteOffset": 3024,
+            "componentType": 5126,
+            "count": 252,
+            "max": [
+                9.525193214416504,
+                146.2151641845703,
+                6.65354061126709
+            ],
+            "min": [
+                -9.525193214416504,
+                132.03472900390626,
+                -9.08017635345459
+            ],
+            "type": "VEC3"
+        },
+        {
+            "name": "eriShape#0/vertices/TANGENT",
+            "bufferView": 7,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 252,
+            "max": [
+                0.9999783635139464,
+                0.8955261707305908,
+                0.008781909011304379,
+                1.0
+            ],
+            "min": [
+                -0.9999783635139464,
+                -0.057344645261764529,
+                -0.9690992832183838,
+                -1.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "eriShape#0/vertices/TEXCOORD_0",
+            "bufferView": 5,
+            "byteOffset": 4032,
+            "componentType": 5126,
+            "count": 252,
+            "max": [
+                0.9451080560684204,
+                0.948775589466095
+            ],
+            "min": [
+                0.0016679599648341537,
+                0.015080571174621582
+            ],
+            "type": "VEC2"
+        },
+        {
+            "name": "eriShape#0/vertices/WEIGHTS_0",
+            "bufferView": 7,
+            "byteOffset": 4032,
+            "componentType": 5126,
+            "count": 252,
+            "max": [
+                0.9886853694915772,
+                0.4986850917339325,
+                0.2992968261241913,
+                0.04708031937479973
+            ],
+            "min": [
+                0.34456977248191836,
+                0.009866139851510525,
+                0.0,
+                0.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "eriShape#0/vertices/WEIGHTS_1",
+            "bufferView": 7,
+            "byteOffset": 8064,
+            "componentType": 5126,
+            "count": 252,
+            "max": [
+                0.026280954480171205,
+                0.000009872999726212584,
+                0.0,
+                0.0
+            ],
+            "min": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "cloth_shirtsShape#0/indices",
+            "bufferView": 4,
+            "byteOffset": 2448,
+            "componentType": 5123,
+            "count": 21330,
+            "max": [
+                4593
+            ],
+            "min": [
+                0
+            ],
+            "type": "SCALAR"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/JOINTS_0",
+            "bufferView": 5,
+            "byteOffset": 6048,
+            "componentType": 5123,
+            "count": 4594,
+            "max": [
+                12,
+                14,
+                14,
+                14
+            ],
+            "min": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/JOINTS_1",
+            "bufferView": 5,
+            "byteOffset": 42800,
+            "componentType": 5123,
+            "count": 4594,
+            "max": [
+                14,
+                14,
+                13,
+                13
+            ],
+            "min": [
+                0,
+                0,
+                0,
+                0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/NORMAL",
+            "bufferView": 6,
+            "byteOffset": 6048,
+            "componentType": 5126,
+            "count": 4594,
+            "max": [
+                0.999989092350006,
+                0.9997496008872986,
+                0.9999979734420776
+            ],
+            "min": [
+                -0.9999313354492188,
+                -0.9994953274726868,
+                -0.9998869299888612
+            ],
+            "type": "VEC3"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/POSITION",
+            "bufferView": 6,
+            "byteOffset": 61176,
+            "componentType": 5126,
+            "count": 4594,
+            "max": [
+                28.863222122192384,
+                143.6001129150391,
+                11.612366676330569
+            ],
+            "min": [
+                -28.94423484802246,
+                90.78962707519533,
+                -14.87687873840332
+            ],
+            "type": "VEC3"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/TANGENT",
+            "bufferView": 7,
+            "byteOffset": 12096,
+            "componentType": 5126,
+            "count": 4594,
+            "max": [
+                1.0,
+                0.9999756813049316,
+                0.9995696544647216,
+                1.0
+            ],
+            "min": [
+                -0.999996781349182,
+                -0.999999463558197,
+                -0.9996194243431092,
+                -1.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/TEXCOORD_0",
+            "bufferView": 5,
+            "byteOffset": 79552,
+            "componentType": 5126,
+            "count": 4594,
+            "max": [
+                0.9532167315483092,
+                0.9916929602622986
+            ],
+            "min": [
+                0.04245191812515259,
+                0.005859971046447754
+            ],
+            "type": "VEC2"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/WEIGHTS_0",
+            "bufferView": 7,
+            "byteOffset": 85600,
+            "componentType": 5126,
+            "count": 4594,
+            "max": [
+                1.0,
+                0.4997577965259552,
+                0.30711811780929568,
+                0.0667981207370758
+            ],
+            "min": [
+                0.34456977248191836,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "cloth_shirtsShape#0/vertices/WEIGHTS_1",
+            "bufferView": 7,
+            "byteOffset": 159104,
+            "componentType": 5126,
+            "count": 4594,
+            "max": [
+                0.023086916655302049,
+                0.0003864089958369732,
+                0.000005827000222780043,
+                0.0000012609999657797744
+            ],
+            "min": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+            ],
+            "type": "VEC4"
+        },
+        {
+            "name": "eriShape/skin/IBM",
+            "bufferView": 8,
+            "byteOffset": 0,
+            "componentType": 5126,
+            "count": 9,
+            "max": [
+                0.9584361910820008,
+                1.0,
+                0.0,
+                0.0,
+                0.997440755367279,
+                0.9700782299041748,
+                0.19252197444438938,
+                0.0,
+                0.19252197444438938,
+                0.5181007981300354,
+                0.9880228638648988,
+                0.0,
+                131.38587951660157,
+                136.0201416015625,
+                26.407978057861329,
+                1.0
+            ],
+            "min": [
+                0.0,
+                -0.8427282571792603,
+                -0.5038041472434998,
+                0.0,
+                -0.9813305139541626,
+                -0.9700782299041748,
+                -0.2198462039232254,
+                0.0,
+                -0.2198462039232254,
+                -0.5181007981300354,
+                -0.997440755367279,
+                0.0,
+                -143.2582550048828,
+                -136.0199737548828,
+                -30.34436798095703,
+                1.0
+            ],
+            "type": "MAT4"
+        },
+        {
+            "name": "cloth_shirtsShape/skin/IBM",
+            "bufferView": 8,
+            "byteOffset": 576,
+            "componentType": 5126,
+            "count": 15,
+            "max": [
+                0.9584361910820008,
+                1.0,
+                0.0011217190185561777,
+                0.0,
+                0.9998157024383544,
+                0.9700782299041748,
+                0.4063934087753296,
+                0.0,
+                0.280141681432724,
+                0.5181007981300354,
+                0.999929130077362,
+                0.0,
+                131.38587951660157,
+                136.0201416015625,
+                49.647987365722659,
+                1.0
+            ],
+            "min": [
+                -0.05095318332314491,
+                -0.9987004399299622,
+                -0.5038041472434998,
+                0.0,
+                -0.998630166053772,
+                -0.9700782299041748,
+                -0.4063934087753296,
+                0.0,
+                -0.280141681432724,
+                -0.5181007981300354,
+                -0.999929130077362,
+                0.0,
+                -143.2582550048828,
+                -136.0199737548828,
+                -49.64815902709961,
+                1.0
+            ],
+            "type": "MAT4"
+        }
+    ],
+    "bufferViews": [
+        {
+            "buffer": 0,
+            "byteOffset": 511860,
+            "byteLength": 591280
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 1103140,
+            "byteLength": 98296704
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 99399844,
+            "byteLength": 74719632
+        },
+        {
+            "buffer": 0,
+            "byteOffset": 174119476,
+            "byteLength": 323726
+        },
+        {
+            "name": "cloth/data/indices-2",
+            "buffer": 0,
+            "byteOffset": 466752,
+            "byteLength": 45108,
+            "target": 34963
+        },
+        {
+            "name": "cloth/data/vertices-8",
+            "buffer": 0,
+            "byteOffset": 350448,
+            "byteLength": 116304,
+            "byteStride": 8,
+            "target": 34962
+        },
+        {
+            "name": "cloth/data/vertices-12",
+            "buffer": 0,
+            "byteOffset": 234144,
+            "byteLength": 116304,
+            "byteStride": 12,
+            "target": 34962
+        },
+        {
+            "name": "cloth/data/vertices-16",
+            "buffer": 0,
+            "byteOffset": 1536,
+            "byteLength": 232608,
+            "byteStride": 16,
+            "target": 34962
+        },
+        {
+            "name": "cloth/data/generic-64",
+            "buffer": 0,
+            "byteOffset": 0,
+            "byteLength": 1536
+        }
+    ],
+    "buffers": [
+        {
+            "name": "cloth/data",
+            "byteLength": 174443202,
+            "uri": "cloth0.bin"
+        }
+    ]
+}
