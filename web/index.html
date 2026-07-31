@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tinygltf v3 — three.js WASM demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>tinygltf v3 (C) + three.js</h1>
+  <div class="controls">
+    <label class="btn" for="file-input">Open glTF/GLB…</label>
+    <input type="file" id="file-input" accept=".gltf,.glb,model/gltf+json,model/gltf-binary" hidden>
+    <button class="btn" id="sample-btn" hidden>Load sample (Cube.glb)</button>
+  </div>
+</header>
+<main>
+  <div id="drop-zone">
+    <p>Drop a <code>.glb</code> / <code>.gltf</code> file here, or use <b>Open glTF/GLB…</b></p>
+    <p class="hint">Note: assets must be self-contained (GLB chunk or embedded data URI).</p>
+  </div>
+  <div id="viewer" hidden></div>
+</main>
+<footer id="status">Loading WASM module…</footer>
+<script type="module" src="main.js"></script>
+</body>
+</html>

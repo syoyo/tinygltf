@@ -67,7 +67,16 @@ $ cmake -B build && cmake --build build && ctest --test-dir build --output-on-fa
 
 # Meson
 $ meson setup build && meson compile -C build && meson test -C build
+
+# WebAssembly (requires an Emscripten SDK, defaults to ~/work/emsdk)
+$ make -C web && make -C web sample
 ```
+
+## Web/WASM demo
+
+[`web/`](web/) contains a browser demo that compiles the v3 C runtime with
+Emscripten and renders glTF/GLB files with three.js (file picker + drag &
+drop). See [`web/README.md`](web/README.md) for build instructions.
 
 ## Legacy v1/v2 (C++)
 
