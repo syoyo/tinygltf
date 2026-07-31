@@ -1660,6 +1660,7 @@ static int parse_file_arg(const char *path) {
   }
 
   slash = strrchr(path, '/');
+  if (!slash) slash = strrchr(path, '\\');
   base_len = slash ? (size_t)(slash - path) : 0;
 
   tg3_error_stack_init(&errors);
