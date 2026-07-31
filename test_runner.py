@@ -6,17 +6,15 @@ import re
 import subprocess
 import sys
 
-## Cross-version verifier: parses each sample model with the mature v1
-## (loader_example) and the new v3 C tester, then compares both the COUNTS
-## summary line and the structured DIGEST block both binaries emit.
-## v1 is the ground truth.
+## Model verifier for the tinygltf v3 C runtime: parses every sample model
+## with the v3 C tester (tests/tester_v3_c) and validates that it exits
+## successfully and emits a well-formed COUNTS summary and DIGEST block.
 
 # -- config -----------------------
 
 sample_model_dir = "/mnt/nfs/syoyo/glTF-Sample-Models"
 base_model_dir = os.path.join(sample_model_dir, "2.0")
 
-v1_bin = "./loader_example"
 v3_bin = "./tests/tester_v3_c"
 
 kinds = ["glTF", "glTF-Binary", "glTF-Embedded", "glTF-MaterialsCommon"]
@@ -54,65 +52,31 @@ def run_binary(binary, filename):
     return p.returncode, out.decode("utf-8", "replace"), err.decode("utf-8", "replace")
 
 
-def diff_digests(v1, v3, max_lines=20):
-    """Return a short summary of differences between two digest line lists."""
-    diffs = []
-    n = max(len(v1), len(v3))
-    for i in range(n):
-        a = v1[i] if i < len(v1) else "<missing>"
-        b = v3[i] if i < len(v3) else "<missing>"
-        if a != b:
-            diffs.append("  v1[{0}]: {1}".format(i, a))
-            diffs.append("  v3[{0}]: {1}".format(i, b))
-            if len(diffs) >= max_lines * 2:
-                diffs.append("  ... (truncated)")
-                break
-    return diffs
-
-
-parse_failed = []     # v3 returned non-zero or no COUNTS/DIGEST
-v1_skipped = []       # v1 returned non-zero or no COUNTS/DIGEST
-counts_diff = []      # counts disagree
-digest_diff = []      # digest disagrees
+parse_failed = []  # v3 returned non-zero or no COUNTS/DIGEST
+digest_malformed = []  # COUNTS/DIGEST present but structurally wrong
 ok = []
 
 
 def verify(filename):
     print("Testing: " + filename)
 
-    rc1, out1, err1 = run_binary(v1_bin, filename)
-    c1 = parse_counts(out1) if rc1 == 0 else None
-    d1 = parse_digest(out1) if rc1 == 0 else None
-    if c1 is None or d1 is None:
-        v1_skipped.append(filename)
-        print("  v1 ground truth unavailable (rc={0}); skipping".format(rc1))
+    rc, out, err = run_binary(v3_bin, filename)
+    if rc != 0:
+        parse_failed.append((filename, rc, err.strip()))
+        print("  v3 FAILED (rc={0}): {1}".format(rc, err.strip()[:200]))
         return
 
-    rc3, out3, err3 = run_binary(v3_bin, filename)
-    c3 = parse_counts(out3) if rc3 == 0 else None
-    d3 = parse_digest(out3) if rc3 == 0 else None
-    if c3 is None or d3 is None:
-        parse_failed.append((filename, rc3, err3.strip()))
-        print("  v3 FAILED (rc={0}): {1}".format(rc3, err3.strip()[:200]))
+    counts = parse_counts(out)
+    digest = parse_digest(out)
+    if counts is None or digest is None:
+        digest_malformed.append((filename, counts is None, digest is None))
+        print("  v3 COUNTS/DIGEST MISSING (counts={0}, digest={1})".format(
+            counts is not None, digest is not None))
         return
 
-    cdiffs = []
-    for k in sorted(set(c1) | set(c3)):
-        if c1.get(k) != c3.get(k):
-            cdiffs.append((k, c1.get(k), c3.get(k)))
-    if cdiffs:
-        counts_diff.append((filename, cdiffs))
-        print("  COUNTS MISMATCH:")
-        for k, a, b in cdiffs:
-            print("    {0}: v1={1} v3={2}".format(k, a, b))
-        return
-
-    if d1 != d3:
-        diffs = diff_digests(d1, d3)
-        digest_diff.append((filename, diffs))
-        print("  DIGEST MISMATCH ({0} v1 lines, {1} v3 lines):".format(len(d1), len(d3)))
-        for line in diffs[:8]:
-            print(line)
+    if "asset" not in counts:
+        digest_malformed.append((filename, "no asset count", None))
+        print("  v3 COUNTS missing asset key")
         return
 
     ok.append(filename)
@@ -134,8 +98,6 @@ def test():
 
 
 def main():
-    if not os.path.exists(v1_bin):
-        sys.exit("error: v1 binary not found at {0}".format(v1_bin))
     if not os.path.exists(v3_bin):
         sys.exit("error: v3 binary not found at {0}".format(v3_bin))
 
@@ -143,24 +105,14 @@ def main():
 
     print("")
     print("=== Summary ===")
-    print("OK            : {0}".format(len(ok)))
-    print("Counts diff   : {0}".format(len(counts_diff)))
-    print("Digest diff   : {0}".format(len(digest_diff)))
-    print("v3 failed     : {0}".format(len(parse_failed)))
-    print("v1 skipped    : {0}".format(len(v1_skipped)))
+    print("OK              : {0}".format(len(ok)))
+    print("Malformed output: {0}".format(len(digest_malformed)))
+    print("v3 failed       : {0}".format(len(parse_failed)))
 
-    for f, diffs in counts_diff:
-        print("COUNTS DIFF: " + f)
-        for k, a, b in diffs:
-            print("  {0}: v1={1} v3={2}".format(k, a, b))
-    for f, diffs in digest_diff:
-        print("DIGEST DIFF: " + f)
-        for line in diffs:
-            print(line)
     for f, rc, err in parse_failed:
         print("V3 FAIL: {0} (rc={1}) {2}".format(f, rc, err[:200]))
 
-    if counts_diff or digest_diff or parse_failed:
+    if digest_malformed or parse_failed:
         sys.exit(1)
 
 

@@ -15,7 +15,7 @@ What does this PR do? Provide a brief summary of the changes.
 ### Required for All PRs
 
 - [ ] Reproducible glTF test file(s) are included (e.g., `models/regression/`, `tests/issue-***.gltf`, etc.)
-- [ ] Unit tests are written and pass locally (`cd tests && ./tester`)
+- [ ] Unit tests are written and pass locally (`cd tests && make run`)
 
 ### Required for Feature PRs
 

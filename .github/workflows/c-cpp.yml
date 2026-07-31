@@ -4,39 +4,11 @@ on: [push, pull_request]
 
 jobs:
 
-  # gcc4.8 is too old and ubuntu-18.04 image is not supported in GitHub Actions anymore,
-  # so disable this build.
-  ## compile with older gcc4.8
-  #build-gcc48:
-
-  #  runs-on: ubuntu-18.04
-  #  name: Build with gcc 4.8
-
-  #  steps:
-  #    - name: Checkout
-  #      uses: actions/checkout@v5
-
-  #    - name: Build
-  #      run: |
-  #          sudo apt-get update
-  #          sudo apt-get install -y build-essential
-  #          sudo apt-get install -y gcc-4.8 g++-4.8
-  #          g++-4.8 -std=c++11 -o loader_example loader_example.cc
-
-  #    - name: NoexceptBuild
-  #      run: |
-  #          g++-4.8 -DTINYGLTF_NOEXCEPTION -std=c++11 -o loader_example loader_example.cc
-
-  #    - name: RapidjsonBuild
-  #      run: |
-  #          git clone https://github.com/Tencent/rapidjson
-  #          g++-4.8 -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
-
   # compile with mingw gcc cross
   build-mingw-cross:
 
     runs-on: ubuntu-latest
-    name: Build with MinGW gcc cross
+    name: Build v3 C tests with MinGW gcc cross
 
     steps:
       - name: Checkout
@@ -47,14 +19,14 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y build-essential
             sudo apt-get install -y mingw-w64
-            x86_64-w64-mingw32-g++ -std=c++11 -o loader_example loader_example.cc
+            cd tests
+            x86_64-w64-mingw32-gcc -I../ -std=c11 -DTINYGLTF3_ENABLE_FS -o tester_v3_c.exe tester_v3_c.c ../tiny_gltf_v3.c
 
   # Windows(x64) + Visual Studio 2022 build
-  # Assume windows-latest have VS2022 installed
   build-windows-msvc:
 
     runs-on: windows-latest
-    name: Build for Windows(x64, MSVC)
+    name: Build v3 C tests on Windows(x64, MSVC)
 
     # Use system installed cmake
     # https://help.github.com/en/actions/reference/software-installed-on-github-hosted-runners
@@ -65,8 +37,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake --help
-          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF_BUILD_LOADER_EXAMPLE=On -DTINYGLTF_BUILD_GL_EXAMPLES=Off -DTINYGLTF_BUILD_VALIDATOR_EXAMPLE=On -DTINYGLTF_BUILD_TESTS=ON ..
+          cmake -G "Visual Studio 17 2022" -A x64 -DTINYGLTF3_BUILD_TESTS=ON ..
           cd ..
       - name: Build
         run: cmake --build build --config Release
@@ -77,111 +48,24 @@ jobs:
   build-linux:
 
     runs-on: ubuntu-latest
-    name: Buld with gcc
+    name: Build v3 C tests with gcc
 
     steps:
     - uses: actions/checkout@v5
     - name: build
       run: |
-        g++ -std=c++11 -o loader_example loader_example.cc
+        cd tests
+        cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
     - name: test
       run: |
-        ./loader_example models/Cube/Cube.gltf
+        ./tests/tester_v3_c models/Cube/Cube.gltf
 
     - name: tests
       run: |
         cd tests
-        g++ -I../  -std=c++11 -g -O0 -o tester tester.cc
-        ./tester
-        cd ..
-
-    - name: noexcept_tests
-      run: |
-        cd tests
-        g++ -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
-        ./tester_noexcept
-        cd ..
-
-    - name: v3_c_tests
-      run: |
-        cd tests
-        cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
-           -o tester_v3_c tester_v3_c.c ../tiny_gltf_v3.c
+        make all
         ./tester_v3_c
-        cc -I../ -std=c11 -g -O0 -DTINYGLTF3_ENABLE_FS \
-           -o tester_v3_c_v1port tester_v3_c_v1port.c ../tiny_gltf_v3.c
         ./tester_v3_c_v1port
-        cc -I../ -std=c11 -g -O0 \
-           -o tester_v3_json_c tester_v3_json_c.c
         ./tester_v3_json_c
-        cc -I../ -std=c11 -ffreestanding -g -O0 \
-           -o tester_v3_freestanding tester_v3_freestanding.c
         ./tester_v3_freestanding
         cd ..
-
-
-  build-rapidjson-linux:
-
-    runs-on: ubuntu-latest
-    name: Buld with gcc + rapidjson
-
-    steps:
-    - uses: actions/checkout@v5
-    - name: build
-      run: |
-        git clone https://github.com/Tencent/rapidjson
-        g++ -v
-        g++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -o loader_example loader_example.cc
-
-    - name: loader_example_test
-      run: |
-        ./loader_example models/Cube/Cube.gltf
-
-    - name: tests
-      run: |
-        cd tests
-        g++ -DTINYGLTF_USE_RAPIDJSON -I../rapidjson/include/rapidjson -I../  -std=c++11 -g -O0 -o tester tester.cc
-        ./tester
-        cd ..
-
-    - name: noexcept_tests
-      run: |
-        cd tests
-        g++ -DTINYGLTF_USE_RAPIDJSON -I../rapidjson/include/rapidjson -DTINYGLTF_NOEXCEPTION -I../  -std=c++11 -g -O0 -o tester_noexcept tester.cc
-        ./tester_noexcept
-        cd ..
-
-  # Cross-compile for aarch64 linux target
-  build-cross-aarch64:
-
-    runs-on: ubuntu-latest
-    name: Build on cross aarch64
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Build
-        run: |
-            sudo apt-get update
-            sudo apt-get install -y build-essential
-            sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-
-            git clone https://github.com/Tencent/rapidjson
-            aarch64-linux-gnu-g++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc
-
-  # macOS clang
-  build-macos:
-
-    runs-on: macos-latest
-    name: Build on macOS
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-      - name: Build
-        run: |
-            clang++ -std=c++11 -g -O0 -o loader_example loader_example.cc
-            ./loader_example models/Cube/Cube.gltf
-
-            git clone https://github.com/Tencent/rapidjson
-            clang++ -DTINYGLTF_USE_RAPIDJSON -I./rapidjson/include/rapidjson -std=c++11 -g -O0 -o loader_example loader_example.cc

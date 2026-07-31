@@ -1,45 +1,20 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.10)
 
-project(tinygltf)
+project(tinygltf_v3 C)
 
 include(GNUInstallDirs)
-include(CMakePackageConfigHelpers)
 
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED On)
-set(CMAKE_CXX_EXTENSIONS Off)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED On)
+set(CMAKE_C_EXTENSIONS Off)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(TINYGLTF_BUILD_LOADER_EXAMPLE "Build loader_example(load glTF and dump infos)" ON)
-option(TINYGLTF_BUILD_GL_EXAMPLES "Build GL exampels(requires glfw, OpenGL, etc)" OFF)
-option(TINYGLTF_BUILD_VALIDATOR_EXAMPLE "Build validator exampe" OFF)
-option(TINYGLTF_BUILD_BUILDER_EXAMPLE "Build glTF builder example" OFF)
-option(TINYGLTF_BUILD_TESTS "Build unit tests" OFF)
-option(TINYGLTF_HEADER_ONLY "On: header-only mode. Off: create tinygltf library(No TINYGLTF_IMPLEMENTATION required in your project)" OFF)
-option(TINYGLTF_INSTALL "Install tinygltf files during install step. Usually set to OFF if you include tinygltf through add_subdirectory()" ON)
-option(TINYGLTF_INSTALL_VENDOR "Install vendored nlohmann/json and nothings/stb headers" ON)
-option(TINYGLTF_USE_CUSTOM_JSON "Use the built-in fast JSON parser (tinygltf_json.h) instead of nlohmann/json" OFF)
+option(TINYGLTF3_BUILD_TESTS "Build and run tinygltf v3 C unit tests" ON)
+option(TINYGLTF3_INSTALL "Install tinygltf v3 files during install step" ON)
 
-if (TINYGLTF_BUILD_LOADER_EXAMPLE)
-  add_executable(loader_example
-    loader_example.cc
-    )
-endif (TINYGLTF_BUILD_LOADER_EXAMPLE)
+set(TINYGLTF3_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR})
 
-if (TINYGLTF_BUILD_GL_EXAMPLES)
-  add_subdirectory( examples/gltfutil )
-  add_subdirectory( examples/glview )
-endif (TINYGLTF_BUILD_GL_EXAMPLES)
-
-if (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
-  add_subdirectory( examples/validator )
-endif (TINYGLTF_BUILD_VALIDATOR_EXAMPLE)
-
-if (TINYGLTF_BUILD_BUILDER_EXAMPLE)
-  add_subdirectory ( examples/build-gltf )
-endif (TINYGLTF_BUILD_BUILDER_EXAMPLE)
-
-if (TINYGLTF_BUILD_TESTS)
+if (TINYGLTF3_BUILD_TESTS)
   enable_testing()
 
   function(add_tinygltf_v3_c_test target)
@@ -56,31 +31,6 @@ if (TINYGLTF_BUILD_TESTS)
     add_test(NAME ${target} COMMAND ${target} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
   endfunction()
 
-  add_executable(tester tests/tester.cc)
-  target_include_directories(tester PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-  )
-  add_test(NAME tester COMMAND tester WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-
-  # Build and run tests with the custom JSON backend enabled to catch regressions
-  add_executable(tester_customjson tests/tester.cc)
-  target_include_directories(tester_customjson PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-  )
-  target_compile_definitions(tester_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
-  add_test(NAME tester_customjson COMMAND tester_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-
-  # Intensive parser tests for the custom JSON backend
-  add_executable(tester_intensive_customjson tests/tester_intensive_customjson.cc)
-  target_include_directories(tester_intensive_customjson PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests
-  )
-  target_compile_definitions(tester_intensive_customjson PRIVATE TINYGLTF_USE_CUSTOM_JSON)
-  add_test(NAME tester_intensive_customjson COMMAND tester_intensive_customjson WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests)
-
   add_tinygltf_v3_c_test(tester_v3_c tests/tester_v3_c.c tiny_gltf_v3.c)
   target_compile_definitions(tester_v3_c PRIVATE TINYGLTF3_ENABLE_FS)
 
@@ -93,65 +43,14 @@ if (TINYGLTF_BUILD_TESTS)
   if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
     target_compile_options(tester_v3_freestanding PRIVATE -ffreestanding)
   endif()
-endif (TINYGLTF_BUILD_TESTS)
-
-#
-# for add_subdirectory and standalone build
-#
-if (TINYGLTF_HEADER_ONLY)
-  add_library(tinygltf INTERFACE)
-
-  target_include_directories(tinygltf
-          INTERFACE
-          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-  )
-
-else (TINYGLTF_HEADER_ONLY)
-  add_library(tinygltf)
-  target_sources(tinygltf PRIVATE
-          ${CMAKE_CURRENT_SOURCE_DIR}/tiny_gltf.cc)
-  target_include_directories(tinygltf
-          INTERFACE
-          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-          $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-          )
-endif (TINYGLTF_HEADER_ONLY)
-
-if (TINYGLTF_USE_CUSTOM_JSON)
-  if (TINYGLTF_HEADER_ONLY)
-    target_compile_definitions(tinygltf INTERFACE TINYGLTF_USE_CUSTOM_JSON)
-  else ()
-    target_compile_definitions(tinygltf PUBLIC TINYGLTF_USE_CUSTOM_JSON)
-  endif ()
 endif ()
 
-if (TINYGLTF_INSTALL)
-  install(TARGETS tinygltf EXPORT tinygltfTargets)
-  install(EXPORT tinygltfTargets NAMESPACE tinygltf:: FILE TinyGLTFTargets.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tinygltf)
-  configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/TinyGLTFConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/TinyGLTFConfig.cmake INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/TinyGLTFConfig.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/tinygltf)
-  # Do not install .lib even if !TINYGLTF_HEADER_ONLY
-
-  INSTALL ( FILES
-    tiny_gltf.h
+if (TINYGLTF3_INSTALL)
+  install(FILES
     tiny_gltf_v3.h
     tiny_gltf_v3.c
-    tinygltf_json.h
     tinygltf_json_c.h
-    ${TINYGLTF_EXTRA_SOUECES}
     DESTINATION
-    include
-    )
-
-    if(TINYGLTF_INSTALL_VENDOR)
-      INSTALL ( FILES
-        json.hpp
-        stb_image.h
-        stb_image_write.h
-        DESTINATION
-        include
-        )
-    endif()
-
-endif(TINYGLTF_INSTALL)
+    ${TINYGLTF3_INSTALL_DIR}
+  )
+endif ()

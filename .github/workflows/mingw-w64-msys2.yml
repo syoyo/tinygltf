@@ -42,7 +42,7 @@ jobs:
             -G"Ninja" \
             -S . \
             -B build \
-            -DTINYGLTF_BUILD_TESTS=ON
+            -DTINYGLTF3_BUILD_TESTS=ON
 
       - name: Build
         run: |
