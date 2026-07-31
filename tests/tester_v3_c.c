@@ -1409,6 +1409,7 @@ static int parse_path_for_test(tg3_model *model, tg3_error_stack *errors,
   }
 
   slash = strrchr(path, '/');
+  if (!slash) slash = strrchr(path, '\\');
   base_len = slash ? (uint32_t)(slash - path) : 0;
   err = tg3_parse_auto(model, errors, buf, (uint64_t)sz, path, base_len, opts);
   free(buf);
