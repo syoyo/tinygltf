@@ -356,6 +356,7 @@ TINYGLTF3_API void tg3_parse_options_init(tg3_parse_options *options) {
     options->memory.arena_block_size = TG3__ARENA_DEFAULT_BLOCK_SIZE;
     options->max_external_file_size = 0;
     options->validate_indices = 1;
+    options->validate_ranges = 1;
 }
 
 TINYGLTF3_API void tg3_write_options_init(tg3_write_options *options) {
@@ -403,19 +404,42 @@ TINYGLTF3_API int32_t tg3_accessor_byte_stride(const tg3_accessor *accessor, con
     return comp * num;
 }
 
+/* Verified core: string comparison by pointer. The public by-value entry
+ * points below are thin wrappers; keeping the core pointer-based avoids
+ * struct-by-value ABI modelling in formal/GlTF/C (see formal/README.md). */
+static int32_t tg3__str_eq(const tg3_str *a, const tg3_str *b) {
+    if (a->len != b->len) return 0;
+    if (a->len == 0) return 1;
+    return TINYGLTF3_MEMCMP(a->data, b->data, a->len) == 0 ? 1 : 0;
+}
+
 TINYGLTF3_API int32_t tg3_str_equals(tg3_str a, tg3_str b) {
-    if (a.len != b.len) return 0;
-    if (a.len == 0) return 1;
-    return TINYGLTF3_MEMCMP(a.data, b.data, a.len) == 0 ? 1 : 0;
+    return tg3__str_eq(&a, &b);
+}
+
+TINYGLTF3_API int32_t tg3_gltf_version_supported(const char *version, uint32_t len) {
+    uint32_t i;
+    /* "2.<digits>": any 2.x minor version is accepted (glTF minor versions
+     * are backward compatible). */
+    if (!version || len < 3) return 0;
+    if (version[0] != '2' || version[1] != '.') return 0;
+    for (i = 2; i < len; ++i) {
+        if (version[i] < '0' || version[i] > '9') return 0;
+    }
+    return 1;
+}
+
+static int32_t tg3__str_eq_cstr(const tg3_str *a, const char *b) {
+    uint32_t blen;
+    if (!b) return a->len == 0 ? 1 : 0;
+    blen = (uint32_t)TINYGLTF3_STRLEN(b);
+    if (a->len != blen) return 0;
+    if (a->len == 0) return 1;
+    return TINYGLTF3_MEMCMP(a->data, b, a->len) == 0 ? 1 : 0;
 }
 
 TINYGLTF3_API int32_t tg3_str_equals_cstr(tg3_str a, const char *b) {
-    uint32_t blen;
-    if (!b) return a.len == 0 ? 1 : 0;
-    blen = (uint32_t)TINYGLTF3_STRLEN(b);
-    if (a.len != blen) return 0;
-    if (a.len == 0) return 1;
-    return TINYGLTF3_MEMCMP(a.data, b, a.len) == 0 ? 1 : 0;
+    return tg3__str_eq_cstr(&a, b);
 }
 
 static int tg3__b64_decode_char(unsigned char c) {
@@ -427,24 +451,21 @@ static int tg3__b64_decode_char(unsigned char c) {
     return -1;
 }
 
-static uint8_t *tg3__b64_decode(const char *input, size_t input_len, size_t *out_len, tg3_arena *arena) {
-    uint8_t *out;
-    size_t decoded_len;
+/* Verified core: decoded length of `n` base64 characters after `=` padding
+ * has been stripped: `n * 3 / 4`. */
+static size_t tg3__b64_decoded_len(size_t n) {
+    return (n * 3u) / 4u;
+}
+
+/* Verified core: decode `input_len` base64 characters into `out` (capacity
+ * `out_cap`), skipping characters outside the alphabet. Returns the number of
+ * bytes written. No allocation, no globals. */
+static size_t tg3__b64_decode_into(const char *input, size_t input_len,
+                                   uint8_t *out, size_t out_cap) {
     size_t i;
     size_t j = 0;
     uint32_t accum = 0;
     int bits = 0;
-    if (input_len == 0) {
-        *out_len = 0;
-        return NULL;
-    }
-    while (input_len > 0 && input[input_len - 1] == '=') --input_len;
-    decoded_len = (input_len * 3u) / 4u;
-    out = (uint8_t *)tg3__arena_alloc(arena, decoded_len + 1u);
-    if (!out) {
-        *out_len = 0;
-        return NULL;
-    }
     for (i = 0; i < input_len; ++i) {
         int val = tg3__b64_decode_char((unsigned char)input[i]);
         if (val < 0) continue;
@@ -452,10 +473,28 @@ static uint8_t *tg3__b64_decode(const char *input, size_t input_len, size_t *out
         bits += 6;
         if (bits >= 8) {
             bits -= 8;
-            out[j++] = (uint8_t)((accum >> bits) & 0xFFu);
+            if (j < out_cap) out[j] = (uint8_t)((accum >> bits) & 0xFFu);
+            j += 1u;
         }
     }
-    *out_len = j;
+    return j;
+}
+
+static uint8_t *tg3__b64_decode(const char *input, size_t input_len, size_t *out_len, tg3_arena *arena) {
+    uint8_t *out;
+    size_t decoded_len;
+    if (input_len == 0) {
+        *out_len = 0;
+        return NULL;
+    }
+    while (input_len > 0 && input[input_len - 1] == '=') --input_len;
+    decoded_len = tg3__b64_decoded_len(input_len);
+    out = (uint8_t *)tg3__arena_alloc(arena, decoded_len + 1u);
+    if (!out) {
+        *out_len = 0;
+        return NULL;
+    }
+    *out_len = tg3__b64_decode_into(input, input_len, out, decoded_len);
     return out;
 }
 
@@ -1022,6 +1061,13 @@ static void tg3__parse_extras_and_extensions(tg3__parse_ctx *ctx, const tg3json_
             }
         }
     }
+    /* glTF 2.1 unique id */
+    {
+        const tg3json_value *idv = tg3__json_get(o, "id");
+        if (idv && idv->type == TG3JSON_STRING) {
+            ee->id = tg3__arena_str(ctx->arena, idv->u.string.ptr, (uint32_t)idv->u.string.len);
+        }
+    }
 }
 
 static void tg3__init_texture_info(tg3_texture_info *ti) { TINYGLTF3_MEMSET(ti, 0, sizeof(*ti)); ti->index = -1; }
@@ -1049,6 +1095,16 @@ static int tg3__parse_asset(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_ass
     tg3__parse_string(ctx, o, "minVersion", &asset->min_version, 0, "/asset");
     tg3__parse_string(ctx, o, "copyright", &asset->copyright, 0, "/asset");
     tg3__parse_extras_and_extensions(ctx, o, &asset->ext);
+    /* version validation */
+    if (asset->version.data && asset->version.len > 0) {
+        if (!tg3_gltf_version_supported(asset->version.data, asset->version.len)) {
+            tg3__error_pushf(ctx->errors, ctx->arena, TG3_SEVERITY_ERROR,
+                            TG3_ERR_INVALID_VALUE, "/asset",
+                            "Unsupported glTF version '%.*s' (expected 2.x)",
+                            (int)asset->version.len, asset->version.data);
+            return 0;
+        }
+    }
     return 1;
 }
 
@@ -1698,6 +1754,14 @@ static int tg3__parse_audio_source(tg3__parse_ctx *ctx, const tg3json_value *o, 
     return 1;
 }
 
+static int tg3__parse_file(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_file *f) {
+    TINYGLTF3_MEMSET(f, 0, sizeof(*f));
+    tg3__parse_string(ctx, o, "uri", &f->uri, 0, "/files");
+    tg3__parse_string(ctx, o, "mimeType", &f->mime_type, 0, "/files");
+    tg3__parse_extras_and_extensions(ctx, o, &f->ext);
+    return 1;
+}
+
 static int tg3__parse_audio_emitter(tg3__parse_ctx *ctx, const tg3json_value *o, tg3_audio_emitter *emitter) {
     const tg3json_value *pos_it;
     TINYGLTF3_MEMSET(emitter, 0, sizeof(*emitter));
@@ -1959,6 +2023,21 @@ static int tg3__validate_indices(tg3__parse_ctx *ctx, const tg3_model *m) {
     for (i = 0; i < m->materials_count && errs < TG3__IDX_ERR_CAP; ++i) {
         const tg3_material *mat = &m->materials[i];
         uint32_t k;
+        TG3__CHECK_OPT(mat->pbr_metallic_roughness.base_color_texture.index, m->textures_count, "/materials",
+                       "materials[%u].baseColorTexture.index %d out of range [0,%u)",
+                       i, mat->pbr_metallic_roughness.base_color_texture.index, m->textures_count);
+        TG3__CHECK_OPT(mat->pbr_metallic_roughness.metallic_roughness_texture.index, m->textures_count, "/materials",
+                       "materials[%u].metallicRoughnessTexture.index %d out of range [0,%u)",
+                       i, mat->pbr_metallic_roughness.metallic_roughness_texture.index, m->textures_count);
+        TG3__CHECK_OPT(mat->normal_texture.index, m->textures_count, "/materials",
+                       "materials[%u].normalTexture.index %d out of range [0,%u)",
+                       i, mat->normal_texture.index, m->textures_count);
+        TG3__CHECK_OPT(mat->occlusion_texture.index, m->textures_count, "/materials",
+                       "materials[%u].occlusionTexture.index %d out of range [0,%u)",
+                       i, mat->occlusion_texture.index, m->textures_count);
+        TG3__CHECK_OPT(mat->emissive_texture.index, m->textures_count, "/materials",
+                       "materials[%u].emissiveTexture.index %d out of range [0,%u)",
+                       i, mat->emissive_texture.index, m->textures_count);
         for (k = 0; k < mat->lods_count && errs < TG3__IDX_ERR_CAP; ++k) {
             TG3__CHECK_REQ(mat->lods[k], m->materials_count, "/materials",
                            "materials[%u].lods[%u] %d out of range [0,%u)",
@@ -1976,6 +2055,11 @@ static int tg3__validate_indices(tg3__parse_ctx *ctx, const tg3_model *m) {
                        "/extensions/KHR_audio/emitters",
                        "audio_emitters[%u].source %d out of range [0,%u)",
                        i, m->audio_emitters[i].source, m->audio_sources_count);
+    }
+    for (i = 0; i < m->thumbnails_count && errs < TG3__IDX_ERR_CAP; ++i) {
+        TG3__CHECK_REQ(m->thumbnails[i], m->images_count, "/thumbnails",
+                       "thumbnails[%u] %d out of range [0,%u)",
+                       i, m->thumbnails[i], m->images_count);
     }
 
     #undef TG3__CHECK_OPT
@@ -2154,6 +2238,363 @@ static int tg3__validate_resources(tg3__parse_ctx *ctx, const tg3_model *m) {
     return ok;
 }
 
+/* ---- Verified core: spec-conformance rules ---------------------------------
+ * Each tg3__spec_*_mask function is pure and returns a bitmask of violated
+ * rules for one object. The bit assignments and predicates are mirrored
+ * one-to-one by formal/GlTF/Validate.lean (GlTF.Validate.*Mask); keep the two
+ * in sync. Floating-point comparisons are IEEE-754 comparisons (NaN fails
+ * every range check). */
+#define TG3__R_BUFFER_LENGTH        (1u << 0)
+
+#define TG3__R_BV_LENGTH            (1u << 0)
+#define TG3__R_BV_STRIDE            (1u << 1)
+#define TG3__R_BV_TARGET            (1u << 2)
+
+#define TG3__R_ACC_COUNT            (1u << 0)
+#define TG3__R_ACC_MINMAX           (1u << 1)
+#define TG3__R_ACC_ALIGN            (1u << 2)
+#define TG3__R_ACC_NORMALIZED       (1u << 3)
+#define TG3__R_ACC_SPARSE_COUNT     (1u << 4)
+
+#define TG3__R_MESH_NO_PRIMITIVES   (1u << 0)
+#define TG3__R_MESH_MODE            (1u << 1)
+
+#define TG3__R_MAT_ALPHA_MODE       (1u << 0)
+#define TG3__R_MAT_ALPHA_CUTOFF     (1u << 1)
+#define TG3__R_MAT_FACTOR_RANGE     (1u << 2)
+#define TG3__R_MAT_TEXCOORD         (1u << 3)
+
+#define TG3__R_CAM_TYPE             (1u << 0)
+#define TG3__R_CAM_PARAMS           (1u << 1)
+
+#define TG3__R_SAMPLER_MAG          (1u << 0)
+#define TG3__R_SAMPLER_MIN          (1u << 1)
+#define TG3__R_SAMPLER_WRAP         (1u << 2)
+
+#define TG3__R_SKIN_NO_JOINTS       (1u << 0)
+
+#define TG3__R_LIGHT_TYPE           (1u << 0)
+#define TG3__R_LIGHT_RANGE          (1u << 1)
+
+#define TG3__R_ANIM_NO_CHANNELS     (1u << 0)
+#define TG3__R_ANIM_NO_SAMPLERS     (1u << 1)
+#define TG3__R_ANIM_PATH            (1u << 2)
+#define TG3__R_ANIM_INTERPOLATION   (1u << 3)
+
+#define TG3__R_MODEL_EXT_REQUIRED   (1u << 0)
+
+static int tg3__unit_interval(double x) { return x >= 0.0 && x <= 1.0; }
+
+static uint32_t tg3__spec_buffer_mask(const tg3_buffer *b) {
+    uint32_t r = 0;
+    if (b->byte_length < 1u) r |= TG3__R_BUFFER_LENGTH;
+    return r;
+}
+
+static uint32_t tg3__spec_buffer_view_mask(const tg3_buffer_view *bv) {
+    uint32_t r = 0;
+    if (bv->byte_length < 1u) r |= TG3__R_BV_LENGTH;
+    if (bv->byte_stride != 0u &&
+        (bv->byte_stride < 4u || bv->byte_stride > 252u || (bv->byte_stride & 3u) != 0u)) {
+        r |= TG3__R_BV_STRIDE;
+    }
+    if (bv->target != 0 && bv->target != TG3_TARGET_ARRAY_BUFFER &&
+        bv->target != TG3_TARGET_ELEMENT_ARRAY_BUFFER) {
+        r |= TG3__R_BV_TARGET;
+    }
+    return r;
+}
+
+static uint32_t tg3__spec_accessor_mask(const tg3_accessor *a) {
+    uint32_t r = 0;
+    int32_t nc = tg3_num_components(a->type);
+    int32_t cs = tg3_component_size(a->component_type);
+    if (a->count < 1u) r |= TG3__R_ACC_COUNT;
+    if ((a->min_values_count != 0u && (nc < 0 || a->min_values_count != (uint32_t)nc)) ||
+        (a->max_values_count != 0u && (nc < 0 || a->max_values_count != (uint32_t)nc))) {
+        r |= TG3__R_ACC_MINMAX;
+    }
+    if (cs > 0 && (a->byte_offset % (uint64_t)cs) != 0u) r |= TG3__R_ACC_ALIGN;
+    if (a->normalized && (a->component_type == TG3_COMPONENT_TYPE_FLOAT ||
+                          a->component_type == TG3_COMPONENT_TYPE_UNSIGNED_INT)) {
+        r |= TG3__R_ACC_NORMALIZED;
+    }
+    if (a->sparse.is_sparse && a->sparse.count < 1) r |= TG3__R_ACC_SPARSE_COUNT;
+    return r;
+}
+
+static uint32_t tg3__spec_mesh_mask(const tg3_mesh *me) {
+    uint32_t r = 0;
+    uint32_t j;
+    if (me->primitives_count == 0u) r |= TG3__R_MESH_NO_PRIMITIVES;
+    for (j = 0; j < me->primitives_count; ++j) {
+        int32_t mode = me->primitives[j].mode;
+        if (mode != -1 && (mode < 0 || mode > 6)) r |= TG3__R_MESH_MODE;
+    }
+    return r;
+}
+
+static uint32_t tg3__spec_material_mask(const tg3_material *m) {
+    uint32_t r = 0;
+    uint32_t k;
+    const tg3_pbr_metallic_roughness *pbr = &m->pbr_metallic_roughness;
+    if (m->alpha_mode.len != 0u &&
+        !tg3__str_eq_cstr(&m->alpha_mode, "OPAQUE") &&
+        !tg3__str_eq_cstr(&m->alpha_mode, "MASK") &&
+        !tg3__str_eq_cstr(&m->alpha_mode, "BLEND")) {
+        r |= TG3__R_MAT_ALPHA_MODE;
+    }
+    if (!(m->alpha_cutoff >= 0.0)) r |= TG3__R_MAT_ALPHA_CUTOFF;
+    for (k = 0; k < 4u; ++k) {
+        if (!tg3__unit_interval(pbr->base_color_factor[k])) r |= TG3__R_MAT_FACTOR_RANGE;
+    }
+    for (k = 0; k < 3u; ++k) {
+        if (!tg3__unit_interval(m->emissive_factor[k])) r |= TG3__R_MAT_FACTOR_RANGE;
+    }
+    if (!tg3__unit_interval(pbr->metallic_factor) ||
+        !tg3__unit_interval(pbr->roughness_factor) ||
+        !tg3__unit_interval(m->occlusion_texture.strength)) {
+        r |= TG3__R_MAT_FACTOR_RANGE;
+    }
+    if (pbr->base_color_texture.tex_coord < 0 ||
+        pbr->metallic_roughness_texture.tex_coord < 0 ||
+        m->normal_texture.tex_coord < 0 ||
+        m->occlusion_texture.tex_coord < 0 ||
+        m->emissive_texture.tex_coord < 0) {
+        r |= TG3__R_MAT_TEXCOORD;
+    }
+    return r;
+}
+
+static uint32_t tg3__spec_camera_mask(const tg3_camera *c) {
+    uint32_t r = 0;
+    if (tg3__str_eq_cstr(&c->type, "perspective")) {
+        const tg3_perspective_camera *p = &c->perspective;
+        if (!(p->yfov > 0.0) || !(p->znear > 0.0) ||
+            !(p->zfar == 0.0 || p->zfar > p->znear) || !(p->aspect_ratio >= 0.0)) {
+            r |= TG3__R_CAM_PARAMS;
+        }
+    } else if (tg3__str_eq_cstr(&c->type, "orthographic")) {
+        const tg3_orthographic_camera *o = &c->orthographic;
+        if (!(o->xmag != 0.0) || !(o->ymag != 0.0) || !(o->znear >= 0.0) ||
+            !(o->zfar > o->znear)) {
+            r |= TG3__R_CAM_PARAMS;
+        }
+    } else {
+        r |= TG3__R_CAM_TYPE;
+    }
+    return r;
+}
+
+static uint32_t tg3__spec_sampler_mask(const tg3_sampler *s) {
+    uint32_t r = 0;
+    if (s->mag_filter != -1 && s->mag_filter != TG3_TEXTURE_FILTER_NEAREST &&
+        s->mag_filter != TG3_TEXTURE_FILTER_LINEAR) {
+        r |= TG3__R_SAMPLER_MAG;
+    }
+    if (s->min_filter != -1 &&
+        (s->min_filter < TG3_TEXTURE_FILTER_NEAREST ||
+         (s->min_filter > TG3_TEXTURE_FILTER_LINEAR &&
+          s->min_filter < TG3_TEXTURE_FILTER_NEAREST_MIPMAP_NEAREST) ||
+         s->min_filter > TG3_TEXTURE_FILTER_LINEAR_MIPMAP_LINEAR)) {
+        r |= TG3__R_SAMPLER_MIN;
+    }
+    if ((s->wrap_s != TG3_TEXTURE_WRAP_REPEAT && s->wrap_s != TG3_TEXTURE_WRAP_CLAMP_TO_EDGE &&
+         s->wrap_s != TG3_TEXTURE_WRAP_MIRRORED_REPEAT) ||
+        (s->wrap_t != TG3_TEXTURE_WRAP_REPEAT && s->wrap_t != TG3_TEXTURE_WRAP_CLAMP_TO_EDGE &&
+         s->wrap_t != TG3_TEXTURE_WRAP_MIRRORED_REPEAT)) {
+        r |= TG3__R_SAMPLER_WRAP;
+    }
+    return r;
+}
+
+static uint32_t tg3__spec_skin_mask(const tg3_skin *s) {
+    return s->joints_count == 0u ? TG3__R_SKIN_NO_JOINTS : 0u;
+}
+
+static uint32_t tg3__spec_light_mask(const tg3_light *l) {
+    uint32_t r = 0;
+    if (!tg3__str_eq_cstr(&l->type, "directional") &&
+        !tg3__str_eq_cstr(&l->type, "point") &&
+        !tg3__str_eq_cstr(&l->type, "spot")) {
+        r |= TG3__R_LIGHT_TYPE;
+    }
+    if (!(l->range >= 0.0)) r |= TG3__R_LIGHT_RANGE;
+    return r;
+}
+
+static uint32_t tg3__spec_animation_mask(const tg3_animation *an) {
+    uint32_t r = 0;
+    uint32_t k;
+    if (an->channels_count == 0u) r |= TG3__R_ANIM_NO_CHANNELS;
+    if (an->samplers_count == 0u) r |= TG3__R_ANIM_NO_SAMPLERS;
+    for (k = 0; k < an->channels_count; ++k) {
+        const tg3_str *p = &an->channels[k].target.path;
+        if (!tg3__str_eq_cstr(p, "translation") && !tg3__str_eq_cstr(p, "rotation") &&
+            !tg3__str_eq_cstr(p, "scale") && !tg3__str_eq_cstr(p, "weights") &&
+            !tg3__str_eq_cstr(p, "pointer")) {
+            r |= TG3__R_ANIM_PATH;
+        }
+    }
+    for (k = 0; k < an->samplers_count; ++k) {
+        const tg3_str *ip = &an->samplers[k].interpolation;
+        if (ip->len != 0u && !tg3__str_eq_cstr(ip, "LINEAR") &&
+            !tg3__str_eq_cstr(ip, "STEP") && !tg3__str_eq_cstr(ip, "CUBICSPLINE")) {
+            r |= TG3__R_ANIM_INTERPOLATION;
+        }
+    }
+    return r;
+}
+
+static uint32_t tg3__spec_model_mask(const tg3_model *m) {
+    uint32_t r = 0;
+    uint32_t i, j;
+    for (i = 0; i < m->extensions_required_count; ++i) {
+        int found = 0;
+        for (j = 0; j < m->extensions_used_count && !found; ++j) {
+            if (tg3__str_eq(&m->extensions_required[i], &m->extensions_used[j])) found = 1;
+        }
+        if (!found) r |= TG3__R_MODEL_EXT_REQUIRED;
+    }
+    return r;
+}
+
+typedef struct tg3__rule_msg {
+    uint32_t    bit;
+    const char *msg;
+} tg3__rule_msg;
+
+static const tg3__rule_msg tg3__msgs_buffer[] = {
+    { TG3__R_BUFFER_LENGTH, "byteLength must be >= 1" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_bv[] = {
+    { TG3__R_BV_LENGTH, "byteLength must be >= 1" },
+    { TG3__R_BV_STRIDE, "byteStride must be a multiple of 4 in [4,252]" },
+    { TG3__R_BV_TARGET, "target must be 34962 or 34963" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_acc[] = {
+    { TG3__R_ACC_COUNT, "count must be >= 1" },
+    { TG3__R_ACC_MINMAX, "min/max must have one entry per component" },
+    { TG3__R_ACC_ALIGN, "byteOffset must be a multiple of the component size" },
+    { TG3__R_ACC_NORMALIZED, "normalized must be false for FLOAT and UNSIGNED_INT" },
+    { TG3__R_ACC_SPARSE_COUNT, "sparse.count must be >= 1" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_mesh[] = {
+    { TG3__R_MESH_NO_PRIMITIVES, "primitives must not be empty" },
+    { TG3__R_MESH_MODE, "primitive mode must be in [0,6]" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_mat[] = {
+    { TG3__R_MAT_ALPHA_MODE, "alphaMode must be OPAQUE, MASK or BLEND" },
+    { TG3__R_MAT_ALPHA_CUTOFF, "alphaCutoff must be >= 0" },
+    { TG3__R_MAT_FACTOR_RANGE, "color/metallic/roughness/strength factors must be in [0,1]" },
+    { TG3__R_MAT_TEXCOORD, "texCoord must be >= 0" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_cam[] = {
+    { TG3__R_CAM_TYPE, "type must be perspective or orthographic" },
+    { TG3__R_CAM_PARAMS, "projection parameters out of range" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_sampler[] = {
+    { TG3__R_SAMPLER_MAG, "magFilter must be 9728 or 9729" },
+    { TG3__R_SAMPLER_MIN, "minFilter must be one of 9728,9729,9984..9987" },
+    { TG3__R_SAMPLER_WRAP, "wrapS/wrapT must be 33071, 33648 or 10497" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_skin[] = {
+    { TG3__R_SKIN_NO_JOINTS, "joints must not be empty" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_light[] = {
+    { TG3__R_LIGHT_TYPE, "type must be directional, point or spot" },
+    { TG3__R_LIGHT_RANGE, "range must be >= 0" }, { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_anim[] = {
+    { TG3__R_ANIM_NO_CHANNELS, "channels must not be empty" },
+    { TG3__R_ANIM_NO_SAMPLERS, "samplers must not be empty" },
+    { TG3__R_ANIM_PATH, "channel target.path is invalid" },
+    { TG3__R_ANIM_INTERPOLATION, "sampler interpolation must be LINEAR, STEP or CUBICSPLINE" },
+    { 0, NULL } };
+static const tg3__rule_msg tg3__msgs_model[] = {
+    { TG3__R_MODEL_EXT_REQUIRED, "every extensionsRequired entry must be in extensionsUsed" },
+    { 0, NULL } };
+
+#define TG3__SPEC_REPORT_CAP 64
+
+typedef struct tg3__spec_reporter {
+    tg3__parse_ctx *ctx;
+    tg3_severity    sev;
+    uint32_t        reported;
+    uint32_t        violations;
+} tg3__spec_reporter;
+
+static void tg3__spec_report(tg3__spec_reporter *rep, uint32_t mask,
+                             const tg3__rule_msg *msgs, const char *path,
+                             const char *what, uint32_t index) {
+    uint32_t k;
+    if (!mask) return;
+    for (k = 0; msgs[k].msg; ++k) {
+        if (!(mask & msgs[k].bit)) continue;
+        ++rep->violations;
+        if (rep->reported < TG3__SPEC_REPORT_CAP) {
+            ++rep->reported;
+            tg3__error_pushf(rep->ctx->errors, rep->ctx->arena, rep->sev,
+                             TG3_ERR_INVALID_VALUE, path, "%s[%u]: %s",
+                             what, (unsigned)index, msgs[k].msg);
+        }
+    }
+}
+
+/* Returns the number of spec-rule violations. They are pushed as warnings
+ * (TG3_PERMISSIVE) or errors (TG3_STRICT). */
+static uint32_t tg3__validate_spec(tg3__parse_ctx *ctx, const tg3_model *m) {
+    tg3__spec_reporter rep;
+    uint32_t i;
+    rep.ctx = ctx;
+    rep.sev = ctx->opts.strictness == TG3_STRICT ? TG3_SEVERITY_ERROR : TG3_SEVERITY_WARNING;
+    rep.reported = 0;
+    rep.violations = 0;
+    tg3__spec_report(&rep, tg3__spec_model_mask(m), tg3__msgs_model, "/", "model", 0);
+    for (i = 0; i < m->buffers_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_buffer_mask(&m->buffers[i]), tg3__msgs_buffer, "/buffers", "buffers", i);
+    for (i = 0; i < m->buffer_views_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_buffer_view_mask(&m->buffer_views[i]), tg3__msgs_bv, "/bufferViews", "bufferViews", i);
+    for (i = 0; i < m->accessors_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_accessor_mask(&m->accessors[i]), tg3__msgs_acc, "/accessors", "accessors", i);
+    for (i = 0; i < m->meshes_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_mesh_mask(&m->meshes[i]), tg3__msgs_mesh, "/meshes", "meshes", i);
+    for (i = 0; i < m->materials_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_material_mask(&m->materials[i]), tg3__msgs_mat, "/materials", "materials", i);
+    for (i = 0; i < m->cameras_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_camera_mask(&m->cameras[i]), tg3__msgs_cam, "/cameras", "cameras", i);
+    for (i = 0; i < m->samplers_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_sampler_mask(&m->samplers[i]), tg3__msgs_sampler, "/samplers", "samplers", i);
+    for (i = 0; i < m->skins_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_skin_mask(&m->skins[i]), tg3__msgs_skin, "/skins", "skins", i);
+    for (i = 0; i < m->lights_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_light_mask(&m->lights[i]), tg3__msgs_light,
+                         "/extensions/KHR_lights_punctual/lights", "lights", i);
+    for (i = 0; i < m->animations_count; ++i)
+        tg3__spec_report(&rep, tg3__spec_animation_mask(&m->animations[i]), tg3__msgs_anim, "/animations", "animations", i);
+    return rep.violations;
+}
+
+/* Runs all post-parse checks. Returns TG3_OK or the code of the first failing
+ * rule class. */
+static tg3_error_code tg3__validate_model(tg3__parse_ctx *ctx, const tg3_model *m) {
+    tg3_error_code ret = TG3_OK;
+    if (ctx->opts.validate_indices && !tg3__validate_indices(ctx, m)) {
+        ret = TG3_ERR_INVALID_INDEX;
+    }
+    if (ctx->opts.validate_ranges && !tg3__validate_resources(ctx, m)) {
+        if (ret == TG3_OK) ret = TG3_ERR_INVALID_ACCESSOR;
+    }
+    if (tg3__validate_spec(ctx, m) > 0u && ctx->opts.strictness == TG3_STRICT) {
+        if (ret == TG3_OK) ret = TG3_ERR_INVALID_VALUE;
+    }
+    return ret;
+}
+
+TINYGLTF3_API tg3_error_code tg3_validate(const tg3_model *model,
+                                          tg3_strictness strictness,
+                                          tg3_error_stack *errors) {
+    tg3__parse_ctx ctx;
+    if (!model) return TG3_ERR_INVALID_VALUE;
+    TINYGLTF3_MEMSET(&ctx, 0, sizeof(ctx));
+    ctx.arena = model->arena_;
+    ctx.errors = errors;
+    tg3_parse_options_init(&ctx.opts);
+    ctx.opts.strictness = strictness;
+    return tg3__validate_model(&ctx, model);
+}
+
 static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_value *json_doc, tg3_model *model) {
     const tg3json_value *asset_it = tg3json_object_get(json_doc, "asset");
     const tg3json_value *ext_it;
@@ -2170,6 +2611,8 @@ static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_va
     }
     tg3__parse_string_array(ctx, json_doc, "extensionsUsed", &model->extensions_used, &model->extensions_used_count, 0, "/");
     tg3__parse_string_array(ctx, json_doc, "extensionsRequired", &model->extensions_required, &model->extensions_required_count, 0, "/");
+    tg3__parse_int_array(ctx, json_doc, "thumbnails", &model->thumbnails, &model->thumbnails_count, 0, "/");
+    TG3__PARSE_ARRAY_SIMPLE(ctx, json_doc, "files", tg3_file, model->files, model->files_count, tg3__parse_file);
     model->default_scene = -1;
     tg3__parse_int(ctx, json_doc, "scene", &model->default_scene, 0, "/");
 
@@ -2198,6 +2641,10 @@ static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_va
     TG3__PARSE_ARRAY_SIMPLE(ctx, json_doc, "cameras", tg3_camera, model->cameras, model->cameras_count, tg3__parse_camera);
     TG3__STREAM_CB(on_camera, model->cameras, model->cameras_count);
     TG3__PARSE_ARRAY_SIMPLE(ctx, json_doc, "scenes", tg3_scene, model->scenes, model->scenes_count, tg3__parse_scene);
+    if (model->scenes_count > 1 && tg3_str_equals_cstr(model->asset.version, "2.1")) {
+        tg3__error_push(ctx->errors, TG3_SEVERITY_WARNING, TG3_ERR_INVALID_VALUE,
+                        "Multiple scenes are deprecated in glTF 2.1 (spec-unstable)", "/", -1);
+    }
     TG3__STREAM_CB(on_scene, model->scenes, model->scenes_count);
 
     ext_it = tg3json_object_get(json_doc, "extensions");
@@ -2214,13 +2661,9 @@ static tg3_error_code tg3__parse_from_json(tg3__parse_ctx *ctx, const tg3json_va
         }
     }
     tg3__parse_extras_and_extensions(ctx, json_doc, &model->ext);
-    if (ctx->opts.validate_indices) {
-        if (!tg3__validate_indices(ctx, model)) {
-            return TG3_ERR_INVALID_INDEX;
-        }
-    }
-    if (!tg3__validate_resources(ctx, model)) {
-        return TG3_ERR_INVALID_ACCESSOR;
+    {
+        tg3_error_code verr = tg3__validate_model(ctx, model);
+        if (verr != TG3_OK) return verr;
     }
     return (ctx->errors && ctx->errors->has_error) ? TG3_ERR_JSON_PARSE : TG3_OK;
 }
@@ -2235,60 +2678,224 @@ static void tg3__json_parse_options_from_tg3(const tg3_parse_options *options,
     json_options->parse_float32 = options ? options->parse_float32 : 0;
 }
 
+/* ---- Verified core: GLB framing -------------------------------------------
+ * tg3__glb_frame_parse is pure (no allocation, no globals, no libc calls) and
+ * is kept inside the C subset modelled by formal/GlTF/C (see formal/README.md).
+ * Its Lean counterpart is GlTF.Glb.parseFrame; keep the two in sync. */
+typedef struct tg3__glb_frame {
+    uint64_t json_off;
+    uint64_t json_len;
+    uint64_t bin_off;
+    uint64_t bin_len;
+    int32_t  has_json;
+    int32_t  has_bin;
+    int32_t  is64;
+} tg3__glb_frame;
+
+static uint32_t tg3__rd_u32le(const uint8_t *p, uint64_t off) {
+    return (uint32_t)p[off] | ((uint32_t)p[off + 1u] << 8) |
+           ((uint32_t)p[off + 2u] << 16) | ((uint32_t)p[off + 3u] << 24);
+}
+
+static uint64_t tg3__rd_u64le(const uint8_t *p, uint64_t off) {
+    return (uint64_t)tg3__rd_u32le(p, off) | ((uint64_t)tg3__rd_u32le(p, off + 4u) << 32);
+}
+
+/* Precondition: data points to at least `size` readable bytes. */
+static tg3_error_code tg3__glb_frame_parse(const uint8_t *data, uint64_t size,
+                                           tg3__glb_frame *f) {
+    uint32_t version;
+    uint32_t chunk_type;
+    uint64_t total;
+    uint64_t off;
+    uint64_t hdr;
+    uint64_t clen;
+    uint64_t pad;
+    f->json_off = 0; f->json_len = 0; f->bin_off = 0; f->bin_len = 0;
+    f->has_json = 0; f->has_bin = 0; f->is64 = 0;
+    if (size < 12u) return TG3_ERR_GLB_INVALID_HEADER;
+    if (data[0] != 0x67u || data[1] != 0x6Cu || data[2] != 0x54u || data[3] != 0x46u) {
+        return TG3_ERR_GLB_INVALID_MAGIC;
+    }
+    version = tg3__rd_u32le(data, 4u);
+    if (version == 2u) {
+        total = (uint64_t)tg3__rd_u32le(data, 8u);
+        off = 12u;
+        hdr = 8u;
+    } else if (version == 3u) {
+        /* glTF 2.1 (spec-unstable): 64-bit total length and chunk lengths. */
+        if (size < 16u) return TG3_ERR_GLB_INVALID_HEADER;
+        total = tg3__rd_u64le(data, 8u);
+        off = 16u;
+        hdr = 12u;
+        f->is64 = 1;
+    } else {
+        return TG3_ERR_GLB_INVALID_VERSION;
+    }
+    if (total != size) return TG3_ERR_GLB_SIZE_MISMATCH;
+    /* Invariant: off <= size. All arithmetic below is overflow-free. */
+    while (size - off >= hdr) {
+        if (hdr == 12u) {
+            clen = tg3__rd_u64le(data, off);
+            chunk_type = tg3__rd_u32le(data, off + 8u);
+        } else {
+            clen = (uint64_t)tg3__rd_u32le(data, off);
+            chunk_type = tg3__rd_u32le(data, off + 4u);
+        }
+        off = off + hdr;
+        if (clen > size - off) return TG3_ERR_GLB_CHUNK_ERROR;
+        if (chunk_type == 0x4E4F534Au) {
+            f->json_off = off; f->json_len = clen; f->has_json = 1;
+        } else if (chunk_type == 0x004E4942u) {
+            f->bin_off = off; f->bin_len = clen; f->has_bin = 1;
+        }
+        off = off + clen;
+        pad = (4u - (off & 3u)) & 3u;
+        if (pad > size - off) pad = size - off;
+        off = off + pad;
+    }
+    if (!f->has_json) return TG3_ERR_GLB_CHUNK_ERROR;
+    return TG3_OK;
+}
+
+/* Verified core: GLB layout for the writer. Computes chunk offsets/lengths
+ * (lengths padded to 4 bytes) and the total size. Returns 0 if the container
+ * cannot represent the payload (GLB v2 is limited to 2^32-1 bytes). */
+/* Verified core: the 4-byte-aligned size of `n` bytes. Written as
+ * `(n + 3) / 4 * 4` so it matches `Glb.align4` definitionally (identical to
+ * `(n + 3) & ~3` for `n + 3 < 2^64`). */
+static uint64_t tg3__glb_align4(uint64_t n) {
+    return ((n + 3u) / 4u) * 4u;
+}
+
+static int tg3__glb_layout(uint64_t json_len, uint64_t bin_len, int32_t is64,
+                           tg3__glb_frame *f, uint64_t *total_out) {
+    uint64_t limit;
+    uint64_t start;
+    uint64_t hdr;
+    uint64_t jp;
+    uint64_t bp;
+    uint64_t total;
+    f->json_off = 0; f->json_len = 0; f->bin_off = 0; f->bin_len = 0;
+    f->has_json = 0; f->has_bin = 0; f->is64 = is64 ? 1 : 0;
+    *total_out = 0;
+    if (is64) { limit = 0xFFFFFFFFFFFFFFFFull; start = 16u; hdr = 12u; }
+    else      { limit = 0xFFFFFFFFull;         start = 12u; hdr = 8u; }
+    if (json_len > limit - 3u) return 0;
+    jp = tg3__glb_align4(json_len);
+    if (jp > limit - start - hdr) return 0;
+    total = start + hdr + jp;
+    f->json_off = start + hdr;
+    f->json_len = jp;
+    f->has_json = 1;
+    if (bin_len > 0u) {
+        if (bin_len > limit - 3u) return 0;
+        bp = tg3__glb_align4(bin_len);
+        if (hdr > limit - total || bp > limit - total - hdr) return 0;
+        f->bin_off = total + hdr;
+        f->bin_len = bp;
+        f->has_bin = 1;
+        total = total + hdr + bp;
+    }
+    *total_out = total;
+    return 1;
+}
+
+static void tg3__wr_u32le(uint8_t *p, uint64_t off, uint32_t v) {
+    p[off] = (uint8_t)(v & 0xFFu);
+    p[off + 1u] = (uint8_t)((v >> 8) & 0xFFu);
+    p[off + 2u] = (uint8_t)((v >> 16) & 0xFFu);
+    p[off + 3u] = (uint8_t)((v >> 24) & 0xFFu);
+}
+
+static void tg3__wr_u64le(uint8_t *p, uint64_t off, uint64_t v) {
+    tg3__wr_u32le(p, off, (uint32_t)(v & 0xFFFFFFFFu));
+    tg3__wr_u32le(p, off + 4u, (uint32_t)(v >> 32));
+}
+
+/* Verified core: writes the GLB header and chunk headers described by a
+ * frame produced by tg3__glb_layout. Precondition: out has `total` bytes. */
+/* Verified core: GLB magic ("glTF"). */
+static void tg3__glb_write_magic(uint8_t *out) {
+    out[0] = 0x67u;
+    out[1] = 0x6Cu;
+    out[2] = 0x54u;
+    out[3] = 0x46u;
+}
+
+/* Verified core: GLB v2 (32-bit) container and chunk headers. */
+static void tg3__glb_write_header32(uint8_t *out, const tg3__glb_frame *f, uint32_t total) {
+    tg3__wr_u32le(out, 4u, 2u);
+    tg3__wr_u32le(out, 8u, total);
+    tg3__wr_u32le(out, f->json_off - 8u, (uint32_t)f->json_len);
+    tg3__wr_u32le(out, f->json_off - 4u, 0x4E4F534Au);
+    if (f->has_bin) {
+        tg3__wr_u32le(out, f->bin_off - 8u, (uint32_t)f->bin_len);
+        tg3__wr_u32le(out, f->bin_off - 4u, 0x004E4942u);
+    }
+}
+
+/* Verified core: GLB v3 (64-bit, glTF 2.1, spec-unstable) container and chunk
+ * headers. */
+static void tg3__glb_write_header64(uint8_t *out, const tg3__glb_frame *f, uint64_t total) {
+    tg3__wr_u32le(out, 4u, 3u);
+    tg3__wr_u64le(out, 8u, total);
+    tg3__wr_u64le(out, f->json_off - 12u, f->json_len);
+    tg3__wr_u32le(out, f->json_off - 4u, 0x4E4F534Au);
+    if (f->has_bin) {
+        tg3__wr_u64le(out, f->bin_off - 12u, f->bin_len);
+        tg3__wr_u32le(out, f->bin_off - 4u, 0x004E4942u);
+    }
+}
+
+/* Verified core: writes the GLB header and chunk headers described by `f`. */
+static void tg3__glb_write_headers(uint8_t *out, const tg3__glb_frame *f, uint64_t total) {
+    tg3__glb_write_magic(out);
+    if (f->is64) {
+        tg3__glb_write_header64(out, f, total);
+    } else {
+        tg3__glb_write_header32(out, f, (uint32_t)total);
+    }
+}
+
+
+
 static tg3_error_code tg3__parse_glb_header(const uint8_t *data, uint64_t size,
                                             const uint8_t **json_out, uint64_t *json_size_out,
                                             const uint8_t **bin_out, uint64_t *bin_size_out,
+                                            int32_t *is64_out,
                                             tg3_error_stack *errors) {
-    uint32_t version;
-    uint32_t total_length;
-    uint64_t offset = 12;
+    tg3__glb_frame f;
+    tg3_error_code err = tg3__glb_frame_parse(data, size, &f);
     *json_out = NULL; *json_size_out = 0; *bin_out = NULL; *bin_size_out = 0;
-    if (size < 12) {
-        tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_INVALID_HEADER,
-                        "GLB data too small for header", NULL, -1);
-        return TG3_ERR_GLB_INVALID_HEADER;
-    }
-    if (data[0] != 'g' || data[1] != 'l' || data[2] != 'T' || data[3] != 'F') {
-        tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_INVALID_MAGIC,
-                        "Invalid GLB magic bytes", NULL, -1);
-        return TG3_ERR_GLB_INVALID_MAGIC;
-    }
-    TINYGLTF3_MEMCPY(&version, data + 4, 4);
-    if (version != 2) {
-        tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_INVALID_VERSION,
-                        "Unsupported GLB version (expected 2)", NULL, -1);
-        return TG3_ERR_GLB_INVALID_VERSION;
-    }
-    TINYGLTF3_MEMCPY(&total_length, data + 8, 4);
-    if ((uint64_t)total_length != size) {
-        tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_SIZE_MISMATCH,
-                        "GLB total length does not match data size", NULL, -1);
-        return TG3_ERR_GLB_SIZE_MISMATCH;
-    }
-    while (offset + 8 <= (uint64_t)total_length) {
-        uint32_t chunk_length;
-        uint32_t chunk_type;
-        TINYGLTF3_MEMCPY(&chunk_length, data + offset, 4); offset += 4;
-        TINYGLTF3_MEMCPY(&chunk_type, data + offset, 4); offset += 4;
-        if (offset + chunk_length > (uint64_t)total_length) {
+    *is64_out = f.is64;
+    switch (err) {
+        case TG3_OK:
+            break;
+        case TG3_ERR_GLB_INVALID_HEADER:
+            tg3__error_push(errors, TG3_SEVERITY_ERROR, err, "GLB data too small for header", NULL, -1);
+            return err;
+        case TG3_ERR_GLB_INVALID_MAGIC:
+            tg3__error_push(errors, TG3_SEVERITY_ERROR, err, "Invalid GLB magic bytes", NULL, -1);
+            return err;
+        case TG3_ERR_GLB_INVALID_VERSION:
+            tg3__error_push(errors, TG3_SEVERITY_ERROR, err,
+                            "Unsupported GLB version (expected 2, or 3 for glTF 2.1)", NULL, -1);
+            return err;
+        case TG3_ERR_GLB_SIZE_MISMATCH:
+            tg3__error_push(errors, TG3_SEVERITY_ERROR, err,
+                            "GLB total length does not match data size", NULL, -1);
+            return err;
+        default:
             tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_CHUNK_ERROR,
-                            "GLB chunk exceeds data size", NULL, -1);
+                            "GLB chunk exceeds data size or JSON chunk is missing", NULL, -1);
             return TG3_ERR_GLB_CHUNK_ERROR;
-        }
-        if (chunk_type == 0x4E4F534Au) {
-            *json_out = data + offset;
-            *json_size_out = chunk_length;
-        } else if (chunk_type == 0x004E4942u) {
-            *bin_out = data + offset;
-            *bin_size_out = chunk_length;
-        }
-        offset += chunk_length;
-        while ((offset & 3u) != 0u && offset < size) ++offset;
     }
-    if (!*json_out) {
-        tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_GLB_CHUNK_ERROR,
-                        "GLB missing JSON chunk", NULL, -1);
-        return TG3_ERR_GLB_CHUNK_ERROR;
+    *json_out = data + f.json_off;
+    *json_size_out = f.json_len;
+    if (f.has_bin) {
+        *bin_out = data + f.bin_off;
+        *bin_size_out = f.bin_len;
     }
     return TG3_OK;
 }
@@ -2351,6 +2958,7 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
     uint64_t json_chunk_size = 0;
     const uint8_t *bin_chunk = NULL;
     uint64_t bin_chunk_size = 0;
+    int32_t glb_is64 = 0;
     tg3_parse_options default_opts;
     tg3_arena *arena;
     tg3__parse_ctx ctx;
@@ -2365,8 +2973,12 @@ TINYGLTF3_API tg3_error_code tg3_parse_glb(tg3_model *model, tg3_error_stack *er
     if (!model) return TG3_ERR_GLB_INVALID_HEADER;
     tg3__model_init(model);
     if (!glb_data) return TG3_ERR_GLB_INVALID_HEADER;
-    err = tg3__parse_glb_header(glb_data, glb_size, &json_chunk, &json_chunk_size, &bin_chunk, &bin_chunk_size, errors);
+    err = tg3__parse_glb_header(glb_data, glb_size, &json_chunk, &json_chunk_size, &bin_chunk, &bin_chunk_size, &glb_is64, errors);
     if (err != TG3_OK) return err;
+    if (glb_is64) {
+        tg3__error_push(errors, TG3_SEVERITY_WARNING, TG3_ERR_GLB_INVALID_VERSION,
+                        "GLB version 3 (glTF 2.1 64-bit container) is spec-unstable", NULL, -1);
+    }
     if (!options) { tg3_parse_options_init(&default_opts); options = &default_opts; }
     arena = tg3__arena_create(&options->memory);
     if (!arena) {
@@ -2770,6 +3382,9 @@ static int tg3__serialize_extras_ext(tg3json_value *o, const tg3_extras_ext *ee)
             }
         }
     }
+    if (ee->id.data && ee->id.len > 0) {
+        if (!tg3__json_set_string_n(o, "id", ee->id.data, ee->id.len)) return 0;
+    }
     return 1;
 }
 
@@ -3040,7 +3655,7 @@ static int tg3__serialize_material(const tg3_material *m, int wd, tg3json_value 
     if ((m->emissive_factor[0] != 0.0 || m->emissive_factor[1] != 0.0 ||
          m->emissive_factor[2] != 0.0 || wd) &&
         !tg3__serialize_double_array(out, "emissiveFactor", m->emissive_factor, 3)) goto fail;
-    if (m->alpha_mode.data && !tg3_str_equals_cstr(m->alpha_mode, "OPAQUE") &&
+    if (m->alpha_mode.data && !tg3__str_eq_cstr(&m->alpha_mode, "OPAQUE") &&
         !tg3__serialize_str(out, "alphaMode", m->alpha_mode)) goto fail;
     if (!tg3__serialize_double(out, "alphaCutoff", m->alpha_cutoff, 0.5, wd) ||
         !tg3__serialize_bool(out, "doubleSided", m->double_sided, 0, wd) ||
@@ -3360,6 +3975,18 @@ fail:
     return 0;
 }
 
+static int tg3__serialize_file(const tg3_file *f, int wd, tg3json_value *out) {
+    (void)wd;
+    tg3json_value_init_object(out);
+    if (!tg3__serialize_str(out, "uri", f->uri) ||
+        !tg3__serialize_str(out, "mimeType", f->mime_type) ||
+        !tg3__serialize_extras_ext(out, &f->ext)) goto fail;
+    return 1;
+fail:
+    tg3json_value_free(out);
+    return 0;
+}
+
 static int tg3__serialize_model(const tg3_model *model, int wd,
                                 int embed_images, int embed_buffers,
                                 tg3json_value *out) {
@@ -3370,7 +3997,8 @@ static int tg3__serialize_model(const tg3_model *model, int wd,
         !tg3__json_set_take(out, "asset", &asset)) goto fail;
     if (model->default_scene >= 0 && !tg3__json_set_int(out, "scene", model->default_scene)) goto fail;
     if (!tg3__serialize_string_array(out, "extensionsUsed", model->extensions_used, model->extensions_used_count) ||
-        !tg3__serialize_string_array(out, "extensionsRequired", model->extensions_required, model->extensions_required_count)) goto fail;
+        !tg3__serialize_string_array(out, "extensionsRequired", model->extensions_required, model->extensions_required_count) ||
+        !tg3__serialize_int_array(out, "thumbnails", model->thumbnails, model->thumbnails_count)) goto fail;
 
 #define TG3__SERIALIZE_ARRAY_FIELD(json_key, arr_ptr, arr_count, fn, ...) \
     do { \
@@ -3404,6 +4032,7 @@ static int tg3__serialize_model(const tg3_model *model, int wd,
     TG3__SERIALIZE_ARRAY_FIELD("animations", model->animations, model->animations_count, tg3__serialize_animation, wd);
     TG3__SERIALIZE_ARRAY_FIELD("cameras", model->cameras, model->cameras_count, tg3__serialize_camera, wd);
     TG3__SERIALIZE_ARRAY_FIELD("scenes", model->scenes, model->scenes_count, tg3__serialize_scene, wd);
+    TG3__SERIALIZE_ARRAY_FIELD("files", model->files, model->files_count, tg3__serialize_file, wd);
 
 #undef TG3__SERIALIZE_ARRAY_FIELD
 
@@ -3465,47 +4094,40 @@ TINYGLTF3_API tg3_error_code tg3_write_to_memory(const tg3_model *model, tg3_err
         return TG3_ERR_OUT_OF_MEMORY;
     }
     if (options->write_binary) {
-        uint32_t json_padded = ((uint32_t)json_len + 3u) & ~3u;
+        tg3__glb_frame f;
+        uint64_t total = 0;
+        uint64_t i;
         const uint8_t *bin_data = NULL;
         uint64_t bin_len = 0;
-        uint32_t bin_padded;
-        uint32_t total;
         uint8_t *glb;
         if (model->buffers_count > 0 && model->buffers && model->buffers[0].data.data) {
             bin_data = model->buffers[0].data.data;
             bin_len = model->buffers[0].data.count;
         }
-        bin_padded = ((uint32_t)bin_len + 3u) & ~3u;
-        total = 12u + 8u + json_padded + ((bin_data && bin_len > 0) ? (8u + bin_padded) : 0u);
-        glb = (uint8_t *)TINYGLTF3_MALLOC(total);
+        if (!tg3__glb_layout((uint64_t)json_len, bin_len, options->write_glb_64bit ? 1 : 0,
+                             &f, &total) ||
+            total > (uint64_t)SIZE_MAX) {
+            TINYGLTF3_FREE(json_str);
+            tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_WRITE_FAILED,
+                            options->write_glb_64bit
+                                ? "GLB output size overflows"
+                                : "GLB output exceeds 4 GiB (set write_glb_64bit for glTF 2.1 GLB)",
+                            NULL, -1);
+            return TG3_ERR_WRITE_FAILED;
+        }
+        glb = (uint8_t *)TINYGLTF3_MALLOC((size_t)total);
         if (!glb) {
             TINYGLTF3_FREE(json_str);
             tg3__error_push(errors, TG3_SEVERITY_ERROR, TG3_ERR_OUT_OF_MEMORY,
                             "OOM allocating GLB output", NULL, -1);
             return TG3_ERR_OUT_OF_MEMORY;
         }
-        TINYGLTF3_MEMCPY(glb, "glTF", 4);
-        {
-            uint32_t version = 2u;
-            uint32_t json_type = 0x4E4F534Au;
-            TINYGLTF3_MEMCPY(glb + 4, &version, 4);
-            TINYGLTF3_MEMCPY(glb + 8, &total, 4);
-            TINYGLTF3_MEMCPY(glb + 12, &json_padded, 4);
-            TINYGLTF3_MEMCPY(glb + 16, &json_type, 4);
-            TINYGLTF3_MEMCPY(glb + 20, json_str, json_len);
-        }
-        while ((uint32_t)json_len < json_padded) {
-            glb[20u + json_len] = ' ';
-            ++json_len;
-        }
-        if (bin_data && bin_len > 0) {
-            uint32_t bin_off = 20u + json_padded;
-            uint32_t bin_type = 0x004E4942u;
-            uint32_t i;
-            TINYGLTF3_MEMCPY(glb + bin_off, &bin_padded, 4);
-            TINYGLTF3_MEMCPY(glb + bin_off + 4u, &bin_type, 4);
-            TINYGLTF3_MEMCPY(glb + bin_off + 8u, bin_data, (size_t)bin_len);
-            for (i = (uint32_t)bin_len; i < bin_padded; ++i) glb[bin_off + 8u + i] = 0;
+        tg3__glb_write_headers(glb, &f, total);
+        TINYGLTF3_MEMCPY(glb + f.json_off, json_str, json_len);
+        for (i = (uint64_t)json_len; i < f.json_len; ++i) glb[f.json_off + i] = ' ';
+        if (f.has_bin) {
+            TINYGLTF3_MEMCPY(glb + f.bin_off, bin_data, (size_t)bin_len);
+            for (i = bin_len; i < f.bin_len; ++i) glb[f.bin_off + i] = 0;
         }
         TINYGLTF3_FREE(json_str);
         *out_data = glb;

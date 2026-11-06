@@ -1698,6 +1698,277 @@ static int parse_file_arg(const char *path) {
   return ok;
 }
 
+
+/* ---- GLB framing hardening (formal/GlTF/Glb.lean) ---- */
+
+static void write_u64le(uint8_t *dst, uint64_t v) {
+  write_u32le(dst, (uint32_t)(v & 0xFFFFFFFFu));
+  write_u32le(dst + 4, (uint32_t)(v >> 32));
+}
+
+static tg3_error_code parse_glb_bytes(const uint8_t *data, uint64_t size) {
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse_glb(&model, &errors, data, size, "", 0, &opts);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return err;
+}
+
+static int check_glb64_short_header_rejected(void) {
+  /* 12..15 byte v3 header: must be rejected without reading past `size`.
+   * The buffer is heap-allocated with the exact size so ASan catches OOB. */
+  uint64_t n;
+  for (n = 12; n < 16; ++n) {
+    uint8_t *glb = (uint8_t *)malloc((size_t)n);
+    tg3_error_code err;
+    if (!glb) return 0;
+    memset(glb, 0, (size_t)n);
+    memcpy(glb, "glTF", 4);
+    write_u32le(glb + 4, 3u);
+    err = parse_glb_bytes(glb, n);
+    free(glb);
+    if (err != TG3_ERR_GLB_INVALID_HEADER) {
+      fprintf(stderr, "GLB v3 %u-byte header expected INVALID_HEADER, got %d\n", (unsigned)n, (int)err);
+      return 0;
+    }
+  }
+  return 1;
+}
+
+static int check_glb64_chunk_length_overflow_rejected(void) {
+  /* chunk_length near UINT64_MAX used to wrap `offset + chunk_length`. */
+  uint8_t glb[40];
+  tg3_error_code err;
+  memset(glb, 0, sizeof(glb));
+  memcpy(glb, "glTF", 4);
+  write_u32le(glb + 4, 3u);
+  write_u64le(glb + 8, (uint64_t)sizeof(glb));
+  write_u64le(glb + 16, 0xFFFFFFFFFFFFFFF0ull);
+  write_u32le(glb + 24, 0x4E4F534Au);
+  err = parse_glb_bytes(glb, sizeof(glb));
+  if (err != TG3_ERR_GLB_CHUNK_ERROR) {
+    fprintf(stderr, "GLB v3 huge chunk length expected CHUNK_ERROR, got %d\n", (int)err);
+    return 0;
+  }
+  return 1;
+}
+
+static int check_glb_v2_chunk_exact_fit(void) {
+  /* JSON chunk ending exactly at total length; trailing partial header ignored. */
+  static const char json[] = "{\"asset\":{\"version\":\"2.0\"}}";
+  uint8_t glb[64];
+  uint32_t jl = (uint32_t)((sizeof(json) - 1 + 3) & ~3u);
+  uint32_t total = 20u + jl;
+  tg3_error_code err;
+  memset(glb, ' ', sizeof(glb));
+  memcpy(glb, "glTF", 4);
+  write_u32le(glb + 4, 2u);
+  write_u32le(glb + 8, total);
+  write_u32le(glb + 12, jl);
+  write_u32le(glb + 16, 0x4E4F534Au);
+  memcpy(glb + 20, json, sizeof(json) - 1);
+  err = parse_glb_bytes(glb, total);
+  if (err != TG3_OK) {
+    fprintf(stderr, "exact-fit GLB v2 expected OK, got %d\n", (int)err);
+    return 0;
+  }
+  write_u32le(glb + 12, jl + 4u);
+  err = parse_glb_bytes(glb, total);
+  if (err != TG3_ERR_GLB_CHUNK_ERROR) {
+    fprintf(stderr, "overlong GLB v2 chunk expected CHUNK_ERROR, got %d\n", (int)err);
+    return 0;
+  }
+  return 1;
+}
+
+static int check_glb64_write_roundtrip(void) {
+  static const uint8_t json[] =
+      "{\"asset\":{\"version\":\"2.1\"},"
+      "\"buffers\":[{\"byteLength\":3,\"uri\":\"data:application/octet-stream;base64,AQID\"}]}";
+  tg3_model model, rt;
+  tg3_error_stack errors;
+  tg3_parse_options popts;
+  tg3_write_options wopts;
+  uint8_t *out = NULL;
+  uint64_t out_size = 0;
+  tg3_error_code err;
+  int ok = 1;
+  uint32_t i;
+  int saw_unstable = 0;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&popts);
+  err = tg3_parse(&model, &errors, json, sizeof(json) - 1, "", 0, &popts);
+  if (err != TG3_OK) { fprintf(stderr, "glb64 source parse failed %d\n", (int)err); return 0; }
+  tg3_write_options_init(&wopts);
+  wopts.write_binary = 1;
+  wopts.write_glb_64bit = 1;
+  err = tg3_write_to_memory(&model, &errors, &out, &out_size, &wopts);
+  ok = ok && err == TG3_OK && out && out_size >= 28 && out[4] == 3 && (out_size % 4) == 0;
+  if (ok) {
+    tg3_error_stack_free(&errors);
+    tg3_error_stack_init(&errors);
+    err = tg3_parse_glb(&rt, &errors, out, out_size, "", 0, &popts);
+    ok = err == TG3_OK && rt.buffers_count == 1 && rt.buffers[0].data.count >= 3 &&
+         rt.buffers[0].data.data[0] == 1 && rt.buffers[0].data.data[2] == 3;
+    for (i = 0; i < tg3_errors_count(&errors); ++i) {
+      const tg3_error_entry *e = tg3_errors_get(&errors, i);
+      if (e->severity == TG3_SEVERITY_WARNING && e->code == TG3_ERR_GLB_INVALID_VERSION) saw_unstable = 1;
+    }
+    ok = ok && saw_unstable;
+    tg3_model_free(&rt);
+  }
+  if (!ok) fprintf(stderr, "GLB v3 write/read roundtrip failed (err=%d)\n", (int)err);
+  tg3_write_free(out, &wopts);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return ok;
+}
+
+/* ---- Strictness levels (formal/GlTF/Validate.lean) ---- */
+
+static int count_severity(const tg3_error_stack *es, tg3_severity sev, tg3_error_code code) {
+  uint32_t i;
+  int n = 0;
+  for (i = 0; i < tg3_errors_count(es); ++i) {
+    const tg3_error_entry *e = tg3_errors_get(es, i);
+    if (e->severity == sev && e->code == code) ++n;
+  }
+  return n;
+}
+
+static int check_strictness_levels(void) {
+  static const char *const cases[] = {
+    "{\"asset\":{\"version\":\"2.0\"},\"materials\":[{\"alphaMode\":\"FOO\"}]}",
+    "{\"asset\":{\"version\":\"2.0\"},\"cameras\":[{\"type\":\"foo\"}]}",
+    "{\"asset\":{\"version\":\"2.0\"},\"meshes\":[{\"primitives\":[{\"mode\":99}]}]}",
+    "{\"asset\":{\"version\":\"2.0\"},\"samplers\":[{\"magFilter\":1234}]}",
+    "{\"asset\":{\"version\":\"2.0\"},\"extensionsRequired\":[\"EXT_x\"]}",
+    ("{\"asset\":{\"version\":\"2.0\"},\"buffers\":[{\"byteLength\":8}],"
+     "\"bufferViews\":[{\"buffer\":0,\"byteLength\":8,\"byteStride\":5}]}"),
+    "{\"asset\":{\"version\":\"2.0\"},\"materials\":[{\"pbrMetallicRoughness\":{\"metallicFactor\":2.0}}]}",
+  };
+  size_t c;
+  for (c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_parse_options opts;
+    tg3_error_code err;
+    tg3_error_stack_init(&errors);
+    tg3_parse_options_init(&opts);
+    err = tg3_parse(&model, &errors, (const uint8_t *)cases[c], strlen(cases[c]), "", 0, &opts);
+    if (err != TG3_OK || count_severity(&errors, TG3_SEVERITY_WARNING, TG3_ERR_INVALID_VALUE) < 1) {
+      fprintf(stderr, "permissive case %u: expected OK + warning, got %d\n", (unsigned)c, (int)err);
+      tg3_model_free(&model); tg3_error_stack_free(&errors);
+      return 0;
+    }
+    /* tg3_validate on the parsed model agrees with the parser. */
+    if (tg3_validate(&model, TG3_STRICT, NULL) != TG3_ERR_INVALID_VALUE ||
+        tg3_validate(&model, TG3_PERMISSIVE, NULL) != TG3_OK) {
+      fprintf(stderr, "tg3_validate disagrees on case %u\n", (unsigned)c);
+      tg3_model_free(&model); tg3_error_stack_free(&errors);
+      return 0;
+    }
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+
+    tg3_error_stack_init(&errors);
+    opts.strictness = TG3_STRICT;
+    err = tg3_parse(&model, &errors, (const uint8_t *)cases[c], strlen(cases[c]), "", 0, &opts);
+    if (err != TG3_ERR_INVALID_VALUE || count_severity(&errors, TG3_SEVERITY_ERROR, TG3_ERR_INVALID_VALUE) < 1) {
+      fprintf(stderr, "strict case %u: expected INVALID_VALUE error, got %d\n", (unsigned)c, (int)err);
+      tg3_model_free(&model); tg3_error_stack_free(&errors);
+      return 0;
+    }
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+  }
+  return 1;
+}
+
+static int check_strict_accepts_valid_model(void) {
+  static const char json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"buffers\":[{\"byteLength\":12}],"
+      "\"bufferViews\":[{\"buffer\":0,\"byteLength\":12,\"target\":34962}],"
+      "\"accessors\":[{\"bufferView\":0,\"componentType\":5126,\"count\":1,\"type\":\"VEC3\","
+      "\"min\":[0,0,0],\"max\":[1,1,1]}],"
+      "\"materials\":[{\"alphaMode\":\"MASK\",\"alphaCutoff\":0.25}],"
+      "\"meshes\":[{\"primitives\":[{\"attributes\":{\"POSITION\":0},\"material\":0}]}],"
+      "\"cameras\":[{\"type\":\"perspective\",\"perspective\":{\"yfov\":1.0,\"znear\":0.1}}],"
+      "\"nodes\":[{\"mesh\":0,\"camera\":0}],\"scenes\":[{\"nodes\":[0]}],\"scene\":0}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  opts.strictness = TG3_STRICT;
+  /* No data for buffer 0: skip loading, ranges are still validated. */
+  err = tg3_parse(&model, &errors, (const uint8_t *)json, sizeof(json) - 1, "", 0, &opts);
+  if (err != TG3_OK || tg3_errors_count(&errors) != 0) {
+    uint32_t i;
+    fprintf(stderr, "strict valid model rejected: %d\n", (int)err);
+    for (i = 0; i < tg3_errors_count(&errors); ++i)
+      fprintf(stderr, "  %s\n", tg3_errors_get(&errors, i)->message);
+    tg3_model_free(&model); tg3_error_stack_free(&errors);
+    return 0;
+  }
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  return 1;
+}
+
+static int check_material_texture_index_oob_rejected(void) {
+  static const char json[] =
+      "{\"asset\":{\"version\":\"2.0\"},"
+      "\"materials\":[{\"normalTexture\":{\"index\":7}}]}";
+  tg3_model model;
+  tg3_error_stack errors;
+  tg3_parse_options opts;
+  tg3_error_code err;
+  tg3_error_stack_init(&errors);
+  tg3_parse_options_init(&opts);
+  err = tg3_parse(&model, &errors, (const uint8_t *)json, sizeof(json) - 1, "", 0, &opts);
+  tg3_model_free(&model);
+  tg3_error_stack_free(&errors);
+  if (err != TG3_ERR_INVALID_INDEX) {
+    fprintf(stderr, "material texture OOB index expected INVALID_INDEX, got %d\n", (int)err);
+    return 0;
+  }
+  return 1;
+}
+
+static int check_version_rejected(void) {
+  static const char *const bad[] = {
+    "{\"asset\":{\"version\":\"1.0\"}}",
+    "{\"asset\":{\"version\":\"3.0\"}}",
+    "{\"asset\":{\"version\":\"2.x\"}}",
+  };
+  size_t c;
+  for (c = 0; c < sizeof(bad) / sizeof(bad[0]); ++c) {
+    tg3_model model;
+    tg3_error_stack errors;
+    tg3_parse_options opts;
+    tg3_error_code err;
+    tg3_error_stack_init(&errors);
+    tg3_parse_options_init(&opts);
+    err = tg3_parse(&model, &errors, (const uint8_t *)bad[c], strlen(bad[c]), "", 0, &opts);
+    tg3_model_free(&model);
+    tg3_error_stack_free(&errors);
+    if (err == TG3_OK) {
+      fprintf(stderr, "unsupported version case %u accepted\n", (unsigned)c);
+      return 0;
+    }
+  }
+  return tg3_gltf_version_supported("2.10", 4) && tg3_gltf_version_supported("2.0", 3) &&
+         !tg3_gltf_version_supported("2.", 2);
+}
+
 int main(int argc, char **argv) {
   if (argc > 1) {
     int i;
@@ -1740,6 +2011,30 @@ int main(int argc, char **argv) {
     return 1;
   }
   if (!check_glb_header_errors()) {
+    return 1;
+  }
+  if (!check_glb64_short_header_rejected()) {
+    return 1;
+  }
+  if (!check_glb64_chunk_length_overflow_rejected()) {
+    return 1;
+  }
+  if (!check_glb_v2_chunk_exact_fit()) {
+    return 1;
+  }
+  if (!check_glb64_write_roundtrip()) {
+    return 1;
+  }
+  if (!check_strictness_levels()) {
+    return 1;
+  }
+  if (!check_strict_accepts_valid_model()) {
+    return 1;
+  }
+  if (!check_material_texture_index_oob_rejected()) {
+    return 1;
+  }
+  if (!check_version_rejected()) {
     return 1;
   }
   if (!check_parse_file_failure_initializes_model()) {

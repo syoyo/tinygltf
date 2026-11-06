@@ -235,6 +235,24 @@ extern "C" {
 /* Sentinel for absent index */
 #define TG3_INDEX_NONE (-1)
 
+/* ----------------------------------------------------------------------
+ * glTF 2.1 support  [TG3_GLTF21_UNSTABLE]
+ *
+ * glTF 2.1 is NOT a ratified Khronos specification. Everything marked
+ * TG3_GLTF21_UNSTABLE (GLB container version 3 with 64-bit lengths,
+ * `id`, `files`, `thumbnails`, the promoted-extension names below,
+ * write_glb_64bit) follows a draft and may change incompatibly in any
+ * release without a version bump. Reading a GLB v3 container pushes a
+ * TG3_SEVERITY_WARNING.
+ * ---------------------------------------------------------------------- */
+#define TG3_GLTF21_UNSTABLE 1
+
+/* glTF 2.1 promoted extension names [TG3_GLTF21_UNSTABLE] */
+#define TG3_EXT_TEXTURE_WEBP "EXT_texture_webp"
+#define TG3_EXT_MATERIALS_EMISSIVE_STRENGTH "KHR_materials_emissive_strength"
+#define TG3_EXT_MESH_QUANTIZATION "KHR_mesh_quantization"
+#define TG3_EXT_NODE_VISIBILITY "KHR_node_visibility"
+
 /* Section check flags */
 #define TG3_NO_REQUIRE       0x00
 #define TG3_REQUIRE_VERSION  0x01
@@ -246,7 +264,16 @@ extern "C" {
 #define TG3_REQUIRE_BUFFER_VIEWS 0x40
 #define TG3_REQUIRE_ALL          0x7f
 
-/* Parse strictness */
+/* Parse strictness.
+ *
+ * Spec-conformance rules (enum values, value ranges, required non-empty
+ * arrays, ...; see formal/GlTF/Validate.lean for the normative list) are
+ * reported as TG3_SEVERITY_WARNING under TG3_PERMISSIVE (the default) and as
+ * TG3_SEVERITY_ERROR (parse fails) under TG3_STRICT.
+ *
+ * Memory-safety rules (out-of-range indices and byte ranges, unknown
+ * component types) are always errors, independent of strictness; they can
+ * only be disabled through validate_indices / validate_ranges. */
 typedef enum tg3_strictness {
     TG3_PERMISSIVE = 0,
     TG3_STRICT     = 1
@@ -430,6 +457,7 @@ typedef struct tg3_extras_ext {
     uint32_t             extensions_count;
     tg3_str              extras_json;      /* Raw JSON if store_original_json */
     tg3_str              extensions_json;
+    tg3_str              id;               /* glTF 2.1 unique id (optional) [TG3_GLTF21_UNSTABLE] */
 } tg3_extras_ext;
 
 /* ======================================================================
@@ -731,6 +759,13 @@ typedef struct tg3_light {
     tg3_extras_ext ext;
 } tg3_light;
 
+/* --- File (glTF 2.1 unified file reference) [TG3_GLTF21_UNSTABLE] --- */
+typedef struct tg3_file {
+    tg3_str  uri;
+    tg3_str  mime_type;
+    tg3_extras_ext ext;
+} tg3_file;
+
 /* --- Audio (KHR_audio) --- */
 typedef struct tg3_audio_source {
     tg3_str        name;
@@ -788,6 +823,10 @@ typedef struct tg3_model {
     const tg3_light         *lights;         uint32_t lights_count;
     const tg3_audio_emitter *audio_emitters; uint32_t audio_emitters_count;
     const tg3_audio_source  *audio_sources;  uint32_t audio_sources_count;
+    const tg3_file          *files;          uint32_t files_count;
+
+    /* glTF 2.1 thumbnails (image indices) [TG3_GLTF21_UNSTABLE] */
+    const int32_t           *thumbnails;     uint32_t thumbnails_count;
 
     int32_t    default_scene;
     const tg3_str *extensions_used;      uint32_t extensions_used_count;
@@ -984,12 +1023,19 @@ typedef struct tg3_parse_options {
                                         *     after parse so naive consumers cannot
                                         *     dereference attacker-controlled indices.
                                         *     Default: 1. Set to 0 to skip (raw mode). */
+    int32_t  validate_ranges;           /* 1 = reject out-of-range byte ranges
+                                         *     (buffer/bufferView/accessor/sparse)
+                                         *     and invalid component types.
+                                         *     Default: 1. Set to 0 only when the
+                                         *     caller performs its own checks. */
     uint64_t max_external_file_size;    /* 0 = no limit */
 } tg3_parse_options;
 
 typedef struct tg3_write_options {
     int32_t          pretty_print;     /* 1 = indented JSON */
     int32_t          write_binary;     /* 1 = GLB format */
+    int32_t          write_glb_64bit;  /* 1 = emit GLB container v3 with 64-bit
+                                        *     lengths (glTF 2.1) [TG3_GLTF21_UNSTABLE] */
     int32_t          embed_images;     /* 1 = embed as data URIs */
     int32_t          embed_buffers;    /* 1 = embed as data URIs */
     int32_t          serialize_defaults; /* 1 = write default values */
@@ -1101,6 +1147,22 @@ TINYGLTF3_API int32_t tg3_accessor_byte_stride(const tg3_accessor *accessor,
 
 /* Check if a string is a data URI */
 TINYGLTF3_API int32_t tg3_is_data_uri(const char *uri, uint32_t len);
+
+/* Validate an already-parsed (or hand-built) model.
+ * Runs the same checks as tg3_parse: memory-safety rules (indices, byte
+ * ranges, component types) are always errors; spec-conformance rules are
+ * warnings under TG3_PERMISSIVE and errors under TG3_STRICT.
+ * Diagnostics are appended to `errors` (may be NULL). Returns TG3_OK when
+ * no error-severity diagnostic was produced, otherwise the code of the first
+ * failing rule class (TG3_ERR_INVALID_INDEX, TG3_ERR_INVALID_ACCESSOR,
+ * TG3_ERR_INVALID_VALUE). Messages are stored in the model's arena, so the
+ * error stack must not outlive the model when model->arena_ is non-NULL. */
+TINYGLTF3_API tg3_error_code tg3_validate(const tg3_model *model,
+                                          tg3_strictness strictness,
+                                          tg3_error_stack *errors);
+
+/* Check if a glTF version string is supported ("2.0" .. "2.9") */
+TINYGLTF3_API int32_t tg3_gltf_version_supported(const char *version, uint32_t len);
 
 /* tg3_str helpers */
 TINYGLTF3_API int32_t tg3_str_equals(tg3_str a, tg3_str b);

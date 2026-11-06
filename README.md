@@ -1,7 +1,8 @@
 # tinygltf v3 — C glTF 2.0 loader/saver
 
 `TinyGLTF v3` is a C11-first implementation of a glTF 2.0
-https://github.com/KhronosGroup/glTF loader and writer.
+https://github.com/KhronosGroup/glTF loader and writer, with experimental
+(spec-unstable) glTF 2.1 support.
 
 - **Pure C POD API** (`tiny_gltf_v3.h` + `tiny_gltf_v3.c` + `tinygltf_json_c.h`) — no STL, no RTTI, no exceptions required; easy to bind to other languages.
 - **Arena-based memory management** — all parse-time allocations come from a single arena; a single `tg3_model_free()` frees everything.
@@ -10,7 +11,9 @@ https://github.com/KhronosGroup/glTF loader and writer.
 - **Streaming callbacks** — opt-in streaming parse/write via user-supplied callbacks.
 - **Opt-in filesystem and image I/O** — `TINYGLTF3_ENABLE_FS` / `TINYGLTF3_ENABLE_STB_IMAGE` are off by default; you control when and how assets are loaded.
 - **C++20 coroutine facade** (optional, auto-detected). C17/C++17 default.
-- **Hardened against untrusted input** — URI sanitization, post-parse index-bounds validation (default-on, opt-out via `tg3_parse_options.validate_indices = 0`), strict numeric range checks; exercised by a libFuzzer harness. See the `Security Considerations` block at the top of `tiny_gltf_v3.h`.
+- **Hardened against untrusted input** — URI sanitization, post-parse index-bounds and byte-range validation (default-on, opt-out via `tg3_parse_options.validate_indices` / `validate_ranges`), strict numeric range checks; exercised by a libFuzzer harness. See the `Security Considerations` block at the top of `tiny_gltf_v3.h`.
+- **Strictness levels** — spec-conformance violations are warnings by default (`TG3_PERMISSIVE`) and errors under `TG3_STRICT`; `tg3_validate()` checks hand-built models with the same rules.
+- **Formal specification and machine-checked proofs** — a Lean 4 specification of the validation rules and GLB framing, and a Lean proof that the C GLB framing code is free of undefined behaviour and refines the specification. See [`formal/`](formal/README.md).
 
 ## Quick start
 
@@ -46,6 +49,33 @@ tg3_model_free(&model);
 tg3_error_stack_free(&errors);
 ```
 
+## Strictness and validation
+
+Validation rules come in two classes (the normative list is
+[`formal/GlTF/Validate.lean`](formal/GlTF/Validate.lean)):
+
+| Class | Examples | `TG3_PERMISSIVE` (default) | `TG3_STRICT` |
+|---|---|---|---|
+| Memory safety | out-of-range indices, accessor/bufferView byte ranges, unknown component types | error | error |
+| Spec conformance | `alphaMode`, primitive `mode`, sampler filters, camera parameters, factor ranges, `byteStride` alignment, `extensionsRequired ⊆ extensionsUsed` | warning | error (`TG3_ERR_INVALID_VALUE`) |
+
+```c
+tg3_parse_options opts;
+tg3_parse_options_init(&opts);
+opts.strictness = TG3_STRICT;          /* reject non-conforming files */
+...
+tg3_validate(&model, TG3_STRICT, &errors);   /* same rules for any model */
+```
+
+## glTF 2.1 (spec-unstable)
+
+glTF 2.1 is **not** a ratified Khronos specification. tinygltf follows a draft
+and marks every such item `TG3_GLTF21_UNSTABLE` in `tiny_gltf_v3.h`: GLB
+container version 3 with 64-bit lengths (read by default, written only with
+`tg3_write_options.write_glb_64bit`), `id`, `files`, `thumbnails` and the
+promoted-extension names. These may change incompatibly in any release.
+Reading a GLB v3 container emits a warning.
+
 ## Testing & verification
 
 The v3 C runtime ships with three layers of automated coverage:
@@ -54,6 +84,7 @@ The v3 C runtime ships with three layers of automated coverage:
 - **`tests/tester_v3_c_v1port.c`** — v3 C port of the legacy unit tests, keeping behavioral parity with the old C++ API.
 - **`tests/tester_v3_json_c.c`** and **`tests/tester_v3_freestanding.c`** — JSON backend and freestanding (no libc) checks.
 - **`test_runner.py`** — model verifier that runs `tests/tester_v3_c` against every model in `glTF-Sample-Models/2.0` and validates the structured COUNTS/DIGEST output.
+- **`formal/`** — Lean 4 specification, proofs, and machine-checked refinement proofs of the verified C core (`cd formal && lake build`; see [`formal/README.md`](formal/README.md)).
 - **`tests/v3/fuzzer/`** — libFuzzer harness with ASan + UBSan (`make run` builds and runs `fuzz_gltf_v3_c`). Crafted regression inputs live in `tests/v3/security/` and are seeded into `tests/v3/fuzzer/corpus/`.
 
 ### Building

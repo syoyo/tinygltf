@@ -66,3 +66,27 @@ jobs:
         ./tester_v3_json_c
         ./tester_v3_freestanding
         cd ..
+
+  # Lean 4 specification, MiniC semantics and machine-checked C proofs
+  # (see formal/README.md).
+  formal-verification:
+
+    runs-on: ubuntu-latest
+    name: Lean formalization and C-to-Lean proofs
+
+    steps:
+    - uses: actions/checkout@v5
+    - name: Install elan
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+        echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+    - name: Generated Lean is up to date with tiny_gltf_v3.c
+      run: python3 formal/tools/c2lean.py --check
+    - name: No unfinished proofs
+      run: "! grep -rnw sorry formal/GlTF"
+    - name: Build specification and proofs
+      run: |
+        cd formal
+        lake build
+    - name: Differential test (compiled C vs MiniC vs spec)
+      run: python3 formal/tools/cdiff.py --n 500

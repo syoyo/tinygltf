@@ -12,6 +12,11 @@ tested.
 - WASM/web demo (requires Emscripten SDK, default `~/work/emsdk`):
   `make -C web && make -C web sample` — then open `http://localhost:8000` via `make -C web serve`
 - Fuzzers: `make -C tests/v3/fuzzer` (clang + libFuzzer)
+- Formal (Lean 4, needs elan + clang): `cd formal && lake build`;
+  after changing any verified-core C function (see `formal/README.md`) run
+  `python3 formal/tools/c2lean.py` to regenerate `formal/GlTF/C/Gen.lean`,
+  then `lake build` and `python3 formal/tools/cdiff.py`.
+  Never commit `formal/.lake/`.
 
 ## Pre-push audit checklist
 
