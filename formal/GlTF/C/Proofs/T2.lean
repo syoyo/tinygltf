@@ -286,4 +286,39 @@ theorem skin_mask_correct (loc : Locals) (m : Mem) (sp : Nat) (blk : Block)
       EvE.cond (bc := false) heq (by simp [truthy, boolVal, h]) (EvE.const _)
     exact ExS.ret hcond
 
+/-! ## `Int32`/`UInt32` bit-pattern bridging -/
+
+theorem wrap32_eq_iff (x : Int32) (c : Nat) (hc : c < 4294967296) :
+    GlTF.wrap32 x = c ↔ x = Int32.ofNat c := by
+  constructor
+  · intro h
+    have hb : x.toBitVec = (Int32.ofNat c).toBitVec := by
+      apply BitVec.toNat_inj.mp
+      simpa [GlTF.wrap32, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hc] using h
+    exact Int32.toBitVec_inj.mp hb
+  · intro h; subst h; simp [GlTF.wrap32, BitVec.toNat_ofNat, Nat.mod_eq_of_lt hc]
+
+theorem u32_bne_zero (a : UInt32) : (a != 0) = (a.toNat != 0) := by
+  rw [Bool.eq_iff_iff]
+  simp only [bne_iff_ne]
+  constructor
+  · intro h hh; exact h (UInt32.toNat_inj.mp hh)
+  · intro h he; exact h (by rw [he]; rfl)
+
+theorem u32_and3_bne (a : UInt32) : (a &&& 3 != 0) = (a.toNat &&& 3 != 0) := by
+  rw [Bool.eq_iff_iff]
+  simp only [bne_iff_ne]
+  constructor
+  · intro h hh; exact h (UInt32.toNat_inj.mp (by simpa [UInt32.toNat_and] using hh))
+  · intro h he; exact h (by simpa [UInt32.toNat_and] using congrArg UInt32.toNat he)
+
+theorem i32_bne_ofNat (t : Int32) (c : Nat) (hc : c < 4294967296) :
+    (t != Int32.ofNat c) = (GlTF.wrap32 t != c) := by
+  rw [Bool.eq_iff_iff]
+  simp only [bne_iff_ne]
+  constructor
+  · intro h hw; exact h ((wrap32_eq_iff t c hc).mp hw)
+  · intro h hw
+    exact h (by rw [hw]; exact (wrap32_eq_iff (Int32.ofNat c) c hc).mpr rfl)
+
 end GlTF.C.Proofs
