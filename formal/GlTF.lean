@@ -18,5 +18,6 @@ import GlTF.C.Proofs.Hdr
 import GlTF.C.Proofs.HdrWrite
 import GlTF.C.Proofs.Layout
 import GlTF.C.Proofs.T3
+import GlTF.C.Proofs.T2
 import GlTF.B64
 import GlTF.Tests
