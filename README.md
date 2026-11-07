@@ -1,5 +1,7 @@
 # tinygltf v3 — C glTF 2.0 loader/saver
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=github)](https://github.com/sponsors/syoyo)
+
 `TinyGLTF v3` is a C11-first implementation of a glTF 2.0
 https://github.com/KhronosGroup/glTF loader and writer, with experimental
 (spec-unstable) glTF 2.1 support.
