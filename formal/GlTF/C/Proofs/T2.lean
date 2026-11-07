@@ -186,4 +186,104 @@ theorem buffer_mask_correct (loc : Locals) (m : Mem) (bp : Nat) (blk : Block)
     have hbody := ExS.seq hset0 (ExS.seq hite hret)
     simpa [Gen.tg3__spec_buffer_mask, IntTy.u32, IntTy.i32, IntTy.u64] using hbody
 
+/-! ## u32 / i32 comparison helpers -/
+
+theorem evalBin_ne_u32 (a c : Nat) (ha : a < 4294967296) (hc : c < 4294967296) :
+    evalBin .ne (some IntTy.u32) (.int IntTy.u32 a) (.int IntTy.u32 c)
+      = .ok (boolVal (a ≠ c)) := by
+  simp [evalBin, isPtr, evalBinInt, binInt, intOf, IntTy.u32, IntTy.modulus,
+    Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hc, boolVal]
+
+theorem evalBin_lt_u32 (a c : Nat) (ha : a < 4294967296) (hc : c < 4294967296) :
+    evalBin .lt (some IntTy.u32) (.int IntTy.u32 a) (.int IntTy.u32 c)
+      = .ok (boolVal (a < c)) := by
+  simp [evalBin, isPtr, evalBinInt, binInt, intOf, IntTy.u32, IntTy.modulus,
+    Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hc, boolVal]
+
+theorem evalBin_gt_u32 (a c : Nat) (ha : a < 4294967296) (hc : c < 4294967296) :
+    evalBin .gt (some IntTy.u32) (.int IntTy.u32 a) (.int IntTy.u32 c)
+      = .ok (boolVal (a > c)) := by
+  simp [evalBin, isPtr, evalBinInt, binInt, intOf, IntTy.u32, IntTy.modulus,
+    Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hc, boolVal]
+
+theorem evalBin_band_u32 (a c : Nat) :
+    evalBin .band (some IntTy.u32) (.int IntTy.u32 a) (.int IntTy.u32 c)
+      = .ok (.int IntTy.u32 (a &&& c)) := by
+  simp [evalBin, isPtr, evalBinInt, binInt, intOf, IntTy.u32]
+
+theorem evalBin_ne_i32 (a c : Nat) (ha : a < 4294967296) (hc : c < 2147483648) :
+    evalBin .ne (some IntTy.i32) (.int IntTy.i32 a) (.int IntTy.i32 c)
+      = .ok (boolVal (a ≠ c)) := by
+  simp [evalBin, isPtr, evalBinInt, binInt, intOf, IntTy.i32, IntTy.toInt, IntTy.modulus,
+    Nat.mod_eq_of_lt ha, boolVal]
+  by_cases ha31 : 2147483648 ≤ a
+  · have hc31 : ¬ 2147483648 ≤ c := by omega
+    have hne : a ≠ c := by omega
+    have hne' : (a : Int) - 4294967296 ≠ (c : Int) := by omega
+    simp [ha31, hc31, hne, hne']
+  · have hc31 : ¬ 2147483648 ≤ c := by omega
+    by_cases h : a = c
+    · subst h; simp
+    · have h' : (a : Int) ≠ (c : Int) := by omega
+      simp [ha31, hc31, h, h']
+
+theorem evalBin_eq_u32 (a c : Nat) (ha : a < 4294967296) (hc : c < 4294967296) :
+    evalBin .eq (some IntTy.u32) (.int IntTy.u32 a) (.int IntTy.u32 c)
+      = .ok (boolVal (a = c)) := by
+  simp [evalBin, isPtr, evalBinInt, binInt, intOf, IntTy.u32, IntTy.modulus,
+    Nat.mod_eq_of_lt ha, Nat.mod_eq_of_lt hc, boolVal]
+
+theorem skinMask_toNat (s : Skin) :
+    (Validate.skinMask s).toNat = if s.joints.isEmpty then 1 else 0 := by
+  unfold Validate.skinMask Validate.flag Validate.bit
+  by_cases h : s.joints.isEmpty <;> simp [h]
+
+/-! ## `tg3__spec_skin_mask` -/
+
+theorem skin_mask_correct (loc : Locals) (m : Mem) (sp : Nat) (blk : Block)
+    (s : Skin)
+    (h0 : loc 0 = some (.ptr sp 0)) (hm : m sp = some blk)
+    (hblk : 36 ≤ blk.length) (hcount : s.joints.length < 4294967296)
+    (hlen : List.take 4 (List.drop 32 blk) = encodeLE 4 s.joints.length) :
+    ExS Gen.prog ⟨loc, m, false⟩ Gen.tg3__spec_skin_mask.body
+      (.ret (some (.int IntTy.u32 (Validate.skinMask s).toNat))) ⟨loc, m, false⟩ := by
+  have hload : EvE Gen.prog ⟨loc, m, false⟩
+      (.load (Ty.int IntTy.u32) (.field (.var 0) 32)) (.int IntTy.u32 s.joints.length) :=
+    varLoad loc m false 0 sp blk h0 hm 32 IntTy.u32 4 (by rfl) (by omega)
+      s.joints.length (by simpa using hcount) hlen
+  have heq : EvE Gen.prog ⟨loc, m, false⟩
+      (.bin .eq (some IntTy.u32)
+        (.load (Ty.int IntTy.u32) (.field (.var 0) 32))
+        (.const (.int IntTy.u32 0))) (boolVal (s.joints.length = 0)) :=
+    EvE.bin hload (EvE.const _) (evalBin_eq_u32 s.joints.length 0 hcount (by decide))
+  rw [skinMask_toNat]
+  by_cases h : s.joints.length = 0
+  · have his : s.joints.isEmpty = true := List.isEmpty_iff_length_eq_zero.mpr h
+    rw [his]
+    have hshl : EvE Gen.prog ⟨loc, m, false⟩
+        (.bin .shl (some IntTy.u32) (.const (.int IntTy.u32 1)) (.const (.int IntTy.i32 0)))
+        (.int IntTy.u32 1) := by
+      have h := evShlU32 loc m false 1 0 (.const (.int IntTy.u32 1))
+        (.const (.int IntTy.i32 0)) (EvE.const _) (EvE.const _) (by decide) (by decide)
+      simpa using h
+    have hcond : EvE Gen.prog ⟨loc, m, false⟩
+        (.cond (.bin .eq (some IntTy.u32)
+            (.load (Ty.int IntTy.u32) (.field (.var 0) 32))
+            (.const (.int IntTy.u32 0)))
+          (.bin .shl (some IntTy.u32) (.const (.int IntTy.u32 1)) (.const (.int IntTy.i32 0)))
+          (.const (.int IntTy.u32 0))) (.int IntTy.u32 1) :=
+      EvE.cond (bc := true) heq (by simp [truthy, boolVal, h]) hshl
+    exact ExS.ret hcond
+  · have his : s.joints.isEmpty = false := by
+      cases hh : s.joints.isEmpty <;> simp_all [List.isEmpty_iff_length_eq_zero]
+    rw [his]
+    have hcond : EvE Gen.prog ⟨loc, m, false⟩
+        (.cond (.bin .eq (some IntTy.u32)
+            (.load (Ty.int IntTy.u32) (.field (.var 0) 32))
+            (.const (.int IntTy.u32 0)))
+          (.bin .shl (some IntTy.u32) (.const (.int IntTy.u32 1)) (.const (.int IntTy.i32 0)))
+          (.const (.int IntTy.u32 0))) (.int IntTy.u32 0) :=
+      EvE.cond (bc := false) heq (by simp [truthy, boolVal, h]) (EvE.const _)
+    exact ExS.ret hcond
+
 end GlTF.C.Proofs
