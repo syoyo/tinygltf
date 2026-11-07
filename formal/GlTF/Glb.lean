@@ -194,4 +194,11 @@ theorem encLE_length (k n : Nat) : (encLE k n).length = k := by
   | succ k ih => simp [encLE, ih]
 
 end Glb
+
+/-! ## Writer constants -/
+
+def chunkTypeJSON : Nat := 0x4E4F534A
+
+def chunkTypeBIN : Nat := 0x004E4942
+
 end GlTF

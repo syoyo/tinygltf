@@ -90,6 +90,10 @@ def const_int(node):
                 pass
         if node["kind"] == "UnaryOperator" and node.get("opcode") == "-":
             return -const_int(node["inner"][0])
+        if node["kind"] == "BinaryOperator" and node.get("opcode") == "+":
+            return const_int(node["inner"][0]) + const_int(node["inner"][1])
+        if node["kind"] == "BinaryOperator" and node.get("opcode") == "*":
+            return const_int(node["inner"][0]) * const_int(node["inner"][1])
         for v in node.get("inner", []) or []:
             try:
                 return const_int(v)

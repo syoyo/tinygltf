@@ -197,7 +197,7 @@ theorem splice4 (blk : Block) (o v : Nat) (h : o + 4 ≤ blk.length) :
           ++ [v / 65536 % 256 |>.toUInt8]) ++ [v / 16777216 % 256 |>.toUInt8]) :=
     splice_append blk o _ _ (by simp only [List.length_cons, List.length_nil, List.length_append]; omega)
   rw [hs1, hs2, hs3]
-  simp [encodeLE4_eq, Nat.div_one, List.singleton_append, List.append_assoc]
+  simp [encodeLE4_eq, Nat.div_one]
 
 /-- **`tg3__wr_u32le`** writes `encodeLE 4 v` at `p + off`. -/
 theorem wr_u32le_writes (loc : Locals) (m : Mem) (b : Nat) (blk : Block) (hm : m b = some blk)

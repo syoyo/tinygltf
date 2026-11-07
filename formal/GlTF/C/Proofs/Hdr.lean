@@ -28,7 +28,7 @@ structure FrameAt (fblk : Block) (f : Glb.Frame) : Prop where
   len : 44 ≤ fblk.length
 
 /-- A field read from the frame object. -/
-theorem frameLoad (loc : Locals) (m : Mem) (ro : Bool) (bf b : Nat) (fblk : Block)
+theorem frameLoad (loc : Locals) (m : Mem) (ro : Bool) (bf _b : Nat) (fblk : Block)
     (hp : loc 1 = some (.ptr bf 0)) (hm : m bf = some fblk)
     (o : Nat) (t : IntTy) (w : Nat) (hw : t.width / 8 = w) (ho : o + w ≤ fblk.length)
     (v : Nat) (hv : v < 256 ^ w)
@@ -52,7 +52,7 @@ theorem align4_correct (loc : Locals) (m : Mem) (ro : Bool) (n : Nat)
       (.ret (some (.int IntTy.u64 (Glb.align4 n)))) ⟨loc, m, ro⟩ := by
   refine ExS.of_eq 25 (fun _ => ?_)
   simp [Gen.tg3__glb_align4, execStmt, evalExpr, evalBin, evalBinInt, binInt, evalCast, intOf,
-    IntTy.u64, IntTy.u32, IntTy.toInt, IntTy.modulus, Nat.mod_eq_of_lt, isPtr, C.guard, h0, hn,
+    IntTy.u64, IntTy.toInt, IntTy.modulus, Nat.mod_eq_of_lt, isPtr, h0, hn,
     Glb.align4, (by omega : (n + 3) / 4 * 4 < 18446744073709551616)]
 
 /-! ## Magic -/

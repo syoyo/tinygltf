@@ -15,5 +15,7 @@ import GlTF.C.Splice
 import GlTF.C.Proofs.Write
 import GlTF.C.Proofs.Wr64
 import GlTF.C.Proofs.Hdr
+import GlTF.C.Proofs.HdrWrite
+import GlTF.C.Proofs.Layout
 import GlTF.B64
 import GlTF.Tests
