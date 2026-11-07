@@ -17,6 +17,16 @@ Everything builds with `lake build`; there is no `sorry`, and every theorem
 depends only on Lean's three standard axioms (`propext`, `Classical.choice`,
 `Quot.sound`). No Mathlib, no `native_decide`, no `bv_decide`.
 
+## Update log
+
+- **2026-11-07** — T1 complete: GLB parse, byte writers, header writers, and
+  `tg3__glb_layout` (`glb_layout_correct`). T3 helpers landed:
+  `component_size`, `num_components`, `b64_decoded_len`, `b64_decode_char`.
+  T2 started: `buffer_mask`, `skin_mask`. See the [status table](#status).
+  Lean 4 documentation: <https://lean-lang.org/documentation/>.
+- glTF 2.1 (draft) GLB v3 framing (64-bit chunk lengths) is covered by the
+  verified `Glb.parseFrame` / `Glb.layout` and the header writers.
+
 ## Build and check
 
 ```sh

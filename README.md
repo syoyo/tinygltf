@@ -15,6 +15,13 @@ https://github.com/KhronosGroup/glTF loader and writer, with experimental
 - **Strictness levels** — spec-conformance violations are warnings by default (`TG3_PERMISSIVE`) and errors under `TG3_STRICT`; `tg3_validate()` checks hand-built models with the same rules.
 - **Formal specification and machine-checked proofs** — a Lean 4 specification of the validation rules and GLB framing, and a Lean proof that the C GLB framing code is free of undefined behaviour and refines the specification. See [`formal/`](formal/README.md).
 
+## Update log
+
+| Date | Update |
+|---|---|
+| 2026-11-07 | **glTF 2.1 (draft) support.** GLB container version 3 with 64-bit lengths (read by default, written only with `tg3_write_options.write_glb_64bit`), plus `id`, `files`, `thumbnails`, and the promoted-extension names. These items are marked `TG3_GLTF21_UNSTABLE` because glTF 2.1 is not yet a ratified Khronos specification and may change incompatibly. |
+| 2026-11-07 | **Lean 4 formalization and verification.** Added a Lean 4 specification of the validation rules and GLB framing, a MiniC operational semantics for the verified core of `tiny_gltf_v3.c`, and machine-checked refinement proofs. Current coverage: T1 (GLB parse, byte writers, header writers, GLB layout), T3 helpers (`component_size`, `num_components`, base64 decode helpers), and the first T2 validation masks. The proofs contain no `sorry` and use only Lean's standard axioms. See [`formal/README.md`](formal/README.md) for the full status, and the [Lean 4 documentation](https://lean-lang.org/documentation/) for the proof assistant. |
+
 ## Quick start
 
 Copy `tiny_gltf_v3.h`, `tiny_gltf_v3.c`, and `tinygltf_json_c.h` to your project.
